@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kylia</title>
+  <style>
+    :root {
+      --bg: #f5f8f2;
+      --text: #1f2a1f;
+      --muted: #5a685a;
+      --card: #ffffff;
+      --border: #dfe7d9;
+      --high: #a01818;
+      --medium: #a46b00;
+      --low: #1f7a38;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 1.5rem;
+    }
+
+    .sub {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .risk {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .risk.alto { color: var(--high); }
+    .risk.medio { color: var(--medium); }
+    .risk.bajo { color: var(--low); }
+
+    .risk-reason {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .forecast {
+      margin-top: 14px;
+    }
+
+    .forecast-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .forecast-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: var(--bg);
+    }
+
+    .forecast-day {
+      margin: 0 0 6px;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .forecast-risk {
+      margin: 0 0 4px;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .forecast-risk.alto { color: var(--high); }
+    .forecast-risk.medio { color: var(--medium); }
+    .forecast-risk.bajo { color: var(--low); }
+
+    .forecast-temp {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .weather-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .weather-item {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px dashed var(--border);
+      padding-bottom: 6px;
+    }
+
+    .weather-item:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .status {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .status.error {
+      color: var(--high);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>Hola, Elias</h1>
+    <p class="sub">Parc Agrari del Baix Llobregat • 9 de abril de 2026</p>
+
+    <section class="card" aria-label="Riesgo de pulgón">
+      <div class="label">Alerta de pulgón</div>
+      <p id="aphid-risk" class="risk">Riesgo: --</p>
+      <p id="aphid-risk-reason" class="risk-reason"></p>
+      <div class="forecast" aria-label="Previsión de riesgo de pulgón">
+        <div class="label">Próximos 3 días</div>
+        <div id="aphid-forecast" class="forecast-grid"></div>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Tiempo de hoy">
+      <div class="label">Condiciones de hoy</div>
+      <p id="weather-status" class="status">Cargando...</p>
+      <ul class="weather-list">
+        <li class="weather-item"><span>Temperatura</span><strong id="temp-value">--</strong></li>
+        <li class="weather-item"><span>Humedad</span><strong id="humidity-value">--</strong></li>
+        <li class="weather-item"><span>Viento</span><strong id="wind-value">--</strong></li>
+      </ul>
+    </section>
+  </main>
+  <script>
+    const MENSAJE_RIESGO_FUTURO_ALTO = "Se prevé riesgo alto en los próximos 3 días. Actúa antes de que llegue.";
+
+    function calcularRiesgoPulgon(temperaturaMax, humedadMax) {
+      const tempEnAlto = temperaturaMax >= 15 && temperaturaMax <= 25;
+      const humEnAlto = humedadMax > 60;
+
+      const tempEnMedio = temperaturaMax >= 10 && temperaturaMax <= 30;
+      const humEnMedio = humedadMax >= 40 && humedadMax <= 60;
+
+      if (tempEnAlto && humEnAlto) {
+        return {
+          nivel: "ALTO",
+          clase: "alto",
+          motivo: "La temperatura máxima y la humedad máxima previstas para hoy son ideales para que el pulgón se multiplique rápido. Revisa tus lechugas hoy mismo y prepara un tratamiento preventivo para mañana.",
+        };
+      }
+
+      if (tempEnMedio && humEnMedio) {
+        return {
+          nivel: "MEDIO",
+          clase: "medio",
+          motivo: "Las máximas de temperatura y humedad previstas para hoy son moderadas para el pulgón. Mantente atento y revisa las plantas a primera hora de la mañana.",
+        };
+      }
+
+      return {
+        nivel: "BAJO",
+        clase: "bajo",
+        motivo: "Las máximas de temperatura y humedad previstas para hoy no son favorables para el pulgón. Puedes estar tranquilo.",
+      };
+    }
+
+    function formatearDiaSemana(fechaIso) {
+      const fecha = new Date(`${fechaIso}T12:00:00`);
+      return fecha.toLocaleDateString("es-ES", { weekday: "long" });
+    }
+
+    function renderizarPrevisionRiesgo(prevision) {
+      const forecastEl = document.getElementById("aphid-forecast");
+      if (!forecastEl) return;
+
+      forecastEl.innerHTML = prevision.map((dia) => `
+        <article class="forecast-card">
+          <p class="forecast-day">${dia.nombreDia}</p>
+          <p class="forecast-risk ${dia.clase}">${dia.nivel}</p>
+          <p class="forecast-temp">Max: ${dia.temperaturaMax} °C</p>
+        </article>
+      `).join("");
+    }
+
+    function actualizarUIRiesgoPulgon(temperatura, humedad, hayRiesgoAltoEnPrevision = false) {
+      const riskEl = document.getElementById("aphid-risk");
+      const reasonEl = document.getElementById("aphid-risk-reason");
+      if (!riskEl || !reasonEl) return;
+
+      const { nivel, clase, motivo } = calcularRiesgoPulgon(temperatura, humedad);
+      riskEl.textContent = `Riesgo: ${nivel}`;
+      riskEl.classList.remove("alto", "medio", "bajo");
+      riskEl.classList.add(clase);
+      reasonEl.textContent = hayRiesgoAltoEnPrevision ? MENSAJE_RIESGO_FUTURO_ALTO : motivo;
+    }
+
+    async function cargarTiempoActual() {
+      const statusEl = document.getElementById("weather-status");
+      const tempEl = document.getElementById("temp-value");
+      const humidityEl = document.getElementById("humidity-value");
+      const windEl = document.getElementById("wind-value");
+      const forecastEl = document.getElementById("aphid-forecast");
+
+      statusEl.textContent = "Cargando...";
+      statusEl.classList.remove("error");
+      if (forecastEl) {
+        forecastEl.innerHTML = "";
+      }
+
+      const apiUrl = "https://api.open-meteo.com/v1/forecast?latitude=41.3328&longitude=2.0134&current=temperature_2m,relative_humidity_2m,wind_speed_10m&daily=temperature_2m_max,relative_humidity_2m_max&forecast_days=4&timezone=auto";
+
+      try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error("La API no responde correctamente.");
+        }
+
+        const data = await response.json();
+        if (!data.current) {
+          throw new Error("No se han recibido datos actuales.");
+        }
+        if (
+          !data.daily?.time?.length ||
+          !data.daily.temperature_2m_max?.length ||
+          !data.daily.relative_humidity_2m_max?.length
+        ) {
+          throw new Error("No se han recibido datos de previsión diaria.");
+        }
+
+        const temperatura = data.current.temperature_2m;
+        const humedad = data.current.relative_humidity_2m;
+        const viento = data.current.wind_speed_10m;
+
+        const tempMaxHoy = data.daily.temperature_2m_max[0];
+        const humMaxHoy = data.daily.relative_humidity_2m_max[0];
+
+        const prevision = data.daily.time.slice(1, 4).map((fecha, index) => {
+          const i = index + 1;
+          const temperaturaMax = data.daily.temperature_2m_max[i];
+          const humedadMax = data.daily.relative_humidity_2m_max[i];
+          const riesgo = calcularRiesgoPulgon(temperaturaMax, humedadMax);
+
+          return {
+            nombreDia: formatearDiaSemana(fecha),
+            nivel: riesgo.nivel,
+            clase: riesgo.clase,
+            temperaturaMax,
+          };
+        });
+
+        const hayRiesgoAltoEnPrevision = prevision.some((dia) => dia.nivel === "ALTO");
+
+        tempEl.textContent = `${temperatura} °C`;
+        humidityEl.textContent = `${humedad} %`;
+        windEl.textContent = `${viento} km/h`;
+
+        actualizarUIRiesgoPulgon(tempMaxHoy, humMaxHoy, hayRiesgoAltoEnPrevision);
+        renderizarPrevisionRiesgo(prevision);
+        statusEl.textContent = "Datos actualizados";
+      } catch (error) {
+        statusEl.textContent = `Error al cargar el tiempo: ${error.message}`;
+        statusEl.classList.add("error");
+        tempEl.textContent = "--";
+        humidityEl.textContent = "--";
+        windEl.textContent = "--";
+
+        const riskEl = document.getElementById("aphid-risk");
+        const reasonEl = document.getElementById("aphid-risk-reason");
+        if (riskEl) {
+          riskEl.textContent = "Riesgo: --";
+          riskEl.classList.remove("alto", "medio", "bajo");
+        }
+        if (reasonEl) {
+          reasonEl.textContent = "No se puede calcular el riesgo sin la previsión diaria de temperatura y humedad máximas.";
+        }
+        if (forecastEl) {
+          forecastEl.innerHTML = "";
+        }
+      }
+    }
+
+    cargarTiempoActual();
+  </script>
+</body>
+</html>
+
