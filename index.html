@@ -6,23 +6,24 @@
   <title>Kylia</title>
   <style>
     :root {
-      --bg: #f5f8f2;
-      --text: #1f2a1f;
-      --muted: #5a685a;
-      --card: #ffffff;
-      --border: #dfe7d9;
-      --high: #a01818;
-      --medium: #a46b00;
-      --low: #1f7a38;
+      --bg:         #f5f8f2;
+      --text:       #1f2a1f;
+      --muted:      #5a685a;
+      --card:       #ffffff;
+      --border:     #dfe7d9;
+      --high:       #b91c1c;
+      --medium:     #b45309;
+      --low:        #15803d;
+      --high-bg:    #fee2e2;
+      --medium-bg:  #fef3c7;
+      --low-bg:     #dcfce7;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.4;
@@ -31,61 +32,251 @@
     .app {
       max-width: 480px;
       margin: 0 auto;
-      padding: 16px;
+      padding: 20px 16px 32px;
     }
 
-    h1 {
-      margin: 0 0 6px;
-      font-size: 1.5rem;
+    /* ── Header ── */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .header-text h1 {
+      margin: 0 0 3px;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
     }
 
     .sub {
-      margin: 0 0 16px;
+      margin: 0;
       color: var(--muted);
-      font-size: 0.95rem;
+      font-size: 0.9rem;
     }
 
+    .btn-config {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 11px;
+      cursor: pointer;
+      font-size: 1rem;
+      color: var(--muted);
+      flex-shrink: 0;
+      line-height: 1;
+      margin-top: 2px;
+      font-family: inherit;
+    }
+    .btn-config:hover { background: var(--border); }
+
+    /* ── Config panel ── */
+    .config-panel {
+      display: none;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    .config-panel.visible { display: block; }
+
+    .config-panel h2 {
+      margin: 0 0 14px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .config-field { margin-bottom: 14px; }
+
+    .config-field label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .config-field input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .config-field input:focus {
+      outline: 2px solid var(--low);
+      border-color: transparent;
+    }
+
+    .btn-gps {
+      width: 100%;
+      background: var(--text);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    .btn-gps:hover { opacity: 0.85; }
+    .btn-gps:disabled { opacity: 0.5; cursor: default; }
+
+    .config-sep {
+      margin: 8px 0;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .config-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .btn-save {
+      background: var(--text);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 20px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-save:hover { opacity: 0.85; }
+    .btn-save:disabled { opacity: 0.5; cursor: default; }
+
+    .config-feedback {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .config-feedback.error { color: var(--high); }
+
+    /* ── Cultivos ── */
+    .cultivos-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .btn-cultivo {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 10px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 500;
+      text-align: left;
+      width: 100%;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .btn-cultivo.activo {
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text);
+    }
+
+    /* ── Card base ── */
     .card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
+      border-radius: 14px;
+      padding: 16px;
       margin-bottom: 12px;
     }
 
-    .label {
-      font-size: 0.8rem;
+    /* ── Alerta card ── */
+    .card-alerta {
+      border-left: 4px solid var(--border);
+      padding-left: 14px;
+    }
+    .card-alerta.alto   { border-left-color: var(--high); }
+    .card-alerta.medio  { border-left-color: var(--medium); }
+    .card-alerta.bajo   { border-left-color: var(--low); }
+
+    .alerta-titulo {
+      font-size: 0.78rem;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.07em;
       color: var(--muted);
-      margin-bottom: 6px;
+      margin-bottom: 10px;
     }
 
-    .risk {
-      margin: 0;
-      font-size: 1.1rem;
+    /* ── Cultivos afectados (chips bajo el título de alerta) ── */
+    .alerta-cultivos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    .chip-cultivo {
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 2px 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+    }
+
+    /* ── Risk badge ── */
+    .risk-badge {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 1rem;
       font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 8px;
     }
-
-    .risk.alto { color: var(--high); }
-    .risk.medio { color: var(--medium); }
-    .risk.bajo { color: var(--low); }
+    .risk-badge.alto   { background: var(--high-bg);   color: var(--high); }
+    .risk-badge.medio  { background: var(--medium-bg); color: var(--medium); }
+    .risk-badge.bajo   { background: var(--low-bg);    color: var(--low); }
 
     .risk-reason {
-      margin: 6px 0 0;
+      margin: 0;
       color: var(--muted);
-      font-size: 0.95rem;
+      font-size: 0.875rem;
+      line-height: 1.45;
     }
 
+    /* ── Forecast ── */
     .forecast {
-      margin-top: 14px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .forecast-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 10px;
     }
 
     .forecast-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
-      margin-top: 8px;
     }
 
     .forecast-card {
@@ -97,233 +288,702 @@
 
     .forecast-day {
       margin: 0 0 6px;
-      font-size: 0.9rem;
-      font-weight: 700;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-transform: capitalize;
+      color: var(--text);
     }
 
     .forecast-risk {
-      margin: 0 0 4px;
-      font-size: 0.95rem;
+      display: block;
+      font-size: 0.75rem;
       font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 6px;
     }
+    .forecast-risk.alto   { background: var(--high-bg);   color: var(--high); }
+    .forecast-risk.medio  { background: var(--medium-bg); color: var(--medium); }
+    .forecast-risk.bajo   { background: var(--low-bg);    color: var(--low); }
 
-    .forecast-risk.alto { color: var(--high); }
-    .forecast-risk.medio { color: var(--medium); }
-    .forecast-risk.bajo { color: var(--low); }
-
-    .forecast-temp {
+    .forecast-meta {
       margin: 0;
       color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    /* ── Alertas vacías ── */
+    .alertas-empty {
+      text-align: center;
+      padding: 28px 16px;
+      color: var(--muted);
       font-size: 0.9rem;
+      background: var(--card);
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      margin-bottom: 12px;
+      line-height: 1.5;
     }
 
-    .weather-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      gap: 8px;
-    }
-
-    .weather-item {
+    /* ── Weather card ── */
+    .weather-header {
       display: flex;
       justify-content: space-between;
-      border-bottom: 1px dashed var(--border);
-      padding-bottom: 6px;
+      align-items: center;
+      margin-bottom: 14px;
     }
 
-    .weather-item:last-child {
-      border-bottom: 0;
-      padding-bottom: 0;
+    .weather-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+    }
+
+    .btn-refresh {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 9px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      color: var(--muted);
+      font-family: inherit;
+    }
+    .btn-refresh:hover { background: var(--border); }
+    .btn-refresh:disabled { opacity: 0.5; cursor: default; }
+
+    .weather-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 8px;
+    }
+
+    .weather-stat-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+
+    .weather-stat-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     .status {
-      margin: 0 0 10px;
+      display: block;
+      margin-top: 12px;
       color: var(--muted);
-      font-size: 0.95rem;
+      font-size: 0.8rem;
+      text-align: right;
     }
-
     .status.error {
       color: var(--high);
-      font-weight: 700;
+      font-weight: 600;
+      text-align: left;
     }
   </style>
 </head>
 <body>
   <main class="app">
-    <h1>Hola, Elias</h1>
-    <p class="sub">Parc Agrari del Baix Llobregat • 9 de abril de 2026</p>
 
-    <section class="card" aria-label="Riesgo de pulgón">
-      <div class="label">Alerta de pulgón</div>
-      <p id="aphid-risk" class="risk">Riesgo: --</p>
-      <p id="aphid-risk-reason" class="risk-reason"></p>
-      <div class="forecast" aria-label="Previsión de riesgo de pulgón">
-        <div class="label">Próximos 3 días</div>
-        <div id="aphid-forecast" class="forecast-grid"></div>
+    <!-- Header -->
+    <div class="header">
+      <div class="header-text">
+        <h1 id="greeting">Hola</h1>
+        <p class="sub" id="subtitle"> </p>
       </div>
+      <button class="btn-config" id="btn-config" aria-label="Abrir configuración">&#9881;</button>
+    </div>
+
+    <!-- Panel de configuración -->
+    <div class="config-panel" id="config-panel" aria-label="Configuración">
+      <h2>Configuración</h2>
+      <div class="config-field">
+        <label for="input-nombre">Nombre</label>
+        <input type="text" id="input-nombre" placeholder="Ej: Elias" maxlength="40" autocomplete="off">
+      </div>
+      <div class="config-field">
+        <label>Ubicación</label>
+        <button class="btn-gps" id="btn-gps">&#128205; Usar mi ubicación GPS</button>
+        <div class="config-sep">— o introducir manualmente —</div>
+        <input type="text" id="input-ciudad" placeholder="Ej: El Prat de Llobregat" maxlength="80" autocomplete="off">
+      </div>
+      <div class="config-field">
+        <label>Mis cultivos</label>
+        <div class="cultivos-grid" id="cultivos-grid"></div>
+      </div>
+      <div class="config-actions">
+        <button class="btn-save" id="btn-save-config">Guardar</button>
+        <span class="config-feedback" id="config-feedback" aria-live="polite"></span>
+      </div>
+    </div>
+
+    <!-- Alertas dinámicas -->
+    <div id="alertas-container"></div>
+
+    <!-- Condiciones meteorológicas -->
+    <section class="card" aria-label="Condiciones meteorológicas">
+      <div class="weather-header">
+        <span class="weather-label">Ahora mismo</span>
+        <button class="btn-refresh" id="btn-refresh" aria-label="Actualizar datos">&#8635; Actualizar</button>
+      </div>
+      <div class="weather-grid">
+        <div>
+          <div class="weather-stat-value" id="temp-value">--</div>
+          <div class="weather-stat-label">Temperatura</div>
+        </div>
+        <div>
+          <div class="weather-stat-value" id="humidity-value">--</div>
+          <div class="weather-stat-label">Humedad</div>
+        </div>
+        <div>
+          <div class="weather-stat-value" id="wind-value">--</div>
+          <div class="weather-stat-label">Viento</div>
+        </div>
+        <div>
+          <div class="weather-stat-value" id="rain-value">--</div>
+          <div class="weather-stat-label">Lluvia hoy</div>
+        </div>
+      </div>
+      <span id="weather-status" class="status" aria-live="polite">Cargando...</span>
     </section>
 
-    <section class="card" aria-label="Tiempo de hoy">
-      <div class="label">Condiciones de hoy</div>
-      <p id="weather-status" class="status">Cargando...</p>
-      <ul class="weather-list">
-        <li class="weather-item"><span>Temperatura</span><strong id="temp-value">--</strong></li>
-        <li class="weather-item"><span>Humedad</span><strong id="humidity-value">--</strong></li>
-        <li class="weather-item"><span>Viento</span><strong id="wind-value">--</strong></li>
-      </ul>
-    </section>
   </main>
   <script>
-    const MENSAJE_RIESGO_FUTURO_ALTO = "Se prevé riesgo alto en los próximos 3 días. Actúa antes de que llegue.";
+    // ─── Constantes ───────────────────────────────────────────────────────────
+    const REFRESH_MS  = 30 * 60 * 1000;
+    const STORAGE_KEY = "kylia_config";
 
-    function calcularRiesgoPulgon(temperaturaMax, humedadMax) {
-      const tempEnAlto = temperaturaMax >= 15 && temperaturaMax <= 25;
-      const humEnAlto = humedadMax > 60;
+    const DEFAULTS = {
+      nombre:   "Agricultor",
+      ciudad:   "Barcelona",
+      lat:      41.3828,
+      lon:      2.1771,
+      cultivos: ["lechuga"],
+    };
 
-      const tempEnMedio = temperaturaMax >= 10 && temperaturaMax <= 30;
-      const humEnMedio = humedadMax >= 40 && humedadMax <= 60;
+    // ─── Config (localStorage) ────────────────────────────────────────────────
+    let cfg = loadConfig();
 
-      if (tempEnAlto && humEnAlto) {
-        return {
-          nivel: "ALTO",
-          clase: "alto",
-          motivo: "La temperatura máxima y la humedad máxima previstas para hoy son ideales para que el pulgón se multiplique rápido. Revisa tus lechugas hoy mismo y prepara un tratamiento preventivo para mañana.",
-        };
-      }
-
-      if (tempEnMedio && humEnMedio) {
-        return {
-          nivel: "MEDIO",
-          clase: "medio",
-          motivo: "Las máximas de temperatura y humedad previstas para hoy son moderadas para el pulgón. Mantente atento y revisa las plantas a primera hora de la mañana.",
-        };
-      }
-
-      return {
-        nivel: "BAJO",
-        clase: "bajo",
-        motivo: "Las máximas de temperatura y humedad previstas para hoy no son favorables para el pulgón. Puedes estar tranquilo.",
-      };
+    function loadConfig() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+      } catch (_) {}
+      return { ...DEFAULTS };
     }
 
+    function saveConfig(newCfg) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newCfg));
+      cfg = newCfg;
+    }
+
+    // ─── Modelos de riesgo ────────────────────────────────────────────────────
+
+    // Myzus persicae / Nasonovia ribisnigri en Lactuca sativa
+    function calcularRiesgoPulgon({ tempMax, humMax, vientoMax, lluvia }) {
+      const lluviaFuerte  = lluvia    > 8;
+      const vientoAlto    = vientoMax > 25;
+      const tempOptima    = tempMax >= 18 && tempMax <= 22;
+      const tempFavorable = tempMax >= 12 && tempMax <= 28;
+      const humAlta       = humMax  > 65;
+      const humModerada   = humMax  >= 50;
+
+      if (lluviaFuerte) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: `La lluvia (${lluvia} mm) reduce la actividad del pulgón temporalmente.` };
+      }
+      if (tempOptima && humAlta && !vientoAlto) {
+        return { nivel: "ALTO", clase: "alto",
+          motivo: `Temperatura (${tempMax}°C) y humedad (${humMax}%) óptimas. Revisa los cultivos y prepara tratamiento preventivo.` };
+      }
+      if (tempFavorable && humAlta && !vientoAlto) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Condiciones favorables (${tempMax}°C, ${humMax}%). Revisa las plantas a primera hora.` };
+      }
+      if (tempFavorable && humModerada && !vientoAlto) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Temperatura propicia (${tempMax}°C) con humedad moderada. Mantente atento.` };
+      }
+      return { nivel: "BAJO", clase: "bajo",
+        motivo: vientoAlto
+          ? `Viento fuerte (${vientoMax} km/h) dificulta el establecimiento del pulgón.`
+          : "Las condiciones actuales no favorecen el desarrollo del pulgón." };
+    }
+
+    // Bremia lactucae en Lactuca sativa
+    function calcularRiesgoMildiu({ tempMax, humMax, lluvia }) {
+      const tempInfeccion  = tempMax >= 10 && tempMax <= 22;
+      const tempInhibicion = tempMax > 27;
+      const humCritica     = humMax  > 85;
+      const humFavorable   = humMax  >= 70;
+      const hayLluvia      = lluvia  > 0.5;
+
+      if (tempInhibicion) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: `Las altas temperaturas (${tempMax}°C) inhiben las esporas del mildiu.` };
+      }
+      if (tempInfeccion && (humCritica || hayLluvia)) {
+        return { nivel: "ALTO", clase: "alto",
+          motivo: `Condiciones críticas: ${tempMax}°C, ${humMax}% humedad${hayLluvia ? ` y ${lluvia} mm de lluvia` : ""}. Aplica fungicida preventivo.` };
+      }
+      if (tempInfeccion && humFavorable) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Humedad elevada (${humMax}%) con temperatura propicia (${tempMax}°C). Vigila las hojas inferiores.` };
+      }
+      return { nivel: "BAJO", clase: "bajo",
+        motivo: "Las condiciones actuales no son favorables para el mildiu." };
+    }
+
+    // Pieris brassicae / Plutella xylostella en brassicas
+    function calcularRiesgoOrugaCol({ tempMax, lluvia }) {
+      const tempActiva     = tempMax >= 16 && tempMax <= 28;
+      const lluviaFuerte   = lluvia  > 8;
+      const lluviaModerada = lluvia  > 3;
+
+      if (tempMax < 10 || tempMax > 32) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: tempMax < 10
+            ? `Frío (${tempMax}°C) — las orugas están inactivas.`
+            : `Calor excesivo (${tempMax}°C) reduce la actividad de las orugas.` };
+      }
+      if (lluviaFuerte) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: `La lluvia fuerte (${lluvia} mm) reduce la supervivencia de las larvas jóvenes.` };
+      }
+      if (tempActiva && !lluviaModerada) {
+        return { nivel: "ALTO", clase: "alto",
+          motivo: `Temperatura ideal (${tempMax}°C) y tiempo seco. Revisa el envés de las hojas en busca de huevos o larvas.` };
+      }
+      if (tempMax >= 12) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Condiciones moderadas (${tempMax}°C). Mantente atento al envés de las hojas.` };
+      }
+      return { nivel: "BAJO", clase: "bajo",
+        motivo: "Las condiciones actuales no favorecen el desarrollo de orugas." };
+    }
+
+    // Bemisia tabaci / Trialeurodes vaporariorum
+    function calcularRiesgoMoscaBlanca({ tempMax, humMax, lluvia }) {
+      const tempOptima    = tempMax >= 25 && tempMax <= 32;
+      const tempFavorable = tempMax >= 20;
+      const humBaja       = humMax  < 65;
+      const humModerada   = humMax  < 75;
+      const lluviaInhibe  = lluvia  > 5;
+
+      if (tempMax < 18 || lluviaInhibe) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: tempMax < 18
+            ? `Temperatura baja (${tempMax}°C) — la mosca blanca está inactiva.`
+            : `La lluvia (${lluvia} mm) reduce las poblaciones de mosca blanca.` };
+      }
+      if (tempOptima && humBaja) {
+        return { nivel: "ALTO", clase: "alto",
+          motivo: `Calor (${tempMax}°C) y baja humedad (${humMax}%) favorecen la explosión de mosca blanca. Revisa el envés de las hojas.` };
+      }
+      if (tempFavorable && humModerada) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Condiciones moderadas (${tempMax}°C, ${humMax}%). Vigila especialmente las plantas jóvenes.` };
+      }
+      return { nivel: "BAJO", clase: "bajo",
+        motivo: "Las condiciones actuales no favorecen la mosca blanca." };
+    }
+
+    // Tetranychus urticae
+    function calcularRiesgoAranaRoja({ tempMax, humMax, lluvia }) {
+      const tempOptima  = tempMax >= 28;
+      const tempFavor   = tempMax >= 23;
+      const humCritica  = humMax  < 45;
+      const humBaja     = humMax  < 60;
+      const lluviaInhib = lluvia  > 3;
+      const humAlta     = humMax  > 65;
+
+      if (tempMax < 20 || humAlta || lluviaInhib) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: humAlta || lluviaInhib
+            ? "Humedad alta o lluvia — la araña roja está controlada naturalmente."
+            : `Temperatura baja (${tempMax}°C) — la araña roja está inactiva.` };
+      }
+      if (tempOptima && humCritica) {
+        return { nivel: "ALTO", clase: "alto",
+          motivo: `Calor extremo (${tempMax}°C) y ambiente muy seco (${humMax}%). Revisa urgentemente el envés de las hojas.` };
+      }
+      if (tempFavor && humBaja) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Temperatura alta (${tempMax}°C) y baja humedad (${humMax}%). Vigila los cultivos.` };
+      }
+      return { nivel: "BAJO", clase: "bajo",
+        motivo: "Las condiciones actuales no favorecen la araña roja." };
+    }
+
+    // ─── Catálogo ─────────────────────────────────────────────────────────────
+    const ALERTAS = {
+      pulgon:       { titulo: "Pulgón",           calcFn: calcularRiesgoPulgon },
+      mildiu:       { titulo: "Mildiu",           calcFn: calcularRiesgoMildiu },
+      oruga_col:    { titulo: "Oruga de la col",  calcFn: calcularRiesgoOrugaCol },
+      mosca_blanca: { titulo: "Mosca blanca",     calcFn: calcularRiesgoMoscaBlanca },
+      arana_roja:   { titulo: "Araña roja",       calcFn: calcularRiesgoAranaRoja },
+    };
+
+    const CULTIVOS = [
+      { id: "lechuga",   nombre: "Lechuga",        alertas: ["pulgon", "mildiu"] },
+      { id: "espinaca",  nombre: "Espinaca",        alertas: ["pulgon", "mildiu"] },
+      { id: "brassica",  nombre: "Col / Coliflor",  alertas: ["pulgon", "oruga_col"] },
+      { id: "tomate",    nombre: "Tomate",          alertas: ["mosca_blanca", "arana_roja"] },
+      { id: "pimiento",  nombre: "Pimiento",        alertas: ["mosca_blanca", "arana_roja"] },
+      { id: "berenjena", nombre: "Berenjena",       alertas: ["mosca_blanca", "arana_roja"] },
+      { id: "calabacin", nombre: "Calabacín",       alertas: ["mosca_blanca"] },
+    ];
+
+    // ─── UI helpers ───────────────────────────────────────────────────────────
     function formatearDiaSemana(fechaIso) {
-      const fecha = new Date(`${fechaIso}T12:00:00`);
-      return fecha.toLocaleDateString("es-ES", { weekday: "long" });
+      return new Date(`${fechaIso}T12:00:00`).toLocaleDateString("es-ES", { weekday: "long" });
     }
 
-    function renderizarPrevisionRiesgo(prevision) {
-      const forecastEl = document.getElementById("aphid-forecast");
-      if (!forecastEl) return;
+    function renderizarPrevision(gridId, prevision) {
+      const grid = document.getElementById(gridId);
+      if (!grid) return;
+      grid.innerHTML = "";
+      prevision.forEach((dia) => {
+        const article = document.createElement("article");
+        article.className = "forecast-card";
 
-      forecastEl.innerHTML = prevision.map((dia) => `
-        <article class="forecast-card">
-          <p class="forecast-day">${dia.nombreDia}</p>
-          <p class="forecast-risk ${dia.clase}">${dia.nivel}</p>
-          <p class="forecast-temp">Max: ${dia.temperaturaMax} °C</p>
-        </article>
-      `).join("");
+        const pDia = document.createElement("p");
+        pDia.className = "forecast-day";
+        pDia.textContent = dia.nombreDia;
+
+        const pRisk = document.createElement("span");
+        pRisk.className = `forecast-risk ${dia.clase}`;
+        pRisk.textContent = dia.nivel;
+
+        const pMeta = document.createElement("p");
+        pMeta.className = "forecast-meta";
+        pMeta.textContent = `${dia.tempMax}° · ${dia.humMax}%`;
+
+        article.appendChild(pDia);
+        article.appendChild(pRisk);
+        article.appendChild(pMeta);
+        grid.appendChild(article);
+      });
     }
 
-    function actualizarUIRiesgoPulgon(temperatura, humedad, hayRiesgoAltoEnPrevision = false) {
-      const riskEl = document.getElementById("aphid-risk");
-      const reasonEl = document.getElementById("aphid-risk-reason");
+    function actualizarPlaga(riskId, reasonId, forecastId, calcFn, datosHoy, diasFuturos) {
+      const { nivel, clase, motivo } = calcFn(datosHoy);
+
+      const prevision = diasFuturos.map((dia) => {
+        const r = calcFn(dia);
+        return { nombreDia: dia.nombreDia, nivel: r.nivel, clase: r.clase,
+                 tempMax: dia.tempMax, humMax: dia.humMax };
+      });
+
+      // Días consecutivos en riesgo ALTO empezando desde hoy
+      const todosDias = [{ nivel }, ...prevision];
+      let rachaAlto = 0;
+      for (const d of todosDias) {
+        if (d.nivel === "ALTO") rachaAlto++;
+        else break;
+      }
+
+      const hayAltoFuturo = prevision.some((d) => d.nivel === "ALTO");
+
+      const riskEl   = document.getElementById(riskId);
+      const reasonEl = document.getElementById(reasonId);
       if (!riskEl || !reasonEl) return;
 
-      const { nivel, clase, motivo } = calcularRiesgoPulgon(temperatura, humedad);
-      riskEl.textContent = `Riesgo: ${nivel}`;
-      riskEl.classList.remove("alto", "medio", "bajo");
-      riskEl.classList.add(clase);
-      reasonEl.textContent = hayRiesgoAltoEnPrevision ? MENSAJE_RIESGO_FUTURO_ALTO : motivo;
-    }
+      riskEl.textContent = nivel;
+      riskEl.className   = `risk-badge ${clase}`;
 
-    async function cargarTiempoActual() {
-      const statusEl = document.getElementById("weather-status");
-      const tempEl = document.getElementById("temp-value");
-      const humidityEl = document.getElementById("humidity-value");
-      const windEl = document.getElementById("wind-value");
-      const forecastEl = document.getElementById("aphid-forecast");
-
-      statusEl.textContent = "Cargando...";
-      statusEl.classList.remove("error");
-      if (forecastEl) {
-        forecastEl.innerHTML = "";
+      // Actualizar borde izquierdo de la tarjeta
+      const cardEl = riskEl.closest(".card-alerta");
+      if (cardEl) {
+        cardEl.classList.remove("alto", "medio", "bajo");
+        cardEl.classList.add(clase);
       }
 
-      const apiUrl = "https://api.open-meteo.com/v1/forecast?latitude=41.3328&longitude=2.0134&current=temperature_2m,relative_humidity_2m,wind_speed_10m&daily=temperature_2m_max,relative_humidity_2m_max&forecast_days=4&timezone=auto";
+      let textoMotivo = motivo;
+      if (rachaAlto >= 2) {
+        textoMotivo += ` Atención: ${rachaAlto} días consecutivos de riesgo ALTO.`;
+      } else if (hayAltoFuturo && nivel !== "ALTO") {
+        textoMotivo = `Se prevé riesgo ALTO en los próximos días. ${motivo}`;
+      }
+      reasonEl.textContent = textoMotivo;
+
+      renderizarPrevision(forecastId, prevision);
+    }
+
+    function setStatus(texto, esError = false) {
+      const el = document.getElementById("weather-status");
+      el.textContent = texto;
+      el.className = esError ? "status error" : "status";
+    }
+
+    function actualizarHeader() {
+      document.getElementById("greeting").textContent = `Hola, ${cfg.nombre}`;
+      const fecha = new Date().toLocaleDateString("es-ES", {
+        weekday: "long", day: "numeric", month: "long",
+      });
+      const sub = document.getElementById("subtitle");
+      sub.textContent = `${cfg.ciudad} · ${fecha}`;
+    }
+
+    // ─── Renderizado dinámico de alertas ──────────────────────────────────────
+    function renderizarAlertas(datosHoy = null, diasFuturos = []) {
+      const container = document.getElementById("alertas-container");
+      container.innerHTML = "";
+
+      const cultivosActivos = cfg.cultivos;
+      const alertasActivas = new Set();
+      cultivosActivos.forEach((cId) => {
+        const c = CULTIVOS.find((x) => x.id === cId);
+        if (c) c.alertas.forEach((a) => alertasActivas.add(a));
+      });
+
+      if (alertasActivas.size === 0) {
+        container.innerHTML =
+          '<div class="alertas-empty">Selecciona tus cultivos en la configuración &#9881;<br>para ver las alertas correspondientes.</div>';
+        return;
+      }
+
+      // Mapa alertaId → nombres de cultivos seleccionados que la generan
+      const alertaCultivos = {};
+      cultivosActivos.forEach((cId) => {
+        const c = CULTIVOS.find((x) => x.id === cId);
+        if (c) c.alertas.forEach((aId) => {
+          if (!alertaCultivos[aId]) alertaCultivos[aId] = [];
+          alertaCultivos[aId].push(c.nombre);
+        });
+      });
+
+      Object.entries(ALERTAS).forEach(([alertaId, alerta]) => {
+        if (!alertasActivas.has(alertaId)) return;
+
+        const riskId     = `${alertaId}-risk`;
+        const reasonId   = `${alertaId}-reason`;
+        const forecastId = `${alertaId}-forecast`;
+
+        const chips = (alertaCultivos[alertaId] || [])
+          .map((n) => `<span class="chip-cultivo">${n}</span>`)
+          .join("");
+
+        const section = document.createElement("section");
+        section.className = "card card-alerta";
+        section.setAttribute("aria-label", `Riesgo de ${alerta.titulo.toLowerCase()}`);
+        section.innerHTML =
+          `<div class="alerta-titulo">${alerta.titulo}</div>` +
+          `<div class="alerta-cultivos">${chips}</div>` +
+          `<span id="${riskId}" class="risk-badge">--</span>` +
+          `<p id="${reasonId}" class="risk-reason"></p>` +
+          `<div class="forecast">` +
+            `<div class="forecast-label">Próximos 3 días</div>` +
+            `<div id="${forecastId}" class="forecast-grid"></div>` +
+          `</div>`;
+        container.appendChild(section);
+
+        if (datosHoy) {
+          actualizarPlaga(riskId, reasonId, forecastId, alerta.calcFn, datosHoy, diasFuturos);
+        }
+      });
+    }
+
+    // ─── Carga de datos ───────────────────────────────────────────────────────
+    async function cargarDatos() {
+      document.getElementById("btn-refresh").disabled = true;
+      setStatus("Cargando...");
+
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${cfg.lat}&longitude=${cfg.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&daily=temperature_2m_max,relative_humidity_2m_max,precipitation_sum,wind_speed_10m_max&forecast_days=4&timezone=auto`;
 
       try {
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-          throw new Error("La API no responde correctamente.");
-        }
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("La API no responde correctamente.");
+        const data = await res.json();
 
-        const data = await response.json();
-        if (!data.current) {
-          throw new Error("No se han recibido datos actuales.");
-        }
-        if (
-          !data.daily?.time?.length ||
-          !data.daily.temperature_2m_max?.length ||
-          !data.daily.relative_humidity_2m_max?.length
-        ) {
-          throw new Error("No se han recibido datos de previsión diaria.");
-        }
+        if (!data.current)             throw new Error("No se han recibido datos actuales.");
+        if (!data.daily?.time?.length) throw new Error("No se han recibido datos de previsión diaria.");
 
-        const temperatura = data.current.temperature_2m;
-        const humedad = data.current.relative_humidity_2m;
-        const viento = data.current.wind_speed_10m;
+        const { temperature_2m: temp, relative_humidity_2m: hum, wind_speed_10m: viento } = data.current;
 
-        const tempMaxHoy = data.daily.temperature_2m_max[0];
-        const humMaxHoy = data.daily.relative_humidity_2m_max[0];
+        const datosHoy = {
+          tempMax:   data.daily.temperature_2m_max[0],
+          humMax:    data.daily.relative_humidity_2m_max[0],
+          lluvia:    data.daily.precipitation_sum[0],
+          vientoMax: data.daily.wind_speed_10m_max[0],
+        };
 
-        const prevision = data.daily.time.slice(1, 4).map((fecha, index) => {
-          const i = index + 1;
-          const temperaturaMax = data.daily.temperature_2m_max[i];
-          const humedadMax = data.daily.relative_humidity_2m_max[i];
-          const riesgo = calcularRiesgoPulgon(temperaturaMax, humedadMax);
+        const diasFuturos = data.daily.time.slice(1, 4).map((fecha, i) => ({
+          nombreDia: formatearDiaSemana(fecha),
+          tempMax:   data.daily.temperature_2m_max[i + 1],
+          humMax:    data.daily.relative_humidity_2m_max[i + 1],
+          lluvia:    data.daily.precipitation_sum[i + 1],
+          vientoMax: data.daily.wind_speed_10m_max[i + 1],
+        }));
 
-          return {
-            nombreDia: formatearDiaSemana(fecha),
-            nivel: riesgo.nivel,
-            clase: riesgo.clase,
-            temperaturaMax,
-          };
+        document.getElementById("temp-value").textContent     = `${temp}°C`;
+        document.getElementById("humidity-value").textContent = `${hum}%`;
+        document.getElementById("wind-value").textContent     = `${viento} km/h`;
+        document.getElementById("rain-value").textContent     = `${datosHoy.lluvia} mm`;
+
+        renderizarAlertas(datosHoy, diasFuturos);
+
+        const hora = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+        setStatus(`Actualizado a las ${hora}`);
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, true);
+        renderizarAlertas();
+        ["temp-value", "humidity-value", "wind-value", "rain-value"].forEach((id) => {
+          document.getElementById(id).textContent = "--";
         });
-
-        const hayRiesgoAltoEnPrevision = prevision.some((dia) => dia.nivel === "ALTO");
-
-        tempEl.textContent = `${temperatura} °C`;
-        humidityEl.textContent = `${humedad} %`;
-        windEl.textContent = `${viento} km/h`;
-
-        actualizarUIRiesgoPulgon(tempMaxHoy, humMaxHoy, hayRiesgoAltoEnPrevision);
-        renderizarPrevisionRiesgo(prevision);
-        statusEl.textContent = "Datos actualizados";
-      } catch (error) {
-        statusEl.textContent = `Error al cargar el tiempo: ${error.message}`;
-        statusEl.classList.add("error");
-        tempEl.textContent = "--";
-        humidityEl.textContent = "--";
-        windEl.textContent = "--";
-
-        const riskEl = document.getElementById("aphid-risk");
-        const reasonEl = document.getElementById("aphid-risk-reason");
-        if (riskEl) {
-          riskEl.textContent = "Riesgo: --";
-          riskEl.classList.remove("alto", "medio", "bajo");
-        }
-        if (reasonEl) {
-          reasonEl.textContent = "No se puede calcular el riesgo sin la previsión diaria de temperatura y humedad máximas.";
-        }
-        if (forecastEl) {
-          forecastEl.innerHTML = "";
-        }
+      } finally {
+        document.getElementById("btn-refresh").disabled = false;
       }
     }
 
-    cargarTiempoActual();
+    // ─── Panel de configuración ───────────────────────────────────────────────
+    function initConfigPanel() {
+      const panel       = document.getElementById("config-panel");
+      const btnConfig   = document.getElementById("btn-config");
+      const btnGps      = document.getElementById("btn-gps");
+      const btnSave     = document.getElementById("btn-save-config");
+      const feedback    = document.getElementById("config-feedback");
+      const inputNombre = document.getElementById("input-nombre");
+      const inputCiudad = document.getElementById("input-ciudad");
+
+      function obtenerCultivosSeleccionados() {
+        return [...document.querySelectorAll(".btn-cultivo.activo")].map((b) => b.dataset.id);
+      }
+
+      async function guardarYActualizar(nuevoCfg) {
+        saveConfig(nuevoCfg);
+        actualizarHeader();
+        panel.classList.remove("visible");
+        setFeedback("");
+        await cargarDatos();
+      }
+
+      function setFeedback(texto, esError = false) {
+        feedback.textContent = texto;
+        feedback.className   = esError ? "config-feedback error" : "config-feedback";
+      }
+
+      function inicializarCultivos() {
+        const grid = document.getElementById("cultivos-grid");
+        grid.innerHTML = "";
+        CULTIVOS.forEach((cultivo) => {
+          const btn = document.createElement("button");
+          const activo = cfg.cultivos.includes(cultivo.id);
+          btn.className = "btn-cultivo" + (activo ? " activo" : "");
+          btn.textContent = cultivo.nombre;
+          btn.dataset.id = cultivo.id;
+          btn.type = "button";
+          btn.addEventListener("click", () => btn.classList.toggle("activo"));
+          grid.appendChild(btn);
+        });
+      }
+
+      function mostrarConfigActual() {
+        inputNombre.value = cfg.nombre !== DEFAULTS.nombre ? cfg.nombre : "";
+        inputCiudad.value = "";
+        setFeedback(cfg.ciudad ? `Ubicación actual: ${cfg.ciudad}` : "");
+        inicializarCultivos();
+      }
+
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        panel.classList.add("visible");
+        inicializarCultivos();
+      }
+
+      btnConfig.addEventListener("click", () => {
+        const visible = panel.classList.toggle("visible");
+        if (visible) mostrarConfigActual();
+      });
+
+      btnSave.addEventListener("click", async () => {
+        const nombre = inputNombre.value.trim() || DEFAULTS.nombre;
+        const ciudad = inputCiudad.value.trim();
+        const cultivosSeleccionados = obtenerCultivosSeleccionados();
+
+        if (!ciudad) {
+          await guardarYActualizar({ ...cfg, nombre, cultivos: cultivosSeleccionados });
+          return;
+        }
+
+        btnSave.disabled = true;
+        setFeedback("Buscando ubicación...");
+
+        try {
+          const res  = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(ciudad)}&count=1&language=es&format=json`);
+          const data = await res.json();
+
+          if (!data.results?.length) {
+            setFeedback("Ciudad no encontrada. Prueba con otra.", true);
+            return;
+          }
+
+          const lugar = data.results[0];
+          await guardarYActualizar({ nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados });
+        } catch (_) {
+          setFeedback("Error de conexión. Inténtalo de nuevo.", true);
+        } finally {
+          btnSave.disabled = false;
+        }
+      });
+
+      btnGps.addEventListener("click", () => {
+        if (!navigator.geolocation) {
+          setFeedback("Tu navegador no soporta GPS.", true);
+          return;
+        }
+
+        const nombre = inputNombre.value.trim() || DEFAULTS.nombre;
+        const cultivosSeleccionados = obtenerCultivosSeleccionados();
+
+        btnGps.disabled = true;
+        setFeedback("Obteniendo ubicación GPS...");
+
+        navigator.geolocation.getCurrentPosition(
+          async ({ coords }) => {
+            const { latitude: lat, longitude: lon } = coords;
+            setFeedback("Identificando lugar...");
+
+            try {
+              const res  = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=es`);
+              const data = await res.json();
+              const ciudad = data.city || data.locality || data.principalSubdivision || "Ubicación GPS";
+
+              await guardarYActualizar({ nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados });
+            } catch (_) {
+              await guardarYActualizar({ nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados });
+            } finally {
+              btnGps.disabled = false;
+            }
+          },
+          (err) => {
+            btnGps.disabled = false;
+            setFeedback(err.code === 1
+              ? "Permiso de ubicación denegado."
+              : "No se ha podido obtener el GPS.", true);
+          },
+          { timeout: 10000, maximumAge: 60000 }
+        );
+      });
+    }
+
+    // ─── Arranque ─────────────────────────────────────────────────────────────
+    document.addEventListener("DOMContentLoaded", () => {
+      actualizarHeader();
+      initConfigPanel();
+      renderizarAlertas();
+      cargarDatos();
+      setInterval(cargarDatos, REFRESH_MS);
+      document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
+    });
   </script>
 </body>
 </html>
+
 
