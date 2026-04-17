@@ -41,10 +41,13 @@ exports.handler = async (event) => {
   // 3. Evalscript NDVI: excluye píxeles nubosos via CLM
   const evalscript = `//VERSION=3
 function setup() {
-  return { input: ["B04", "B08"], output: { bands: 1, sampleType: "FLOAT32" } };
+  return {
+    input: [{ bands: ["B04", "B08"] }],
+    output: [{ id: "ndvi", bands: 1, sampleType: "FLOAT32" }]
+  };
 }
 function evaluatePixel(s) {
-  return [(s.B08 - s.B04) / (s.B08 + s.B04 + 1e-10)];
+  return { ndvi: [(s.B08 - s.B04) / (s.B08 + s.B04 + 1e-10)] };
 }`;
 
   const hoy    = new Date().toISOString().slice(0, 10);
@@ -69,7 +72,7 @@ function evaluatePixel(s) {
         resy: 10,
       },
       calculations: {
-        default: { statistics: { default: { percentiles: { k: [50] } } } },
+        ndvi: { statistics: { default: { percentiles: { k: [50] } } } },
       },
     }),
   });
@@ -83,7 +86,7 @@ function evaluatePixel(s) {
 
   // Filtrar intervalos con datos válidos (media no nula)
   const intervalos = (stats.data || []).filter(
-    (i) => i.outputs?.default?.bands?.B0?.stats?.mean != null,
+    (i) => i.outputs?.ndvi?.bands?.B0?.stats?.mean != null,
   );
 
   if (!intervalos.length) {
@@ -91,7 +94,7 @@ function evaluatePixel(s) {
   }
 
   const ultimo = intervalos[intervalos.length - 1];
-  const band   = ultimo.outputs.default.bands.B0.stats;
+  const band   = ultimo.outputs.ndvi.bands.B0.stats;
 
   const ndvi  = +band.percentiles["50"].toFixed(3);
   const nubes = band.noDataCount > 0;
