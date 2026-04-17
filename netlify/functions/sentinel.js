@@ -76,7 +76,8 @@ function evaluatePixel(s) {
   });
 
   if (!statsRes.ok) {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: "Error al consultar CDSE Statistics API" }) };
+    const errBody = await statsRes.text();
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: "Error al consultar CDSE Statistics API", status: statsRes.status, detail: errBody }) };
   }
 
   const stats = await statsRes.json();
