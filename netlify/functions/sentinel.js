@@ -41,10 +41,9 @@ exports.handler = async (event) => {
   // 3. Evalscript NDVI: excluye píxeles nubosos via CLM
   const evalscript = `//VERSION=3
 function setup() {
-  return { input: ["B04", "B08", "CLM"], output: { bands: 1, sampleType: "FLOAT32" } };
+  return { input: ["B04", "B08"], output: { bands: 1, sampleType: "FLOAT32" } };
 }
 function evaluatePixel(s) {
-  if (s.CLM > 0) return [NaN];
   return [(s.B08 - s.B04) / (s.B08 + s.B04 + 1e-10)];
 }`;
 
