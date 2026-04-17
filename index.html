@@ -325,6 +325,26 @@
       line-height: 1.5;
     }
 
+    /* ── Salud del cultivo (NDVI) ── */
+    .ndvi-badge {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 8px;
+    }
+    .ndvi-badge.buena    { background: var(--low-bg);    color: var(--low); }
+    .ndvi-badge.moderada { background: var(--medium-bg); color: var(--medium); }
+    .ndvi-badge.estres   { background: var(--high-bg);   color: var(--high); }
+
+    .ndvi-sub {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
     /* ── Weather card ── */
     .weather-header {
       display: flex;
@@ -387,7 +407,40 @@
       font-weight: 600;
       text-align: left;
     }
+    /* ── Mapa parcela ── */
+    #mapa-parcela {
+      height: 240px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .btn-confirmar-parcela {
+      display: none;
+      width: 100%;
+      margin-top: 8px;
+      background: var(--low);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-confirmar-parcela.visible { display: block; }
+
+    .parcela-info {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 4px;
+      margin-bottom: 0;
+    }
   </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
   <main class="app">
@@ -415,6 +468,13 @@
         <input type="text" id="input-ciudad" placeholder="Ej: El Prat de Llobregat" maxlength="80" autocomplete="off">
       </div>
       <div class="config-field">
+        <label>Parcela agrícola</label>
+        <p class="parcela-info" id="parcela-info">Toca tu campo en el mapa para cargar el contorno oficial de SIGPAC.</p>
+        <div id="mapa-parcela"></div>
+        <button class="btn-confirmar-parcela" id="btn-confirmar-parcela" type="button">&#10003; Confirmar parcela</button>
+      </div>
+
+      <div class="config-field">
         <label>Mis cultivos</label>
         <div class="cultivos-grid" id="cultivos-grid"></div>
       </div>
@@ -426,6 +486,14 @@
 
     <!-- Alertas dinámicas -->
     <div id="alertas-container"></div>
+
+    <!-- Salud del cultivo (Sentinel-2 NDVI) -->
+    <section class="card card-alerta" id="card-ndvi" aria-label="Salud del cultivo">
+      <div class="alerta-titulo">Salud del cultivo · Sentinel-2</div>
+      <span class="ndvi-badge" id="ndvi-estado">--</span>
+      <p class="risk-reason" id="ndvi-motivo"></p>
+      <p class="ndvi-sub" id="ndvi-fecha"></p>
+    </section>
 
     <!-- Condiciones meteorológicas -->
     <section class="card" aria-label="Condiciones meteorológicas">
@@ -466,6 +534,7 @@
       lat:      41.3828,
       lon:      2.1771,
       cultivos: ["lechuga"],
+      parcela:  null,
     };
 
     // ─── Config (localStorage) ────────────────────────────────────────────────
@@ -791,6 +860,47 @@
       });
     }
 
+    // ─── Salud del cultivo (NDVI) ──────────────────────────────────────────────────
+    async function cargarNDVI() {
+      const estadoEl = document.getElementById("ndvi-estado");
+      const motivoEl = document.getElementById("ndvi-motivo");
+      const fechaEl  = document.getElementById("ndvi-fecha");
+      const cardEl   = document.getElementById("card-ndvi");
+
+      try {
+        const geometryParam = cfg.parcela
+          ? `&geometry=${encodeURIComponent(JSON.stringify(cfg.parcela))}`
+          : "";
+        const res  = await fetch(`/api/sentinel?lat=${cfg.lat}&lon=${cfg.lon}${geometryParam}`);
+        if (!res.ok) throw new Error("respuesta no válida");
+        const data = await res.json();
+
+        if (!data.ndvi) {
+          estadoEl.textContent = "--";
+          estadoEl.className   = "ndvi-badge";
+          motivoEl.textContent = "Sin imágenes recientes disponibles (nubes o sin datos).";
+          fechaEl.textContent  = "";
+          return;
+        }
+
+        const etiquetas = { buena: "BUENA",   moderada: "VIGILAR", estres: "ESTRÉS" };
+        const textos    = {
+          buena:    "La vegetación está en buen estado.",
+          moderada: "Estrés leve detectado. Vigila tus cultivos.",
+          estres:   "Estrés severo detectado desde satélite. Revisa urgentemente.",
+        };
+
+        estadoEl.textContent = etiquetas[data.estado];
+        estadoEl.className   = `ndvi-badge ${data.estado}`;
+        cardEl.classList.remove("alto", "medio", "bajo");
+        cardEl.classList.add(data.estado === "buena" ? "bajo" : data.estado === "moderada" ? "medio" : "alto");
+        motivoEl.textContent = textos[data.estado] + (data.nubes ? " (cobertura de nubes parcial)" : "");
+        fechaEl.textContent  = `NDVI ${data.ndvi} · imagen del ${data.fecha}`;
+      } catch (_) {
+        motivoEl.textContent = "No se han podido cargar los datos del satélite.";
+      }
+    }
+
     // ─── Carga de datos ───────────────────────────────────────────────────────
     async function cargarDatos() {
       document.getElementById("btn-refresh").disabled = true;
@@ -843,6 +953,71 @@
       }
     }
 
+    // ─── Mapa parcela (Leaflet + SIGPAC) ─────────────────────────────────────
+    let mapaLeaflet      = null;
+    let parcelaPendiente = null;
+    let capaParcela      = null;
+
+    function mostrarPoligono(geometry, centrar) {
+      if (capaParcela) mapaLeaflet.removeLayer(capaParcela);
+      capaParcela = L.geoJSON(
+        { type: "Feature", geometry },
+        { style: { color: "#15803d", weight: 2, fillOpacity: 0.15 } }
+      ).addTo(mapaLeaflet);
+      if (centrar) mapaLeaflet.fitBounds(capaParcela.getBounds(), { padding: [20, 20] });
+    }
+
+    function initMapaParcela() {
+      if (mapaLeaflet) {
+        mapaLeaflet.setView([cfg.lat, cfg.lon], 16);
+        return;
+      }
+
+      mapaLeaflet = L.map("mapa-parcela").setView([cfg.lat, cfg.lon], 16);
+
+      L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        { attribution: "Esri World Imagery" }
+      ).addTo(mapaLeaflet);
+
+      if (cfg.parcela) mostrarPoligono(cfg.parcela, false);
+
+      mapaLeaflet.on("click", async (e) => {
+        const infoEl = document.getElementById("parcela-info");
+        const btnEl  = document.getElementById("btn-confirmar-parcela");
+        infoEl.textContent = "Buscando parcela...";
+
+        try {
+          const res  = await fetch(`/api/sigpac?lat=${e.latlng.lat}&lon=${e.latlng.lng}`);
+          const data = await res.json();
+
+          if (!data.parcela) {
+            infoEl.textContent = "No se ha encontrado parcela aquí. Toca un terreno agrícola.";
+            btnEl.classList.remove("visible");
+            return;
+          }
+
+          parcelaPendiente = data.parcela;
+          mostrarPoligono(data.parcela, true);
+          infoEl.textContent = "Parcela SIGPAC encontrada. Confirma para guardarla.";
+          btnEl.classList.add("visible");
+        } catch (_) {
+          infoEl.textContent = "Error al consultar SIGPAC. Inténtalo de nuevo.";
+        }
+      });
+
+      document.getElementById("btn-confirmar-parcela").addEventListener("click", () => {
+        if (!parcelaPendiente) return;
+        cfg = { ...cfg, parcela: parcelaPendiente };
+        saveConfig(cfg);
+        parcelaPendiente = null;
+        document.getElementById("btn-confirmar-parcela").classList.remove("visible");
+        document.getElementById("parcela-info").textContent =
+          "Parcela guardada. El NDVI usará este contorno exacto.";
+        cargarNDVI();
+      });
+    }
+
     // ─── Panel de configuración ───────────────────────────────────────────────
     function initConfigPanel() {
       const panel       = document.getElementById("config-panel");
@@ -863,6 +1038,7 @@
         panel.classList.remove("visible");
         setFeedback("");
         await cargarDatos();
+        cargarNDVI();
       }
 
       function setFeedback(texto, esError = false) {
@@ -899,7 +1075,10 @@
 
       btnConfig.addEventListener("click", () => {
         const visible = panel.classList.toggle("visible");
-        if (visible) mostrarConfigActual();
+        if (visible) {
+          mostrarConfigActual();
+          initMapaParcela();
+        }
       });
 
       btnSave.addEventListener("click", async () => {
@@ -979,11 +1158,11 @@
       initConfigPanel();
       renderizarAlertas();
       cargarDatos();
+      cargarNDVI();
       setInterval(cargarDatos, REFRESH_MS);
+      setInterval(cargarNDVI, 6 * 60 * 60 * 1000); // cada 6h (Sentinel-2 revisita ~5 días)
       document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
     });
   </script>
 </body>
 </html>
-
-
