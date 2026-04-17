@@ -1,6 +1,5 @@
 const TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
-
 const CORS = { "Access-Control-Allow-Origin": "*" };
 
 exports.handler = async (event) => {
@@ -14,7 +13,6 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "lat/lon requeridos" }) };
   }
 
-  // 1. Token OAuth2 con client credentials
   const tokenRes = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -26,23 +24,22 @@ exports.handler = async (event) => {
   });
 
   if (!tokenRes.ok) {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: "Error de autenticación CDSE" }) };
+    const e = await tokenRes.text();
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: "Auth failed", detail: e }) };
   }
   const { access_token } = await tokenRes.json();
 
-  // 2. Bounds: polígono SIGPAC exacto si está disponible, bbox ~200m como fallback
-  const d    = 0.001;
+  const d = 0.001;
   const bbox = [lon - d, lat - d, lon + d, lat + d];
   const geometryParam = event.queryStringParameters?.geometry;
-  const boundsObj = geometryParam
+  const bounds = geometryParam
     ? { geometry: JSON.parse(geometryParam), properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } }
     : { bbox, properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } };
 
-  // 3. Evalscript NDVI: excluye píxeles nubosos via CLM
   const evalscript = `//VERSION=3
 function setup() {
   return {
-    input: [{ bands: ["B04", "B08"], units: "REFLECTANCE" }],
+    input: [{ bands: ["B04", "B08"] }],
     output: [{ id: "ndvi", bands: 1, sampleType: "FLOAT32" }]
   };
 }
@@ -55,13 +52,10 @@ function evaluatePixel(s) {
 
   const statsRes = await fetch(STATS_URL, {
     method: "POST",
-    headers: {
-      Authorization:  `Bearer ${access_token}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       input: {
-        bounds: boundsObj,
+        bounds,
         data: [{ type: "sentinel-2-l2a", dataFilter: { maxCloudCoverage: 80 } }],
       },
       aggregation: {
@@ -71,22 +65,18 @@ function evaluatePixel(s) {
         resx: 10,
         resy: 10,
       },
-      calculations: {
-        ndvi: { statistics: { default: { percentiles: { k: [50] } } } },
-      },
     }),
   });
 
   if (!statsRes.ok) {
     const errBody = await statsRes.text();
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: "Error al consultar CDSE Statistics API", status: statsRes.status, detail: errBody }) };
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: "Stats API failed", status: statsRes.status, detail: errBody }) };
   }
 
   const stats = await statsRes.json();
 
-  // Filtrar intervalos con datos válidos (media no nula)
   const intervalos = (stats.data || []).filter(
-    (i) => i.outputs?.ndvi?.bands?.B0?.stats?.mean != null,
+    (i) => i.outputs?.ndvi?.bands?.B0?.stats?.mean != null
   );
 
   if (!intervalos.length) {
@@ -95,15 +85,13 @@ function evaluatePixel(s) {
 
   const ultimo = intervalos[intervalos.length - 1];
   const band   = ultimo.outputs.ndvi.bands.B0.stats;
-
-  const ndvi  = +band.percentiles["50"].toFixed(3);
-  const nubes = band.noDataCount > 0;
-  const fecha = ultimo.interval.from.slice(0, 10);
+  const ndvi   = +(band.mean).toFixed(3);
+  const fecha  = ultimo.interval.from.slice(0, 10);
   const estado = ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres";
 
   return {
     statusCode: 200,
     headers: CORS,
-    body: JSON.stringify({ ndvi, fecha, nubes, estado }),
+    body: JSON.stringify({ ndvi, fecha, nubes: false, estado }),
   };
 };
