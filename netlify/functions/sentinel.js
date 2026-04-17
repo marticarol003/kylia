@@ -30,33 +30,18 @@ exports.handler = async (event) => {
   const { access_token } = await tokenRes.json();
 
   const d = 0.001;
-  const bbox = [lon - d, lat - d, lon + d, lat + d];
-  const geometryParam = event.queryStringParameters?.geometry;
-  const bounds = geometryParam
-    ? { geometry: JSON.parse(geometryParam), properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } }
-    : { bbox, properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } };
-
-  const evalscript = `//VERSION=3
-function setup() {
-  return {
-    input: [{ bands: ["B04", "B08"] }],
-    output: [{ id: "ndvi", bands: 1 }]
-  };
-}
-function evaluatePixel(s) {
-  return { ndvi: [(s.B08 - s.B04) / (s.B08 + s.B04 + 1e-10)] };
-}`;
-
   const hoy    = new Date().toISOString().slice(0, 10);
   const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+
+  const evalscript = "//VERSION=3\nfunction setup(){return{input:[{bands:[\"B04\",\"B08\"]}],output:[{id:\"ndvi\",bands:1}]};}\nfunction evaluatePixel(s){return{ndvi:[(s.B08-s.B04)/(s.B08+s.B04)];};}";
 
   const statsRes = await fetch(STATS_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       input: {
-        bounds,
-        data: [{ type: "sentinel-2-l2a", dataFilter: { maxCloudCoverage: 80 } }],
+        bounds: { bbox: [lon - d, lat - d, lon + d, lat + d] },
+        data: [{ type: "sentinel-2-l2a" }],
       },
       aggregation: {
         timeRange: { from: `${hace30}T00:00:00Z`, to: `${hoy}T23:59:59Z` },
