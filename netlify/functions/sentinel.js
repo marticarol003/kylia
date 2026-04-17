@@ -42,7 +42,7 @@ exports.handler = async (event) => {
   const evalscript = `//VERSION=3
 function setup() {
   return {
-    input: [{ bands: ["B04", "B08"] }],
+    input: [{ bands: ["B04", "B08"], units: "REFLECTANCE" }],
     output: [{ id: "ndvi", bands: 1, sampleType: "FLOAT32" }]
   };
 }
