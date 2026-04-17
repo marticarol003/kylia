@@ -40,7 +40,7 @@ exports.handler = async (event) => {
 function setup() {
   return {
     input: [{ bands: ["B04", "B08"] }],
-    output: [{ id: "ndvi", bands: 1, sampleType: "FLOAT32" }]
+    output: [{ id: "ndvi", bands: 1 }]
   };
 }
 function evaluatePixel(s) {
@@ -65,6 +65,7 @@ function evaluatePixel(s) {
         resx: 10,
         resy: 10,
       },
+      calculations: { ndvi: {} },
     }),
   });
 
