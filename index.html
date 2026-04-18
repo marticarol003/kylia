@@ -875,7 +875,7 @@
         if (!res.ok) throw new Error("respuesta no válida");
         const data = await res.json();
 
-        if (!data.ndvi) {
+        if (data.ndvi === null || data.ndvi === undefined) {
           estadoEl.textContent = "--";
           estadoEl.className   = "ndvi-badge";
           motivoEl.textContent = "Sin imágenes recientes disponibles (nubes o sin datos).";
@@ -1104,7 +1104,7 @@
           }
 
           const lugar = data.results[0];
-          await guardarYActualizar({ nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados });
+          await guardarYActualizar({ ...cfg, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados });
         } catch (_) {
           setFeedback("Error de conexión. Inténtalo de nuevo.", true);
         } finally {
@@ -1134,9 +1134,9 @@
               const data = await res.json();
               const ciudad = data.city || data.locality || data.principalSubdivision || "Ubicación GPS";
 
-              await guardarYActualizar({ nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados });
+              await guardarYActualizar({ ...cfg, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados });
             } catch (_) {
-              await guardarYActualizar({ nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados });
+              await guardarYActualizar({ ...cfg, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados });
             } finally {
               btnGps.disabled = false;
             }

@@ -2,7 +2,6 @@ const { inflateSync } = require('zlib');
 
 const TOKEN_URL   = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process";
-const CORS        = { "Access-Control-Allow-Origin": "*" };
 
 function parsePng1x1(buf) {
   const chunks = [];
@@ -20,13 +19,14 @@ function parsePng1x1(buf) {
   return { r: raw[1], g: raw[2], a: raw[4] };
 }
 
-exports.handler = async (event) => {
-  if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: CORS };
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const lat = parseFloat(event.queryStringParameters?.lat);
-  const lon = parseFloat(event.queryStringParameters?.lon);
+  const lat = parseFloat(req.query.lat);
+  const lon = parseFloat(req.query.lon);
   if (isNaN(lat) || isNaN(lon)) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "lat/lon requeridos" }) };
+    return res.status(400).json({ error: "lat/lon requeridos" });
   }
 
   const tokenRes = await fetch(TOKEN_URL, {
@@ -39,7 +39,7 @@ exports.handler = async (event) => {
     }),
   });
   if (!tokenRes.ok) {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: "Auth failed" }) };
+    return res.status(502).json({ error: "Auth failed" });
   }
   const { access_token } = await tokenRes.json();
 
@@ -47,11 +47,10 @@ exports.handler = async (event) => {
   const hoy    = new Date().toISOString().slice(0, 10);
   const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
 
-  const geometryParam = event.queryStringParameters?.geometry;
   let bounds;
   try {
-    bounds = geometryParam
-      ? { geometry: JSON.parse(geometryParam), properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } }
+    bounds = req.query.geometry
+      ? { geometry: JSON.parse(req.query.geometry), properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } }
       : { bbox: [lon - d, lat - d, lon + d, lat + d], properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } };
   } catch (_) {
     bounds = { bbox: [lon - d, lat - d, lon + d, lat + d], properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } };
@@ -100,23 +99,19 @@ function evaluatePixel(s) {
 
   if (!processRes.ok) {
     const err = await processRes.text();
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: "Process API failed", detail: err }) };
+    return res.status(502).json({ error: "Process API failed", detail: err });
   }
 
   const arrayBuf = await processRes.arrayBuffer();
   const pixel    = parsePng1x1(Buffer.from(arrayBuf));
 
   if (!pixel || pixel.a === 0) {
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ndvi: null, motivo: "sin_datos" }) };
+    return res.status(200).json({ ndvi: null, motivo: "sin_datos" });
   }
 
   const u16    = (pixel.r << 8) | pixel.g;
   const ndvi   = +((u16 / 65535) * 2 - 1).toFixed(3);
   const estado = ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres";
 
-  return {
-    statusCode: 200,
-    headers: CORS,
-    body: JSON.stringify({ ndvi, fecha: hoy, nubes: false, estado }),
-  };
+  return res.status(200).json({ ndvi, fecha: hoy, nubes: false, estado });
 };
