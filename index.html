@@ -549,12 +549,21 @@
       parcela:  null,
     };
 
-    const NDVI_HISTORY_KEY  = "kylia_ndvi_history";
     const NDVI_HISTORY_DAYS = 56; // 8 semanas
+
+    function getNdviKey() {
+      if (cfg.parcela) {
+        const c = cfg.parcela.type === "Polygon"
+          ? cfg.parcela.coordinates[0][0]
+          : cfg.parcela.coordinates[0][0][0];
+        return `kylia_ndvi_${c[0].toFixed(5)}_${c[1].toFixed(5)}`;
+      }
+      return `kylia_ndvi_${cfg.lat.toFixed(4)}_${cfg.lon.toFixed(4)}`;
+    }
 
     function loadNdviHistory() {
       try {
-        const raw = localStorage.getItem(NDVI_HISTORY_KEY);
+        const raw = localStorage.getItem(getNdviKey());
         return raw ? JSON.parse(raw) : [];
       } catch (_) { return []; }
     }
@@ -565,7 +574,7 @@
       history.sort((a, b) => a.date.localeCompare(b.date));
       const cutoff = new Date(Date.now() - NDVI_HISTORY_DAYS * 86_400_000).toISOString().slice(0, 10);
       history = history.filter(h => h.date >= cutoff);
-      localStorage.setItem(NDVI_HISTORY_KEY, JSON.stringify(history));
+      localStorage.setItem(getNdviKey(), JSON.stringify(history));
       return history;
     }
 
