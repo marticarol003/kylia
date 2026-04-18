@@ -973,7 +973,8 @@
         return;
       }
 
-      mapaLeaflet = L.map("mapa-parcela").setView([cfg.lat, cfg.lon], 16);
+      mapaLeaflet = L.map("mapa-parcela", { zoomControl: true }).setView([cfg.lat, cfg.lon], 16);
+      setTimeout(() => mapaLeaflet.invalidateSize(), 50);
 
       L.tileLayer(
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -1078,6 +1079,7 @@
         if (visible) {
           mostrarConfigActual();
           initMapaParcela();
+          setTimeout(() => mapaLeaflet?.invalidateSize(), 50);
         }
       });
 
