@@ -345,6 +345,17 @@
       margin-top: 6px;
     }
 
+    .ndvi-tendencia {
+      margin: 10px 0 0;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .ndvi-tendencia.bajando  { color: var(--high); }
+    .ndvi-tendencia.mejorando { color: var(--low); }
+
     /* ── Weather card ── */
     .weather-header {
       display: flex;
@@ -493,6 +504,7 @@
       <span class="ndvi-badge" id="ndvi-estado">--</span>
       <p class="risk-reason" id="ndvi-motivo"></p>
       <p class="ndvi-sub" id="ndvi-fecha"></p>
+      <p class="ndvi-tendencia" id="ndvi-tendencia"></p>
     </section>
 
     <!-- Condiciones meteorológicas -->
@@ -536,6 +548,56 @@
       cultivos: ["lechuga"],
       parcela:  null,
     };
+
+    const NDVI_HISTORY_KEY  = "kylia_ndvi_history";
+    const NDVI_HISTORY_DAYS = 56; // 8 semanas
+
+    function loadNdviHistory() {
+      try {
+        const raw = localStorage.getItem(NDVI_HISTORY_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (_) { return []; }
+    }
+
+    function saveNdviEntry(entry) {
+      let history = loadNdviHistory().filter(h => h.date !== entry.date);
+      history.push(entry);
+      history.sort((a, b) => a.date.localeCompare(b.date));
+      const cutoff = new Date(Date.now() - NDVI_HISTORY_DAYS * 86_400_000).toISOString().slice(0, 10);
+      history = history.filter(h => h.date >= cutoff);
+      localStorage.setItem(NDVI_HISTORY_KEY, JSON.stringify(history));
+      return history;
+    }
+
+    function calcularTendencia(history) {
+      if (history.length < 2) return null;
+      const actual     = history[history.length - 1];
+      const hace14iso  = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
+      const referencia = [...history].reverse().find(h => h.date <= hace14iso) || history[0];
+      if (referencia.date === actual.date) return null;
+      const diff = +(actual.ndvi - referencia.ndvi).toFixed(3);
+      const dias = Math.round((new Date(actual.date) - new Date(referencia.date)) / 86_400_000);
+      return { diff, referencia, dias };
+    }
+
+    function textoTendencia(tendencia) {
+      if (!tendencia) return { texto: null, clase: "" };
+      const { diff, referencia, dias } = tendencia;
+      const de = referencia.ndvi.toFixed(2);
+      if (diff <= -0.08) {
+        return { texto: `↓ Bajando — pasaste de ${de} hace ${dias} días al ${tendencia.referencia.date.slice(5).replace("-","/")} a ${(referencia.ndvi + diff).toFixed(2)} hoy. Revisa el riego y busca síntomas de enfermedad.`, clase: "bajando" };
+      }
+      if (diff <= -0.03) {
+        return { texto: `↓ Ligera bajada respecto a hace ${dias} días (${de} → ${(referencia.ndvi + diff).toFixed(2)}). Mantente atento.`, clase: "bajando" };
+      }
+      if (diff >= 0.08) {
+        return { texto: `↑ Mejorando — el cultivo lleva ${dias} días recuperándose (${de} → ${(referencia.ndvi + diff).toFixed(2)}). Buen trabajo.`, clase: "mejorando" };
+      }
+      if (diff >= 0.03) {
+        return { texto: `↑ Levemente mejor que hace ${dias} días (${de} → ${(referencia.ndvi + diff).toFixed(2)}).`, clase: "mejorando" };
+      }
+      return { texto: `→ Estable desde hace ${dias} días (${de}).`, clase: "" };
+    }
 
     // ─── Config (localStorage) ────────────────────────────────────────────────
     let cfg = loadConfig();
@@ -862,43 +924,60 @@
 
     // ─── Salud del cultivo (NDVI) ──────────────────────────────────────────────────
     async function cargarNDVI() {
-      const estadoEl = document.getElementById("ndvi-estado");
-      const motivoEl = document.getElementById("ndvi-motivo");
-      const fechaEl  = document.getElementById("ndvi-fecha");
-      const cardEl   = document.getElementById("card-ndvi");
+      const estadoEl    = document.getElementById("ndvi-estado");
+      const motivoEl    = document.getElementById("ndvi-motivo");
+      const fechaEl     = document.getElementById("ndvi-fecha");
+      const cardEl      = document.getElementById("card-ndvi");
+      const tendenciaEl = document.getElementById("ndvi-tendencia");
 
-      try {
-        const geometryParam = cfg.parcela
-          ? `&geometry=${encodeURIComponent(JSON.stringify(cfg.parcela))}`
-          : "";
-        const res  = await fetch(`/api/sentinel?lat=${cfg.lat}&lon=${cfg.lon}${geometryParam}`);
-        if (!res.ok) throw new Error("respuesta no válida");
-        const data = await res.json();
+      const hoy     = new Date().toISOString().slice(0, 10);
+      let   history = loadNdviHistory();
+      let   entrada = history.find(h => h.date === hoy);
 
-        if (data.ndvi === null || data.ndvi === undefined) {
-          estadoEl.textContent = "--";
-          estadoEl.className   = "ndvi-badge";
-          motivoEl.textContent = "Sin imágenes recientes disponibles (nubes o sin datos).";
-          fechaEl.textContent  = "";
+      if (!entrada) {
+        try {
+          const geometryParam = cfg.parcela
+            ? `&geometry=${encodeURIComponent(JSON.stringify(cfg.parcela))}`
+            : "";
+          const res  = await fetch(`/api/sentinel?lat=${cfg.lat}&lon=${cfg.lon}${geometryParam}`);
+          if (!res.ok) throw new Error("respuesta no válida");
+          const data = await res.json();
+
+          if (data.ndvi === null || data.ndvi === undefined) {
+            estadoEl.textContent    = "--";
+            estadoEl.className      = "ndvi-badge";
+            motivoEl.textContent    = "Sin imágenes recientes disponibles (nubes o sin datos).";
+            fechaEl.textContent     = "";
+            tendenciaEl.textContent = "";
+            return;
+          }
+
+          entrada = { date: hoy, ndvi: data.ndvi, estado: data.estado };
+          history = saveNdviEntry(entrada);
+        } catch (_) {
+          motivoEl.textContent = "No se han podido cargar los datos del satélite.";
           return;
         }
-
-        const etiquetas = { buena: "BUENA",   moderada: "VIGILAR", estres: "ESTRÉS" };
-        const textos    = {
-          buena:    "La vegetación está en buen estado.",
-          moderada: "Estrés leve detectado. Vigila tus cultivos.",
-          estres:   "Estrés severo detectado desde satélite. Revisa urgentemente.",
-        };
-
-        estadoEl.textContent = etiquetas[data.estado];
-        estadoEl.className   = `ndvi-badge ${data.estado}`;
-        cardEl.classList.remove("alto", "medio", "bajo");
-        cardEl.classList.add(data.estado === "buena" ? "bajo" : data.estado === "moderada" ? "medio" : "alto");
-        motivoEl.textContent = textos[data.estado] + (data.nubes ? " (cobertura de nubes parcial)" : "");
-        fechaEl.textContent  = `NDVI ${data.ndvi} · imagen del ${data.fecha}`;
-      } catch (_) {
-        motivoEl.textContent = "No se han podido cargar los datos del satélite.";
       }
+
+      const etiquetas = { buena: "BUENA", moderada: "VIGILAR", estres: "ESTRÉS" };
+      const textos    = {
+        buena:    "El campo está en buen estado.",
+        moderada: "Estrés leve detectado. Vigila tus cultivos.",
+        estres:   "Estrés severo detectado desde satélite. Revisa urgentemente.",
+      };
+
+      estadoEl.textContent = etiquetas[entrada.estado];
+      estadoEl.className   = `ndvi-badge ${entrada.estado}`;
+      cardEl.classList.remove("alto", "medio", "bajo");
+      cardEl.classList.add(entrada.estado === "buena" ? "bajo" : entrada.estado === "moderada" ? "medio" : "alto");
+      motivoEl.textContent = textos[entrada.estado];
+      fechaEl.textContent  = `NDVI ${entrada.ndvi} · imagen del ${entrada.date}`;
+
+      const tendencia = calcularTendencia(history);
+      const { texto, clase } = textoTendencia(tendencia);
+      tendenciaEl.textContent = texto || "";
+      tendenciaEl.className   = `ndvi-tendencia${clase ? " " + clase : ""}`;
     }
 
     // ─── Carga de datos ───────────────────────────────────────────────────────
