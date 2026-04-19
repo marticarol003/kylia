@@ -3,20 +3,45 @@ const { inflateSync } = require('zlib');
 const TOKEN_URL   = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process";
 
-function parsePng1x1(buf) {
+function parsePngNdviStats(buf) {
   const chunks = [];
-  let pos = 8;
+  let pos = 8, width = 0, height = 0;
   while (pos + 12 <= buf.length) {
     const len  = buf.readUInt32BE(pos);
     const type = buf.slice(pos + 4, pos + 8).toString('ascii');
+    if (type === 'IHDR') {
+      width  = buf.readUInt32BE(pos + 8);
+      height = buf.readUInt32BE(pos + 12);
+    }
     if (type === 'IDAT') chunks.push(buf.slice(pos + 8, pos + 8 + len));
     if (type === 'IEND') break;
     pos += 12 + len;
   }
-  if (!chunks.length) return null;
-  const raw = inflateSync(Buffer.concat(chunks));
-  if (raw.length < 5) return null;
-  return { r: raw[1], g: raw[2], a: raw[4] };
+  if (!chunks.length || !width || !height) return null;
+
+  const raw    = inflateSync(Buffer.concat(chunks));
+  const stride = 1 + width * 4; // filter_byte + RGBA per row
+  const values = [];
+
+  for (let y = 0; y < height; y++) {
+    const base = y * stride;
+    for (let x = 0; x < width; x++) {
+      const i = base + 1 + x * 4;
+      const r = raw[i], g = raw[i + 1], a = raw[i + 3];
+      if (a === 0) continue;
+      const u16 = (r << 8) | g;
+      values.push((u16 / 65535) * 2 - 1);
+    }
+  }
+
+  if (!values.length) return null;
+  const mean     = values.reduce((s, v) => s + v, 0) / values.length;
+  const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length;
+  return {
+    ndvi:   +mean.toFixed(3),
+    stdev:  +Math.sqrt(variance).toFixed(3),
+    pixels: values.length,
+  };
 }
 
 module.exports = async (req, res) => {
@@ -89,8 +114,8 @@ function evaluatePixel(s) {
         }],
       },
       output: {
-        width:  1,
-        height: 1,
+        width:  20,
+        height: 20,
         responses: [{ identifier: "default", format: { type: "image/png" } }],
       },
       evalscript,
@@ -103,15 +128,12 @@ function evaluatePixel(s) {
   }
 
   const arrayBuf = await processRes.arrayBuffer();
-  const pixel    = parsePng1x1(Buffer.from(arrayBuf));
+  const stats    = parsePngNdviStats(Buffer.from(arrayBuf));
 
-  if (!pixel || pixel.a === 0) {
+  if (!stats) {
     return res.status(200).json({ ndvi: null, motivo: "sin_datos" });
   }
 
-  const u16    = (pixel.r << 8) | pixel.g;
-  const ndvi   = +((u16 / 65535) * 2 - 1).toFixed(3);
-  const estado = ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres";
-
-  return res.status(200).json({ ndvi, fecha: hoy, nubes: false, estado });
+  const estado = stats.ndvi > 0.6 ? "buena" : stats.ndvi > 0.35 ? "moderada" : "estres";
+  return res.status(200).json({ ndvi: stats.ndvi, stdev: stats.stdev, pixels: stats.pixels, fecha: hoy, nubes: false, estado });
 };

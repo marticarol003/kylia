@@ -355,6 +355,7 @@
     }
     .ndvi-tendencia.bajando  { color: var(--high); }
     .ndvi-tendencia.mejorando { color: var(--low); }
+    .ndvi-variabilidad { font-size: 0.78rem; color: var(--muted); margin: 6px 0 0; }
 
     /* ── Weather card ── */
     .weather-header {
@@ -504,6 +505,7 @@
       <span class="ndvi-badge" id="ndvi-estado">--</span>
       <p class="risk-reason" id="ndvi-motivo"></p>
       <p class="ndvi-sub" id="ndvi-fecha"></p>
+      <p class="ndvi-variabilidad" id="ndvi-variabilidad"></p>
       <p class="ndvi-tendencia" id="ndvi-tendencia"></p>
     </section>
 
@@ -933,11 +935,12 @@
 
     // ─── Salud del cultivo (NDVI) ──────────────────────────────────────────────────
     async function cargarNDVI() {
-      const estadoEl    = document.getElementById("ndvi-estado");
-      const motivoEl    = document.getElementById("ndvi-motivo");
-      const fechaEl     = document.getElementById("ndvi-fecha");
-      const cardEl      = document.getElementById("card-ndvi");
-      const tendenciaEl = document.getElementById("ndvi-tendencia");
+      const estadoEl       = document.getElementById("ndvi-estado");
+      const motivoEl       = document.getElementById("ndvi-motivo");
+      const fechaEl        = document.getElementById("ndvi-fecha");
+      const cardEl         = document.getElementById("card-ndvi");
+      const variabilidadEl = document.getElementById("ndvi-variabilidad");
+      const tendenciaEl    = document.getElementById("ndvi-tendencia");
 
       const hoy     = new Date().toISOString().slice(0, 10);
       let   history = loadNdviHistory();
@@ -961,7 +964,7 @@
             return;
           }
 
-          entrada = { date: hoy, ndvi: data.ndvi, estado: data.estado };
+          entrada = { date: hoy, ndvi: data.ndvi, stdev: data.stdev, estado: data.estado };
           history = saveNdviEntry(entrada);
         } catch (_) {
           motivoEl.textContent = "No se han podido cargar los datos del satélite.";
@@ -982,6 +985,14 @@
       cardEl.classList.add(entrada.estado === "buena" ? "bajo" : entrada.estado === "moderada" ? "medio" : "alto");
       motivoEl.textContent = textos[entrada.estado];
       fechaEl.textContent  = `NDVI ${entrada.ndvi} · imagen del ${entrada.date}`;
+
+      if (entrada.stdev !== undefined) {
+        if (entrada.stdev > 0.12)      variabilidadEl.textContent = `Alta variabilidad en la parcela (σ ${entrada.stdev}) — puede haber zonas con problemas.`;
+        else if (entrada.stdev > 0.05) variabilidadEl.textContent = `Variabilidad moderada en la parcela (σ ${entrada.stdev}).`;
+        else                           variabilidadEl.textContent = "";
+      } else {
+        variabilidadEl.textContent = "";
+      }
 
       const tendencia = calcularTendencia(history);
       const { texto, clase } = textoTendencia(tendencia);
