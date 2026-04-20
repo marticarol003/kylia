@@ -137,7 +137,7 @@ function evaluatePixel(s) {
           type: "sentinel-2-l2a",
           dataFilter: {
             timeRange:        { from: `${hace30}T00:00:00Z`, to: `${hoy}T23:59:59Z` },
-            maxCloudCoverage: 30,
+            maxCloudCoverage: 60,
             mosaickingOrder:  "mostRecent",
           },
         }],
