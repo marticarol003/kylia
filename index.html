@@ -986,13 +986,7 @@
       motivoEl.textContent = textos[entrada.estado];
       fechaEl.textContent  = `NDVI ${entrada.ndvi} · imagen del ${entrada.date}`;
 
-      if (entrada.stdev !== undefined) {
-        if (entrada.stdev > 0.12)      variabilidadEl.textContent = `Alta variabilidad en la parcela (σ ${entrada.stdev}) — puede haber zonas con problemas.`;
-        else if (entrada.stdev > 0.05) variabilidadEl.textContent = `Variabilidad moderada en la parcela (σ ${entrada.stdev}).`;
-        else                           variabilidadEl.textContent = "";
-      } else {
-        variabilidadEl.textContent = "";
-      }
+      variabilidadEl.textContent = "";
 
       const tendencia = calcularTendencia(history);
       const { texto, clase } = textoTendencia(tendencia);
