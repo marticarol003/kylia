@@ -1205,7 +1205,7 @@
           }
 
           const lugar = data.results[0];
-          await guardarYActualizar({ ...cfg, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados });
+          await guardarYActualizar({ ...cfg, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados, parcela: null });
         } catch (_) {
           setFeedback("Error de conexión. Inténtalo de nuevo.", true);
         } finally {
@@ -1235,9 +1235,9 @@
               const data = await res.json();
               const ciudad = data.city || data.locality || data.principalSubdivision || "Ubicación GPS";
 
-              await guardarYActualizar({ ...cfg, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados });
+              await guardarYActualizar({ ...cfg, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados, parcela: null });
             } catch (_) {
-              await guardarYActualizar({ ...cfg, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados });
+              await guardarYActualizar({ ...cfg, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados, parcela: null });
             } finally {
               btnGps.disabled = false;
             }
