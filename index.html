@@ -934,7 +934,7 @@
     }
 
     // ─── Salud del cultivo (NDVI) ──────────────────────────────────────────────────
-    async function cargarNDVI() {
+    async function cargarNDVI(forzar = false) {
       const estadoEl       = document.getElementById("ndvi-estado");
       const motivoEl       = document.getElementById("ndvi-motivo");
       const fechaEl        = document.getElementById("ndvi-fecha");
@@ -944,7 +944,7 @@
 
       const hoy     = new Date().toISOString().slice(0, 10);
       let   history = loadNdviHistory();
-      let   entrada = history.find(h => h.date === hoy);
+      let   entrada = forzar ? null : history.find(h => h.date === hoy);
 
       if (!entrada) {
         try {
@@ -1114,7 +1114,7 @@
         document.getElementById("btn-confirmar-parcela").classList.remove("visible");
         document.getElementById("parcela-info").textContent =
           "Parcela guardada. El NDVI usará este contorno exacto.";
-        cargarNDVI();
+        cargarNDVI(true);
       });
     }
 
