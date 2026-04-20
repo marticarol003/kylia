@@ -1,23 +1,67 @@
-const { inflateSync } = require('zlib');
+const TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
+const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
+const CORS      = { "Access-Control-Allow-Origin": "*" };
 
-const TOKEN_URL   = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
-const PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process";
-const CORS        = { "Access-Control-Allow-Origin": "*" };
+// Evalscript: NDVI por píxel + dataMask que descarta nubes, sombras, nieve, etc.
+// La Statistical API promedia los píxeles válidos dentro de la geometría.
+const EVALSCRIPT = `//VERSION=3
+function setup() {
+  return {
+    input: [{ bands: ["B04", "B08", "SCL", "dataMask"] }],
+    output: [
+      { id: "ndvi",     bands: 1, sampleType: "FLOAT32" },
+      { id: "dataMask", bands: 1 }
+    ]
+  };
+}
+function evaluatePixel(s) {
+  // SCL classes excluidas: 0 no data, 1 saturado, 3 sombra de nube,
+  // 8 nube media, 9 nube alta, 10 cirrus, 11 nieve/hielo
+  var bad = [0, 1, 3, 8, 9, 10, 11];
+  var validScl = bad.indexOf(s.SCL) === -1 ? 1 : 0;
+  var ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 1e-10);
+  return {
+    ndvi:     [ndvi],
+    dataMask: [s.dataMask * validScl]
+  };
+}`;
 
-function parsePng1x1(buf) {
-  const chunks = [];
-  let pos = 8;
-  while (pos + 12 <= buf.length) {
-    const len  = buf.readUInt32BE(pos);
-    const type = buf.slice(pos + 4, pos + 8).toString('ascii');
-    if (type === 'IDAT') chunks.push(buf.slice(pos + 8, pos + 8 + len));
-    if (type === 'IEND') break;
-    pos += 12 + len;
+function buildBounds(geometryParam, lat, lon) {
+  const d = 0.001;
+  if (geometryParam) {
+    try {
+      return {
+        geometry:   JSON.parse(geometryParam),
+        properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" },
+      };
+    } catch (_) {
+      // cae al bbox
+    }
   }
-  if (!chunks.length) return null;
-  const raw = inflateSync(Buffer.concat(chunks));
-  if (raw.length < 5) return null;
-  return { r: raw[1], g: raw[2], a: raw[4] };
+  return {
+    bbox:       [lon - d, lat - d, lon + d, lat + d],
+    properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" },
+  };
+}
+
+// Statistics API devuelve un array `data[]` con un objeto por intervalo temporal.
+// Cogemos el intervalo más reciente que tenga al menos un píxel válido.
+function pickLatestValid(statsJson) {
+  const items = (statsJson?.data || [])
+    .map((d) => {
+      const stats = d?.outputs?.ndvi?.bands?.B0?.stats;
+      if (!stats) return null;
+      const sample = stats.sampleCount || 0;
+      const nodata = stats.noDataCount || 0;
+      const valid  = sample - nodata;
+      if (valid <= 0) return null;
+      if (typeof stats.mean !== "number" || Number.isNaN(stats.mean)) return null;
+      return { from: d.interval.from, stats, validPixels: valid };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.from.localeCompare(a.from));
+
+  return items[0] || null;
 }
 
 exports.handler = async (event) => {
@@ -29,6 +73,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "lat/lon requeridos" }) };
   }
 
+  // ─── OAuth2 Copernicus ────────────────────────────────────────────
   const tokenRes = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -43,80 +88,64 @@ exports.handler = async (event) => {
   }
   const { access_token } = await tokenRes.json();
 
-  const d      = 0.001;
+  // ─── Rango temporal: últimos 30 días (Sentinel-2 revisita ~5 días) ─
   const hoy    = new Date().toISOString().slice(0, 10);
   const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const bounds = buildBounds(event.queryStringParameters?.geometry, lat, lon);
 
-  const geometryParam = event.queryStringParameters?.geometry;
-  let bounds;
-  try {
-    bounds = geometryParam
-      ? { geometry: JSON.parse(geometryParam), properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } }
-      : { bbox: [lon - d, lat - d, lon + d, lat + d], properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } };
-  } catch (_) {
-    bounds = { bbox: [lon - d, lat - d, lon + d, lat + d], properties: { crs: "http://www.opengis.net/def/crs/EPSG/0/4326" } };
-  }
-
-  const evalscript = `//VERSION=3
-function setup() {
-  return {
-    input: [{ bands: ["B04", "B08"] }],
-    output: { bands: 4, sampleType: "UINT8" }
+  const statsReq = {
+    input: {
+      bounds,
+      data: [{
+        type: "sentinel-2-l2a",
+        dataFilter: { maxCloudCoverage: 60, mosaickingOrder: "leastCC" },
+      }],
+    },
+    aggregation: {
+      timeRange:           { from: `${hace30}T00:00:00Z`, to: `${hoy}T23:59:59Z` },
+      aggregationInterval: { of: "P1D" },
+      evalscript:          EVALSCRIPT,
+      resx: 10,
+      resy: 10,
+    },
   };
-}
-function evaluatePixel(s) {
-  if (s.B08 === 0 && s.B04 === 0) return [0, 0, 0, 0];
-  var ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 1e-10);
-  var u16  = Math.round(((ndvi + 1) / 2) * 65535);
-  return [(u16 >> 8) / 255, (u16 & 0xFF) / 255, 0, 1];
-}`;
 
-  const processRes = await fetch(PROCESS_URL, {
+  const statsRes = await fetch(STATS_URL, {
     method: "POST",
     headers: {
       Authorization:  `Bearer ${access_token}`,
       "Content-Type": "application/json",
-      "Accept":       "image/png",
+      "Accept":       "application/json",
     },
-    body: JSON.stringify({
-      input: {
-        bounds,
-        data: [{
-          type: "sentinel-2-l2a",
-          dataFilter: {
-            timeRange:        { from: `${hace30}T00:00:00Z`, to: `${hoy}T23:59:59Z` },
-            maxCloudCoverage: 80,
-          },
-        }],
-      },
-      output: {
-        width:  1,
-        height: 1,
-        responses: [{ identifier: "default", format: { type: "image/png" } }],
-      },
-      evalscript,
-    }),
+    body: JSON.stringify(statsReq),
   });
 
-  if (!processRes.ok) {
-    const err = await processRes.text();
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: "Process API failed", detail: err }) };
+  if (!statsRes.ok) {
+    const err = await statsRes.text();
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: "Statistics API failed", detail: err }) };
   }
 
-  const arrayBuf = await processRes.arrayBuffer();
-  const pixel    = parsePng1x1(Buffer.from(arrayBuf));
+  const statsJson = await statsRes.json();
+  const latest    = pickLatestValid(statsJson);
 
-  if (!pixel || pixel.a === 0) {
+  if (!latest) {
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ndvi: null, motivo: "sin_datos" }) };
   }
 
-  const u16    = (pixel.r << 8) | pixel.g;
-  const ndvi   = +((u16 / 65535) * 2 - 1).toFixed(3);
+  const ndvi   = +latest.stats.mean.toFixed(3);
+  const stdev  = typeof latest.stats.stDev === "number" ? +latest.stats.stDev.toFixed(3) : null;
+  const fecha  = latest.from.slice(0, 10);
   const estado = ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres";
 
   return {
     statusCode: 200,
     headers: CORS,
-    body: JSON.stringify({ ndvi, fecha: hoy, nubes: false, estado }),
+    body: JSON.stringify({
+      ndvi,
+      stdev,
+      fecha,
+      estado,
+      pixeles: latest.validPixels,
+    }),
   };
 };

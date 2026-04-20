@@ -964,7 +964,14 @@
             return;
           }
 
-          entrada = { date: hoy, ndvi: data.ndvi, stdev: data.stdev, estado: data.estado };
+          entrada = {
+            date:         hoy,
+            ndvi:         data.ndvi,
+            stdev:        data.stdev,
+            estado:       data.estado,
+            imagenFecha:  data.fecha || hoy,
+            pixeles:      data.pixeles || null,
+          };
           history = saveNdviEntry(entrada);
         } catch (_) {
           motivoEl.textContent = "No se han podido cargar los datos del satélite.";
@@ -984,9 +991,21 @@
       cardEl.classList.remove("alto", "medio", "bajo");
       cardEl.classList.add(entrada.estado === "buena" ? "bajo" : entrada.estado === "moderada" ? "medio" : "alto");
       motivoEl.textContent = textos[entrada.estado];
-      fechaEl.textContent  = `NDVI ${entrada.ndvi} · imagen del ${entrada.date}`;
 
-      variabilidadEl.textContent = "";
+      const fechaImg = entrada.imagenFecha || entrada.date;
+      const origen   = cfg.parcela ? "parcela SIGPAC" : "entorno de la ubicación";
+      const pxInfo   = entrada.pixeles ? ` · ${entrada.pixeles} px` : "";
+      fechaEl.textContent = `NDVI ${entrada.ndvi} (${origen}${pxInfo}) · imagen del ${fechaImg}`;
+
+      if (entrada.stdev != null && entrada.stdev >= 0) {
+        let nota = "";
+        if (entrada.stdev >= 0.15)      nota = " — el campo es muy heterogéneo, hay zonas con peor vigor.";
+        else if (entrada.stdev >= 0.08) nota = " — hay variabilidad apreciable dentro de la parcela.";
+        else                            nota = " — el vigor es homogéneo en la parcela.";
+        variabilidadEl.textContent = `Variabilidad dentro del campo: ±${entrada.stdev}${nota}`;
+      } else {
+        variabilidadEl.textContent = "";
+      }
 
       const tendencia = calcularTendencia(history);
       const { texto, clase } = textoTendencia(tendencia);
