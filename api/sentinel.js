@@ -95,7 +95,7 @@ module.exports = async (req, res) => {
       bounds,
       data: [{
         type: "sentinel-2-l2a",
-        dataFilter: { maxCloudCoverage: 60, mosaickingOrder: "leastCC" },
+        dataFilter: { maxCloudCoverage: 60 },
       }],
     },
     aggregation: {

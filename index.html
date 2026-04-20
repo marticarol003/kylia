@@ -501,7 +501,10 @@
 
     <!-- Salud del cultivo (Sentinel-2 NDVI) -->
     <section class="card card-alerta" id="card-ndvi" aria-label="Salud del cultivo">
-      <div class="alerta-titulo">Salud del cultivo · Sentinel-2</div>
+      <div class="weather-header">
+        <span class="alerta-titulo" style="margin-bottom:0;">Salud del cultivo · Sentinel-2</span>
+        <button class="btn-refresh" id="btn-refresh-ndvi" aria-label="Actualizar NDVI">&#8635; Actualizar</button>
+      </div>
       <span class="ndvi-badge" id="ndvi-estado">--</span>
       <p class="risk-reason" id="ndvi-motivo"></p>
       <p class="ndvi-sub" id="ndvi-fecha"></p>
@@ -934,6 +937,11 @@
     }
 
     // ─── Salud del cultivo (NDVI) ──────────────────────────────────────────────────
+    // Una entrada es "nueva" (post-Statistical API) si trae stdev/pixeles/imagenFecha.
+    function entradaEsNueva(e) {
+      return e && ("stdev" in e) && ("pixeles" in e) && ("imagenFecha" in e);
+    }
+
     async function cargarNDVI(forzar = false) {
       const estadoEl       = document.getElementById("ndvi-estado");
       const motivoEl       = document.getElementById("ndvi-motivo");
@@ -941,41 +949,72 @@
       const cardEl         = document.getElementById("card-ndvi");
       const variabilidadEl = document.getElementById("ndvi-variabilidad");
       const tendenciaEl    = document.getElementById("ndvi-tendencia");
+      const btnNdvi        = document.getElementById("btn-refresh-ndvi");
 
       const hoy     = new Date().toISOString().slice(0, 10);
       let   history = loadNdviHistory();
-      let   entrada = forzar ? null : history.find(h => h.date === hoy);
+      let   entrada = history.find(h => h.date === hoy);
+
+      // Si la entrada cacheada viene del formato viejo (sin stdev), la tiramos
+      // para obligar a una recarga contra la Statistical API nueva.
+      if (entrada && !entradaEsNueva(entrada)) {
+        history = history.filter(h => h.date !== hoy);
+        localStorage.setItem(getNdviKey(), JSON.stringify(history));
+        entrada = null;
+      }
+      if (forzar) entrada = null;
 
       if (!entrada) {
+        if (btnNdvi) btnNdvi.disabled = true;
+        motivoEl.textContent = "Consultando satélite...";
         try {
           const geometryParam = cfg.parcela
             ? `&geometry=${encodeURIComponent(JSON.stringify(cfg.parcela))}`
             : "";
-          const res  = await fetch(`/api/sentinel?lat=${cfg.lat}&lon=${cfg.lon}${geometryParam}`);
-          if (!res.ok) throw new Error("respuesta no válida");
-          const data = await res.json();
+          // Cache-busting (&_=timestamp) para evitar cualquier intermediario cacheando
+          const res = await fetch(
+            `/api/sentinel?lat=${cfg.lat}&lon=${cfg.lon}${geometryParam}&_=${Date.now()}`,
+            { cache: "no-store" }
+          );
+
+          let data = null;
+          try { data = await res.json(); } catch (_) { data = null; }
+
+          if (!res.ok) {
+            const detalle = data?.detail || data?.error || `HTTP ${res.status}`;
+            motivoEl.textContent = `Error del servidor NDVI: ${detalle}`;
+            estadoEl.textContent = "--";
+            estadoEl.className   = "ndvi-badge";
+            fechaEl.textContent  = "";
+            variabilidadEl.textContent = "";
+            tendenciaEl.textContent    = "";
+            return;
+          }
 
           if (data.ndvi === null || data.ndvi === undefined) {
-            estadoEl.textContent    = "--";
-            estadoEl.className      = "ndvi-badge";
-            motivoEl.textContent    = "Sin imágenes recientes disponibles (nubes o sin datos).";
-            fechaEl.textContent     = "";
-            tendenciaEl.textContent = "";
+            estadoEl.textContent = "--";
+            estadoEl.className   = "ndvi-badge";
+            motivoEl.textContent = "Sin imágenes recientes disponibles (nubes o sin datos en los últimos 30 días).";
+            fechaEl.textContent  = "";
+            variabilidadEl.textContent = "";
+            tendenciaEl.textContent    = "";
             return;
           }
 
           entrada = {
             date:         hoy,
             ndvi:         data.ndvi,
-            stdev:        data.stdev,
+            stdev:        data.stdev ?? null,
             estado:       data.estado,
             imagenFecha:  data.fecha || hoy,
             pixeles:      data.pixeles || null,
           };
           history = saveNdviEntry(entrada);
-        } catch (_) {
-          motivoEl.textContent = "No se han podido cargar los datos del satélite.";
+        } catch (err) {
+          motivoEl.textContent = `No se ha podido contactar con /api/sentinel (${err.message}).`;
           return;
+        } finally {
+          if (btnNdvi) btnNdvi.disabled = false;
         }
       }
 
@@ -1276,6 +1315,7 @@
       setInterval(cargarDatos, REFRESH_MS);
       setInterval(cargarNDVI, 6 * 60 * 60 * 1000); // cada 6h (Sentinel-2 revisita ~5 días)
       document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
+      document.getElementById("btn-refresh-ndvi").addEventListener("click", () => cargarNDVI(true));
     });
   </script>
 </body>
