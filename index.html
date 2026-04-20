@@ -558,9 +558,9 @@
         const c = cfg.parcela.type === "Polygon"
           ? cfg.parcela.coordinates[0][0]
           : cfg.parcela.coordinates[0][0][0];
-        return `kylia_ndvi_${c[0].toFixed(5)}_${c[1].toFixed(5)}`;
+        return `kylia_ndvi2_${c[0].toFixed(5)}_${c[1].toFixed(5)}`;
       }
-      return `kylia_ndvi_${cfg.lat.toFixed(4)}_${cfg.lon.toFixed(4)}`;
+      return `kylia_ndvi2_${cfg.lat.toFixed(4)}_${cfg.lon.toFixed(4)}`;
     }
 
     function loadNdviHistory() {
