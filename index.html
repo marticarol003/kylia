@@ -1118,19 +1118,46 @@
       if (centrar) mapaLeaflet.fitBounds(capaParcela.getBounds(), { padding: [20, 20] });
     }
 
+    function forzarRedibujoMapa() {
+      if (!mapaLeaflet) return;
+      [0, 50, 200, 500, 1000].forEach((ms) =>
+        setTimeout(() => mapaLeaflet.invalidateSize(), ms)
+      );
+    }
+
     function initMapaParcela() {
+      if (typeof L === "undefined") {
+        const info = document.getElementById("parcela-info");
+        if (info) info.textContent = "Leaflet no se ha podido cargar (¿bloqueado por el navegador o sin conexión?).";
+        return;
+      }
       if (mapaLeaflet) {
         mapaLeaflet.setView([cfg.lat, cfg.lon], 16);
+        forzarRedibujoMapa();
         return;
       }
 
       mapaLeaflet = L.map("mapa-parcela", { zoomControl: true }).setView([cfg.lat, cfg.lon], 16);
-      setTimeout(() => mapaLeaflet.invalidateSize(), 50);
 
-      L.tileLayer(
+      // Tile satélite de Esri; si falla, cae automáticamente a OSM
+      const tileEsri = L.tileLayer(
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        { attribution: "Esri World Imagery" }
-      ).addTo(mapaLeaflet);
+        { attribution: "Esri World Imagery", maxZoom: 19 }
+      );
+      const tileOsm = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        { attribution: "© OpenStreetMap", maxZoom: 19 }
+      );
+      let esriFallos = 0;
+      tileEsri.on("tileerror", () => {
+        if (++esriFallos > 2 && !mapaLeaflet.hasLayer(tileOsm)) {
+          mapaLeaflet.removeLayer(tileEsri);
+          tileOsm.addTo(mapaLeaflet);
+        }
+      });
+      tileEsri.addTo(mapaLeaflet);
+
+      forzarRedibujoMapa();
 
       if (cfg.parcela) mostrarPoligono(cfg.parcela, false);
 
@@ -1223,6 +1250,8 @@
       if (!localStorage.getItem(STORAGE_KEY)) {
         panel.classList.add("visible");
         inicializarCultivos();
+        initMapaParcela();
+        forzarRedibujoMapa();
       }
 
       btnConfig.addEventListener("click", () => {
@@ -1230,7 +1259,7 @@
         if (visible) {
           mostrarConfigActual();
           initMapaParcela();
-          setTimeout(() => mapaLeaflet?.invalidateSize(), 50);
+          forzarRedibujoMapa();
         }
       });
 
