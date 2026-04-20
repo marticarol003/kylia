@@ -98,7 +98,7 @@ module.exports = async (req, res) => {
 
   const d      = 0.001;
   const hoy    = new Date().toISOString().slice(0, 10);
-  const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const hace30 = new Date(Date.now() - 10 * 86_400_000).toISOString().slice(0, 10);
 
   let bounds;
   try {
@@ -137,13 +137,14 @@ function evaluatePixel(s) {
           type: "sentinel-2-l2a",
           dataFilter: {
             timeRange:        { from: `${hace30}T00:00:00Z`, to: `${hoy}T23:59:59Z` },
-            maxCloudCoverage: 80,
+            maxCloudCoverage: 30,
+            mosaickingOrder:  "mostRecent",
           },
         }],
       },
       output: {
-        width:  20,
-        height: 20,
+        width:  50,
+        height: 50,
         responses: [{ identifier: "default", format: { type: "image/png" } }],
       },
       evalscript,
