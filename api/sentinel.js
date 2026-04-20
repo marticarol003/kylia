@@ -3,6 +3,38 @@ const { inflateSync } = require('zlib');
 const TOKEN_URL   = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process";
 
+function paeth(a, b, c) {
+  const p = a + b - c;
+  const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+}
+
+function unfilterPng(raw, width, channels) {
+  const stride = 1 + width * channels;
+  const height = Math.floor(raw.length / stride);
+  const out    = Buffer.alloc(width * channels * height);
+
+  for (let y = 0; y < height; y++) {
+    const filterType = raw[y * stride];
+    const rowIn  = y * stride + 1;
+    const rowOut = y * width * channels;
+    const prevOut = (y - 1) * width * channels;
+
+    for (let x = 0; x < width * channels; x++) {
+      const byte = raw[rowIn + x];
+      const a = x >= channels ? out[rowOut + x - channels] : 0;
+      const b = y > 0 ? out[prevOut + x] : 0;
+      const c = (x >= channels && y > 0) ? out[prevOut + x - channels] : 0;
+      out[rowOut + x] = (filterType === 1 ? byte + a
+                       : filterType === 2 ? byte + b
+                       : filterType === 3 ? byte + Math.floor((a + b) / 2)
+                       : filterType === 4 ? byte + paeth(a, b, c)
+                       : byte) & 0xFF;
+    }
+  }
+  return out;
+}
+
 function parsePngNdviStats(buf) {
   const chunks = [];
   let pos = 8, width = 0, height = 0;
@@ -19,19 +51,15 @@ function parsePngNdviStats(buf) {
   }
   if (!chunks.length || !width || !height) return null;
 
-  const raw    = inflateSync(Buffer.concat(chunks));
-  const stride = 1 + width * 4; // filter_byte + RGBA per row
-  const values = [];
+  const raw      = inflateSync(Buffer.concat(chunks));
+  const pixels   = unfilterPng(raw, width, 4); // RGBA
+  const values   = [];
 
-  for (let y = 0; y < height; y++) {
-    const base = y * stride;
-    for (let x = 0; x < width; x++) {
-      const i = base + 1 + x * 4;
-      const r = raw[i], g = raw[i + 1], a = raw[i + 3];
-      if (a === 0) continue;
-      const u16 = (r << 8) | g;
-      values.push((u16 / 65535) * 2 - 1);
-    }
+  for (let i = 0; i < width * height; i++) {
+    const r = pixels[i * 4], g = pixels[i * 4 + 1], a = pixels[i * 4 + 3];
+    if (a === 0) continue;
+    const u16 = (r << 8) | g;
+    values.push((u16 / 65535) * 2 - 1);
   }
 
   if (!values.length) return null;
