@@ -2,14 +2,15 @@ const TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/pro
 const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
 const CORS      = { "Access-Control-Allow-Origin": "*" };
 
-// Evalscript: NDVI por píxel + dataMask que descarta nubes, sombras, nieve, etc.
-// La Statistical API promedia los píxeles válidos dentro de la geometría.
+// Evalscript: NDVI (B04/B08) + NDMI (B08/B11) + dataMask.
+// NDVI = vigor; NDMI = agua en la hoja.
 const EVALSCRIPT = `//VERSION=3
 function setup() {
   return {
-    input: [{ bands: ["B04", "B08", "SCL", "dataMask"] }],
+    input: [{ bands: ["B04", "B08", "B11", "SCL", "dataMask"] }],
     output: [
       { id: "ndvi",     bands: 1, sampleType: "FLOAT32" },
+      { id: "ndmi",     bands: 1, sampleType: "FLOAT32" },
       { id: "dataMask", bands: 1 }
     ]
   };
@@ -20,8 +21,10 @@ function evaluatePixel(s) {
   var bad = [0, 1, 3, 8, 9, 10, 11];
   var validScl = bad.indexOf(s.SCL) === -1 ? 1 : 0;
   var ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 1e-10);
+  var ndmi = (s.B08 - s.B11) / (s.B08 + s.B11 + 1e-10);
   return {
     ndvi:     [ndvi],
+    ndmi:     [ndmi],
     dataMask: [s.dataMask * validScl]
   };
 }`;
@@ -49,14 +52,15 @@ function buildBounds(geometryParam, lat, lon) {
 function pickLatestValid(statsJson) {
   const items = (statsJson?.data || [])
     .map((d) => {
-      const stats = d?.outputs?.ndvi?.bands?.B0?.stats;
-      if (!stats) return null;
-      const sample = stats.sampleCount || 0;
-      const nodata = stats.noDataCount || 0;
+      const statsNdvi = d?.outputs?.ndvi?.bands?.B0?.stats;
+      const statsNdmi = d?.outputs?.ndmi?.bands?.B0?.stats;
+      if (!statsNdvi) return null;
+      const sample = statsNdvi.sampleCount || 0;
+      const nodata = statsNdvi.noDataCount || 0;
       const valid  = sample - nodata;
       if (valid <= 0) return null;
-      if (typeof stats.mean !== "number" || Number.isNaN(stats.mean)) return null;
-      return { from: d.interval.from, stats, validPixels: valid };
+      if (typeof statsNdvi.mean !== "number" || Number.isNaN(statsNdvi.mean)) return null;
+      return { from: d.interval.from, statsNdvi, statsNdmi, validPixels: valid };
     })
     .filter(Boolean)
     .sort((a, b) => b.from.localeCompare(a.from));
@@ -132,8 +136,12 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ndvi: null, motivo: "sin_datos" }) };
   }
 
-  const ndvi   = +latest.stats.mean.toFixed(3);
-  const stdev  = typeof latest.stats.stDev === "number" ? +latest.stats.stDev.toFixed(3) : null;
+  const ndvi   = +latest.statsNdvi.mean.toFixed(3);
+  const stdev  = typeof latest.statsNdvi.stDev === "number" ? +latest.statsNdvi.stDev.toFixed(3) : null;
+  const ndmi      = latest.statsNdmi && typeof latest.statsNdmi.mean === "number"
+    ? +latest.statsNdmi.mean.toFixed(3) : null;
+  const ndmiStdev = latest.statsNdmi && typeof latest.statsNdmi.stDev === "number"
+    ? +latest.statsNdmi.stDev.toFixed(3) : null;
   const fecha  = latest.from.slice(0, 10);
   const estado = ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres";
 
@@ -143,6 +151,8 @@ exports.handler = async (event) => {
     body: JSON.stringify({
       ndvi,
       stdev,
+      ndmi,
+      ndmiStdev,
       fecha,
       estado,
       pixeles: latest.validPixels,
