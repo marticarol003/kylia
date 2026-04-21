@@ -1047,6 +1047,31 @@
     let ultimoSuelo = null;  // { hoy: [s1,s2,s3], hace7: [s1,s2,s3] }
     let ultimoNDMI  = null;  // { ndmi, stdev, fecha }
 
+    // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
+    // seleccionada, cae al lat/lon del pueblo/configuración.
+    // Esto es importante para Open-Meteo: si no usamos el centroide, toda la
+    // tarjeta de humedad del suelo se calcula en la ubicación del pueblo y
+    // nunca cambia al cambiar de parcela.
+    function puntoConsulta() {
+      if (!cfg.parcela) return { lat: cfg.lat, lon: cfg.lon };
+      try {
+        // Ring externo del polígono (Polygon o MultiPolygon)
+        const ring = cfg.parcela.type === "Polygon"
+          ? cfg.parcela.coordinates[0]
+          : cfg.parcela.coordinates[0][0];
+        let sx = 0, sy = 0, n = 0;
+        for (const [lon, lat] of ring) {
+          if (typeof lat === "number" && typeof lon === "number") {
+            sx += lon; sy += lat; n++;
+          }
+        }
+        if (n === 0) return { lat: cfg.lat, lon: cfg.lon };
+        return { lat: sy / n, lon: sx / n };
+      } catch (_) {
+        return { lat: cfg.lat, lon: cfg.lon };
+      }
+    }
+
     async function cargarNDVI(forzar = false) {
       const estadoEl       = document.getElementById("ndvi-estado");
       const motivoEl       = document.getElementById("ndvi-motivo");
@@ -1174,8 +1199,13 @@
       const trendEl = document.getElementById("suelo-tendencia");
 
       try {
+        // Usamos el centroide de la parcela (si hay) en vez del pueblo, para que
+        // la humedad del suelo cambie al elegir otra parcela — aunque DWD ICON
+        // tiene una malla de ~7 km y parcelas muy cercanas pueden caer en la
+        // misma celda.
+        const p = puntoConsulta();
         const url = `https://api.open-meteo.com/v1/forecast`
-          + `?latitude=${cfg.lat}&longitude=${cfg.lon}`
+          + `?latitude=${p.lat.toFixed(5)}&longitude=${p.lon.toFixed(5)}`
           + `&hourly=soil_moisture_0_to_1cm,soil_moisture_1_to_3cm,soil_moisture_3_to_9cm`
           + `,soil_moisture_9_to_27cm,soil_moisture_27_to_81cm`
           + `&past_days=7&forecast_days=1`;   // sin timezone → UTC, coincide con toISOString()
