@@ -357,6 +357,31 @@
     .ndvi-tendencia.mejorando { color: var(--low); }
     .ndvi-variabilidad { font-size: 0.78rem; color: var(--muted); margin: 6px 0 0; }
 
+    /* ── Histórico NDVI (sparkline) ── */
+    .ndvi-historial {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .ndvi-historial-titulo {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ndvi-historial-titulo span:last-child { font-weight: 600; color: var(--text); }
+    .ndvi-chart { width: 100%; height: 70px; display: block; }
+    .ndvi-chart .grid     { stroke: var(--border); stroke-width: 0.5; }
+    .ndvi-chart .area     { fill: rgba(43, 122, 58, 0.18); }
+    .ndvi-chart .line     { fill: none; stroke: #2b7a3a; stroke-width: 1.6; }
+    .ndvi-chart .dot      { fill: #2b7a3a; }
+    .ndvi-chart .dot.last { fill: #fff; stroke: #2b7a3a; stroke-width: 2; }
+    .ndvi-chart .axis     { font-size: 9px; fill: var(--muted); }
+    .ndvi-chart .tip      { font-size: 10px; fill: var(--text); font-weight: 600; }
+    .ndvi-historial-vacio { font-size: 0.78rem; color: var(--muted); font-style: italic; }
+
     /* ── Humedad (suelo + NDMI + recomendación) ── */
     .humedad-bloque {
       padding-top: 12px;
@@ -584,6 +609,13 @@
       <p class="ndvi-sub" id="ndvi-fecha"></p>
       <p class="ndvi-variabilidad" id="ndvi-variabilidad"></p>
       <p class="ndvi-tendencia" id="ndvi-tendencia"></p>
+      <div class="ndvi-historial" id="ndvi-historial">
+        <div class="ndvi-historial-titulo">
+          <span>Evolución del NDVI</span>
+          <span id="ndvi-historial-rango"></span>
+        </div>
+        <div id="ndvi-historial-contenido"></div>
+      </div>
     </section>
 
     <!-- Humedad: suelo + planta (NDMI) + recomendación -->
@@ -712,6 +744,99 @@
         return { texto: `↑ Levemente mejor que hace ${dias} días (${de} → ${(referencia.ndvi + diff).toFixed(2)}).`, clase: "mejorando" };
       }
       return { texto: `→ Estable desde hace ${dias} días (${de}).`, clase: "" };
+    }
+
+    // ─── Sparkline del histórico NDVI ─────────────────────────────────────────
+    // Dibuja un SVG sencillo con la serie NDVI de los últimos 56 días.
+    // Bandas de color (estrés / moderado / bueno) sobre el mismo gráfico para
+    // que la lectura sea inmediata sin necesidad de leyenda.
+    function renderNdviChart(history) {
+      const box = document.getElementById("ndvi-historial-contenido");
+      const rango = document.getElementById("ndvi-historial-rango");
+      if (!box) return;
+
+      if (!history || history.length < 2) {
+        box.innerHTML = `<p class="ndvi-historial-vacio">`
+          + `Todavía no hay suficiente histórico. Vuelve en unos días — cada vez que el satélite pase sobre tu parcela se añadirá un punto.`
+          + `</p>`;
+        if (rango) rango.textContent = "";
+        return;
+      }
+
+      const ordenado = [...history].sort((a, b) => a.date.localeCompare(b.date));
+      const primera  = ordenado[0];
+      const ultima   = ordenado[ordenado.length - 1];
+
+      const W = 320, H = 70;
+      const padL = 26, padR = 10, padT = 6, padB = 16;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+
+      // Eje Y fijo 0-1 (rango estándar de NDVI sano)
+      const yMin = 0, yMax = 1;
+      const y = (v) => padT + plotH * (1 - (v - yMin) / (yMax - yMin));
+
+      const t0 = new Date(primera.date).getTime();
+      const t1 = new Date(ultima.date).getTime();
+      const spanMs = Math.max(t1 - t0, 86_400_000);
+      const x = (iso) => padL + plotW * ((new Date(iso).getTime() - t0) / spanMs);
+
+      // Bandas: 0-0.35 estrés (rojo), 0.35-0.6 moderado (amarillo), 0.6-1 bueno (verde)
+      const bands = [
+        { from: 0.0,  to: 0.35, color: "rgba(220,53,69,0.10)" },
+        { from: 0.35, to: 0.6,  color: "rgba(255,193,7,0.12)" },
+        { from: 0.6,  to: 1.0,  color: "rgba(40,167,69,0.12)" },
+      ].map(({ from, to, color }) => {
+        const yTop = y(to), yBot = y(from);
+        return `<rect x="${padL}" y="${yTop}" width="${plotW}" height="${yBot - yTop}" fill="${color}" />`;
+      }).join("");
+
+      // Línea del histórico
+      const puntos = ordenado.map(p => [x(p.date), y(p.ndvi)]);
+      const linePath = puntos.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+      const areaPath = linePath
+        + ` L ${puntos[puntos.length - 1][0].toFixed(1)},${(padT + plotH).toFixed(1)}`
+        + ` L ${puntos[0][0].toFixed(1)},${(padT + plotH).toFixed(1)} Z`;
+
+      // Ticks eje Y (0, 0.5, 1)
+      const yTicks = [0, 0.5, 1].map(v =>
+        `<line class="grid" x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}"/>`
+        + `<text class="axis" x="${padL - 4}" y="${y(v) + 3}" text-anchor="end">${v.toFixed(1)}</text>`
+      ).join("");
+
+      // Ticks eje X: primer y último
+      const fmt = (iso) => iso.slice(5).replace("-", "/");
+      const xTicks = `
+        <text class="axis" x="${padL}" y="${H - 3}" text-anchor="start">${fmt(primera.date)}</text>
+        <text class="axis" x="${W - padR}" y="${H - 3}" text-anchor="end">${fmt(ultima.date)}</text>
+      `;
+
+      // Puntos (los 3 últimos destacados)
+      const dots = puntos.map(([px, py], i) => {
+        const esUltimo = i === puntos.length - 1;
+        const r = esUltimo ? 3.2 : 1.8;
+        return `<circle class="dot${esUltimo ? " last" : ""}" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${r}"/>`;
+      }).join("");
+
+      // Etiqueta con el último valor
+      const ultimoX = puntos[puntos.length - 1][0];
+      const ultimoY = puntos[puntos.length - 1][1];
+      const labelX  = Math.min(ultimoX + 5, W - padR - 20);
+      const labelY  = Math.max(ultimoY - 5, padT + 9);
+      const tip = `<text class="tip" x="${labelX}" y="${labelY}">${ultima.ndvi.toFixed(2)}</text>`;
+
+      box.innerHTML = `
+        <svg class="ndvi-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Evolución del NDVI">
+          ${bands}
+          ${yTicks}
+          <path class="area" d="${areaPath}"/>
+          <path class="line" d="${linePath}"/>
+          ${dots}
+          ${tip}
+          ${xTicks}
+        </svg>
+      `;
+      if (rango) rango.textContent = `${ordenado.length} lecturas · ${fmt(primera.date)} → ${fmt(ultima.date)}`;
     }
 
     // ─── Config (localStorage) ────────────────────────────────────────────────
@@ -1118,6 +1243,7 @@
             fechaEl.textContent  = "";
             variabilidadEl.textContent = "";
             tendenciaEl.textContent    = "";
+            renderNdviChart(history);
             return;
           }
 
@@ -1128,6 +1254,7 @@
             fechaEl.textContent  = "";
             variabilidadEl.textContent = "";
             tendenciaEl.textContent    = "";
+            renderNdviChart(history);
             return;
           }
 
@@ -1182,6 +1309,8 @@
       const { texto, clase } = textoTendencia(tendencia);
       tendenciaEl.textContent = texto || "";
       tendenciaEl.className   = `ndvi-tendencia${clase ? " " + clase : ""}`;
+
+      renderNdviChart(history);
 
       // Propaga NDMI a la tarjeta de humedad
       ultimoNDMI = entrada.ndmi != null
