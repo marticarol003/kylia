@@ -1,0 +1,1840 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kylia</title>
+  <style>
+    :root {
+      --bg:         #f5f8f2;
+      --text:       #1f2a1f;
+      --muted:      #5a685a;
+      --card:       #ffffff;
+      --border:     #dfe7d9;
+      --high:       #b91c1c;
+      --medium:     #b45309;
+      --low:        #15803d;
+      --high-bg:    #fee2e2;
+      --medium-bg:  #fef3c7;
+      --low-bg:     #dcfce7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 20px 16px 32px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .header-text h1 {
+      margin: 0 0 3px;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .btn-config {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 11px;
+      cursor: pointer;
+      font-size: 1rem;
+      color: var(--muted);
+      flex-shrink: 0;
+      line-height: 1;
+      margin-top: 2px;
+      font-family: inherit;
+    }
+    .btn-config:hover { background: var(--border); }
+
+    /* ── Config panel ── */
+    .config-panel {
+      display: none;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    .config-panel.visible { display: block; }
+
+    .config-panel h2 {
+      margin: 0 0 14px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .config-field { margin-bottom: 14px; }
+
+    .config-field label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .config-field input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .config-field input:focus {
+      outline: 2px solid var(--low);
+      border-color: transparent;
+    }
+
+    .btn-gps {
+      width: 100%;
+      background: var(--text);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    .btn-gps:hover { opacity: 0.85; }
+    .btn-gps:disabled { opacity: 0.5; cursor: default; }
+
+    .config-sep {
+      margin: 8px 0;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .config-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .btn-save {
+      background: var(--text);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 20px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-save:hover { opacity: 0.85; }
+    .btn-save:disabled { opacity: 0.5; cursor: default; }
+
+    .config-feedback {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .config-feedback.error { color: var(--high); }
+
+    /* ── Cultivos ── */
+    .cultivos-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .btn-cultivo {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 10px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 500;
+      text-align: left;
+      width: 100%;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .btn-cultivo.activo {
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text);
+    }
+
+    /* ── Card base ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    /* ── Alerta card ── */
+    .card-alerta {
+      border-left: 4px solid var(--border);
+      padding-left: 14px;
+    }
+    .card-alerta.alto   { border-left-color: var(--high); }
+    .card-alerta.medio  { border-left-color: var(--medium); }
+    .card-alerta.bajo   { border-left-color: var(--low); }
+
+    .alerta-titulo {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* ── Cultivos afectados (chips bajo el título de alerta) ── */
+    .alerta-cultivos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    .chip-cultivo {
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 2px 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+    }
+
+    /* ── Risk badge ── */
+    .risk-badge {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 8px;
+    }
+    .risk-badge.alto   { background: var(--high-bg);   color: var(--high); }
+    .risk-badge.medio  { background: var(--medium-bg); color: var(--medium); }
+    .risk-badge.bajo   { background: var(--low-bg);    color: var(--low); }
+
+    .risk-reason {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.875rem;
+      line-height: 1.45;
+    }
+
+    /* ── Forecast ── */
+    .forecast {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .forecast-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .forecast-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .forecast-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: var(--bg);
+    }
+
+    .forecast-day {
+      margin: 0 0 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-transform: capitalize;
+      color: var(--text);
+    }
+
+    .forecast-risk {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+    }
+    .forecast-risk.alto   { background: var(--high-bg);   color: var(--high); }
+    .forecast-risk.medio  { background: var(--medium-bg); color: var(--medium); }
+    .forecast-risk.bajo   { background: var(--low-bg);    color: var(--low); }
+
+    .forecast-meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    /* ── Alertas vacías ── */
+    .alertas-empty {
+      text-align: center;
+      padding: 28px 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      background: var(--card);
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    /* ── Salud del cultivo (NDVI) ── */
+    .ndvi-badge {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 8px;
+    }
+    .ndvi-badge.buena    { background: var(--low-bg);    color: var(--low); }
+    .ndvi-badge.moderada { background: var(--medium-bg); color: var(--medium); }
+    .ndvi-badge.estres   { background: var(--high-bg);   color: var(--high); }
+
+    .ndvi-sub {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .ndvi-tendencia {
+      margin: 10px 0 0;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .ndvi-tendencia.bajando  { color: var(--high); }
+    .ndvi-tendencia.mejorando { color: var(--low); }
+    .ndvi-variabilidad { font-size: 0.78rem; color: var(--muted); margin: 6px 0 0; }
+
+    /* ── Histórico NDVI (sparkline) ── */
+    .ndvi-historial {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .ndvi-historial-titulo {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ndvi-historial-titulo span:last-child { font-weight: 600; color: var(--text); }
+    .ndvi-chart { width: 100%; height: 70px; display: block; }
+    .ndvi-chart .grid     { stroke: var(--border); stroke-width: 0.5; }
+    .ndvi-chart .area     { fill: rgba(43, 122, 58, 0.18); }
+    .ndvi-chart .line     { fill: none; stroke: #2b7a3a; stroke-width: 1.6; }
+    .ndvi-chart .dot      { fill: #2b7a3a; }
+    .ndvi-chart .dot.last { fill: #fff; stroke: #2b7a3a; stroke-width: 2; }
+    .ndvi-chart .axis     { font-size: 9px; fill: var(--muted); }
+    .ndvi-chart .tip      { font-size: 10px; fill: var(--text); font-weight: 600; }
+    .ndvi-historial-vacio { font-size: 0.78rem; color: var(--muted); font-style: italic; }
+
+    /* ── Humedad (suelo + NDMI + recomendación) ── */
+    .humedad-bloque {
+      padding-top: 12px;
+      margin-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .humedad-bloque:first-of-type {
+      padding-top: 0;
+      margin-top: 0;
+      border-top: none;
+    }
+    .humedad-titulo {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .suelo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .suelo-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 6px;
+      background: var(--bg);
+      text-align: center;
+      line-height: 1.2;
+    }
+    .suelo-card.seco     { background: var(--high-bg);   border-color: var(--high-bg); }
+    .suelo-card.adecuado { background: var(--low-bg);    border-color: var(--low-bg); }
+    .suelo-card.saturado { background: var(--medium-bg); border-color: var(--medium-bg); }
+    .suelo-profundidad {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin: 0 0 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .suelo-valor {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0;
+    }
+    .suelo-estado {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin: 3px 0 0;
+      text-transform: uppercase;
+    }
+    .suelo-card.seco     .suelo-estado { color: var(--high); }
+    .suelo-card.adecuado .suelo-estado { color: var(--low); }
+    .suelo-card.saturado .suelo-estado { color: var(--medium); }
+    .suelo-tendencia {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin: 8px 0 0;
+      line-height: 1.4;
+    }
+    .suelo-tendencia.bajando  { color: var(--high); }
+    .suelo-tendencia.subiendo { color: var(--low);  }
+
+    .recomendacion-texto {
+      margin: 0;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      color: var(--text);
+    }
+
+    /* ── Weather card ── */
+    .weather-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .weather-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+    }
+
+    .btn-refresh {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 9px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      color: var(--muted);
+      font-family: inherit;
+    }
+    .btn-refresh:hover { background: var(--border); }
+    .btn-refresh:disabled { opacity: 0.5; cursor: default; }
+
+    .weather-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 8px;
+    }
+
+    .weather-stat-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+
+    .weather-stat-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .status {
+      display: block;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-align: right;
+    }
+    .status.error {
+      color: var(--high);
+      font-weight: 600;
+      text-align: left;
+    }
+    /* ── Mapa parcela ── */
+    #mapa-parcela {
+      height: 240px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .btn-confirmar-parcela {
+      display: none;
+      width: 100%;
+      margin-top: 8px;
+      background: var(--low);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-confirmar-parcela.visible { display: block; }
+
+    .parcela-info {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 4px;
+      margin-bottom: 0;
+    }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <main class="app">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-text">
+        <h1 id="greeting">Hola</h1>
+        <p class="sub" id="subtitle"> </p>
+      </div>
+      <button class="btn-config" id="btn-config" aria-label="Abrir configuración">&#9881;</button>
+    </div>
+
+    <!-- Panel de configuración -->
+    <div class="config-panel" id="config-panel" aria-label="Configuración">
+      <h2>Configuración</h2>
+      <div class="config-field">
+        <label for="input-nombre">Nombre</label>
+        <input type="text" id="input-nombre" placeholder="Ej: Elias" maxlength="40" autocomplete="off">
+      </div>
+      <div class="config-field">
+        <label>Ubicación</label>
+        <button class="btn-gps" id="btn-gps">&#128205; Usar mi ubicación GPS</button>
+        <div class="config-sep">— o introducir manualmente —</div>
+        <input type="text" id="input-ciudad" placeholder="Ej: El Prat de Llobregat" maxlength="80" autocomplete="off">
+      </div>
+      <div class="config-field">
+        <label>Parcela agrícola</label>
+        <p class="parcela-info" id="parcela-info">Toca tu campo en el mapa para cargar el contorno oficial de SIGPAC.</p>
+        <div id="mapa-parcela"></div>
+        <button class="btn-confirmar-parcela" id="btn-confirmar-parcela" type="button">&#10003; Confirmar parcela</button>
+      </div>
+
+      <div class="config-field">
+        <label>Mis cultivos</label>
+        <div class="cultivos-grid" id="cultivos-grid"></div>
+      </div>
+      <div class="config-actions">
+        <button class="btn-save" id="btn-save-config">Guardar</button>
+        <span class="config-feedback" id="config-feedback" aria-live="polite"></span>
+      </div>
+    </div>
+
+    <!-- Alertas dinámicas -->
+    <div id="alertas-container"></div>
+
+    <!-- Salud del cultivo (Sentinel-2 NDVI) -->
+    <section class="card card-alerta" id="card-ndvi" aria-label="Salud del cultivo">
+      <div class="weather-header">
+        <span class="alerta-titulo" style="margin-bottom:0;">Salud del cultivo · Sentinel-2</span>
+        <button class="btn-refresh" id="btn-refresh-ndvi" aria-label="Actualizar NDVI">&#8635; Actualizar</button>
+      </div>
+      <span class="ndvi-badge" id="ndvi-estado">--</span>
+      <p class="risk-reason" id="ndvi-motivo"></p>
+      <p class="ndvi-sub" id="ndvi-fecha"></p>
+      <p class="ndvi-variabilidad" id="ndvi-variabilidad"></p>
+      <p class="ndvi-tendencia" id="ndvi-tendencia"></p>
+      <div class="ndvi-historial" id="ndvi-historial">
+        <div class="ndvi-historial-titulo">
+          <span>Evolución del NDVI</span>
+          <span id="ndvi-historial-rango"></span>
+        </div>
+        <div id="ndvi-historial-contenido"></div>
+      </div>
+    </section>
+
+    <!-- Humedad: suelo + planta (NDMI) + recomendación -->
+    <section class="card card-alerta" id="card-humedad" aria-label="Humedad del suelo y la planta">
+      <div class="weather-header">
+        <span class="alerta-titulo" style="margin-bottom:0;">Humedad</span>
+        <button class="btn-refresh" id="btn-refresh-humedad" aria-label="Actualizar humedad">&#8635; Actualizar</button>
+      </div>
+
+      <div class="humedad-bloque">
+        <div class="humedad-titulo">Humedad del suelo</div>
+        <div class="suelo-grid" id="suelo-grid"></div>
+        <p class="suelo-tendencia" id="suelo-tendencia"></p>
+      </div>
+
+      <div class="humedad-bloque">
+        <div class="humedad-titulo">Humedad en la planta (NDMI)</div>
+        <span class="ndvi-badge" id="ndmi-estado">--</span>
+        <p class="risk-reason" id="ndmi-motivo"></p>
+        <p class="ndvi-sub" id="ndmi-fecha"></p>
+        <p class="ndvi-variabilidad" id="ndmi-variabilidad"></p>
+      </div>
+
+      <div class="humedad-bloque">
+        <div class="humedad-titulo">Recomendación</div>
+        <p class="recomendacion-texto" id="humedad-recomendacion">Cargando datos...</p>
+      </div>
+    </section>
+
+    <!-- Condiciones meteorológicas -->
+    <section class="card" aria-label="Condiciones meteorológicas">
+      <div class="weather-header">
+        <span class="weather-label">Ahora mismo</span>
+        <button class="btn-refresh" id="btn-refresh" aria-label="Actualizar datos">&#8635; Actualizar</button>
+      </div>
+      <div class="weather-grid">
+        <div>
+          <div class="weather-stat-value" id="temp-value">--</div>
+          <div class="weather-stat-label">Temperatura</div>
+        </div>
+        <div>
+          <div class="weather-stat-value" id="humidity-value">--</div>
+          <div class="weather-stat-label">Humedad</div>
+        </div>
+        <div>
+          <div class="weather-stat-value" id="wind-value">--</div>
+          <div class="weather-stat-label">Viento</div>
+        </div>
+        <div>
+          <div class="weather-stat-value" id="rain-value">--</div>
+          <div class="weather-stat-label">Lluvia hoy</div>
+        </div>
+      </div>
+      <span id="weather-status" class="status" aria-live="polite">Cargando...</span>
+    </section>
+
+  </main>
+  <script>
+    // ─── Constantes ───────────────────────────────────────────────────────────
+    const REFRESH_MS  = 30 * 60 * 1000;
+    const STORAGE_KEY = "kylia_config";
+
+    const DEFAULTS = {
+      nombre:   "Agricultor",
+      ciudad:   "Barcelona",
+      lat:      41.3828,
+      lon:      2.1771,
+      cultivos: ["lechuga"],
+      parcela:  null,
+    };
+
+    const NDVI_HISTORY_DAYS = 56; // 8 semanas
+
+    function getNdviKey() {
+      if (cfg.parcela) {
+        const c = cfg.parcela.type === "Polygon"
+          ? cfg.parcela.coordinates[0][0]
+          : cfg.parcela.coordinates[0][0][0];
+        return `kylia_ndvi2_${c[0].toFixed(5)}_${c[1].toFixed(5)}`;
+      }
+      return `kylia_ndvi2_${cfg.lat.toFixed(4)}_${cfg.lon.toFixed(4)}`;
+    }
+
+    function loadNdviHistory() {
+      try {
+        const raw = localStorage.getItem(getNdviKey());
+        return raw ? JSON.parse(raw) : [];
+      } catch (_) { return []; }
+    }
+
+    function saveNdviEntry(entry) {
+      let history = loadNdviHistory().filter(h => h.date !== entry.date);
+      history.push(entry);
+      history.sort((a, b) => a.date.localeCompare(b.date));
+      const cutoff = new Date(Date.now() - NDVI_HISTORY_DAYS * 86_400_000).toISOString().slice(0, 10);
+      history = history.filter(h => h.date >= cutoff);
+      localStorage.setItem(getNdviKey(), JSON.stringify(history));
+      return history;
+    }
+
+    function calcularTendencia(history) {
+      if (history.length < 2) return null;
+      const actual     = history[history.length - 1];
+      const hace14iso  = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
+      const referencia = [...history].reverse().find(h => h.date <= hace14iso) || history[0];
+      if (referencia.date === actual.date) return null;
+      const diff = +(actual.ndvi - referencia.ndvi).toFixed(3);
+      const dias = Math.round((new Date(actual.date) - new Date(referencia.date)) / 86_400_000);
+      return { diff, referencia, dias };
+    }
+
+    function textoTendencia(tendencia) {
+      if (!tendencia) return { texto: null, clase: "" };
+      const { diff, referencia, dias } = tendencia;
+      const de = referencia.ndvi.toFixed(2);
+      if (diff <= -0.08) {
+        return { texto: `↓ Bajando — pasaste de ${de} hace ${dias} días al ${tendencia.referencia.date.slice(5).replace("-","/")} a ${(referencia.ndvi + diff).toFixed(2)} hoy. Revisa el riego y busca síntomas de enfermedad.`, clase: "bajando" };
+      }
+      if (diff <= -0.03) {
+        return { texto: `↓ Ligera bajada respecto a hace ${dias} días (${de} → ${(referencia.ndvi + diff).toFixed(2)}). Mantente atento.`, clase: "bajando" };
+      }
+      if (diff >= 0.08) {
+        return { texto: `↑ Mejorando — el cultivo lleva ${dias} días recuperándose (${de} → ${(referencia.ndvi + diff).toFixed(2)}). Buen trabajo.`, clase: "mejorando" };
+      }
+      if (diff >= 0.03) {
+        return { texto: `↑ Levemente mejor que hace ${dias} días (${de} → ${(referencia.ndvi + diff).toFixed(2)}).`, clase: "mejorando" };
+      }
+      return { texto: `→ Estable desde hace ${dias} días (${de}).`, clase: "" };
+    }
+
+    // ─── Sparkline del histórico NDVI ─────────────────────────────────────────
+    // Dibuja un SVG sencillo con la serie NDVI de los últimos 56 días.
+    // Bandas de color (estrés / moderado / bueno) sobre el mismo gráfico para
+    // que la lectura sea inmediata sin necesidad de leyenda.
+    function renderNdviChart(history) {
+      const box = document.getElementById("ndvi-historial-contenido");
+      const rango = document.getElementById("ndvi-historial-rango");
+      if (!box) return;
+
+      if (!history || history.length < 2) {
+        box.innerHTML = `<p class="ndvi-historial-vacio">`
+          + `Todavía no hay suficiente histórico. Vuelve en unos días — cada vez que el satélite pase sobre tu parcela se añadirá un punto.`
+          + `</p>`;
+        if (rango) rango.textContent = "";
+        return;
+      }
+
+      const ordenado = [...history].sort((a, b) => a.date.localeCompare(b.date));
+      const primera  = ordenado[0];
+      const ultima   = ordenado[ordenado.length - 1];
+
+      const W = 320, H = 70;
+      const padL = 26, padR = 10, padT = 6, padB = 16;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+
+      // Eje Y fijo 0-1 (rango estándar de NDVI sano)
+      const yMin = 0, yMax = 1;
+      const y = (v) => padT + plotH * (1 - (v - yMin) / (yMax - yMin));
+
+      const t0 = new Date(primera.date).getTime();
+      const t1 = new Date(ultima.date).getTime();
+      const spanMs = Math.max(t1 - t0, 86_400_000);
+      const x = (iso) => padL + plotW * ((new Date(iso).getTime() - t0) / spanMs);
+
+      // Bandas: 0-0.35 estrés (rojo), 0.35-0.6 moderado (amarillo), 0.6-1 bueno (verde)
+      const bands = [
+        { from: 0.0,  to: 0.35, color: "rgba(220,53,69,0.10)" },
+        { from: 0.35, to: 0.6,  color: "rgba(255,193,7,0.12)" },
+        { from: 0.6,  to: 1.0,  color: "rgba(40,167,69,0.12)" },
+      ].map(({ from, to, color }) => {
+        const yTop = y(to), yBot = y(from);
+        return `<rect x="${padL}" y="${yTop}" width="${plotW}" height="${yBot - yTop}" fill="${color}" />`;
+      }).join("");
+
+      // Línea del histórico
+      const puntos = ordenado.map(p => [x(p.date), y(p.ndvi)]);
+      const linePath = puntos.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+      const areaPath = linePath
+        + ` L ${puntos[puntos.length - 1][0].toFixed(1)},${(padT + plotH).toFixed(1)}`
+        + ` L ${puntos[0][0].toFixed(1)},${(padT + plotH).toFixed(1)} Z`;
+
+      // Ticks eje Y (0, 0.5, 1)
+      const yTicks = [0, 0.5, 1].map(v =>
+        `<line class="grid" x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}"/>`
+        + `<text class="axis" x="${padL - 4}" y="${y(v) + 3}" text-anchor="end">${v.toFixed(1)}</text>`
+      ).join("");
+
+      // Ticks eje X: primer y último
+      const fmt = (iso) => iso.slice(5).replace("-", "/");
+      const xTicks = `
+        <text class="axis" x="${padL}" y="${H - 3}" text-anchor="start">${fmt(primera.date)}</text>
+        <text class="axis" x="${W - padR}" y="${H - 3}" text-anchor="end">${fmt(ultima.date)}</text>
+      `;
+
+      // Puntos (los 3 últimos destacados)
+      const dots = puntos.map(([px, py], i) => {
+        const esUltimo = i === puntos.length - 1;
+        const r = esUltimo ? 3.2 : 1.8;
+        return `<circle class="dot${esUltimo ? " last" : ""}" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${r}"/>`;
+      }).join("");
+
+      // Etiqueta con el último valor
+      const ultimoX = puntos[puntos.length - 1][0];
+      const ultimoY = puntos[puntos.length - 1][1];
+      const labelX  = Math.min(ultimoX + 5, W - padR - 20);
+      const labelY  = Math.max(ultimoY - 5, padT + 9);
+      const tip = `<text class="tip" x="${labelX}" y="${labelY}">${ultima.ndvi.toFixed(2)}</text>`;
+
+      box.innerHTML = `
+        <svg class="ndvi-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Evolución del NDVI">
+          ${bands}
+          ${yTicks}
+          <path class="area" d="${areaPath}"/>
+          <path class="line" d="${linePath}"/>
+          ${dots}
+          ${tip}
+          ${xTicks}
+        </svg>
+      `;
+      if (rango) rango.textContent = `${ordenado.length} lecturas · ${fmt(primera.date)} → ${fmt(ultima.date)}`;
+    }
+
+    // ─── Config (localStorage) ────────────────────────────────────────────────
+    let cfg = loadConfig();
+
+    function loadConfig() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+      } catch (_) {}
+      return { ...DEFAULTS };
+    }
+
+    function saveConfig(newCfg) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newCfg));
+      cfg = newCfg;
+    }
+
+    // ─── Modelos de riesgo ────────────────────────────────────────────────────
+
+    // Myzus persicae / Nasonovia ribisnigri en Lactuca sativa
+    function calcularRiesgoPulgon({ tempMax, humMax, vientoMax, lluvia }) {
+      const lluviaFuerte  = lluvia    > 8;
+      const vientoAlto    = vientoMax > 25;
+      const tempOptima    = tempMax >= 18 && tempMax <= 22;
+      const tempFavorable = tempMax >= 12 && tempMax <= 28;
+      const humAlta       = humMax  > 65;
+      const humModerada   = humMax  >= 50;
+
+      if (lluviaFuerte) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: `La lluvia (${lluvia} mm) reduce la actividad del pulgón temporalmente.` };
+      }
+      if (tempOptima && humAlta && !vientoAlto) {
+        return { nivel: "ALTO", clase: "alto",
+          motivo: `Temperatura (${tempMax}°C) y humedad (${humMax}%) óptimas. Revisa los cultivos y prepara tratamiento preventivo.` };
+      }
+      if (tempFavorable && humAlta && !vientoAlto) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Condiciones favorables (${tempMax}°C, ${humMax}%). Revisa las plantas a primera hora.` };
+      }
+      if (tempFavorable && humModerada && !vientoAlto) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Temperatura propicia (${tempMax}°C) con humedad moderada. Mantente atento.` };
+      }
+      return { nivel: "BAJO", clase: "bajo",
+        motivo: vientoAlto
+          ? `Viento fuerte (${vientoMax} km/h) dificulta el establecimiento del pulgón.`
+          : "Las condiciones actuales no favorecen el desarrollo del pulgón." };
+    }
+
+    // Bremia lactucae en Lactuca sativa
+    function calcularRiesgoMildiu({ tempMax, humMax, lluvia }) {
+      const tempInfeccion  = tempMax >= 10 && tempMax <= 22;
+      const tempInhibicion = tempMax > 27;
+      const humCritica     = humMax  > 85;
+      const humFavorable   = humMax  >= 70;
+      const hayLluvia      = lluvia  > 0.5;
+
+      if (tempInhibicion) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: `Las altas temperaturas (${tempMax}°C) inhiben las esporas del mildiu.` };
+      }
+      if (tempInfeccion && (humCritica || hayLluvia)) {
+        return { nivel: "ALTO", clase: "alto",
+          motivo: `Condiciones críticas: ${tempMax}°C, ${humMax}% humedad${hayLluvia ? ` y ${lluvia} mm de lluvia` : ""}. Aplica fungicida preventivo.` };
+      }
+      if (tempInfeccion && humFavorable) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Humedad elevada (${humMax}%) con temperatura propicia (${tempMax}°C). Vigila las hojas inferiores.` };
+      }
+      return { nivel: "BAJO", clase: "bajo",
+        motivo: "Las condiciones actuales no son favorables para el mildiu." };
+    }
+
+    // Pieris brassicae / Plutella xylostella en brassicas
+    function calcularRiesgoOrugaCol({ tempMax, lluvia }) {
+      const tempActiva     = tempMax >= 16 && tempMax <= 28;
+      const lluviaFuerte   = lluvia  > 8;
+      const lluviaModerada = lluvia  > 3;
+
+      if (tempMax < 10 || tempMax > 32) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: tempMax < 10
+            ? `Frío (${tempMax}°C) — las orugas están inactivas.`
+            : `Calor excesivo (${tempMax}°C) reduce la actividad de las orugas.` };
+      }
+      if (lluviaFuerte) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: `La lluvia fuerte (${lluvia} mm) reduce la supervivencia de las larvas jóvenes.` };
+      }
+      if (tempActiva && !lluviaModerada) {
+        return { nivel: "ALTO", clase: "alto",
+          motivo: `Temperatura ideal (${tempMax}°C) y tiempo seco. Revisa el envés de las hojas en busca de huevos o larvas.` };
+      }
+      if (tempMax >= 12) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Condiciones moderadas (${tempMax}°C). Mantente atento al envés de las hojas.` };
+      }
+      return { nivel: "BAJO", clase: "bajo",
+        motivo: "Las condiciones actuales no favorecen el desarrollo de orugas." };
+    }
+
+    // Bemisia tabaci / Trialeurodes vaporariorum
+    function calcularRiesgoMoscaBlanca({ tempMax, humMax, lluvia }) {
+      const tempOptima    = tempMax >= 25 && tempMax <= 32;
+      const tempFavorable = tempMax >= 20;
+      const humBaja       = humMax  < 65;
+      const humModerada   = humMax  < 75;
+      const lluviaInhibe  = lluvia  > 5;
+
+      if (tempMax < 18 || lluviaInhibe) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: tempMax < 18
+            ? `Temperatura baja (${tempMax}°C) — la mosca blanca está inactiva.`
+            : `La lluvia (${lluvia} mm) reduce las poblaciones de mosca blanca.` };
+      }
+      if (tempOptima && humBaja) {
+        return { nivel: "ALTO", clase: "alto",
+          motivo: `Calor (${tempMax}°C) y baja humedad (${humMax}%) favorecen la explosión de mosca blanca. Revisa el envés de las hojas.` };
+      }
+      if (tempFavorable && humModerada) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Condiciones moderadas (${tempMax}°C, ${humMax}%). Vigila especialmente las plantas jóvenes.` };
+      }
+      return { nivel: "BAJO", clase: "bajo",
+        motivo: "Las condiciones actuales no favorecen la mosca blanca." };
+    }
+
+    // Tetranychus urticae
+    function calcularRiesgoAranaRoja({ tempMax, humMax, lluvia }) {
+      const tempOptima  = tempMax >= 28;
+      const tempFavor   = tempMax >= 23;
+      const humCritica  = humMax  < 45;
+      const humBaja     = humMax  < 60;
+      const lluviaInhib = lluvia  > 3;
+      const humAlta     = humMax  > 65;
+
+      if (tempMax < 20 || humAlta || lluviaInhib) {
+        return { nivel: "BAJO", clase: "bajo",
+          motivo: humAlta || lluviaInhib
+            ? "Humedad alta o lluvia — la araña roja está controlada naturalmente."
+            : `Temperatura baja (${tempMax}°C) — la araña roja está inactiva.` };
+      }
+      if (tempOptima && humCritica) {
+        return { nivel: "ALTO", clase: "alto",
+          motivo: `Calor extremo (${tempMax}°C) y ambiente muy seco (${humMax}%). Revisa urgentemente el envés de las hojas.` };
+      }
+      if (tempFavor && humBaja) {
+        return { nivel: "MEDIO", clase: "medio",
+          motivo: `Temperatura alta (${tempMax}°C) y baja humedad (${humMax}%). Vigila los cultivos.` };
+      }
+      return { nivel: "BAJO", clase: "bajo",
+        motivo: "Las condiciones actuales no favorecen la araña roja." };
+    }
+
+    // ─── Catálogo ─────────────────────────────────────────────────────────────
+    const ALERTAS = {
+      pulgon:       { titulo: "Pulgón",           calcFn: calcularRiesgoPulgon },
+      mildiu:       { titulo: "Mildiu",           calcFn: calcularRiesgoMildiu },
+      oruga_col:    { titulo: "Oruga de la col",  calcFn: calcularRiesgoOrugaCol },
+      mosca_blanca: { titulo: "Mosca blanca",     calcFn: calcularRiesgoMoscaBlanca },
+      arana_roja:   { titulo: "Araña roja",       calcFn: calcularRiesgoAranaRoja },
+    };
+
+    const CULTIVOS = [
+      { id: "lechuga",   nombre: "Lechuga",        alertas: ["pulgon", "mildiu"] },
+      { id: "espinaca",  nombre: "Espinaca",        alertas: ["pulgon", "mildiu"] },
+      { id: "brassica",  nombre: "Col / Coliflor",  alertas: ["pulgon", "oruga_col"] },
+      { id: "tomate",    nombre: "Tomate",          alertas: ["mosca_blanca", "arana_roja"] },
+      { id: "pimiento",  nombre: "Pimiento",        alertas: ["mosca_blanca", "arana_roja"] },
+      { id: "berenjena", nombre: "Berenjena",       alertas: ["mosca_blanca", "arana_roja"] },
+      { id: "calabacin", nombre: "Calabacín",       alertas: ["mosca_blanca"] },
+    ];
+
+    // ─── UI helpers ───────────────────────────────────────────────────────────
+    function formatearDiaSemana(fechaIso) {
+      return new Date(`${fechaIso}T12:00:00`).toLocaleDateString("es-ES", { weekday: "long" });
+    }
+
+    function renderizarPrevision(gridId, prevision) {
+      const grid = document.getElementById(gridId);
+      if (!grid) return;
+      grid.innerHTML = "";
+      prevision.forEach((dia) => {
+        const article = document.createElement("article");
+        article.className = "forecast-card";
+
+        const pDia = document.createElement("p");
+        pDia.className = "forecast-day";
+        pDia.textContent = dia.nombreDia;
+
+        const pRisk = document.createElement("span");
+        pRisk.className = `forecast-risk ${dia.clase}`;
+        pRisk.textContent = dia.nivel;
+
+        const pMeta = document.createElement("p");
+        pMeta.className = "forecast-meta";
+        pMeta.textContent = `${dia.tempMax}° · ${dia.humMax}%`;
+
+        article.appendChild(pDia);
+        article.appendChild(pRisk);
+        article.appendChild(pMeta);
+        grid.appendChild(article);
+      });
+    }
+
+    function actualizarPlaga(riskId, reasonId, forecastId, calcFn, datosHoy, diasFuturos) {
+      const { nivel, clase, motivo } = calcFn(datosHoy);
+
+      const prevision = diasFuturos.map((dia) => {
+        const r = calcFn(dia);
+        return { nombreDia: dia.nombreDia, nivel: r.nivel, clase: r.clase,
+                 tempMax: dia.tempMax, humMax: dia.humMax };
+      });
+
+      // Días consecutivos en riesgo ALTO empezando desde hoy
+      const todosDias = [{ nivel }, ...prevision];
+      let rachaAlto = 0;
+      for (const d of todosDias) {
+        if (d.nivel === "ALTO") rachaAlto++;
+        else break;
+      }
+
+      const hayAltoFuturo = prevision.some((d) => d.nivel === "ALTO");
+
+      const riskEl   = document.getElementById(riskId);
+      const reasonEl = document.getElementById(reasonId);
+      if (!riskEl || !reasonEl) return;
+
+      riskEl.textContent = nivel;
+      riskEl.className   = `risk-badge ${clase}`;
+
+      // Actualizar borde izquierdo de la tarjeta
+      const cardEl = riskEl.closest(".card-alerta");
+      if (cardEl) {
+        cardEl.classList.remove("alto", "medio", "bajo");
+        cardEl.classList.add(clase);
+      }
+
+      let textoMotivo = motivo;
+      if (rachaAlto >= 2) {
+        textoMotivo += ` Atención: ${rachaAlto} días consecutivos de riesgo ALTO.`;
+      } else if (hayAltoFuturo && nivel !== "ALTO") {
+        textoMotivo = `Se prevé riesgo ALTO en los próximos días. ${motivo}`;
+      }
+      reasonEl.textContent = textoMotivo;
+
+      renderizarPrevision(forecastId, prevision);
+    }
+
+    function setStatus(texto, esError = false) {
+      const el = document.getElementById("weather-status");
+      el.textContent = texto;
+      el.className = esError ? "status error" : "status";
+    }
+
+    function actualizarHeader() {
+      document.getElementById("greeting").textContent = `Hola, ${cfg.nombre}`;
+      const fecha = new Date().toLocaleDateString("es-ES", {
+        weekday: "long", day: "numeric", month: "long",
+      });
+      const sub = document.getElementById("subtitle");
+      sub.textContent = `${cfg.ciudad} · ${fecha}`;
+    }
+
+    // ─── Renderizado dinámico de alertas ──────────────────────────────────────
+    function renderizarAlertas(datosHoy = null, diasFuturos = []) {
+      const container = document.getElementById("alertas-container");
+      container.innerHTML = "";
+
+      const cultivosActivos = cfg.cultivos;
+      const alertasActivas = new Set();
+      cultivosActivos.forEach((cId) => {
+        const c = CULTIVOS.find((x) => x.id === cId);
+        if (c) c.alertas.forEach((a) => alertasActivas.add(a));
+      });
+
+      if (alertasActivas.size === 0) {
+        container.innerHTML =
+          '<div class="alertas-empty">Selecciona tus cultivos en la configuración &#9881;<br>para ver las alertas correspondientes.</div>';
+        return;
+      }
+
+      // Mapa alertaId → nombres de cultivos seleccionados que la generan
+      const alertaCultivos = {};
+      cultivosActivos.forEach((cId) => {
+        const c = CULTIVOS.find((x) => x.id === cId);
+        if (c) c.alertas.forEach((aId) => {
+          if (!alertaCultivos[aId]) alertaCultivos[aId] = [];
+          alertaCultivos[aId].push(c.nombre);
+        });
+      });
+
+      Object.entries(ALERTAS).forEach(([alertaId, alerta]) => {
+        if (!alertasActivas.has(alertaId)) return;
+
+        const riskId     = `${alertaId}-risk`;
+        const reasonId   = `${alertaId}-reason`;
+        const forecastId = `${alertaId}-forecast`;
+
+        const chips = (alertaCultivos[alertaId] || [])
+          .map((n) => `<span class="chip-cultivo">${n}</span>`)
+          .join("");
+
+        const section = document.createElement("section");
+        section.className = "card card-alerta";
+        section.setAttribute("aria-label", `Riesgo de ${alerta.titulo.toLowerCase()}`);
+        section.innerHTML =
+          `<div class="alerta-titulo">${alerta.titulo}</div>` +
+          `<div class="alerta-cultivos">${chips}</div>` +
+          `<span id="${riskId}" class="risk-badge">--</span>` +
+          `<p id="${reasonId}" class="risk-reason"></p>` +
+          `<div class="forecast">` +
+            `<div class="forecast-label">Próximos 3 días</div>` +
+            `<div id="${forecastId}" class="forecast-grid"></div>` +
+          `</div>`;
+        container.appendChild(section);
+
+        if (datosHoy) {
+          actualizarPlaga(riskId, reasonId, forecastId, alerta.calcFn, datosHoy, diasFuturos);
+        }
+      });
+    }
+
+    // ─── Salud del cultivo (NDVI) ──────────────────────────────────────────────────
+    // Una entrada es "nueva" (post-Statistical API + NDMI) si trae ndmi.
+    function entradaEsNueva(e) {
+      return e && ("stdev" in e) && ("pixeles" in e) && ("imagenFecha" in e) && ("ndmi" in e);
+    }
+
+    // Estado compartido para la tarjeta "Humedad"
+    let ultimoSuelo = null;  // { hoy: [s1,s2,s3], hace7: [s1,s2,s3] }
+    let ultimoNDMI  = null;  // { ndmi, stdev, fecha }
+
+    // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
+    // seleccionada, cae al lat/lon del pueblo/configuración.
+    // Esto es importante para Open-Meteo: si no usamos el centroide, toda la
+    // tarjeta de humedad del suelo se calcula en la ubicación del pueblo y
+    // nunca cambia al cambiar de parcela.
+    function puntoConsulta() {
+      if (!cfg.parcela) return { lat: cfg.lat, lon: cfg.lon };
+      try {
+        // Ring externo del polígono (Polygon o MultiPolygon)
+        const ring = cfg.parcela.type === "Polygon"
+          ? cfg.parcela.coordinates[0]
+          : cfg.parcela.coordinates[0][0];
+        let sx = 0, sy = 0, n = 0;
+        for (const [lon, lat] of ring) {
+          if (typeof lat === "number" && typeof lon === "number") {
+            sx += lon; sy += lat; n++;
+          }
+        }
+        if (n === 0) return { lat: cfg.lat, lon: cfg.lon };
+        return { lat: sy / n, lon: sx / n };
+      } catch (_) {
+        return { lat: cfg.lat, lon: cfg.lon };
+      }
+    }
+
+    async function cargarNDVI(forzar = false) {
+      const estadoEl       = document.getElementById("ndvi-estado");
+      const motivoEl       = document.getElementById("ndvi-motivo");
+      const fechaEl        = document.getElementById("ndvi-fecha");
+      const cardEl         = document.getElementById("card-ndvi");
+      const variabilidadEl = document.getElementById("ndvi-variabilidad");
+      const tendenciaEl    = document.getElementById("ndvi-tendencia");
+      const btnNdvi        = document.getElementById("btn-refresh-ndvi");
+
+      const hoy     = new Date().toISOString().slice(0, 10);
+      let   history = loadNdviHistory();
+      let   entrada = history.find(h => h.date === hoy);
+
+      // Si la entrada cacheada viene del formato viejo (sin stdev), la tiramos
+      // para obligar a una recarga contra la Statistical API nueva.
+      if (entrada && !entradaEsNueva(entrada)) {
+        history = history.filter(h => h.date !== hoy);
+        localStorage.setItem(getNdviKey(), JSON.stringify(history));
+        entrada = null;
+      }
+      if (forzar) entrada = null;
+
+      if (!entrada) {
+        if (btnNdvi) btnNdvi.disabled = true;
+        motivoEl.textContent = "Consultando satélite...";
+        try {
+          const geometryParam = cfg.parcela
+            ? `&geometry=${encodeURIComponent(JSON.stringify(cfg.parcela))}`
+            : "";
+          // Cache-busting (&_=timestamp) para evitar cualquier intermediario cacheando
+          const res = await fetch(
+            `/api/sentinel?lat=${cfg.lat}&lon=${cfg.lon}${geometryParam}&_=${Date.now()}`,
+            { cache: "no-store" }
+          );
+
+          let data = null;
+          try { data = await res.json(); } catch (_) { data = null; }
+
+          if (!res.ok) {
+            const detalle = data?.detail || data?.error || `HTTP ${res.status}`;
+            motivoEl.textContent = `Error del servidor NDVI: ${detalle}`;
+            estadoEl.textContent = "--";
+            estadoEl.className   = "ndvi-badge";
+            fechaEl.textContent  = "";
+            variabilidadEl.textContent = "";
+            tendenciaEl.textContent    = "";
+            renderNdviChart(history);
+            return;
+          }
+
+          if (data.ndvi === null || data.ndvi === undefined) {
+            estadoEl.textContent = "--";
+            estadoEl.className   = "ndvi-badge";
+            motivoEl.textContent = "Sin imágenes recientes disponibles (nubes o sin datos en los últimos 30 días).";
+            fechaEl.textContent  = "";
+            variabilidadEl.textContent = "";
+            tendenciaEl.textContent    = "";
+            renderNdviChart(history);
+            return;
+          }
+
+          entrada = {
+            date:         hoy,
+            ndvi:         data.ndvi,
+            stdev:        data.stdev ?? null,
+            ndmi:         data.ndmi ?? null,
+            ndmiStdev:    data.ndmiStdev ?? null,
+            estado:       data.estado,
+            imagenFecha:  data.fecha || hoy,
+            pixeles:      data.pixeles || null,
+          };
+          history = saveNdviEntry(entrada);
+        } catch (err) {
+          motivoEl.textContent = `No se ha podido contactar con /api/sentinel (${err.message}).`;
+          return;
+        } finally {
+          if (btnNdvi) btnNdvi.disabled = false;
+        }
+      }
+
+      const etiquetas = { buena: "BUENA", moderada: "VIGILAR", estres: "ESTRÉS" };
+      const textos    = {
+        buena:    "El campo está en buen estado.",
+        moderada: "Estrés leve detectado. Vigila tus cultivos.",
+        estres:   "Estrés severo detectado desde satélite. Revisa urgentemente.",
+      };
+
+      estadoEl.textContent = etiquetas[entrada.estado];
+      estadoEl.className   = `ndvi-badge ${entrada.estado}`;
+      cardEl.classList.remove("alto", "medio", "bajo");
+      cardEl.classList.add(entrada.estado === "buena" ? "bajo" : entrada.estado === "moderada" ? "medio" : "alto");
+      motivoEl.textContent = textos[entrada.estado];
+
+      const fechaImg = entrada.imagenFecha || entrada.date;
+      const origen   = cfg.parcela ? "parcela SIGPAC" : "entorno de la ubicación";
+      const pxInfo   = entrada.pixeles ? ` · ${entrada.pixeles} px` : "";
+      fechaEl.textContent = `NDVI ${entrada.ndvi} (${origen}${pxInfo}) · imagen del ${fechaImg}`;
+
+      if (entrada.stdev != null && entrada.stdev >= 0) {
+        let nota = "";
+        if (entrada.stdev >= 0.15)      nota = " — el campo es muy heterogéneo, hay zonas con peor vigor.";
+        else if (entrada.stdev >= 0.08) nota = " — hay variabilidad apreciable dentro de la parcela.";
+        else                            nota = " — el vigor es homogéneo en la parcela.";
+        variabilidadEl.textContent = `Variabilidad dentro del campo: ±${entrada.stdev}${nota}`;
+      } else {
+        variabilidadEl.textContent = "";
+      }
+
+      const tendencia = calcularTendencia(history);
+      const { texto, clase } = textoTendencia(tendencia);
+      tendenciaEl.textContent = texto || "";
+      tendenciaEl.className   = `ndvi-tendencia${clase ? " " + clase : ""}`;
+
+      renderNdviChart(history);
+
+      // Propaga NDMI a la tarjeta de humedad
+      ultimoNDMI = entrada.ndmi != null
+        ? { ndmi: entrada.ndmi, stdev: entrada.ndmiStdev, fecha: entrada.imagenFecha || entrada.date }
+        : null;
+      renderNDMI();
+      renderRecomendacion();
+    }
+
+    // ─── Humedad del suelo (Open-Meteo DWD ICON) ──────────────────────────────
+    // Capas nativas del modelo DWD ICON: 0-1, 1-3, 3-9, 9-27, 27-81 cm.
+    // Agrupamos en tres franjas agronómicas: superficie, raíz media, raíz profunda.
+    async function cargarHumedadSuelo() {
+      const gridEl  = document.getElementById("suelo-grid");
+      const trendEl = document.getElementById("suelo-tendencia");
+
+      try {
+        // Usamos el centroide de la parcela (si hay) en vez del pueblo, para que
+        // la humedad del suelo cambie al elegir otra parcela — aunque DWD ICON
+        // tiene una malla de ~7 km y parcelas muy cercanas pueden caer en la
+        // misma celda.
+        const p = puntoConsulta();
+        const url = `https://api.open-meteo.com/v1/forecast`
+          + `?latitude=${p.lat.toFixed(5)}&longitude=${p.lon.toFixed(5)}`
+          + `&hourly=soil_moisture_0_to_1cm,soil_moisture_1_to_3cm,soil_moisture_3_to_9cm`
+          + `,soil_moisture_9_to_27cm,soil_moisture_27_to_81cm`
+          + `&past_days=7&forecast_days=1`;   // sin timezone → UTC, coincide con toISOString()
+        const res  = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const times = data?.hourly?.time || [];
+        const a = data?.hourly?.soil_moisture_0_to_1cm   || [];
+        const b = data?.hourly?.soil_moisture_1_to_3cm   || [];
+        const c = data?.hourly?.soil_moisture_3_to_9cm   || [];
+        const d = data?.hourly?.soil_moisture_9_to_27cm  || [];
+        const e = data?.hourly?.soil_moisture_27_to_81cm || [];
+
+        if (!times.length || !c.length || !d.length || !e.length) {
+          throw new Error(data?.reason || "sin datos de suelo");
+        }
+
+        // Índice de la hora actual: último timestamp <= ahora (UTC)
+        const ahoraIso = new Date().toISOString().slice(0, 13);
+        let idxAhora = -1;
+        for (let i = times.length - 1; i >= 0; i--) {
+          if (times[i] <= ahoraIso) { idxAhora = i; break; }
+        }
+        if (idxAhora === -1) idxAhora = 0;
+        const idxHace7 = Math.max(0, idxAhora - 7 * 24);
+
+        // Media ponderada por grosor de capa:
+        //   superficie = (0-1·1 + 1-3·2 + 3-9·6) / 9
+        //   raíz media = 9-27  (único, 18 cm)
+        //   profundo   = 27-81 (único, 54 cm)
+        const media = (x) => {
+          const v0 = a[x], v1 = b[x], v2 = c[x];
+          if (v0 == null || v1 == null || v2 == null) return null;
+          return (v0 * 1 + v1 * 2 + v2 * 6) / 9;
+        };
+        ultimoSuelo = {
+          hoy:   [media(idxAhora), d[idxAhora] ?? null, e[idxAhora] ?? null],
+          hace7: [media(idxHace7), d[idxHace7] ?? null, e[idxHace7] ?? null],
+        };
+        renderSuelo();
+        renderRecomendacion();
+      } catch (err) {
+        gridEl.innerHTML = "";
+        trendEl.textContent = `No se ha podido cargar la humedad del suelo (${err.message}).`;
+        ultimoSuelo = null;
+        renderRecomendacion();
+      }
+    }
+
+    // ─── Renderizado: suelo, NDMI y recomendación ─────────────────────────────
+    function clasificarHumedadSuelo(valor) {
+      if (valor == null || Number.isNaN(valor)) return { clase: "", etiqueta: "--" };
+      if (valor < 0.15) return { clase: "seco",     etiqueta: "SECO" };
+      if (valor > 0.35) return { clase: "saturado", etiqueta: "HÚMEDO" };
+      return                { clase: "adecuado", etiqueta: "ADECUADO" };
+    }
+
+    function renderSuelo() {
+      const gridEl  = document.getElementById("suelo-grid");
+      const trendEl = document.getElementById("suelo-tendencia");
+      if (!ultimoSuelo) {
+        gridEl.innerHTML = "";
+        trendEl.textContent = "";
+        return;
+      }
+
+      const capas = [
+        { label: "0-9 cm",    i: 0 },  // superficie (media ponderada de 0-1, 1-3, 3-9)
+        { label: "9-27 cm",   i: 1 },  // raíces hortícolas
+        { label: "27-81 cm",  i: 2 },  // raíces profundas
+      ];
+
+      gridEl.innerHTML = "";
+      capas.forEach(({ label, i }) => {
+        const v = ultimoSuelo.hoy[i];
+        const { clase, etiqueta } = clasificarHumedadSuelo(v);
+        const pct = v != null ? `${Math.round(v * 100)}%` : "--";
+        const card = document.createElement("div");
+        card.className = `suelo-card ${clase}`;
+        card.innerHTML =
+          `<p class="suelo-profundidad">${label}</p>` +
+          `<p class="suelo-valor">${pct}</p>` +
+          `<p class="suelo-estado">${etiqueta}</p>`;
+        gridEl.appendChild(card);
+      });
+
+      // Tendencia 7 días en la capa 9-27 cm (zona de raíces de la mayoría de hortalizas)
+      const ahora = ultimoSuelo.hoy[1];
+      const hace7 = ultimoSuelo.hace7[1];
+      if (ahora != null && hace7 != null) {
+        const diff = ahora - hace7;
+        const diffPct = (diff * 100).toFixed(1);
+        if (diff <= -0.04) {
+          trendEl.textContent = `↓ El suelo se ha secado ${Math.abs(diffPct)}% en la última semana.`;
+          trendEl.className   = "suelo-tendencia bajando";
+        } else if (diff >= 0.04) {
+          trendEl.textContent = `↑ El suelo ha ganado ${diffPct}% de humedad en la última semana.`;
+          trendEl.className   = "suelo-tendencia subiendo";
+        } else {
+          trendEl.textContent = `→ La humedad del suelo está estable respecto a hace 7 días.`;
+          trendEl.className   = "suelo-tendencia";
+        }
+      } else {
+        trendEl.textContent = "";
+      }
+    }
+
+    function clasificarNDMI(ndmi) {
+      if (ndmi == null) return { clase: "", etiqueta: "--", motivo: "Sin datos satélite recientes." };
+      if (ndmi < 0.2)   return { clase: "estres",   etiqueta: "ESTRÉS HÍDRICO", motivo: "La planta está perdiendo agua. Riega cuanto antes." };
+      if (ndmi < 0.4)   return { clase: "moderada", etiqueta: "VIGILAR",         motivo: "La planta empieza a notar falta de agua." };
+      return                  { clase: "buena",    etiqueta: "HIDRATADA",      motivo: "Buen contenido de agua en la hoja." };
+    }
+
+    function renderNDMI() {
+      const estadoEl = document.getElementById("ndmi-estado");
+      const motivoEl = document.getElementById("ndmi-motivo");
+      const fechaEl  = document.getElementById("ndmi-fecha");
+      const varEl    = document.getElementById("ndmi-variabilidad");
+
+      if (!ultimoNDMI) {
+        estadoEl.textContent = "--";
+        estadoEl.className   = "ndvi-badge";
+        motivoEl.textContent = "Sin datos de satélite para NDMI.";
+        fechaEl.textContent  = "";
+        varEl.textContent    = "";
+        return;
+      }
+
+      const { ndmi, stdev, fecha } = ultimoNDMI;
+      const { clase, etiqueta, motivo } = clasificarNDMI(ndmi);
+      estadoEl.textContent = etiqueta;
+      estadoEl.className   = `ndvi-badge ${clase}`;
+      motivoEl.textContent = motivo;
+      fechaEl.textContent  = `NDMI ${ndmi} · imagen del ${fecha}`;
+      if (stdev != null) {
+        let nota = "";
+        if (stdev >= 0.12)      nota = " — hay zonas de la parcela más secas que otras.";
+        else if (stdev >= 0.06) nota = " — algo de variación entre zonas.";
+        else                    nota = " — hidratación homogénea.";
+        varEl.textContent = `Variabilidad: ±${stdev}${nota}`;
+      } else {
+        varEl.textContent = "";
+      }
+    }
+
+    function renderRecomendacion() {
+      const recEl = document.getElementById("humedad-recomendacion");
+
+      // Profundidad relevante según cultivos seleccionados
+      const cultivos = cfg.cultivos || [];
+      const haceProfundo = cultivos.some((c) => ["tomate", "pimiento", "berenjena"].includes(c));
+      const capaRel      = haceProfundo ? 2 : (cultivos.some((c) => ["brassica", "calabacin"].includes(c)) ? 1 : 0);
+      const labelCapa    = ["0-9 cm", "9-27 cm", "27-81 cm"][capaRel];
+
+      if (!ultimoSuelo && !ultimoNDMI) {
+        recEl.textContent = "Cargando datos...";
+        return;
+      }
+
+      const vSuelo = ultimoSuelo ? ultimoSuelo.hoy[capaRel] : null;
+      const sueloCl = clasificarHumedadSuelo(vSuelo).clase;  // seco | adecuado | saturado | ""
+      const ndmiCl  = ultimoNDMI ? clasificarNDMI(ultimoNDMI.ndmi).clase : ""; // estres | moderada | buena | ""
+
+      let texto = "";
+
+      if (sueloCl === "seco" && ndmiCl === "estres") {
+        texto = `⚠️ Suelo seco a ${labelCapa} y la planta ya muestra estrés hídrico. Riega hoy mismo.`;
+      } else if (sueloCl === "seco" && ndmiCl === "moderada") {
+        texto = `Suelo seco a ${labelCapa}; la planta empieza a notarlo. Conviene regar en las próximas horas.`;
+      } else if (sueloCl === "seco" && ndmiCl === "buena") {
+        texto = `El suelo está seco a ${labelCapa} pero la planta aún conserva reservas. Riega en los próximos 1-2 días.`;
+      } else if (sueloCl === "seco" && !ndmiCl) {
+        texto = `Suelo seco a ${labelCapa}. Riega pronto (sin datos recientes de la planta).`;
+      } else if (sueloCl === "saturado" && ndmiCl === "buena") {
+        texto = `Hay exceso de agua en el suelo y la planta está bien hidratada. Evita regar y vigila posibles hongos.`;
+      } else if (sueloCl === "saturado") {
+        texto = `El suelo está saturado. No riegues y asegura un buen drenaje para evitar pudrición de raíz.`;
+      } else if (sueloCl === "adecuado" && ndmiCl === "estres") {
+        texto = `El suelo tiene humedad aceptable pero la planta está estresada. Revisa calor, viento o posibles enfermedades.`;
+      } else if (sueloCl === "adecuado" && ndmiCl === "moderada") {
+        texto = `La humedad del suelo es correcta; la planta está algo justa. Observa las próximas 24 h antes de regar.`;
+      } else if (sueloCl === "adecuado" && ndmiCl === "buena") {
+        texto = `Todo en orden: suelo y planta están en buenas condiciones de humedad.`;
+      } else if (sueloCl === "adecuado") {
+        texto = `Humedad del suelo correcta a ${labelCapa}. Sin datos satélite recientes de la planta.`;
+      } else if (!sueloCl && ndmiCl === "estres") {
+        texto = `La planta muestra estrés hídrico. Sin datos del suelo; riega con precaución.`;
+      } else if (!sueloCl && ndmiCl === "buena") {
+        texto = `La planta está bien hidratada según el último paso del satélite.`;
+      } else {
+        texto = "Datos insuficientes para una recomendación fiable.";
+      }
+
+      recEl.textContent = texto;
+    }
+
+    // ─── Carga de datos ───────────────────────────────────────────────────────
+    async function cargarDatos() {
+      document.getElementById("btn-refresh").disabled = true;
+      setStatus("Cargando...");
+
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${cfg.lat}&longitude=${cfg.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&daily=temperature_2m_max,relative_humidity_2m_max,precipitation_sum,wind_speed_10m_max&forecast_days=4&timezone=auto`;
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("La API no responde correctamente.");
+        const data = await res.json();
+
+        if (!data.current)             throw new Error("No se han recibido datos actuales.");
+        if (!data.daily?.time?.length) throw new Error("No se han recibido datos de previsión diaria.");
+
+        const { temperature_2m: temp, relative_humidity_2m: hum, wind_speed_10m: viento } = data.current;
+
+        const datosHoy = {
+          tempMax:   data.daily.temperature_2m_max[0],
+          humMax:    data.daily.relative_humidity_2m_max[0],
+          lluvia:    data.daily.precipitation_sum[0],
+          vientoMax: data.daily.wind_speed_10m_max[0],
+        };
+
+        const diasFuturos = data.daily.time.slice(1, 4).map((fecha, i) => ({
+          nombreDia: formatearDiaSemana(fecha),
+          tempMax:   data.daily.temperature_2m_max[i + 1],
+          humMax:    data.daily.relative_humidity_2m_max[i + 1],
+          lluvia:    data.daily.precipitation_sum[i + 1],
+          vientoMax: data.daily.wind_speed_10m_max[i + 1],
+        }));
+
+        document.getElementById("temp-value").textContent     = `${temp}°C`;
+        document.getElementById("humidity-value").textContent = `${hum}%`;
+        document.getElementById("wind-value").textContent     = `${viento} km/h`;
+        document.getElementById("rain-value").textContent     = `${datosHoy.lluvia} mm`;
+
+        renderizarAlertas(datosHoy, diasFuturos);
+
+        const hora = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+        setStatus(`Actualizado a las ${hora}`);
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, true);
+        renderizarAlertas();
+        ["temp-value", "humidity-value", "wind-value", "rain-value"].forEach((id) => {
+          document.getElementById(id).textContent = "--";
+        });
+      } finally {
+        document.getElementById("btn-refresh").disabled = false;
+      }
+    }
+
+    // ─── Mapa parcela (Leaflet + SIGPAC) ─────────────────────────────────────
+    let mapaLeaflet      = null;
+    let parcelaPendiente = null;
+    let capaParcela      = null;
+
+    function mostrarPoligono(geometry, centrar) {
+      if (capaParcela) mapaLeaflet.removeLayer(capaParcela);
+      capaParcela = L.geoJSON(
+        { type: "Feature", geometry },
+        { style: { color: "#15803d", weight: 2, fillOpacity: 0.15 } }
+      ).addTo(mapaLeaflet);
+      if (centrar) mapaLeaflet.fitBounds(capaParcela.getBounds(), { padding: [20, 20] });
+    }
+
+    function forzarRedibujoMapa() {
+      if (!mapaLeaflet) return;
+      [0, 50, 200, 500, 1000].forEach((ms) =>
+        setTimeout(() => mapaLeaflet.invalidateSize(), ms)
+      );
+    }
+
+    function initMapaParcela() {
+      if (typeof L === "undefined") {
+        const info = document.getElementById("parcela-info");
+        if (info) info.textContent = "Leaflet no se ha podido cargar (¿bloqueado por el navegador o sin conexión?).";
+        return;
+      }
+      if (mapaLeaflet) {
+        mapaLeaflet.setView([cfg.lat, cfg.lon], 16);
+        forzarRedibujoMapa();
+        return;
+      }
+
+      mapaLeaflet = L.map("mapa-parcela", { zoomControl: true }).setView([cfg.lat, cfg.lon], 16);
+
+      // Tile satélite de Esri; si falla, cae automáticamente a OSM
+      const tileEsri = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        { attribution: "Esri World Imagery", maxZoom: 19 }
+      );
+      const tileOsm = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        { attribution: "© OpenStreetMap", maxZoom: 19 }
+      );
+      let esriFallos = 0;
+      tileEsri.on("tileerror", () => {
+        if (++esriFallos > 2 && !mapaLeaflet.hasLayer(tileOsm)) {
+          mapaLeaflet.removeLayer(tileEsri);
+          tileOsm.addTo(mapaLeaflet);
+        }
+      });
+      tileEsri.addTo(mapaLeaflet);
+
+      forzarRedibujoMapa();
+
+      if (cfg.parcela) mostrarPoligono(cfg.parcela, false);
+
+      mapaLeaflet.on("click", async (e) => {
+        const infoEl = document.getElementById("parcela-info");
+        const btnEl  = document.getElementById("btn-confirmar-parcela");
+        infoEl.textContent = "Buscando parcela...";
+
+        try {
+          const res  = await fetch(`/api/sigpac?lat=${e.latlng.lat}&lon=${e.latlng.lng}`);
+          const data = await res.json();
+
+          if (!data.parcela) {
+            infoEl.textContent = "No se ha encontrado parcela aquí. Toca un terreno agrícola.";
+            btnEl.classList.remove("visible");
+            return;
+          }
+
+          parcelaPendiente = data.parcela;
+          mostrarPoligono(data.parcela, true);
+          infoEl.textContent = "Parcela SIGPAC encontrada. Confirma para guardarla.";
+          btnEl.classList.add("visible");
+        } catch (_) {
+          infoEl.textContent = "Error al consultar SIGPAC. Inténtalo de nuevo.";
+        }
+      });
+
+      document.getElementById("btn-confirmar-parcela").addEventListener("click", () => {
+        if (!parcelaPendiente) return;
+        cfg = { ...cfg, parcela: parcelaPendiente };
+        saveConfig(cfg);
+        parcelaPendiente = null;
+        document.getElementById("btn-confirmar-parcela").classList.remove("visible");
+        document.getElementById("parcela-info").textContent =
+          "Parcela guardada. El NDVI usará este contorno exacto.";
+        cargarNDVI(true);
+        cargarHumedadSuelo();
+      });
+    }
+
+    // ─── Panel de configuración ───────────────────────────────────────────────
+    function initConfigPanel() {
+      const panel       = document.getElementById("config-panel");
+      const btnConfig   = document.getElementById("btn-config");
+      const btnGps      = document.getElementById("btn-gps");
+      const btnSave     = document.getElementById("btn-save-config");
+      const feedback    = document.getElementById("config-feedback");
+      const inputNombre = document.getElementById("input-nombre");
+      const inputCiudad = document.getElementById("input-ciudad");
+
+      function obtenerCultivosSeleccionados() {
+        return [...document.querySelectorAll(".btn-cultivo.activo")].map((b) => b.dataset.id);
+      }
+
+      async function guardarYActualizar(nuevoCfg) {
+        saveConfig(nuevoCfg);
+        actualizarHeader();
+        panel.classList.remove("visible");
+        setFeedback("");
+        await cargarDatos();
+        cargarNDVI(true);
+        cargarHumedadSuelo();
+      }
+
+      function setFeedback(texto, esError = false) {
+        feedback.textContent = texto;
+        feedback.className   = esError ? "config-feedback error" : "config-feedback";
+      }
+
+      function inicializarCultivos() {
+        const grid = document.getElementById("cultivos-grid");
+        grid.innerHTML = "";
+        CULTIVOS.forEach((cultivo) => {
+          const btn = document.createElement("button");
+          const activo = cfg.cultivos.includes(cultivo.id);
+          btn.className = "btn-cultivo" + (activo ? " activo" : "");
+          btn.textContent = cultivo.nombre;
+          btn.dataset.id = cultivo.id;
+          btn.type = "button";
+          btn.addEventListener("click", () => btn.classList.toggle("activo"));
+          grid.appendChild(btn);
+        });
+      }
+
+      function mostrarConfigActual() {
+        inputNombre.value = cfg.nombre !== DEFAULTS.nombre ? cfg.nombre : "";
+        inputCiudad.value = "";
+        setFeedback(cfg.ciudad ? `Ubicación actual: ${cfg.ciudad}` : "");
+        inicializarCultivos();
+      }
+
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        panel.classList.add("visible");
+        inicializarCultivos();
+        initMapaParcela();
+        forzarRedibujoMapa();
+      }
+
+      btnConfig.addEventListener("click", () => {
+        const visible = panel.classList.toggle("visible");
+        if (visible) {
+          mostrarConfigActual();
+          initMapaParcela();
+          forzarRedibujoMapa();
+        }
+      });
+
+      btnSave.addEventListener("click", async () => {
+        const nombre = inputNombre.value.trim() || DEFAULTS.nombre;
+        const ciudad = inputCiudad.value.trim();
+        const cultivosSeleccionados = obtenerCultivosSeleccionados();
+
+        if (!ciudad) {
+          await guardarYActualizar({ ...cfg, nombre, cultivos: cultivosSeleccionados });
+          return;
+        }
+
+        btnSave.disabled = true;
+        setFeedback("Buscando ubicación...");
+
+        try {
+          const res  = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(ciudad)}&count=1&language=es&format=json`);
+          const data = await res.json();
+
+          if (!data.results?.length) {
+            setFeedback("Ciudad no encontrada. Prueba con otra.", true);
+            return;
+          }
+
+          const lugar = data.results[0];
+          await guardarYActualizar({ ...cfg, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados, parcela: null });
+        } catch (_) {
+          setFeedback("Error de conexión. Inténtalo de nuevo.", true);
+        } finally {
+          btnSave.disabled = false;
+        }
+      });
+
+      btnGps.addEventListener("click", () => {
+        if (!navigator.geolocation) {
+          setFeedback("Tu navegador no soporta GPS.", true);
+          return;
+        }
+
+        const nombre = inputNombre.value.trim() || DEFAULTS.nombre;
+        const cultivosSeleccionados = obtenerCultivosSeleccionados();
+
+        btnGps.disabled = true;
+        setFeedback("Obteniendo ubicación GPS...");
+
+        navigator.geolocation.getCurrentPosition(
+          async ({ coords }) => {
+            const { latitude: lat, longitude: lon } = coords;
+            setFeedback("Identificando lugar...");
+
+            try {
+              const res  = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=es`);
+              const data = await res.json();
+              const ciudad = data.city || data.locality || data.principalSubdivision || "Ubicación GPS";
+
+              await guardarYActualizar({ ...cfg, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados, parcela: null });
+            } catch (_) {
+              await guardarYActualizar({ ...cfg, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados, parcela: null });
+            } finally {
+              btnGps.disabled = false;
+            }
+          },
+          (err) => {
+            btnGps.disabled = false;
+            setFeedback(err.code === 1
+              ? "Permiso de ubicación denegado."
+              : "No se ha podido obtener el GPS.", true);
+          },
+          { timeout: 10000, maximumAge: 60000 }
+        );
+      });
+    }
+
+    // ─── Arranque ─────────────────────────────────────────────────────────────
+    document.addEventListener("DOMContentLoaded", () => {
+      actualizarHeader();
+      initConfigPanel();
+      renderizarAlertas();
+      cargarDatos();
+      cargarNDVI();
+      cargarHumedadSuelo();
+      setInterval(cargarDatos, REFRESH_MS);
+      setInterval(cargarNDVI, 6 * 60 * 60 * 1000);       // cada 6h (Sentinel-2 revisita ~5 días)
+      setInterval(cargarHumedadSuelo, 60 * 60 * 1000);   // cada hora (Open-Meteo es horario)
+      document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
+      document.getElementById("btn-refresh-ndvi").addEventListener("click", () => cargarNDVI(true));
+      document.getElementById("btn-refresh-humedad").addEventListener("click", () => {
+        cargarNDVI(true);
+        cargarHumedadSuelo();
+      });
+    });
+  </script>
+</body>
+</html>
