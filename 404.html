@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#2b7a3a" />
+<meta name="robots" content="noindex,follow" />
+<title>404 · Kylia</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%232b7a3a%22/><path d=%22M10 20 Q16 10 22 20 Z%22 fill=%22white%22/></svg>" />
+<style>
+  :root {
+    --verde:     #2b7a3a;
+    --verde-700: #1f5a2b;
+    --slate-900: #0f172a;
+    --slate-500: #64748b;
+    --border:    #e2e8f0;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, system-ui, sans-serif;
+    color: var(--slate-900);
+    background:
+      radial-gradient(900px 500px at 90% -10%, rgba(43,122,58,0.12), transparent 60%),
+      radial-gradient(800px 400px at -10% 110%, rgba(43,122,58,0.08), transparent 60%),
+      #ffffff;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    line-height: 1.55;
+  }
+  main {
+    max-width: 560px; width: 100%; text-align: center;
+  }
+  .mark {
+    width: 64px; height: 64px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--verde) 0%, var(--verde-700) 100%);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; margin: 0 auto 28px;
+    box-shadow: 0 10px 24px rgba(43,122,58,0.25);
+  }
+  .code {
+    font-size: 0.78rem; font-weight: 700;
+    color: var(--verde); letter-spacing: 0.18em;
+    text-transform: uppercase; margin-bottom: 12px;
+  }
+  h1 {
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    letter-spacing: -0.02em; margin: 0 0 14px;
+  }
+  p { color: var(--slate-500); margin: 0 0 28px; }
+  .btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px; border-radius: 999px;
+    font-weight: 600; font-size: 0.96rem;
+    border: 1px solid transparent;
+    text-decoration: none;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-primary { background: var(--verde); color: #fff; }
+  .btn-primary:hover { background: var(--verde-700); box-shadow: 0 4px 14px rgba(43,122,58,0.25); }
+  .btn-ghost { background: transparent; color: var(--slate-900); border-color: var(--border); }
+  .btn-ghost:hover { background: #f7f9f7; }
+</style>
+</head>
+<body>
+  <main>
+    <div class="mark" aria-hidden="true">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path d="M4 18 Q12 6 20 18 Z" fill="currentColor"/><circle cx="12" cy="8" r="1.5" fill="currentColor"/></svg>
+    </div>
+    <div class="code">Error 404</div>
+    <h1>Esta página no existe.</h1>
+    <p>O la URL estaba mal, o la hemos movido mientras te distraías con la parcela del vecino. Tranquilo — aquí tienes por dónde volver.</p>
+    <div class="btns">
+      <a class="btn btn-primary" href="/">Volver al inicio</a>
+      <a class="btn btn-ghost" href="/app.html">Abrir Kylia</a>
+    </div>
+  </main>
+</body>
+</html>

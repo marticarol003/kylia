@@ -1,674 +1,2050 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kylia — El estado real de cada parcela de tu cooperativa</title>
-  <meta name="description" content="Kylia es la plataforma que usa satélites europeos (Copernicus / Sentinel-2) para darle a cada cooperativa agraria vigor, humedad y alertas por parcela SIGPAC. Sin sensores, sin instalación, sin coste por hectárea." />
-  <meta property="og:title" content="Kylia — Monitorización agronómica para cooperativas" />
-  <meta property="og:description" content="Vigor, humedad y alertas por parcela SIGPAC usando satélites europeos. Sin sensores. Sin coste por hectárea." />
-  <meta property="og:type" content="website" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text y=%22.9em%22 font-size=%2228%22>🌱</text></svg>" />
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#2b7a3a" />
+<meta name="robots" content="index,follow,max-image-preview:large" />
 
-  <style>
-    :root {
-      --verde:        #2b7a3a;
-      --verde-oscuro: #1f5a2b;
-      --verde-claro:  #e8f3ea;
-      --texto:        #1a1a1a;
-      --texto-suave:  #5a5a5a;
-      --borde:        #e5e5e5;
-      --fondo:        #ffffff;
-      --fondo-alt:    #f7f8f7;
-      --max:          1120px;
-      --radio:        14px;
-      --radio-sm:     8px;
-    }
+<title>Kylia — Agricultura de precisión desde el espacio, sin hardware</title>
+<meta name="description" content="Kylia monitoriza cada parcela SIGPAC con satélites europeos Copernicus: vigor, humedad del suelo y alertas en el móvil. Sin sensores, sin coste por hectárea. Para agricultores, cooperativas y el futuro del campo español." />
+<meta name="author" content="Kylia" />
+<meta name="keywords" content="agricultura de precisión, satélite, Sentinel-2, Copernicus, SIGPAC, NDVI, NDMI, humedad del suelo, cooperativas, riego, España" />
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+<link rel="canonical" href="https://kylia.app/" />
 
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, system-ui, sans-serif;
-      color: var(--texto);
-      background: var(--fondo);
-      line-height: 1.55;
-      -webkit-font-smoothing: antialiased;
-    }
+<!-- Preconnect a los hosts de terceros que usa el producto (Leaflet + tiles) -->
+<link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
+<link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
+<link rel="preconnect" href="https://api.open-meteo.com" crossorigin />
+<link rel="dns-prefetch" href="https://sigpac.mapa.gob.es" />
 
-    a { color: var(--verde); text-decoration: none; }
-    a:hover { text-decoration: underline; }
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Kylia" />
+<meta property="og:title" content="Kylia — Agricultura de precisión desde el espacio, sin hardware" />
+<meta property="og:description" content="Monitoriza cada parcela SIGPAC con satélites europeos. Sin sensores, sin coste por hectárea." />
+<meta property="og:locale" content="es_ES" />
+<meta property="og:url" content="https://kylia.app/" />
+<meta property="og:image" content="https://kylia.app/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Kylia — Agricultura de precisión por satélite. Cada parcela SIGPAC de España, sin hardware." />
 
-    .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Kylia — Agricultura de precisión desde el espacio" />
+<meta name="twitter:description" content="Monitoriza cada parcela SIGPAC con satélites europeos. Sin hardware, sin coste por hectárea." />
+<meta name="twitter:image" content="https://kylia.app/og-image.png" />
+<meta name="twitter:image:alt" content="Kylia — NDVI por parcela SIGPAC desde satélite Sentinel-2." />
 
-    /* ── Navbar ─────────────────────────────────────────────────────── */
-    .nav {
-      position: sticky; top: 0; z-index: 20;
-      background: rgba(255, 255, 255, 0.92);
-      backdrop-filter: saturate(180%) blur(8px);
-      -webkit-backdrop-filter: saturate(180%) blur(8px);
-      border-bottom: 1px solid var(--borde);
-    }
-    .nav-inner {
-      display: flex; align-items: center; justify-content: space-between;
-      height: 64px;
-    }
-    .brand {
-      font-weight: 700; font-size: 1.15rem; letter-spacing: -0.01em;
-      color: var(--texto); display: flex; align-items: center; gap: 8px;
-    }
-    .brand-dot {
-      display: inline-block; width: 10px; height: 10px; border-radius: 50%;
-      background: var(--verde);
-    }
-    .nav-links {
-      display: flex; align-items: center; gap: 26px;
-      font-size: 0.92rem;
-    }
-    .nav-links a {
-      color: var(--texto-suave); text-decoration: none;
-    }
-    .nav-links a:hover { color: var(--texto); }
-    .nav-cta {
-      background: var(--verde); color: #fff !important;
-      padding: 8px 16px; border-radius: 999px; font-weight: 600;
-      font-size: 0.9rem;
-    }
-    .nav-cta:hover { background: var(--verde-oscuro); text-decoration: none; }
-    @media (max-width: 640px) {
-      .nav-links a:not(.nav-cta) { display: none; }
-    }
+<!-- Favicon inline (SVG, sin request extra) -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%232b7a3a%22/><path d=%22M10 20 Q16 10 22 20 Z%22 fill=%22white%22/></svg>" />
 
-    /* ── Hero ───────────────────────────────────────────────────────── */
-    .hero {
-      padding: 96px 0 72px;
-      background:
-        radial-gradient(1200px 500px at 80% -10%, rgba(43, 122, 58, 0.10), transparent 60%),
-        radial-gradient(800px 400px at 0% 100%, rgba(43, 122, 58, 0.06), transparent 60%);
+<!-- Structured data: Organization + WebSite + SoftwareApplication -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://kylia.app/#org",
+      "name": "Kylia",
+      "url": "https://kylia.app/",
+      "description": "Monitorización agronómica por satélite para parcelas agrícolas en España.",
+      "sameAs": []
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://kylia.app/#website",
+      "url": "https://kylia.app/",
+      "name": "Kylia",
+      "inLanguage": "es-ES",
+      "publisher": { "@id": "https://kylia.app/#org" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "Kylia",
+      "operatingSystem": "Web",
+      "applicationCategory": "BusinessApplication",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR",
+        "description": "Piloto gratuito durante la campaña 2026."
+      },
+      "description": "Plataforma web de monitorización agronómica por satélite. Integra Sentinel-2, SIGPAC y Open-Meteo para devolver vigor, humedad del suelo y alertas por parcela.",
+      "featureList": [
+        "NDVI por parcela SIGPAC",
+        "NDMI — humedad en la hoja",
+        "Humedad del suelo por capas",
+        "Alertas de estrés hídrico",
+        "Histórico de 56 días"
+      ]
     }
-    .hero-eyebrow {
-      display: inline-block;
-      font-size: 0.78rem; font-weight: 600;
-      color: var(--verde); background: var(--verde-claro);
-      padding: 5px 12px; border-radius: 999px;
-      letter-spacing: 0.02em;
-      margin-bottom: 22px;
+  ]
+}
+</script>
+
+<style>
+  /* ═════════════════════════════════════════════════════════════════
+     Variables & reset
+     ═════════════════════════════════════════════════════════════════ */
+  :root {
+    --verde:        #2b7a3a;
+    --verde-700:    #1f5a2b;
+    --verde-900:    #0f3617;
+    --verde-50:     #e8f3ea;
+    --verde-100:    #d3e8d7;
+    --amarillo:     #d4a82a;
+    --rojo:         #c94343;
+    --azul:         #1c6ea4;
+
+    --slate-900:    #0f172a;
+    --slate-700:    #334155;
+    --slate-500:    #64748b;
+    --slate-300:    #cbd5e1;
+    --slate-200:    #e2e8f0;
+    --slate-100:    #f1f5f9;
+    --slate-50:     #f8fafc;
+
+    --text:         var(--slate-900);
+    --muted:        var(--slate-500);
+    --subtle:       var(--slate-700);
+    --border:       var(--slate-200);
+    --bg:           #ffffff;
+    --bg-alt:       #f7f9f7;
+    --bg-dark:      #0b1f13;
+
+    --max:          1180px;
+    --radius:       16px;
+    --radius-sm:    10px;
+    --radius-xs:    6px;
+
+    --shadow-sm:    0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+    --shadow-md:    0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+    --shadow-lg:    0 10px 15px -3px rgba(15, 23, 42, 0.07), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+
+    --ease:         cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body, h1, h2, h3, h4, p, ul, figure { margin: 0; padding: 0; }
+  ul { list-style: none; }
+  img, svg { display: block; max-width: 100%; }
+  button { font: inherit; cursor: pointer; }
+  a { color: var(--verde); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 3px solid rgba(43, 122, 58, 0.35);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
     }
-    .hero-title {
-      font-size: clamp(2rem, 4.6vw, 3.4rem);
-      line-height: 1.08; letter-spacing: -0.02em;
-      font-weight: 700;
-      max-width: 860px;
-      margin-bottom: 20px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", system-ui, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Skip link para accesibilidad */
+  .skip {
+    position: absolute; left: 12px; top: -40px;
+    background: var(--verde); color: #fff; padding: 8px 12px;
+    border-radius: 6px; z-index: 100;
+    transition: top 0.15s var(--ease);
+  }
+  .skip:focus { top: 12px; text-decoration: none; }
+
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+
+  /* Reveal on scroll */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+  .reveal.is-in { opacity: 1; transform: none; }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Announcement bar + Nav
+     ═════════════════════════════════════════════════════════════════ */
+  .announce {
+    background: var(--verde-900);
+    color: #d8ebdb;
+    font-size: 0.82rem;
+    text-align: center;
+    padding: 8px 16px;
+    letter-spacing: 0.01em;
+  }
+  .announce strong { color: #fff; }
+  .announce a { color: #fff; text-decoration: underline; }
+
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-progress {
+    position: absolute; left: 0; bottom: -1px;
+    height: 2px; width: 0%;
+    background: linear-gradient(to right, var(--verde), var(--amarillo));
+    transition: width 0.08s linear;
+  }
+  .nav-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px;
+  }
+  .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 1.12rem; letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .brand-logo {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--verde) 0%, var(--verde-700) 100%);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff;
+  }
+  .brand:hover { text-decoration: none; }
+  .nav-links {
+    display: flex; align-items: center; gap: 28px;
+    font-size: 0.92rem;
+  }
+  .nav-links a { color: var(--subtle); }
+  .nav-links a:hover { color: var(--text); text-decoration: none; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-weight: 600; font-size: 0.96rem;
+    padding: 12px 20px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    transition: background 0.15s var(--ease), transform 0.05s var(--ease), box-shadow 0.15s var(--ease);
+    white-space: nowrap;
+  }
+  .btn:hover { text-decoration: none; }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--verde); color: #fff; }
+  .btn-primary:hover { background: var(--verde-700); box-shadow: var(--shadow-md); }
+  .btn-ghost {
+    background: transparent; color: var(--text);
+    border-color: var(--border);
+  }
+  .btn-ghost:hover { background: var(--bg-alt); }
+  .btn-sm { padding: 8px 16px; font-size: 0.88rem; }
+  .btn-lg { padding: 16px 26px; font-size: 1.02rem; }
+  .nav-cta { padding: 9px 18px; font-size: 0.9rem; }
+
+  .nav-toggle {
+    display: none;
+    background: transparent; border: 1px solid var(--border);
+    width: 40px; height: 40px; border-radius: 10px;
+    padding: 0; color: var(--text);
+    align-items: center; justify-content: center;
+  }
+  .nav-toggle svg { width: 20px; height: 20px; }
+
+  @media (max-width: 760px) {
+    .nav-links { display: none; }
+    .nav-links.open {
+      display: flex; flex-direction: column; align-items: stretch;
+      position: absolute; top: 64px; left: 0; right: 0;
+      background: #fff; border-bottom: 1px solid var(--border);
+      padding: 16px 24px; gap: 6px;
+      box-shadow: var(--shadow-md);
     }
-    .hero-title em {
-      color: var(--verde); font-style: normal;
+    .nav-links.open a {
+      padding: 12px 8px; border-bottom: 1px solid var(--slate-100);
+      color: var(--text);
     }
-    .hero-sub {
-      font-size: clamp(1.02rem, 1.4vw, 1.18rem);
-      color: var(--texto-suave);
-      max-width: 680px;
-      margin-bottom: 36px;
-    }
-    .hero-cta {
-      display: flex; gap: 14px; flex-wrap: wrap;
-      margin-bottom: 28px;
-    }
-    .btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      font-weight: 600; font-size: 1rem;
-      padding: 14px 22px; border-radius: 999px;
-      border: 1px solid transparent;
-      cursor: pointer; transition: transform 0.05s ease, background 0.15s ease;
-      text-decoration: none;
-    }
-    .btn:hover { text-decoration: none; }
-    .btn:active { transform: translateY(1px); }
-    .btn-primary {
+    .nav-links.open a:last-child { border-bottom: 0; }
+    .nav-links.open .nav-cta {
+      margin-top: 8px; text-align: center;
       background: var(--verde); color: #fff;
+      border-radius: 999px;
     }
-    .btn-primary:hover { background: var(--verde-oscuro); }
-    .btn-ghost {
-      background: transparent; color: var(--texto);
-      border-color: var(--borde);
-    }
-    .btn-ghost:hover { background: var(--fondo-alt); }
-    .hero-trust {
-      display: flex; flex-wrap: wrap; gap: 18px 28px;
-      font-size: 0.84rem; color: var(--texto-suave);
-      padding-top: 14px;
-    }
-    .hero-trust-item {
-      display: inline-flex; align-items: center; gap: 8px;
-    }
-    .hero-trust-item::before {
-      content: "✓"; color: var(--verde); font-weight: 700;
-    }
+    .nav-toggle { display: inline-flex; }
+  }
 
-    /* ── Secciones genéricas ────────────────────────────────────────── */
-    section { padding: 88px 0; }
-    section.alt { background: var(--fondo-alt); }
+  /* ═════════════════════════════════════════════════════════════════
+     Hero
+     ═════════════════════════════════════════════════════════════════ */
+  .hero {
+    position: relative;
+    padding: 96px 0 88px;
+    overflow: hidden;
+    background:
+      radial-gradient(1200px 520px at 85% -20%, rgba(43, 122, 58, 0.12), transparent 60%),
+      radial-gradient(900px 420px at -5% 110%, rgba(43, 122, 58, 0.07), transparent 60%);
+  }
+  .hero-grid {
+    display: grid; gap: 56px;
+    grid-template-columns: 1.1fr 1fr;
+    align-items: center;
+  }
+  @media (max-width: 920px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+    .hero { padding: 64px 0 72px; }
+  }
 
-    .section-eyebrow {
-      font-size: 0.78rem; font-weight: 700; color: var(--verde);
-      letter-spacing: 0.08em; text-transform: uppercase;
-      margin-bottom: 14px;
-    }
-    .section-title {
-      font-size: clamp(1.6rem, 3vw, 2.2rem);
-      font-weight: 700; letter-spacing: -0.015em;
-      line-height: 1.2; margin-bottom: 14px;
-      max-width: 760px;
-    }
-    .section-lead {
-      font-size: 1.05rem; color: var(--texto-suave);
-      max-width: 700px; margin-bottom: 48px;
-    }
+  .eyebrow {
+    display: inline-block;
+    font-size: 0.78rem; font-weight: 600;
+    color: var(--verde-700); background: var(--verde-50);
+    padding: 5px 12px; border-radius: 999px;
+    letter-spacing: 0.02em;
+    margin-bottom: 22px;
+  }
+  .hero-title {
+    font-size: clamp(2.1rem, 4.8vw, 3.6rem);
+    line-height: 1.06; letter-spacing: -0.025em;
+    font-weight: 700;
+    margin-bottom: 22px;
+  }
+  .hero-title em { color: var(--verde); font-style: normal; }
+  .hero-sub {
+    font-size: clamp(1.05rem, 1.3vw, 1.18rem);
+    color: var(--subtle);
+    max-width: 540px;
+    margin-bottom: 32px;
+  }
+  .hero-cta {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+  .hero-trust {
+    display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 18px;
+    font-size: 0.88rem; color: var(--subtle); max-width: 500px;
+  }
+  .hero-trust li { display: flex; align-items: center; gap: 8px; }
+  .check {
+    flex: 0 0 16px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--verde); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+  }
+  .check::before { content: "✓"; }
 
-    /* ── Problema ───────────────────────────────────────────────────── */
-    .problema-grid {
-      display: grid; gap: 20px;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    }
-    .problema-card {
-      background: #fff;
-      border: 1px solid var(--borde);
-      border-radius: var(--radio);
-      padding: 26px 24px;
-    }
-    .problema-card h3 {
-      font-size: 1.02rem; font-weight: 700; margin-bottom: 8px;
-    }
-    .problema-card p { color: var(--texto-suave); font-size: 0.95rem; }
+  /* Hero illustration (SVG) */
+  .hero-art {
+    position: relative;
+    aspect-ratio: 5 / 4;
+    background: linear-gradient(180deg, #fbfdfb 0%, #eef6ef 100%);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+  .hero-art svg { width: 100%; height: 100%; }
+  .hero-art-legend {
+    position: absolute; right: 14px; bottom: 14px;
+    background: rgba(255,255,255,0.92);
+    border: 1px solid var(--border);
+    padding: 8px 10px; border-radius: 10px;
+    font-size: 0.72rem; color: var(--subtle);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .hero-art-legend .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 
-    /* ── Cómo funciona ──────────────────────────────────────────────── */
-    .pasos {
-      display: grid; gap: 24px;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      counter-reset: paso;
-    }
-    .paso {
-      background: #fff; border: 1px solid var(--borde);
-      border-radius: var(--radio); padding: 30px 26px;
-      position: relative;
-    }
-    .paso::before {
-      counter-increment: paso;
-      content: counter(paso);
-      position: absolute; top: -16px; left: 26px;
-      width: 32px; height: 32px;
-      background: var(--verde); color: #fff;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 0.95rem;
-    }
-    .paso h3 {
-      font-size: 1.05rem; font-weight: 700; margin: 6px 0 8px;
-    }
-    .paso p { color: var(--texto-suave); font-size: 0.95rem; }
+  /* ═════════════════════════════════════════════════════════════════
+     Trust logos bar
+     ═════════════════════════════════════════════════════════════════ */
+  .trust-bar {
+    padding: 36px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .trust-label {
+    font-size: 0.76rem; font-weight: 600; letter-spacing: 0.14em;
+    color: var(--muted); text-align: center; text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+  .trust-grid {
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+    gap: 18px 40px;
+    color: var(--subtle); font-weight: 600;
+    font-size: 1rem;
+  }
+  .trust-grid span { display: inline-flex; align-items: center; gap: 8px; opacity: 0.85; }
+  .trust-grid svg { width: 22px; height: 22px; }
 
-    /* ── Beneficios cooperativa ─────────────────────────────────────── */
-    .beneficios {
-      display: grid; gap: 28px 40px;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    }
-    .beneficio {
-      display: flex; gap: 16px; align-items: flex-start;
-    }
-    .beneficio-icon {
-      flex: 0 0 40px; width: 40px; height: 40px;
-      background: var(--verde-claro); color: var(--verde);
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.15rem; font-weight: 700;
-    }
-    .beneficio h3 {
-      font-size: 1.02rem; font-weight: 700; margin-bottom: 4px;
-    }
-    .beneficio p { color: var(--texto-suave); font-size: 0.93rem; }
+  /* ═════════════════════════════════════════════════════════════════
+     Sección base
+     ═════════════════════════════════════════════════════════════════ */
+  section { padding: 96px 0; }
+  section.alt { background: var(--bg-alt); }
+  section.dark {
+    background: var(--bg-dark);
+    color: #e6efe9;
+  }
+  section.dark .section-title { color: #fff; }
+  section.dark .section-lead { color: #b4c7bb; }
+  section.dark .eyebrow { background: rgba(255,255,255,0.08); color: #b4eac1; }
 
-    /* ── Bloque de cifras ───────────────────────────────────────────── */
-    .cifras {
-      display: grid; gap: 24px;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      text-align: center;
-    }
-    .cifra-num {
-      font-size: clamp(1.8rem, 3.2vw, 2.4rem); font-weight: 700;
-      color: var(--verde); letter-spacing: -0.02em;
-      line-height: 1; margin-bottom: 6px;
-    }
-    .cifra-label { font-size: 0.88rem; color: var(--texto-suave); }
+  .section-header { max-width: 780px; margin-bottom: 48px; }
+  .section-title {
+    font-size: clamp(1.7rem, 3vw, 2.4rem);
+    font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1.18;
+    margin-bottom: 14px;
+  }
+  .section-lead {
+    font-size: clamp(1rem, 1.1vw, 1.08rem);
+    color: var(--subtle);
+    max-width: 700px;
+  }
 
-    /* ── Stack / tecnología ─────────────────────────────────────────── */
-    .stack {
-      display: grid; gap: 16px;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    }
-    .stack-item {
-      background: #fff; border: 1px solid var(--borde);
-      border-radius: var(--radio-sm); padding: 18px 20px;
-    }
-    .stack-item h4 {
-      font-size: 0.92rem; font-weight: 700; margin-bottom: 4px;
-      color: var(--verde);
-    }
-    .stack-item p { font-size: 0.88rem; color: var(--texto-suave); }
+  /* ═════════════════════════════════════════════════════════════════
+     Problema
+     ═════════════════════════════════════════════════════════════════ */
+  .problem-grid {
+    display: grid; gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .problem-card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px 26px;
+    transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  }
+  .problem-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .problem-card-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px;
+    background: var(--verde-50); color: var(--verde);
+    border-radius: 8px; font-weight: 700; font-size: 0.9rem;
+    margin-bottom: 14px;
+  }
+  .problem-card h3 {
+    font-size: 1.08rem; font-weight: 700; margin-bottom: 8px;
+  }
+  .problem-card p { color: var(--subtle); font-size: 0.95rem; }
 
-    /* ── Formulario waitlist ────────────────────────────────────────── */
-    .waitlist-card {
-      background: #fff;
-      border: 1px solid var(--borde);
-      border-radius: var(--radio);
-      padding: 40px 36px;
-      max-width: 680px;
-      margin: 0 auto;
-      text-align: center;
-    }
-    .waitlist-card h3 {
-      font-size: 1.4rem; font-weight: 700; margin-bottom: 10px;
-      letter-spacing: -0.015em;
-    }
-    .waitlist-card > p { color: var(--texto-suave); margin-bottom: 24px; }
+  /* ═════════════════════════════════════════════════════════════════
+     Cómo funciona
+     ═════════════════════════════════════════════════════════════════ */
+  .steps {
+    display: grid; gap: 28px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  .step {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 32px 28px;
+    position: relative;
+  }
+  .step-num {
+    position: absolute; top: -16px; left: 28px;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--verde) 0%, var(--verde-700) 100%);
+    color: #fff; font-weight: 700; font-size: 0.95rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow-md);
+  }
+  .step-icon {
+    width: 44px; height: 44px;
+    background: var(--verde-50); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--verde); margin: 10px 0 16px;
+  }
+  .step h3 {
+    font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;
+  }
+  .step p { color: var(--subtle); font-size: 0.94rem; }
 
-    form.waitlist {
-      display: grid; gap: 12px;
-      grid-template-columns: 1fr 1fr;
-      text-align: left;
-    }
-    form.waitlist .full { grid-column: 1 / -1; }
-    form.waitlist label {
-      display: block; font-size: 0.82rem; color: var(--texto-suave);
-      margin-bottom: 6px; font-weight: 500;
-    }
-    form.waitlist input {
-      width: 100%;
-      padding: 12px 14px;
-      border: 1px solid var(--borde);
-      border-radius: var(--radio-sm);
-      font-size: 0.96rem; font-family: inherit;
-      background: #fff;
-      transition: border-color 0.15s ease;
-    }
-    form.waitlist input:focus {
-      outline: none;
-      border-color: var(--verde);
-      box-shadow: 0 0 0 3px rgba(43, 122, 58, 0.12);
-    }
-    form.waitlist button {
-      width: 100%;
-      padding: 14px 22px;
-      font-size: 1rem; font-weight: 600;
-      background: var(--verde); color: #fff;
-      border: 0; border-radius: var(--radio-sm);
-      cursor: pointer;
-      margin-top: 6px;
-    }
-    form.waitlist button:hover:not(:disabled) { background: var(--verde-oscuro); }
-    form.waitlist button:disabled { opacity: 0.6; cursor: default; }
-    .waitlist-status {
-      margin-top: 14px; font-size: 0.9rem; min-height: 20px;
-    }
-    .waitlist-status.ok    { color: var(--verde); }
-    .waitlist-status.err   { color: #b93b3b; }
-    .waitlist-legal {
-      font-size: 0.78rem; color: var(--texto-suave);
-      margin-top: 14px;
-    }
-    @media (max-width: 560px) {
-      form.waitlist { grid-template-columns: 1fr; }
-      .waitlist-card { padding: 32px 24px; }
-    }
+  /* ═════════════════════════════════════════════════════════════════
+     Audience tabs
+     ═════════════════════════════════════════════════════════════════ */
+  .tabs {
+    display: flex; gap: 8px;
+    background: var(--slate-100);
+    padding: 6px; border-radius: 999px;
+    max-width: fit-content; margin-bottom: 36px;
+    flex-wrap: wrap;
+  }
+  .tab {
+    padding: 10px 18px; border-radius: 999px;
+    font-weight: 600; font-size: 0.92rem;
+    color: var(--subtle); background: transparent;
+    border: 0;
+    transition: background 0.15s var(--ease), color 0.15s var(--ease);
+  }
+  .tab.active { background: #fff; color: var(--text); box-shadow: var(--shadow-sm); }
+  .tab:hover:not(.active) { color: var(--text); }
 
-    /* ── Bloque final CTA ───────────────────────────────────────────── */
-    .final-cta {
-      background: var(--verde);
-      color: #fff;
-      text-align: center;
-      padding: 80px 24px;
-    }
-    .final-cta h2 {
-      font-size: clamp(1.6rem, 3vw, 2.2rem);
-      font-weight: 700; letter-spacing: -0.015em;
-      margin-bottom: 14px; max-width: 640px;
-      margin-left: auto; margin-right: auto;
-    }
-    .final-cta p {
-      max-width: 540px; margin: 0 auto 28px;
-      color: rgba(255, 255, 255, 0.88);
-    }
-    .final-cta .btn-primary {
-      background: #fff; color: var(--verde);
-    }
-    .final-cta .btn-primary:hover { background: #f3f3f3; }
+  .tab-panel {
+    display: none;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .tab-panel.active { display: grid; }
+  @media (max-width: 880px) {
+    .tab-panel.active { grid-template-columns: 1fr; gap: 28px; }
+  }
+  .tab-panel h3 {
+    font-size: clamp(1.4rem, 2.2vw, 1.8rem);
+    letter-spacing: -0.02em; margin-bottom: 14px;
+  }
+  .tab-panel p { color: var(--subtle); margin-bottom: 18px; }
+  .tab-list { display: grid; gap: 10px; margin: 20px 0 24px; }
+  .tab-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    color: var(--subtle); font-size: 0.96rem;
+  }
+  .tab-list li::before {
+    content: ""; flex: 0 0 6px; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--verde);
+    margin-top: 10px;
+  }
+  .panel-visual {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px;
+    aspect-ratio: 5 / 4;
+    display: flex; align-items: center; justify-content: center;
+  }
 
-    /* ── Footer ─────────────────────────────────────────────────────── */
-    footer {
-      border-top: 1px solid var(--borde);
-      padding: 36px 0;
-      font-size: 0.86rem; color: var(--texto-suave);
-    }
-    .footer-inner {
-      display: flex; flex-wrap: wrap; gap: 16px;
-      justify-content: space-between; align-items: center;
-    }
-  </style>
+  /* ═════════════════════════════════════════════════════════════════
+     Features grid
+     ═════════════════════════════════════════════════════════════════ */
+  .features {
+    display: grid; gap: 1px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .feature {
+    background: #fff; padding: 28px 26px;
+  }
+  .feature-ic {
+    width: 40px; height: 40px;
+    background: var(--verde-50); color: var(--verde);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px;
+  }
+  .feature h3 { font-size: 1.02rem; margin-bottom: 6px; font-weight: 700; }
+  .feature p { color: var(--subtle); font-size: 0.92rem; }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Stack diagram
+     ═════════════════════════════════════════════════════════════════ */
+  .stack-diagram {
+    display: grid; gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  .stack-card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 20px 22px;
+  }
+  .stack-card h4 {
+    font-size: 0.92rem; font-weight: 700; color: var(--verde); margin-bottom: 6px;
+    letter-spacing: 0.02em;
+  }
+  .stack-card p { font-size: 0.88rem; color: var(--subtle); }
+  .stack-card .badge {
+    display: inline-block; font-size: 0.7rem; font-weight: 600;
+    background: var(--verde-50); color: var(--verde);
+    padding: 3px 10px; border-radius: 999px; margin-bottom: 8px;
+  }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Stats / números
+     ═════════════════════════════════════════════════════════════════ */
+  .stats {
+    display: grid; gap: 32px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    text-align: center;
+  }
+  .stat-num {
+    font-size: clamp(2rem, 3.6vw, 2.8rem);
+    font-weight: 700; color: var(--verde);
+    letter-spacing: -0.03em; line-height: 1;
+    margin-bottom: 8px;
+  }
+  .stat-label {
+    font-size: 0.88rem; color: var(--subtle);
+  }
+  section.dark .stat-num { color: #7bd89a; }
+  section.dark .stat-label { color: #9cb5a4; }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Comparativa
+     ═════════════════════════════════════════════════════════════════ */
+  .compare {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+    font-size: 0.94rem;
+  }
+  .compare th, .compare td {
+    padding: 16px 18px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .compare tr:last-child td { border-bottom: 0; }
+  .compare th {
+    background: var(--bg-alt); font-weight: 700;
+    color: var(--text); font-size: 0.86rem;
+    letter-spacing: 0.02em;
+  }
+  .compare th.highlight { background: var(--verde); color: #fff; }
+  .compare .yes, .compare .no {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-weight: 600; font-size: 0.88rem;
+  }
+  .compare .yes { color: var(--verde); }
+  .compare .no  { color: var(--rojo); }
+  .compare-wrap { overflow-x: auto; }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Testimonios
+     ═════════════════════════════════════════════════════════════════ */
+  .testimonios {
+    display: grid; gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  .testimonio {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px 26px;
+    display: flex; flex-direction: column;
+  }
+  .testimonio-quote {
+    font-size: 1rem; color: var(--text); line-height: 1.6;
+    margin-bottom: 18px; flex: 1;
+  }
+  .testimonio-quote::before {
+    content: "\201C"; font-size: 2.2rem; color: var(--verde);
+    line-height: 0; margin-right: 4px; vertical-align: -14px;
+  }
+  .testimonio-autor {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 0.88rem;
+  }
+  .autor-ini {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--verde-50); color: var(--verde);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+  }
+  .autor-nombre { font-weight: 600; }
+  .autor-rol { color: var(--muted); font-size: 0.82rem; }
+
+  .testimonio.coming {
+    background: linear-gradient(135deg, var(--verde-50) 0%, #fff 100%);
+    border-style: dashed;
+    align-items: center; justify-content: center; text-align: center;
+  }
+  .testimonio.coming .testimonio-quote {
+    color: var(--verde-700); font-weight: 600;
+  }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Pricing
+     ═════════════════════════════════════════════════════════════════ */
+  .pricing {
+    display: grid; gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .price-card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 32px 28px;
+    display: flex; flex-direction: column;
+  }
+  .price-card.featured {
+    border: 2px solid var(--verde);
+    box-shadow: var(--shadow-lg);
+    position: relative;
+  }
+  .price-card.featured::before {
+    content: "Recomendado"; position: absolute; top: -12px; right: 22px;
+    background: var(--verde); color: #fff;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .price-name { font-weight: 700; font-size: 1.05rem; margin-bottom: 4px; }
+  .price-tag {
+    font-size: 2rem; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--text); margin: 8px 0 2px;
+  }
+  .price-unit { color: var(--muted); font-size: 0.88rem; margin-bottom: 20px; }
+  .price-list { display: grid; gap: 10px; margin: 0 0 24px; flex: 1; }
+  .price-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    color: var(--subtle); font-size: 0.92rem;
+  }
+  .price-list li::before {
+    content: "✓"; color: var(--verde); font-weight: 700;
+    margin-top: 1px;
+  }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Roadmap
+     ═════════════════════════════════════════════════════════════════ */
+  .roadmap {
+    display: grid; gap: 0;
+    grid-template-columns: repeat(4, 1fr);
+    border: 1px solid var(--border); background: #fff;
+    border-radius: var(--radius); overflow: hidden;
+  }
+  @media (max-width: 880px) {
+    .roadmap { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .roadmap { grid-template-columns: 1fr; }
+  }
+  .rm-col {
+    padding: 24px 22px;
+    border-right: 1px solid var(--border);
+  }
+  .rm-col:last-child { border-right: 0; }
+  .rm-trimestre {
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.12em; color: var(--muted);
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .rm-titulo { font-weight: 700; margin-bottom: 12px; }
+  .rm-list { display: grid; gap: 8px; font-size: 0.9rem; color: var(--subtle); }
+  .rm-list li { padding-left: 18px; position: relative; }
+  .rm-list li::before {
+    content: ""; position: absolute; left: 0; top: 8px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--verde-100); border: 2px solid var(--verde);
+  }
+  .rm-col.done .rm-list li::before { background: var(--verde); }
+  .rm-col.done .rm-trimestre { color: var(--verde); }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Impacto
+     ═════════════════════════════════════════════════════════════════ */
+  .impact-grid {
+    display: grid; gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .impact-card {
+    padding: 28px 26px;
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .impact-card h3 {
+    font-size: 1.05rem; font-weight: 700; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .impact-card h3 .mark {
+    width: 24px; height: 24px; border-radius: 6px;
+    background: var(--verde-50); color: var(--verde);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; font-weight: 700;
+  }
+  .impact-card p { color: var(--subtle); font-size: 0.94rem; }
+
+  /* ═════════════════════════════════════════════════════════════════
+     FAQ
+     ═════════════════════════════════════════════════════════════════ */
+  .faq-list {
+    display: grid; gap: 12px;
+    max-width: 820px;
+  }
+  details.faq {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 0;
+    overflow: hidden;
+    transition: border-color 0.15s var(--ease);
+  }
+  details.faq[open] { border-color: var(--verde-100); }
+  details.faq > summary {
+    list-style: none;
+    padding: 18px 22px;
+    font-weight: 600; font-size: 1rem;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px;
+    cursor: pointer;
+  }
+  details.faq > summary::-webkit-details-marker { display: none; }
+  details.faq > summary::after {
+    content: "+"; font-size: 1.4rem; line-height: 1; color: var(--verde);
+    transition: transform 0.2s var(--ease);
+    flex: 0 0 auto;
+  }
+  details.faq[open] > summary::after { transform: rotate(45deg); }
+  details.faq > div {
+    padding: 0 22px 20px;
+    color: var(--subtle); font-size: 0.96rem;
+  }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Inversor (dark section)
+     ═════════════════════════════════════════════════════════════════ */
+  .investor-grid {
+    display: grid; gap: 40px;
+    grid-template-columns: 1.1fr 1fr;
+    align-items: start;
+  }
+  @media (max-width: 880px) { .investor-grid { grid-template-columns: 1fr; } }
+
+  .pill-list {
+    display: grid; gap: 10px;
+    font-size: 0.96rem;
+  }
+  .pill-list li {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 14px 18px; border-radius: 10px;
+    color: #dbe8de;
+  }
+  .pill-list li strong { color: #fff; }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Waitlist
+     ═════════════════════════════════════════════════════════════════ */
+  .waitlist-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 48px 40px;
+    max-width: 680px;
+    margin: 0 auto;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+  }
+  .waitlist-card h3 {
+    font-size: clamp(1.4rem, 2vw, 1.7rem);
+    font-weight: 700; margin-bottom: 10px;
+    letter-spacing: -0.02em;
+  }
+  .waitlist-card > p {
+    color: var(--subtle); margin-bottom: 28px;
+  }
+  form.waitlist {
+    display: grid; gap: 14px;
+    grid-template-columns: 1fr 1fr;
+    text-align: left;
+  }
+  form.waitlist .full { grid-column: 1 / -1; }
+  form.waitlist label {
+    display: block; font-size: 0.82rem; color: var(--subtle);
+    margin-bottom: 6px; font-weight: 500;
+  }
+  form.waitlist input, form.waitlist select {
+    width: 100%;
+    padding: 13px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.96rem; font-family: inherit;
+    background: #fff;
+    transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+  }
+  form.waitlist input:focus, form.waitlist select:focus {
+    outline: none;
+    border-color: var(--verde);
+    box-shadow: 0 0 0 3px rgba(43, 122, 58, 0.14);
+  }
+  form.waitlist button {
+    width: 100%;
+    padding: 14px 22px;
+    font-size: 1rem; font-weight: 600;
+    background: var(--verde); color: #fff;
+    border: 0; border-radius: var(--radius-sm);
+    margin-top: 4px;
+    transition: background 0.15s var(--ease);
+  }
+  form.waitlist button:hover:not(:disabled) { background: var(--verde-700); }
+  form.waitlist button:disabled { opacity: 0.6; cursor: default; }
+  .waitlist-status {
+    margin-top: 16px; font-size: 0.92rem; min-height: 22px;
+  }
+  .waitlist-status.ok  { color: var(--verde); }
+  .waitlist-status.err { color: var(--rojo); }
+  .waitlist-legal {
+    font-size: 0.78rem; color: var(--muted);
+    margin-top: 16px;
+  }
+  @media (max-width: 560px) {
+    form.waitlist { grid-template-columns: 1fr; }
+    .waitlist-card { padding: 36px 24px; }
+  }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Final CTA
+     ═════════════════════════════════════════════════════════════════ */
+  .final-cta {
+    background:
+      radial-gradient(900px 400px at 100% 0%, rgba(255,255,255,0.06), transparent 60%),
+      linear-gradient(135deg, var(--verde) 0%, var(--verde-700) 100%);
+    color: #fff; text-align: center;
+    padding: 96px 24px;
+  }
+  .final-cta h2 {
+    font-size: clamp(1.7rem, 3vw, 2.4rem);
+    font-weight: 700; letter-spacing: -0.02em;
+    margin-bottom: 14px; max-width: 720px;
+    margin-left: auto; margin-right: auto;
+  }
+  .final-cta p {
+    max-width: 580px; margin: 0 auto 32px;
+    color: rgba(255, 255, 255, 0.85);
+  }
+  .final-cta .btn-primary { background: #fff; color: var(--verde); }
+  .final-cta .btn-primary:hover { background: #f3faf3; }
+  .final-cta .btn-ghost { color: #fff; border-color: rgba(255,255,255,0.35); }
+  .final-cta .btn-ghost:hover { background: rgba(255,255,255,0.08); }
+
+  /* ═════════════════════════════════════════════════════════════════
+     Footer
+     ═════════════════════════════════════════════════════════════════ */
+  footer {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 56px 0 32px;
+    color: var(--subtle);
+    font-size: 0.92rem;
+  }
+  .footer-grid {
+    display: grid; gap: 32px;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    margin-bottom: 36px;
+  }
+  @media (max-width: 760px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 480px) { .footer-grid { grid-template-columns: 1fr; } }
+  .footer-brand p { margin-top: 10px; max-width: 300px; }
+  .footer h4 {
+    font-size: 0.8rem; font-weight: 700;
+    color: var(--text); text-transform: uppercase;
+    letter-spacing: 0.08em; margin-bottom: 14px;
+  }
+  footer ul { display: grid; gap: 8px; }
+  footer a { color: var(--subtle); }
+  footer a:hover { color: var(--text); }
+  .footer-meta {
+    padding-top: 24px; border-top: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 12px;
+    justify-content: space-between; align-items: center;
+    font-size: 0.82rem; color: var(--muted);
+  }
+</style>
 </head>
 <body>
 
-  <!-- ── Navbar ── -->
-  <nav class="nav">
-    <div class="wrap nav-inner">
-      <a class="brand" href="#">
-        <span class="brand-dot"></span> Kylia
-      </a>
-      <div class="nav-links">
-        <a href="#como-funciona">Cómo funciona</a>
-        <a href="#cooperativas">Para cooperativas</a>
-        <a href="#tecnologia">Tecnología</a>
-        <a class="nav-cta" href="/app.html">Probar</a>
-      </div>
-    </div>
-  </nav>
+<a class="skip" href="#main">Saltar al contenido</a>
 
-  <!-- ── Hero ── -->
-  <header class="hero">
-    <div class="wrap">
-      <span class="hero-eyebrow">Monitorización agronómica por satélite</span>
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Announcement bar                                                -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="announce" role="region" aria-label="Aviso">
+  <strong>Campaña 2026</strong> · Piloto gratuito abierto para las primeras cooperativas y agricultores. <a href="#lista-espera">Apuntarme →</a>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Nav                                                             -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a href="#top" class="brand" aria-label="Kylia — inicio">
+      <span class="brand-logo" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M4 18 Q12 6 20 18 Z" fill="currentColor"/>
+          <circle cx="12" cy="8" r="1.4" fill="currentColor"/>
+        </svg>
+      </span>
+      Kylia
+    </a>
+    <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Abrir menú">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <nav class="nav-links" id="nav-links" aria-label="Navegación principal">
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#publicos">Para quién</a>
+      <a href="#precios">Precios</a>
+      <a href="#faq">FAQ</a>
+      <a class="btn btn-primary btn-sm nav-cta" href="/app.html">Probar Kylia</a>
+    </nav>
+  </div>
+  <div class="nav-progress" id="nav-progress" aria-hidden="true"></div>
+</header>
+
+<main id="main">
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Hero                                                            -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="hero" id="top" aria-label="Presentación">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">Agricultura de precisión por satélite</span>
       <h1 class="hero-title">
-        El estado real de <em>cada parcela</em> de tu cooperativa, sin sensores.
+        Cada parcela, monitorizada desde el <em>espacio</em>. Sin un solo sensor en el campo.
       </h1>
       <p class="hero-sub">
-        Kylia analiza cada recinto SIGPAC con satélites europeos Copernicus y devuelve
-        vigor, humedad del suelo y alertas accionables. Sin instalar nada en campo,
-        sin coste por hectárea y con datos oficiales.
+        Kylia usa satélites europeos Copernicus para darte, en segundos, el vigor del cultivo, la humedad del suelo y la recomendación de riego de cualquier parcela SIGPAC de España. Desde tu móvil, sin instalar nada, sin pagar por hectárea.
       </p>
-
       <div class="hero-cta">
-        <a class="btn btn-primary" href="/app.html">Probar Kylia →</a>
-        <a class="btn btn-ghost" href="#lista-espera">Lista de espera cooperativas</a>
+        <a class="btn btn-primary btn-lg" href="/app.html">Probar con mi parcela →</a>
+        <a class="btn btn-ghost btn-lg" href="#lista-espera">Únete al piloto 2026</a>
       </div>
+      <ul class="hero-trust">
+        <li><span class="check" aria-hidden="true"></span> Dato oficial SIGPAC</li>
+        <li><span class="check" aria-hidden="true"></span> Sentinel-2 a 10&nbsp;m</li>
+        <li><span class="check" aria-hidden="true"></span> Sin hardware en campo</li>
+        <li><span class="check" aria-hidden="true"></span> 0&nbsp;€ por hectárea</li>
+      </ul>
+    </div>
 
-      <div class="hero-trust">
-        <span class="hero-trust-item">Datos oficiales SIGPAC</span>
-        <span class="hero-trust-item">Satélite Sentinel-2 — 10 m</span>
-        <span class="hero-trust-item">Sin hardware en campo</span>
-        <span class="hero-trust-item">0 € por hectárea</span>
+    <!-- Ilustración hero: parcelas con NDVI + satélite -->
+    <div class="hero-art" role="img" aria-label="Mosaico de parcelas con valores NDVI coloreados y un satélite en órbita">
+      <svg viewBox="0 0 500 400" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="skyGrad" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stop-color="#f7fbf8"/>
+            <stop offset="1" stop-color="#e6f1e9"/>
+          </linearGradient>
+          <linearGradient id="satBeam" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stop-color="#2b7a3a" stop-opacity="0.25"/>
+            <stop offset="1" stop-color="#2b7a3a" stop-opacity="0"/>
+          </linearGradient>
+          <pattern id="gridPat" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="0.6"/>
+          </pattern>
+        </defs>
+
+        <rect x="0" y="0" width="500" height="400" fill="url(#skyGrad)"/>
+
+        <!-- Mosaico de parcelas (NDVI simulado) -->
+        <g transform="translate(40,90) rotate(-4)">
+          <!-- fila 1 -->
+          <polygon points="0,0 110,-10 130,80 10,90" fill="#6ab964"/>
+          <polygon points="130,80 10,90 30,180 150,170" fill="#c8d86a"/>
+          <polygon points="110,-10 230,0 260,90 130,80" fill="#b8d56f"/>
+          <polygon points="230,0 360,-10 380,70 260,90" fill="#9ac86a"/>
+          <polygon points="360,-10 430,0 440,60 380,70" fill="#2e8a3d"/>
+          <!-- fila 2 -->
+          <polygon points="150,170 30,180 60,270 180,260" fill="#97b96a"/>
+          <polygon points="260,90 380,70 400,160 280,180" fill="#4f9e4d"/>
+          <polygon points="180,260 60,270 80,340 200,330" fill="#d9cf6d"/>
+          <polygon points="280,180 400,160 410,260 300,280" fill="#7db561"/>
+          <polygon points="200,330 80,340 110,390 220,380" fill="#bfa64d"/>
+          <polygon points="300,280 410,260 420,360 320,380" fill="#3e953d"/>
+
+          <!-- retícula de píxeles -->
+          <rect x="-5" y="-15" width="440" height="410" fill="url(#gridPat)"/>
+        </g>
+
+        <!-- Parcela resaltada -->
+        <g transform="translate(40,90) rotate(-4)">
+          <polygon points="280,180 400,160 410,260 300,280"
+                   fill="none" stroke="#ffffff" stroke-width="3"/>
+          <polygon points="280,180 400,160 410,260 300,280"
+                   fill="none" stroke="#1f5a2b" stroke-width="1.4" stroke-dasharray="4 3"/>
+        </g>
+
+        <!-- Haz del satélite -->
+        <polygon points="430,10 360,10 160,280 260,290" fill="url(#satBeam)"/>
+
+        <!-- Satélite -->
+        <g transform="translate(380,32)">
+          <rect x="-10" y="-6" width="20" height="12" rx="2" fill="#1f2937"/>
+          <rect x="-28" y="-3" width="14" height="6" fill="#2b7a3a"/>
+          <rect x="14"  y="-3" width="14" height="6" fill="#2b7a3a"/>
+          <rect x="-28" y="-3" width="14" height="6" fill="url(#gridPat)"/>
+          <rect x="14"  y="-3" width="14" height="6" fill="url(#gridPat)"/>
+          <circle cx="0" cy="-8" r="2" fill="#d4a82a"/>
+          <line x1="0" y1="-10" x2="0" y2="-18" stroke="#1f2937" stroke-width="1"/>
+        </g>
+
+        <!-- Badge NDVI -->
+        <g transform="translate(120,320)">
+          <rect x="0" y="0" width="180" height="44" rx="10" fill="#fff" stroke="#e2e8f0"/>
+          <circle cx="18" cy="22" r="9" fill="#2b7a3a"/>
+          <text x="34" y="19" font-family="system-ui" font-size="11" fill="#64748b">Parcela seleccionada</text>
+          <text x="34" y="34" font-family="system-ui" font-size="14" fill="#0f172a" font-weight="700">NDVI 0.72 · vigor bueno</text>
+        </g>
+      </svg>
+      <div class="hero-art-legend" aria-hidden="true">
+        <span class="dot" style="background:#c94343"></span> estrés
+        <span class="dot" style="background:#d4a82a"></span> moderado
+        <span class="dot" style="background:#2b7a3a"></span> bueno
       </div>
     </div>
-  </header>
+  </div>
+</section>
 
-  <!-- ── Problema ── -->
-  <section id="problema">
-    <div class="wrap">
-      <div class="section-eyebrow">El problema</div>
-      <h2 class="section-title">
-        Tus socios deciden a ciegas. Tú no ves el conjunto.
-      </h2>
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Trust bar                                                       -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="trust-bar" aria-label="Fuentes de datos">
+  <div class="wrap">
+    <div class="trust-label">Construido sobre datos oficiales</div>
+    <div class="trust-grid">
+      <span>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="#1c6ea4" stroke-width="2"/><path d="M4 12h16M12 3c3 3.5 3 14 0 18M12 3c-3 3.5-3 14 0 18" stroke="#1c6ea4" stroke-width="1.5"/></svg>
+        Copernicus (UE)
+      </span>
+      <span>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="7" width="16" height="10" rx="2" stroke="#2b7a3a" stroke-width="2"/><path d="M8 7V5m8 2V5" stroke="#2b7a3a" stroke-width="2"/></svg>
+        Sentinel-2
+      </span>
+      <span>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20V8l8-5 8 5v12H4z" stroke="#2b7a3a" stroke-width="2"/><path d="M10 20v-6h4v6" stroke="#2b7a3a" stroke-width="2"/></svg>
+        SIGPAC · MAPA
+      </span>
+      <span>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 15a4 4 0 014-8 5 5 0 019.9 1A3.5 3.5 0 0118 15H5z" stroke="#1c6ea4" stroke-width="2"/></svg>
+        Open-Meteo · DWD ICON
+      </span>
+      <span>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3L2 20h20L12 3z" fill="#0f172a"/></svg>
+        Vercel · Edge
+      </span>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Problema                                                        -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section id="problema" aria-labelledby="h-problema">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">El problema</span>
+      <h2 class="section-title" id="h-problema">La agricultura sigue tomando decisiones a ojo.</h2>
       <p class="section-lead">
-        Las cooperativas no tienen un termómetro colectivo del estado de sus
-        socios. Las soluciones agronómicas profesionales están pensadas para
-        explotaciones grandes y cobran por hectárea. El resto — la mayoría del
-        campo español — se queda fuera.
+        Los datos satelitales existen y son libres desde hace años. Pero la información llega solo a las explotaciones grandes que pueden pagar software agronómico especializado. El resto del campo — la mayoría — decide riego, fertilización y tratamientos sin un solo indicador objetivo.
       </p>
-
-      <div class="problema-grid">
-        <div class="problema-card">
-          <h3>Decisiones sin datos</h3>
-          <p>El socio decide cuándo regar, abonar o tratar sin ningún indicador objetivo del cultivo.</p>
-        </div>
-        <div class="problema-card">
-          <h3>Plataformas caras</h3>
-          <p>Climate FieldView, xarvio o Agroptima cobran por hectárea y están pensadas para grandes.</p>
-        </div>
-        <div class="problema-card">
-          <h3>Sin visión agregada</h3>
-          <p>La cooperativa no ve en tiempo real qué parcelas de sus socios están entrando en estrés.</p>
-        </div>
-      </div>
     </div>
-  </section>
+    <div class="problem-grid">
+      <article class="problem-card reveal">
+        <div class="problem-card-num">01</div>
+        <h3>Decisiones a ciegas</h3>
+        <p>El agricultor decide cuándo regar, abonar o tratar sin conocer el estado real del cultivo. El error cuesta producción, agua y fitosanitarios.</p>
+      </article>
+      <article class="problem-card reveal">
+        <div class="problem-card-num">02</div>
+        <h3>Software pensado para grandes</h3>
+        <p>Las plataformas existentes cobran por hectárea, exigen formación y sirven a explotaciones industriales. El pequeño y mediano se queda fuera.</p>
+      </article>
+      <article class="problem-card reveal">
+        <div class="problem-card-num">03</div>
+        <h3>Cooperativas sin visión conjunta</h3>
+        <p>Las cooperativas no ven el estado agregado de sus socios. Cuando alguien llama preguntando ya es tarde para actuar.</p>
+      </article>
+      <article class="problem-card reveal">
+        <div class="problem-card-num">04</div>
+        <h3>Datos libres, subutilizados</h3>
+        <p>Copernicus, SIGPAC y los modelos meteorológicos públicos son gratis. La información está ahí — faltaba un producto que la hiciera útil.</p>
+      </article>
+    </div>
+  </div>
+</section>
 
-  <!-- ── Cómo funciona ── -->
-  <section id="como-funciona" class="alt">
-    <div class="wrap">
-      <div class="section-eyebrow">Cómo funciona</div>
-      <h2 class="section-title">Del clic a la recomendación en segundos.</h2>
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Cómo funciona                                                   -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section id="como-funciona" class="alt" aria-labelledby="h-funciona">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">Cómo funciona</span>
+      <h2 class="section-title" id="h-funciona">De un clic en el mapa a una recomendación accionable.</h2>
       <p class="section-lead">
-        Kylia integra tres fuentes oficiales de datos y las traduce a un
-        semáforo agronómico. El socio sólo tiene que señalar su parcela en
-        un mapa.
+        Kylia hace toda la cadena de valor en segundos: localizar la parcela oficial, pedir la última imagen del satélite, limpiar nubes, calcular los índices agronómicos y devolver una recomendación adaptada al cultivo.
       </p>
-
-      <div class="pasos">
-        <div class="paso">
-          <h3>Selecciona parcela SIGPAC</h3>
-          <p>Un clic sobre el mapa y Kylia detecta el recinto oficial (provincia, polígono, parcela). Sin dibujar, sin coordenadas.</p>
-        </div>
-        <div class="paso">
-          <h3>Analiza el último paso del satélite</h3>
-          <p>Consultamos Sentinel-2 a 10 m de resolución sobre la geometría real de la parcela. Filtramos nubes y calculamos NDVI + NDMI.</p>
-        </div>
-        <div class="paso">
-          <h3>Devuelve una recomendación</h3>
-          <p>Vigor, agua en la hoja, humedad del suelo por capas y una recomendación adaptada al cultivo declarado.</p>
-        </div>
-      </div>
     </div>
-  </section>
+    <div class="steps">
+      <article class="step reveal">
+        <div class="step-num">1</div>
+        <div class="step-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 21s-7-7.5-7-12a7 7 0 1114 0c0 4.5-7 12-7 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <h3>Seleccionas tu parcela</h3>
+        <p>Haces clic en el mapa sobre tu campo y Kylia detecta el recinto SIGPAC oficial: provincia, polígono, parcela, recinto y superficie. Sin dibujar, sin coordenadas, sin registros.</p>
+      </article>
+      <article class="step reveal">
+        <div class="step-num">2</div>
+        <div class="step-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 3l6 6-6 6m0-6H9a5 5 0 00-5 5v3" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <h3>Analizamos el satélite</h3>
+        <p>Consultamos Sentinel-2 sobre la geometría real de la parcela a 10 m de resolución. Filtramos nubes, sombras y datos no válidos. Agregamos toda la parcela — no muestreamos un píxel suelto.</p>
+      </article>
+      <article class="step reveal">
+        <div class="step-num">3</div>
+        <div class="step-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 20L12 4l8 16M8 14h8" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <h3>Recibes una recomendación</h3>
+        <p>Vigor del cultivo, agua en la hoja, humedad del suelo por capas y una frase con lo que hacer — adaptada al cultivo declarado. Todo en el móvil, en segundos.</p>
+      </article>
+    </div>
+  </div>
+</section>
 
-  <!-- ── Para cooperativas ── -->
-  <section id="cooperativas">
-    <div class="wrap">
-      <div class="section-eyebrow">Pensado para cooperativas, ADVs y ATRIAs</div>
-      <h2 class="section-title">Una herramienta para tus socios. Un panel para ti.</h2>
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Para quién (tabs)                                               -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section id="publicos" aria-labelledby="h-publicos">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">Para quién</span>
+      <h2 class="section-title" id="h-publicos">Tres miradas al mismo producto.</h2>
       <p class="section-lead">
-        Kylia te permite ofrecer a tus socios una herramienta profesional sin
-        que compren hardware ni contraten licencias por hectárea. Tú ves el
-        estado conjunto; ellos ven el de su parcela.
+        Kylia está construido para escalar desde la parcela individual hasta la red de una cooperativa, y para ser una propuesta defendible ante inversores en AgTech.
       </p>
+    </div>
 
-      <div class="beneficios">
-        <div class="beneficio">
-          <div class="beneficio-icon">↗</div>
+    <div class="tabs" role="tablist" aria-label="Públicos de Kylia">
+      <button class="tab active" role="tab" id="tab-agricultor"  aria-selected="true"  aria-controls="panel-agricultor"  tabindex="0"  data-panel="agricultor">Agricultores</button>
+      <button class="tab"        role="tab" id="tab-cooperativa" aria-selected="false" aria-controls="panel-cooperativa" tabindex="-1" data-panel="cooperativa">Cooperativas y ADV</button>
+      <button class="tab"        role="tab" id="tab-inversor"    aria-selected="false" aria-controls="panel-inversor"    tabindex="-1" data-panel="inversor">Inversores y socios</button>
+    </div>
+
+    <div class="tab-panel active" id="panel-agricultor" role="tabpanel" aria-labelledby="tab-agricultor">
+      <div class="reveal">
+        <h3>Agricultores: saber cuándo actuar, desde el móvil.</h3>
+        <p>Pensado para el agricultor que cultiva lo suyo, no para el que factura millones. Cero curva de aprendizaje: si sabes usar WhatsApp, sabes usar Kylia.</p>
+        <ul class="tab-list">
+          <li>Ves al instante si tu cultivo está vigoroso, moderado o en estrés.</li>
+          <li>Sabes si el suelo está seco, adecuado o saturado — por capas agronómicas.</li>
+          <li>Recibes una recomendación en lenguaje claro, adaptada a tu cultivo.</li>
+          <li>Historial de 8 semanas para ver si la parcela mejora o empeora.</li>
+          <li>Funciona en cualquier móvil. Sin descargas, sin cuentas complicadas.</li>
+        </ul>
+        <a class="btn btn-primary" href="/app.html">Probar con mi parcela →</a>
+      </div>
+      <div class="panel-visual reveal" aria-hidden="true">
+        <svg viewBox="0 0 300 260" width="260">
+          <rect x="0" y="0" width="300" height="260" fill="none"/>
+          <rect x="60" y="10" width="180" height="240" rx="22" fill="#0f172a"/>
+          <rect x="68" y="28" width="164" height="214" rx="14" fill="#fff"/>
+          <rect x="80" y="42" width="140" height="10" rx="3" fill="#e2e8f0"/>
+          <rect x="80" y="62" width="100" height="8" rx="3" fill="#e2e8f0"/>
+          <!-- NDVI badge -->
+          <rect x="80" y="84" width="140" height="64" rx="10" fill="#e8f3ea"/>
+          <text x="92" y="108" font-family="system-ui" font-size="10" fill="#2b7a3a" font-weight="700">VIGOR BUENO</text>
+          <text x="92" y="132" font-family="system-ui" font-size="22" fill="#0f3617" font-weight="700">NDVI 0.72</text>
+          <text x="92" y="146" font-family="system-ui" font-size="8" fill="#64748b">Últ. imagen · 21 abr</text>
+          <!-- humedad -->
+          <rect x="80" y="158" width="44" height="42" rx="8" fill="#e8f3ea"/>
+          <text x="90" y="176" font-size="8" fill="#2b7a3a" font-weight="700">SUELO</text>
+          <text x="90" y="194" font-size="14" fill="#0f3617" font-weight="700">28%</text>
+          <rect x="128" y="158" width="44" height="42" rx="8" fill="#fff3cd"/>
+          <text x="138" y="176" font-size="8" fill="#d4a82a" font-weight="700">NDMI</text>
+          <text x="138" y="194" font-size="14" fill="#8a6d18" font-weight="700">0.34</text>
+          <rect x="176" y="158" width="44" height="42" rx="8" fill="#e8f3ea"/>
+          <text x="186" y="176" font-size="8" fill="#2b7a3a" font-weight="700">LLUVIA</text>
+          <text x="186" y="194" font-size="14" fill="#0f3617" font-weight="700">2 mm</text>
+          <!-- botón -->
+          <rect x="80" y="212" width="140" height="22" rx="11" fill="#2b7a3a"/>
+          <text x="150" y="227" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">Ver recomendación</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="panel-cooperativa" role="tabpanel" aria-labelledby="tab-cooperativa">
+      <div class="reveal">
+        <h3>Cooperativas y ADV: tu red entera, monitorizada.</h3>
+        <p>Ofrece a tus socios una herramienta profesional sin que tengan que comprar hardware ni aprender GIS. Tú ves el conjunto, ellos ven lo suyo.</p>
+        <ul class="tab-list">
+          <li>Panel agregado con todas las parcelas de tus socios.</li>
+          <li>Alertas centralizadas cuando alguien entra en estrés hídrico.</li>
+          <li>Dato oficial SIGPAC — integrable con tus sistemas de PAC y trazabilidad.</li>
+          <li>Una licencia cooperativa cubre a todos los socios; sin coste por hectárea.</li>
+          <li>API para conectar con tu ERP agronómico o herramienta de facturación.</li>
+        </ul>
+        <a class="btn btn-primary" href="#lista-espera">Apuntarse al piloto →</a>
+      </div>
+      <div class="panel-visual reveal" aria-hidden="true">
+        <svg viewBox="0 0 320 260" width="280">
+          <rect x="10" y="10" width="300" height="240" rx="14" fill="#f7f9f7" stroke="#e2e8f0"/>
+          <text x="26" y="38" font-size="13" fill="#0f172a" font-weight="700">Panel cooperativa</text>
+          <text x="26" y="52" font-size="9" fill="#64748b">124 parcelas · 38 socios</text>
+          <!-- mini cards -->
+          <g font-family="system-ui">
+          <rect x="26" y="68" width="82" height="50" rx="8" fill="#fff" stroke="#e2e8f0"/>
+          <circle cx="42" cy="86" r="8" fill="#2b7a3a"/><text x="58" y="84" font-size="9" fill="#64748b">Vigor bueno</text><text x="58" y="100" font-size="15" fill="#0f3617" font-weight="700">86</text>
+          <rect x="118" y="68" width="82" height="50" rx="8" fill="#fff" stroke="#e2e8f0"/>
+          <circle cx="134" cy="86" r="8" fill="#d4a82a"/><text x="150" y="84" font-size="9" fill="#64748b">Moderado</text><text x="150" y="100" font-size="15" fill="#8a6d18" font-weight="700">27</text>
+          <rect x="210" y="68" width="82" height="50" rx="8" fill="#fff" stroke="#e2e8f0"/>
+          <circle cx="226" cy="86" r="8" fill="#c94343"/><text x="242" y="84" font-size="9" fill="#64748b">En estrés</text><text x="242" y="100" font-size="15" fill="#7a2525" font-weight="700">11</text>
+          <!-- alertas -->
+          <rect x="26" y="128" width="266" height="20" rx="6" fill="#fff5d6"/>
+          <text x="38" y="142" font-size="10" fill="#8a6d18" font-weight="700">⚠ 3 parcelas nuevas en estrés — últimas 24 h</text>
+          <!-- lista -->
+          <rect x="26" y="156" width="266" height="18" rx="4" fill="#fff"/>
+          <text x="36" y="168" font-size="9" fill="#0f172a">Socio #047 — Polígono 12, parcela 3 · NDVI 0.31</text>
+          <rect x="26" y="178" width="266" height="18" rx="4" fill="#fff"/>
+          <text x="36" y="190" font-size="9" fill="#0f172a">Socio #019 — Polígono 4, parcela 8  · NDVI 0.28</text>
+          <rect x="26" y="200" width="266" height="18" rx="4" fill="#fff"/>
+          <text x="36" y="212" font-size="9" fill="#0f172a">Socio #082 — Polígono 7, parcela 2  · NDVI 0.33</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="panel-inversor" role="tabpanel" aria-labelledby="tab-inversor">
+      <div class="reveal">
+        <h3>Inversores y socios: un vehículo para entrar en AgTech europeo.</h3>
+        <p>Mercado enorme, datos abiertos que antes eran de pago, coste marginal por usuario cercano a cero, ventana regulatoria favorable. Una capa muy fina construida sobre infraestructura pública.</p>
+        <ul class="tab-list">
+          <li>España: ~23,5 M ha de superficie agraria útil · ~915 k explotaciones.</li>
+          <li>Copernicus Data Space (UE) abierto desde 2023: consultas gratuitas suficientes para decenas de miles de parcelas.</li>
+          <li>SIGPAC digitalizado y accesible: cada recinto tiene geometría oficial y ID único.</li>
+          <li>Arquitectura serverless: sin coste fijo por usuario, escala sin CAPEX.</li>
+          <li>Modelo de ingresos B2B (cooperativas, ADV, ATRIA) y B2C freemium probado en vertical ya validados.</li>
+        </ul>
+        <a class="btn btn-primary" href="#lista-espera">Hablemos →</a>
+      </div>
+      <div class="panel-visual reveal" aria-hidden="true">
+        <svg viewBox="0 0 320 260">
+          <rect x="10" y="10" width="300" height="240" rx="14" fill="#f7f9f7" stroke="#e2e8f0"/>
+          <text x="26" y="38" font-size="13" fill="#0f172a" font-weight="700">Oportunidad</text>
+          <!-- Barras crecientes -->
+          <g transform="translate(26,60)">
+            <rect x="0"   y="130" width="36" height="30" rx="4" fill="#d3e8d7"/>
+            <rect x="46"  y="104" width="36" height="56" rx="4" fill="#a9d1b0"/>
+            <rect x="92"  y="72"  width="36" height="88" rx="4" fill="#75b484"/>
+            <rect x="138" y="40"  width="36" height="120" rx="4" fill="#4a9657"/>
+            <rect x="184" y="10"  width="36" height="150" rx="4" fill="#2b7a3a"/>
+            <text x="0"   y="178" font-size="9" fill="#64748b">2022</text>
+            <text x="46"  y="178" font-size="9" fill="#64748b">2023</text>
+            <text x="92"  y="178" font-size="9" fill="#64748b">2024</text>
+            <text x="138" y="178" font-size="9" fill="#64748b">2025</text>
+            <text x="184" y="178" font-size="9" fill="#64748b">2026</text>
+          </g>
+          <text x="26" y="210" font-size="10" fill="#0f172a" font-weight="700">Digitalización PAC + Copernicus Data Space</text>
+          <text x="26" y="226" font-size="9" fill="#64748b">Ventana regulatoria y de datos favorable.</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Features                                                        -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="alt" aria-labelledby="h-features">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">Lo que hace Kylia</span>
+      <h2 class="section-title" id="h-features">Un producto, muchas decisiones mejores.</h2>
+      <p class="section-lead">Cada funcionalidad resuelve una decisión concreta del día a día. No añadimos complejidad gratuita.</p>
+    </div>
+    <div class="features">
+      <div class="feature reveal">
+        <div class="feature-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 12c4-6 14-6 18 0-4 6-14 6-18 0z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>NDVI por parcela</h3>
+        <p>Vigor de la vegetación calculado sobre toda la geometría SIGPAC, no sobre un píxel suelto.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feature-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 3c-3 5-6 8-6 12a6 6 0 1012 0c0-4-3-7-6-12z" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>NDMI</h3>
+        <p>Contenido de agua en la hoja. Detecta estrés hídrico antes de que se vea a simple vista.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feature-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 8h16M4 14h16M4 20h16M4 4h16" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>Humedad del suelo</h3>
+        <p>Por capas agronómicas (superficial, media, profunda) con predicción horaria DWD ICON.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feature-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 12l5-8 4 6 4-4 5 10" stroke="currentColor" stroke-width="2" fill="none"/></svg></div>
+        <h3>Histórico 8 semanas</h3>
+        <p>Sparkline con la evolución del cultivo. Ves si va a mejor, a peor o estable.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feature-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 3v10m0 0l-4-4m4 4l4-4M5 17v3h14v-3" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>Alertas (próximamente)</h3>
+        <p>Avisos por email o Telegram cuando la parcela cruza un umbral de estrés.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feature-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 3h14v18H5zM9 7h6M9 11h6M9 15h4" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>Recomendación por cultivo</h3>
+        <p>La salida se adapta al cultivo declarado: tomate no es lo mismo que olivar.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feature-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>Actualización continua</h3>
+        <p>Cada paso del satélite (≈5 días) suma un punto al histórico sin que tengas que hacer nada.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feature-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/><path d="M4 10h16M10 4v16" stroke="currentColor" stroke-width="2"/></svg></div>
+        <h3>API para integraciones</h3>
+        <p>Conecta con tu ERP, CRM de socios o herramienta de trazabilidad. Plan cooperativa.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Stats                                                           -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section aria-labelledby="h-stats">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">En números</span>
+      <h2 class="section-title" id="h-stats">Ingredientes de alta densidad.</h2>
+    </div>
+    <div class="stats">
+      <div class="reveal"><div class="stat-num" data-count="10">10&nbsp;m</div><div class="stat-label">Resolución Sentinel-2</div></div>
+      <div class="reveal"><div class="stat-num" data-count="5">~5&nbsp;días</div><div class="stat-label">Revisita del satélite</div></div>
+      <div class="reveal"><div class="stat-num" data-count="56">56 días</div><div class="stat-label">Histórico rodante</div></div>
+      <div class="reveal"><div class="stat-num" data-count="3">3</div><div class="stat-label">Índices por parcela</div></div>
+      <div class="reveal"><div class="stat-num" data-count="0">0&nbsp;€</div><div class="stat-label">Hardware por campo</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Stack diagram                                                   -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="alt" aria-labelledby="h-stack">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">Cómo está construido</span>
+      <h2 class="section-title" id="h-stack">Infraestructura pública europea. Capa de producto propia.</h2>
+      <p class="section-lead">No dependemos de proveedores privados de imagen satelital. Todo nuestro stack se apoya en infraestructura pública europea de largo plazo.</p>
+    </div>
+    <div class="stack-diagram">
+      <div class="stack-card reveal">
+        <span class="badge">Satélite</span>
+        <h4>Copernicus · Sentinel-2</h4>
+        <p>Programa espacial europeo (ESA/UE). Imagen multiespectral gratuita a 10 m cada ~5 días desde 2015.</p>
+      </div>
+      <div class="stack-card reveal">
+        <span class="badge">Parcelario</span>
+        <h4>SIGPAC · MAPA</h4>
+        <p>Registro oficial español de parcelas agrícolas. Vector tiles abiertos, mismos datos que usa la PAC.</p>
+      </div>
+      <div class="stack-card reveal">
+        <span class="badge">Meteo</span>
+        <h4>Open-Meteo · DWD ICON</h4>
+        <p>Humedad del suelo por capas y meteo horaria. API pública sin clave, limitada a usos razonables.</p>
+      </div>
+      <div class="stack-card reveal">
+        <span class="badge">Producto</span>
+        <h4>Arquitectura serverless</h4>
+        <p>Funciones serverless en Vercel. Sin base de datos propia en esta fase. Coste marginal cero.</p>
+      </div>
+      <div class="stack-card reveal">
+        <span class="badge">Procesado</span>
+        <h4>Sentinel Hub Statistical API</h4>
+        <p>Agregación de NDVI/NDMI sobre la geometría exacta de la parcela, con filtrado de nubes SCL.</p>
+      </div>
+      <div class="stack-card reveal">
+        <span class="badge">Cliente</span>
+        <h4>Web nativa</h4>
+        <p>HTML + Leaflet. Cero instalación. Funciona en cualquier móvil u ordenador.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Comparativa                                                     -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section aria-labelledby="h-compare">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">Comparativa</span>
+      <h2 class="section-title" id="h-compare">Por qué Kylia no es "otra plataforma agronómica".</h2>
+      <p class="section-lead">Comparación honesta frente a las alternativas más habituales en el mercado español.</p>
+    </div>
+    <div class="compare-wrap reveal">
+      <table class="compare">
+        <thead>
+          <tr>
+            <th scope="col">Característica</th>
+            <th scope="col" class="highlight">Kylia</th>
+            <th scope="col">Plataformas agronómicas premium</th>
+            <th scope="col">Sensores IoT en campo</th>
+            <th scope="col">Nada (decidir a ojo)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Coste inicial</th>
+            <td class="yes">0 €</td>
+            <td>Licencia anual + setup</td>
+            <td>€€€ por estación</td>
+            <td>0 €</td>
+          </tr>
+          <tr>
+            <th scope="row">Coste por hectárea</th>
+            <td class="yes">Sin coste por hectárea</td>
+            <td class="no">€ / ha / año</td>
+            <td>Depende del despliegue</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th scope="row">Hardware en campo</th>
+            <td class="yes">No necesario</td>
+            <td>Opcional</td>
+            <td class="no">Obligatorio</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th scope="row">Datos satelitales por parcela</th>
+            <td class="yes">NDVI + NDMI · 10 m</td>
+            <td class="yes">Sí</td>
+            <td class="no">No</td>
+            <td class="no">No</td>
+          </tr>
+          <tr>
+            <th scope="row">Geometría oficial SIGPAC</th>
+            <td class="yes">Sí</td>
+            <td>Parcial</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th scope="row">Curva de aprendizaje</th>
+            <td class="yes">Minutos</td>
+            <td class="no">Días o semanas</td>
+            <td class="no">Requiere técnico</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th scope="row">Funciona sin conexión rural</th>
+            <td>Móvil + internet móvil basta</td>
+            <td>Sí</td>
+            <td class="no">Red propia o LoRa</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <th scope="row">Alertas automáticas</th>
+            <td>En roadmap Q3 2026</td>
+            <td class="yes">Sí</td>
+            <td class="yes">Sí</td>
+            <td class="no">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Visión del fundador + llamadas a piloto                         -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="alt" aria-labelledby="h-testi">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">En construcción abierta</span>
+      <h2 class="section-title" id="h-testi">Todavía no tenemos clientes. Tenemos convicción.</h2>
+      <p class="section-lead">Kylia está en fase piloto. Preferimos no inventarnos testimonios: en su lugar, te explicamos el por qué del producto y abrimos plazas reales para quienes quieran probarlo antes que nadie.</p>
+    </div>
+    <div class="testimonios">
+      <article class="testimonio reveal">
+        <p class="testimonio-quote">Los datos satelitales llevan años siendo gratis. Pero solo llegan al agricultor si alguien los traduce a una frase útil. Eso es lo que quiero resolver.</p>
+        <div class="testimonio-autor">
+          <div class="autor-ini">MC</div>
           <div>
-            <h3>Escala sin fricción</h3>
-            <p>El socio entra desde el móvil y selecciona su parcela. Cero instalación, cero formación.</p>
+            <div class="autor-nombre">Martí Carol</div>
+            <div class="autor-rol">Fundador · Ingeniero</div>
           </div>
         </div>
-        <div class="beneficio">
-          <div class="beneficio-icon">⌖</div>
-          <div>
-            <h3>Dato oficial SIGPAC</h3>
-            <p>Geometría exacta del recinto, no dibujos aproximados. La misma que usa la PAC.</p>
-          </div>
-        </div>
-        <div class="beneficio">
-          <div class="beneficio-icon">⚡</div>
-          <div>
-            <h3>Alertas por parcela</h3>
-            <p>Avisamos al socio (y a ti) cuando una parcela entra en estrés hídrico o caída de vigor.</p>
-          </div>
-        </div>
-        <div class="beneficio">
-          <div class="beneficio-icon">€</div>
-          <div>
-            <h3>Coste marginal cero</h3>
-            <p>Satélites Copernicus (UE), SIGPAC (MAPA) y Open-Meteo son gratuitos. Tú pagas el servicio, no los datos.</p>
-          </div>
-        </div>
-        <div class="beneficio">
-          <div class="beneficio-icon">⌘</div>
-          <div>
-            <h3>Sin hardware en campo</h3>
-            <p>Ni sensores IoT ni estaciones meteo. Sin mantenimiento, sin baterías, sin vandalismo.</p>
-          </div>
-        </div>
-        <div class="beneficio">
-          <div class="beneficio-icon">⇆</div>
-          <div>
-            <h3>Integración a medida</h3>
-            <p>API para conectar con tu ERP agronómico, tu CRM de socios o tu herramienta de trazabilidad.</p>
-          </div>
+      </article>
+      <article class="testimonio coming reveal">
+        <p class="testimonio-quote"><strong>Plaza piloto cooperativa</strong><br>3–5 cooperativas probarán Kylia gratis durante la campaña 2026, a cambio de feedback.</p>
+        <a class="btn btn-primary btn-sm" href="#lista-espera">Postular cooperativa</a>
+      </article>
+      <article class="testimonio coming reveal">
+        <p class="testimonio-quote"><strong>Plaza early-adopter</strong><br>¿Agricultor profesional curioso? Pruébalo ya y dinos qué cambiarías — te escuchamos.</p>
+        <a class="btn btn-primary btn-sm" href="/app.html">Probar ahora</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Pricing                                                         -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section id="precios" aria-labelledby="h-precios">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">Precios</span>
+      <h2 class="section-title" id="h-precios">Simple. Sin sorpresas. Sin euros por hectárea.</h2>
+      <p class="section-lead">Puedes usar Kylia gratis para tu parcela siempre. Los planes de pago son solo para cooperativas o profesionales que necesiten escala, alertas o integración.</p>
+    </div>
+    <div class="pricing">
+      <article class="price-card reveal">
+        <div class="price-name">Agricultor</div>
+        <div class="price-tag">0 €</div>
+        <div class="price-unit">Siempre gratis</div>
+        <ul class="price-list">
+          <li>1 parcela SIGPAC activa</li>
+          <li>NDVI + NDMI + humedad suelo</li>
+          <li>Histórico de 8 semanas</li>
+          <li>Recomendación por cultivo</li>
+        </ul>
+        <a class="btn btn-ghost" href="/app.html">Empezar gratis</a>
+      </article>
+      <article class="price-card reveal">
+        <div class="price-name">Profesional</div>
+        <div class="price-tag">Pronto</div>
+        <div class="price-unit">Reserva tu plaza sin compromiso</div>
+        <ul class="price-list">
+          <li>Hasta 20 parcelas</li>
+          <li>Alertas por email/Telegram</li>
+          <li>Histórico de 1 año</li>
+          <li>Exportación a PDF / CSV</li>
+          <li>Soporte prioritario</li>
+        </ul>
+        <a class="btn btn-ghost" href="#lista-espera">Reservar plaza</a>
+      </article>
+      <article class="price-card featured reveal">
+        <div class="price-name">Cooperativa / ADV</div>
+        <div class="price-tag">A medida</div>
+        <div class="price-unit">Licencia anual · sin €/ha</div>
+        <ul class="price-list">
+          <li>Parcelas de todos los socios</li>
+          <li>Panel agregado y alertas</li>
+          <li>Integración con ERP / PAC</li>
+          <li>Soporte dedicado</li>
+          <li>Formación a técnicos</li>
+          <li><strong>Piloto 2026 gratuito</strong> para las primeras 3–5</li>
+        </ul>
+        <a class="btn btn-primary" href="#lista-espera">Hablemos</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Roadmap                                                         -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="alt" aria-labelledby="h-roadmap">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">Roadmap público</span>
+      <h2 class="section-title" id="h-roadmap">Adónde vamos, y cuándo.</h2>
+      <p class="section-lead">Construcción abierta. Este es el plan actual — las fechas son estimaciones, no promesas, pero nos gusta publicarlas.</p>
+    </div>
+    <div class="roadmap reveal">
+      <div class="rm-col done">
+        <div class="rm-trimestre">Q1 2026 · Hecho</div>
+        <div class="rm-titulo">Base</div>
+        <ul class="rm-list">
+          <li>NDVI por parcela SIGPAC</li>
+          <li>NDMI (agua en la hoja)</li>
+          <li>Humedad del suelo por capas</li>
+          <li>Histórico 8 semanas</li>
+        </ul>
+      </div>
+      <div class="rm-col">
+        <div class="rm-trimestre">Q2 2026 · En curso</div>
+        <div class="rm-titulo">Multi-parcela</div>
+        <ul class="rm-list">
+          <li>Cartera de parcelas por usuario</li>
+          <li>Panel comparativo</li>
+          <li>Alertas por email</li>
+          <li>Exportación PDF</li>
+        </ul>
+      </div>
+      <div class="rm-col">
+        <div class="rm-trimestre">Q3 2026</div>
+        <div class="rm-titulo">Recomendación de riego</div>
+        <ul class="rm-list">
+          <li>ETo Penman-Monteith</li>
+          <li>Lámina de riego por cultivo</li>
+          <li>Mapa NDVI intra-parcela</li>
+          <li>Alertas Telegram</li>
+        </ul>
+      </div>
+      <div class="rm-col">
+        <div class="rm-trimestre">Q4 2026</div>
+        <div class="rm-titulo">Cooperativa</div>
+        <ul class="rm-list">
+          <li>Panel agregado cooperativa</li>
+          <li>API pública documentada</li>
+          <li>Integraciones ERP agronómico</li>
+          <li>PWA instalable</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Impacto                                                         -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section aria-labelledby="h-impacto">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">Impacto</span>
+      <h2 class="section-title" id="h-impacto">Por qué Kylia importa, más allá del producto.</h2>
+      <p class="section-lead">Tres razones estructurales que hacen que este proyecto tenga sentido ahora y no hace cinco años.</p>
+    </div>
+    <div class="impact-grid">
+      <article class="impact-card reveal">
+        <h3><span class="mark">💧</span> Ahorro de agua</h3>
+        <p>Regar en el momento correcto, con el volumen correcto, es la palanca ambiental más grande de la agricultura mediterránea. Kylia ayuda a no regar de más — ni de menos.</p>
+      </article>
+      <article class="impact-card reveal">
+        <h3><span class="mark">🇪🇺</span> Soberanía de datos</h3>
+        <p>Nos apoyamos en infraestructura europea pública (Copernicus, SIGPAC). Los datos agrícolas del campo español no terminan en servidores privados fuera de la UE.</p>
+      </article>
+      <article class="impact-card reveal">
+        <h3><span class="mark">🌱</span> Democratización</h3>
+        <p>Agricultura de precisión no es un lujo de grandes explotaciones. Kylia pone herramientas profesionales en el móvil del pequeño agricultor, gratis.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Inversor highlight (dark)                                       -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="dark" aria-labelledby="h-investor">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">Para inversores</span>
+      <h2 class="section-title" id="h-investor">Una tesis de inversión simple.</h2>
+      <p class="section-lead">AgTech europeo, sin hardware, apoyado en infraestructura pública. Coste marginal por usuario cercano a cero.</p>
+    </div>
+    <div class="investor-grid">
+      <div class="reveal">
+        <ul class="pill-list">
+          <li><strong>Mercado masivo.</strong> España tiene ~23,5 M ha de SAU y ~915 k explotaciones agrarias. La UE, 9 M de agricultores. La mayor parte, sin software agronómico hoy.</li>
+          <li><strong>Ventana favorable.</strong> Copernicus Data Space (UE, 2023) abrió imagen satelital de alta calidad sin coste. SIGPAC digitalizado y obligatorio en PAC. El substrato ya está.</li>
+          <li><strong>Coste marginal ~0.</strong> Arquitectura serverless + datos abiertos = cada usuario adicional cuesta céntimos. Escala sin CAPEX.</li>
+          <li><strong>Go-to-market B2B2C.</strong> La venta a cooperativa arrastra cientos de socios-usuario. El freemium capta al agricultor individual.</li>
+          <li><strong>Defensibilidad.</strong> La capa agronómica (umbrales por cultivo, fenología, traducción a recomendación) se calibra con uso real: ventaja acumulativa.</li>
+        </ul>
+      </div>
+      <div class="reveal">
+        <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:28px;">
+          <div style="font-size:0.76rem; letter-spacing:0.1em; color:#8ab599; text-transform:uppercase; margin-bottom:10px;">Tracción actual</div>
+          <ul style="display:grid;gap:14px;font-size:0.94rem;color:#dbe8de;">
+            <li>✓ Producto en producción (Vercel)</li>
+            <li>✓ Arquitectura validada con parcelas reales</li>
+            <li>✓ Stack 100 % sobre infraestructura pública</li>
+            <li>→ Piloto cooperativas abierto para campaña 2026</li>
+          </ul>
+          <a class="btn btn-primary" href="#lista-espera" style="margin-top:24px;">Agendar conversación →</a>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ── Cifras ── -->
-  <section class="alt">
-    <div class="wrap">
-      <div class="cifras">
-        <div>
-          <div class="cifra-num">10 m</div>
-          <div class="cifra-label">Resolución Sentinel-2</div>
-        </div>
-        <div>
-          <div class="cifra-num">~5 días</div>
-          <div class="cifra-label">Revisita del satélite</div>
-        </div>
-        <div>
-          <div class="cifra-num">3</div>
-          <div class="cifra-label">Índices por parcela (NDVI, NDMI, suelo)</div>
-        </div>
-        <div>
-          <div class="cifra-num">0 €</div>
-          <div class="cifra-label">Hardware por explotación</div>
-        </div>
-      </div>
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- FAQ                                                             -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section id="faq" class="alt" aria-labelledby="h-faq">
+  <div class="wrap">
+    <div class="section-header reveal">
+      <span class="eyebrow">Preguntas frecuentes</span>
+      <h2 class="section-title" id="h-faq">Lo que suelen preguntarnos antes de probar.</h2>
     </div>
-  </section>
-
-  <!-- ── Tecnología ── -->
-  <section id="tecnologia">
-    <div class="wrap">
-      <div class="section-eyebrow">Stack</div>
-      <h2 class="section-title">Construido sobre infraestructura pública europea.</h2>
-      <p class="section-lead">
-        Nos apoyamos en datos abiertos oficiales. Eso mantiene el servicio
-        sostenible y garantiza que la información no depende de ningún
-        proveedor privado.
-      </p>
-
-      <div class="stack">
-        <div class="stack-item">
-          <h4>Copernicus / Sentinel-2</h4>
-          <p>Programa espacial europeo. Imagen multiespectral a 10 m cada 5 días.</p>
-        </div>
-        <div class="stack-item">
-          <h4>SIGPAC</h4>
-          <p>Registro oficial de parcelas del MAPA. Vector tiles abiertos.</p>
-        </div>
-        <div class="stack-item">
-          <h4>Open-Meteo · DWD ICON</h4>
-          <p>Humedad del suelo y meteorología a escala horaria, gratuitos.</p>
-        </div>
-        <div class="stack-item">
-          <h4>Arquitectura serverless</h4>
-          <p>Sin base de datos propia. Escalable sin coste fijo por usuario.</p>
-        </div>
-      </div>
+    <div class="faq-list reveal">
+      <details class="faq">
+        <summary>¿Necesito instalar algo o poner sensores en el campo?</summary>
+        <div>No. Kylia funciona enteramente con datos de satélite y meteorología que ya existen y son públicos. Entras en la web desde el móvil, seleccionas tu parcela en el mapa y listo.</div>
+      </details>
+      <details class="faq">
+        <summary>¿Qué es NDVI y qué es NDMI, en cristiano?</summary>
+        <div>NDVI mide el vigor de la vegetación (cuánto está creciendo y cómo de verde está). NDMI mide el agua que tiene la hoja (es la primera alerta de estrés hídrico, antes incluso de que se vea a simple vista). Kylia los calcula y traduce a un semáforo claro: bueno, moderado o estrés.</div>
+      </details>
+      <details class="faq">
+        <summary>¿Cada cuánto se actualizan los datos?</summary>
+        <div>Sentinel-2 pasa sobre cada parcela aproximadamente cada 5 días. Si ese paso está nublado, Kylia espera al siguiente. La humedad del suelo y la meteorología se actualizan cada hora.</div>
+      </details>
+      <details class="faq">
+        <summary>¿Funciona en toda España?</summary>
+        <div>Sí, cualquier parcela registrada en SIGPAC (todas las agrícolas declaradas) tiene cobertura. Fuera de España, la parte de humedad y meteo funciona, pero la integración SIGPAC es específica de España.</div>
+      </details>
+      <details class="faq">
+        <summary>¿Cómo es de preciso el dato?</summary>
+        <div>Sentinel-2 tiene 10 m de resolución espacial en las bandas que usamos. Kylia agrega todos los píxeles válidos dentro de la geometría oficial de tu parcela (filtrando nubes y sombras) para dar la media real del recinto — no un píxel suelto.</div>
+      </details>
+      <details class="faq">
+        <summary>¿Cuánto cuesta?</summary>
+        <div>El uso para agricultor individual con una parcela es gratis y seguirá siendo gratis. Los planes Profesional y Cooperativa (en preparación) cobran por el uso avanzado: alertas, múltiples parcelas, integraciones. Nunca cobraremos por hectárea.</div>
+      </details>
+      <details class="faq">
+        <summary>¿Qué hacéis con mis datos?</summary>
+        <div>Guardamos en tu propio navegador la cartera de parcelas que seleccionas (en localStorage). En el servidor no almacenamos imágenes del satélite ni datos personales más allá de lo mínimo para que funcione la app. La ubicación de tus parcelas es información pública (SIGPAC).</div>
+      </details>
+      <details class="faq">
+        <summary>Represento a una cooperativa. ¿Cómo empezamos?</summary>
+        <div>Estamos seleccionando 3–5 cooperativas para el piloto gratuito de la campaña 2026. Rellena el formulario más abajo y te escribimos personalmente para ver encaje.</div>
+      </details>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ── Lista de espera ── -->
-  <section id="lista-espera" class="alt">
-    <div class="wrap">
-      <div class="waitlist-card">
-        <h3>Únete al piloto para cooperativas</h3>
-        <p>
-          Estamos seleccionando 3-5 cooperativas para un piloto gratuito durante la
-          próxima campaña. Déjanos tu contacto y te escribimos personalmente.
-        </p>
-        <form class="waitlist" id="form-waitlist" novalidate>
-          <div>
-            <label for="w-nombre">Nombre</label>
-            <input id="w-nombre" name="nombre" type="text" autocomplete="name" />
-          </div>
-          <div>
-            <label for="w-org">Cooperativa / organización</label>
-            <input id="w-org" name="organizacion" type="text" autocomplete="organization" />
-          </div>
-          <div class="full">
-            <label for="w-email">Email *</label>
-            <input id="w-email" name="email" type="email" required autocomplete="email" placeholder="tunombre@cooperativa.com" />
-          </div>
-          <div class="full">
-            <button type="submit" id="w-submit">Apuntarme al piloto</button>
-          </div>
-        </form>
-        <div id="w-status" class="waitlist-status" role="status" aria-live="polite"></div>
-        <p class="waitlist-legal">
-          Solo usaremos tu email para avisarte del piloto. Sin spam, sin terceros.
-        </p>
-      </div>
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Waitlist                                                        -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section id="lista-espera" aria-labelledby="h-waitlist">
+  <div class="wrap">
+    <div class="waitlist-card reveal">
+      <h3 id="h-waitlist">Únete al piloto 2026</h3>
+      <p>Seleccionamos cooperativas, ADVs y agricultores profesionales para probar Kylia gratis durante la campaña. Déjanos un contacto y te escribimos personalmente.</p>
+      <form class="waitlist" id="form-waitlist" novalidate>
+        <div>
+          <label for="w-nombre">Nombre</label>
+          <input id="w-nombre" name="nombre" type="text" autocomplete="name" placeholder="Tu nombre" />
+        </div>
+        <div>
+          <label for="w-rol">Soy…</label>
+          <select id="w-rol" name="rol">
+            <option value="agricultor">Agricultor</option>
+            <option value="cooperativa">Cooperativa / ADV</option>
+            <option value="inversor">Inversor / socio</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="full">
+          <label for="w-org">Organización (opcional)</label>
+          <input id="w-org" name="organizacion" type="text" autocomplete="organization" placeholder="Cooperativa, explotación, fondo…" />
+        </div>
+        <div class="full">
+          <label for="w-email">Email *</label>
+          <input id="w-email" name="email" type="email" required autocomplete="email" placeholder="tunombre@ejemplo.com" />
+        </div>
+        <div class="full">
+          <button type="submit" id="w-submit">Apuntarme al piloto</button>
+        </div>
+      </form>
+      <div id="w-status" class="waitlist-status" role="status" aria-live="polite"></div>
+      <p class="waitlist-legal">Solo usaremos tu email para contactarte sobre Kylia. Sin spam, sin terceros, sin venta de datos.</p>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ── Final CTA ── -->
-  <section class="final-cta">
-    <h2>Prueba Kylia ahora con una parcela real.</h2>
-    <p>
-      No hace falta cuenta ni instalación. Selecciona una parcela en el mapa y
-      obtén su estado en segundos.
-    </p>
-    <a class="btn btn-primary" href="/app.html">Abrir la herramienta →</a>
-  </section>
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Final CTA                                                       -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<section class="final-cta" aria-labelledby="h-final">
+  <h2 id="h-final">Una parcela, un clic, un minuto.</h2>
+  <p>No hace falta cuenta ni tarjeta. Prueba Kylia ahora con una parcela real y mira qué te dice.</p>
+  <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+    <a class="btn btn-primary btn-lg" href="/app.html">Abrir la herramienta →</a>
+    <a class="btn btn-ghost btn-lg" href="#lista-espera">Unirme al piloto</a>
+  </div>
+</section>
 
-  <!-- ── Footer ── -->
-  <footer>
-    <div class="wrap footer-inner">
-      <div>© 2026 Kylia · Monitorización agronómica por satélite</div>
+</main>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Footer                                                          -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#top" class="brand">
+          <span class="brand-logo" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M4 18 Q12 6 20 18 Z" fill="currentColor"/>
+              <circle cx="12" cy="8" r="1.4" fill="currentColor"/>
+            </svg>
+          </span>
+          Kylia
+        </a>
+        <p>Agricultura de precisión desde el espacio, sin hardware en el campo. Hecho en España sobre infraestructura pública europea.</p>
+      </div>
       <div>
-        <a href="/app.html">Producto</a> &nbsp;·&nbsp;
-        <a href="mailto:marticarol003@gmail.com">Contacto</a>
+        <h4>Producto</h4>
+        <ul>
+          <li><a href="/app.html">Abrir Kylia</a></li>
+          <li><a href="#como-funciona">Cómo funciona</a></li>
+          <li><a href="#precios">Precios</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Para quién</h4>
+        <ul>
+          <li><a href="#publicos">Agricultores</a></li>
+          <li><a href="#publicos">Cooperativas y ADV</a></li>
+          <li><a href="#publicos">Inversores</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contacto</h4>
+        <ul>
+          <li><a href="mailto:marticarol003@gmail.com">marticarol003@gmail.com</a></li>
+          <li><a href="#lista-espera">Piloto 2026</a></li>
+        </ul>
       </div>
     </div>
-  </footer>
+    <div class="footer-meta">
+      <div>© 2026 Kylia · Monitorización agronómica por satélite</div>
+      <div>Construido con datos <a href="https://dataspace.copernicus.eu/" rel="noopener">Copernicus</a>, <a href="https://sigpac.mapa.gob.es/" rel="noopener">SIGPAC</a> y <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a>.</div>
+    </div>
+  </div>
+</footer>
 
-  <script>
-    // Envío de la lista de espera al endpoint serverless.
-    const form    = document.getElementById("form-waitlist");
-    const status  = document.getElementById("w-status");
-    const btn     = document.getElementById("w-submit");
+<script>
+  // ═══════════════════════════════════════════════════════════════
+  // Barra de progreso del scroll
+  // ═══════════════════════════════════════════════════════════════
+  const progress = document.getElementById("nav-progress");
+  function onScroll() {
+    const h = document.documentElement;
+    const max = h.scrollHeight - h.clientHeight;
+    const pct = max > 0 ? (h.scrollTop / max) * 100 : 0;
+    progress.style.width = pct + "%";
+  }
+  document.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("w-email").value.trim();
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        status.className = "waitlist-status err";
-        status.textContent = "Necesitamos un email válido para avisarte.";
-        return;
-      }
+  // ═══════════════════════════════════════════════════════════════
+  // Reveal on scroll (IntersectionObserver, respeta reduced-motion)
+  // ═══════════════════════════════════════════════════════════════
+  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (prefersReduced || !("IntersectionObserver" in window)) {
+    document.querySelectorAll(".reveal").forEach(el => el.classList.add("is-in"));
+  } else {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add("is-in");
+          io.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: "0px 0px -40px 0px", threshold: 0.05 });
+    document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+  }
 
-      const payload = {
-        nombre:       document.getElementById("w-nombre").value.trim(),
-        organizacion: document.getElementById("w-org").value.trim(),
-        email,
-      };
-
-      btn.disabled = true;
-      status.className = "waitlist-status";
-      status.textContent = "Enviando...";
-
-      try {
-        const res = await fetch("/api/waitlist", {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        status.className = "waitlist-status ok";
-        status.textContent = "¡Gracias! Te escribiremos antes de que arranque la campaña.";
-        form.reset();
-      } catch (err) {
-        status.className = "waitlist-status err";
-        status.textContent = "No se ha podido enviar. Escríbenos a marticarol003@gmail.com.";
-      } finally {
-        btn.disabled = false;
-      }
+  // ═══════════════════════════════════════════════════════════════
+  // Audience tabs — click + arrow keys + Home/End (ARIA tablist)
+  // ═══════════════════════════════════════════════════════════════
+  const tabs   = Array.from(document.querySelectorAll(".tab"));
+  const panels = {
+    agricultor:  document.getElementById("panel-agricultor"),
+    cooperativa: document.getElementById("panel-cooperativa"),
+    inversor:    document.getElementById("panel-inversor"),
+  };
+  function activateTab(target, focus = true) {
+    tabs.forEach(x => {
+      const on = x === target;
+      x.classList.toggle("active", on);
+      x.setAttribute("aria-selected", on ? "true" : "false");
+      x.setAttribute("tabindex", on ? "0" : "-1");
     });
-  </script>
+    Object.values(panels).forEach(p => p.classList.remove("active"));
+    const which = target.getAttribute("data-panel");
+    panels[which]?.classList.add("active");
+    if (focus) target.focus();
+  }
+  tabs.forEach((t, i) => {
+    t.addEventListener("click", () => activateTab(t, false));
+    t.addEventListener("keydown", (e) => {
+      let next = null;
+      if (e.key === "ArrowRight") next = tabs[(i + 1) % tabs.length];
+      else if (e.key === "ArrowLeft") next = tabs[(i - 1 + tabs.length) % tabs.length];
+      else if (e.key === "Home") next = tabs[0];
+      else if (e.key === "End")  next = tabs[tabs.length - 1];
+      if (next) { e.preventDefault(); activateTab(next, true); }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // Mobile nav toggle
+  // ═══════════════════════════════════════════════════════════════
+  const navToggle = document.getElementById("nav-toggle");
+  const navLinks  = document.getElementById("nav-links");
+  navToggle.addEventListener("click", () => {
+    const open = navLinks.classList.toggle("open");
+    navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    navToggle.setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
+  });
+  // Cerrar al hacer click en un enlace del menú móvil
+  navLinks.querySelectorAll("a").forEach(a => a.addEventListener("click", () => {
+    if (navLinks.classList.contains("open")) {
+      navLinks.classList.remove("open");
+      navToggle.setAttribute("aria-expanded", "false");
+      navToggle.setAttribute("aria-label", "Abrir menú");
+    }
+  }));
+
+  // ═══════════════════════════════════════════════════════════════
+  // Stats count-up (se dispara cuando entran en viewport)
+  // ═══════════════════════════════════════════════════════════════
+  (function () {
+    if (prefersReduced || !("IntersectionObserver" in window)) return;
+    const nums = document.querySelectorAll(".stat-num[data-count]");
+    const animate = (el) => {
+      const target = parseFloat(el.getAttribute("data-count"));
+      if (!isFinite(target) || target === 0) return;
+      const originalHTML = el.innerHTML;
+      const suffixMatch  = originalHTML.match(/[^\d.,]+$/);
+      const suffix       = suffixMatch ? suffixMatch[0] : "";
+      const dur = 900; const t0 = performance.now();
+      function tick(t) {
+        const p = Math.min(1, (t - t0) / dur);
+        const ease = 1 - Math.pow(1 - p, 3);
+        const val = target * ease;
+        const pretty = target >= 10 ? Math.round(val) : val.toFixed(0);
+        el.textContent = pretty + suffix;
+        if (p < 1) requestAnimationFrame(tick);
+        else el.innerHTML = originalHTML; // restaura formato final exacto
+      }
+      requestAnimationFrame(tick);
+    };
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { animate(e.target); obs.unobserve(e.target); }
+      });
+    }, { threshold: 0.4 });
+    nums.forEach(n => obs.observe(n));
+  })();
+
+  // ═══════════════════════════════════════════════════════════════
+  // Waitlist form
+  // ═══════════════════════════════════════════════════════════════
+  const form    = document.getElementById("form-waitlist");
+  const status  = document.getElementById("w-status");
+  const btn     = document.getElementById("w-submit");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("w-email").value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      status.className = "waitlist-status err";
+      status.textContent = "Necesitamos un email válido para avisarte.";
+      return;
+    }
+    const payload = {
+      nombre:       document.getElementById("w-nombre").value.trim(),
+      organizacion: document.getElementById("w-org").value.trim(),
+      rol:          document.getElementById("w-rol").value,
+      email,
+    };
+    btn.disabled = true;
+    status.className = "waitlist-status";
+    status.textContent = "Enviando...";
+    try {
+      const res = await fetch("/api/waitlist", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      status.className = "waitlist-status ok";
+      status.textContent = "¡Gracias! Te escribiremos antes de que arranque la campaña.";
+      form.reset();
+    } catch (err) {
+      status.className = "waitlist-status err";
+      status.textContent = "No se ha podido enviar. Escríbenos a marticarol003@gmail.com.";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+
 </body>
 </html>
