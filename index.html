@@ -594,16 +594,50 @@
     aspect-ratio: 5 / 4;
     display: flex; align-items: center; justify-content: center;
   }
+  .panel-visual img { display: block; }
+  .investor-panel {
+    aspect-ratio: auto;
+    display: grid; gap: 14px;
+    grid-template-columns: 1fr 1fr;
+    padding: 22px;
+    align-items: stretch; justify-items: stretch;
+  }
+  .investor-kpi {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .investor-kpi.kpi-accent {
+    background: linear-gradient(135deg, var(--verde-50) 0%, #fff 100%);
+    border-color: rgba(43,122,58,0.35);
+  }
+  .kpi-eyebrow {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em;
+    color: var(--verde-700); text-transform: uppercase;
+  }
+  .kpi-num {
+    font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--text); line-height: 1.15;
+  }
+  .kpi-sub { font-size: 0.8rem; color: var(--subtle); line-height: 1.4; }
 
   /* ═════════════════════════════════════════════════════════════════
      Features grid
      ═════════════════════════════════════════════════════════════════ */
   .features {
     display: grid; gap: 1px;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     background: var(--border);
     border: 1px solid var(--border);
     border-radius: var(--radius); overflow: hidden;
+  }
+  @media (max-width: 880px) {
+    .features { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 520px) {
+    .features { grid-template-columns: 1fr; }
   }
   .feature {
     background: #fff; padding: 28px 26px;
@@ -683,12 +717,11 @@
     letter-spacing: 0.02em;
   }
   .compare th.highlight { background: var(--verde); color: #fff; }
-  .compare .yes, .compare .no {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-weight: 600; font-size: 0.88rem;
+  .compare td.yes, .compare td.no {
+    font-weight: 600;
   }
-  .compare .yes { color: var(--verde); }
-  .compare .no  { color: var(--rojo); }
+  .compare td.yes { color: var(--verde); }
+  .compare td.no  { color: var(--rojo); }
   .compare-wrap { overflow-x: auto; }
 
   /* ═════════════════════════════════════════════════════════════════
@@ -738,17 +771,62 @@
      ═════════════════════════════════════════════════════════════════ */
   .pricing {
     display: grid; gap: 20px;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
+  }
+  @media (max-width: 1080px) {
+    .pricing { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 540px) {
+    .pricing { grid-template-columns: 1fr; }
   }
   .price-card {
     background: #fff; border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 32px 28px;
+    border-radius: var(--radius); padding: 28px 24px;
     display: flex; flex-direction: column;
   }
   .price-card.featured {
     border: 2px solid var(--verde);
     box-shadow: var(--shadow-lg);
     position: relative;
+  }
+  .price-card.enterprise {
+    background: linear-gradient(180deg, #0f172a 0%, #1f2937 100%);
+    color: #fff;
+    border: 1px solid #1f2937;
+  }
+  .price-card.enterprise .price-name { color: #b4eac1; }
+  .price-card.enterprise .price-tag { color: #fff; }
+  .price-card.enterprise .price-unit { color: rgba(255,255,255,0.65); }
+  .price-card.enterprise .price-list li { color: rgba(255,255,255,0.85); }
+  .price-card.enterprise .price-list li::before { color: #b4eac1; }
+  .price-card.enterprise .price-micro { color: rgba(255,255,255,0.55); }
+  .price-card.enterprise .btn-ghost {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    border-color: rgba(255,255,255,0.18);
+  }
+  .price-card.enterprise .btn-ghost:hover {
+    background: rgba(255,255,255,0.14);
+  }
+  .price-tiers {
+    list-style: none; padding: 0; margin: 0 0 18px;
+    display: grid; gap: 6px;
+    font-size: 0.84rem; color: var(--subtle);
+  }
+  .price-tiers li {
+    display: flex; justify-content: space-between;
+    padding: 6px 10px;
+    background: var(--bg-alt);
+    border-radius: 6px;
+  }
+  .price-tiers li strong { color: var(--text); font-weight: 600; }
+  .price-save {
+    display: inline-block;
+    background: var(--verde-50); color: var(--verde-700);
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
+    padding: 2px 8px; border-radius: 999px;
+    margin-left: 6px; vertical-align: middle;
+    text-transform: uppercase;
   }
   .price-card.featured::before {
     content: "Recomendado"; position: absolute; top: -12px; right: 22px;
@@ -1055,7 +1133,7 @@
       <a href="#publicos">Para quién</a>
       <a href="#precios">Precios</a>
       <a href="#faq">FAQ</a>
-      <a class="btn btn-primary btn-sm nav-cta" href="/app.html">Probar gratis</a>
+      <a class="btn btn-primary btn-sm nav-cta" href="app.html">Probar gratis</a>
     </nav>
   </div>
   <div class="nav-progress" id="nav-progress" aria-hidden="true"></div>
@@ -1074,10 +1152,10 @@
         Tu campo, vigilado desde el <em>espacio</em>.
       </h1>
       <p class="hero-sub">
-        Vigor del cultivo, humedad del suelo y recomendación de riego para cualquier parcela SIGPAC. En el móvil, en segundos. Sin sensores, sin €/ha.
+        Vigor del cultivo, humedad del suelo y recomendación de riego para cualquier parcela SIGPAC. En el móvil, en segundos. Gratis hasta 20 hectáreas.
       </p>
       <div class="hero-cta">
-        <a class="btn btn-primary btn-lg" href="/app.html">Ver mi parcela gratis →</a>
+        <a class="btn btn-primary btn-lg" href="app.html">Ver mi parcela gratis →</a>
         <a class="btn btn-ghost btn-lg" href="#producto">Ver cómo funciona</a>
       </div>
       <ul class="hero-trust">
@@ -1094,7 +1172,7 @@
         <span class="pill-dot"></span>
         <span>Última imagen <strong>hace 2 días</strong></span>
       </div>
-      <img src="/product-mobile.png"
+      <img src="assets/img/product-mobile.png"
            alt="La app Kylia en un iPhone: parcela de olivar con NDVI 0.72, humedad del suelo al 28% y recomendación de no regar hasta el lunes."
            width="620" height="940"
            loading="eager" fetchpriority="high" decoding="async">
@@ -1151,7 +1229,7 @@
     </div>
     <div class="producto-shell reveal">
       <div class="producto-frame">
-        <img src="/product-desktop.png"
+        <img src="assets/img/product-desktop.png"
              alt="La interfaz de Kylia en escritorio: un mapa satelital con parcelas SIGPAC, la parcela seleccionada resaltada con su ficha de NDVI 0.72, NDMI 0.34, humedad del suelo 28% y recomendación de riego."
              width="1600" height="1000"
              loading="lazy" decoding="async">
@@ -1285,7 +1363,7 @@
           <li>Historial de 8 semanas para ver si la parcela mejora o empeora.</li>
           <li>Funciona en cualquier móvil. Sin descargas, sin cuentas complicadas.</li>
         </ul>
-        <a class="btn btn-primary" href="/app.html">Probar con mi parcela →</a>
+        <a class="btn btn-primary" href="app.html">Probar con mi parcela →</a>
       </div>
       <div class="panel-visual reveal" aria-hidden="true">
         <svg viewBox="0 0 300 260" width="260">
@@ -1330,7 +1408,7 @@
         <a class="btn btn-primary" href="#lista-espera">Apuntarse al piloto →</a>
       </div>
       <div class="panel-visual reveal">
-        <img src="/product-dashboard.png"
+        <img src="assets/img/product-dashboard.png"
              alt="Panel de cooperativa en Kylia: 124 parcelas, 38 socios, 86 con vigor bueno, 27 moderado, 11 en estrés, tabla de alertas y distribución por estado."
              width="1400" height="900"
              loading="lazy" decoding="async"
@@ -1341,36 +1419,37 @@
     <div class="tab-panel" id="panel-inversor" role="tabpanel" aria-labelledby="tab-inversor">
       <div class="reveal">
         <h3>Inversores y socios: un vehículo para entrar en AgTech europeo.</h3>
-        <p>Mercado enorme, datos abiertos que antes eran de pago, coste marginal por usuario cercano a cero, ventana regulatoria favorable. Una capa muy fina construida sobre infraestructura pública.</p>
+        <p>Mercado enorme, datos abiertos que antes eran de pago, coste marginal por usuario cercano a cero, ventana regulatoria favorable. Tres líneas de monetización ya identificadas: B2C Pro, B2B cooperativas y B2G/Enterprise.</p>
         <ul class="tab-list">
-          <li>España: ~23,5 M ha de superficie agraria útil · ~915 k explotaciones.</li>
-          <li>Copernicus Data Space (UE) abierto desde 2023: consultas gratuitas suficientes para decenas de miles de parcelas.</li>
-          <li>SIGPAC digitalizado y accesible: cada recinto tiene geometría oficial y ID único.</li>
-          <li>Arquitectura serverless: sin coste fijo por usuario, escala sin CAPEX.</li>
-          <li>Modelo de ingresos B2B (cooperativas, ADV, ATRIA) y B2C freemium probado en vertical ya validados.</li>
+          <li>Mercado español: ~23,5 M ha de SAU, ~915 k explotaciones y ~3.700 cooperativas agroalimentarias.</li>
+          <li>Pricing público y por tramos planos (sin €/ha lineal): Pro desde <strong>19 €/mes</strong>, Cooperativa desde <strong>6.000 €/año</strong>, Enterprise desde <strong>25.000 €/año</strong>.</li>
+          <li>Vector Enterprise: aseguradoras agrarias, banca rural y administración (CCAA, Confederaciones) — tickets de 25 a 150 k €/año.</li>
+          <li>Stack 100 % sobre infraestructura pública europea: Copernicus, SIGPAC, DWD ICON. Sin proveedor privado crítico.</li>
+          <li>Coste variable Sentinel Hub ≈ 0,40 € por usuario Pro al mes — gross margin objetivo &gt; 85 %.</li>
         </ul>
-        <a class="btn btn-primary" href="#lista-espera">Hablemos →</a>
+        <a class="btn btn-primary" href="mailto:marticarol003@gmail.com?subject=Kylia%20-%20conversaci%C3%B3n%20inversi%C3%B3n">Hablemos →</a>
       </div>
-      <div class="panel-visual reveal" aria-hidden="true">
-        <svg viewBox="0 0 320 260">
-          <rect x="10" y="10" width="300" height="240" rx="14" fill="#f7f9f7" stroke="#e2e8f0"/>
-          <text x="26" y="38" font-size="13" fill="#0f172a" font-weight="700">Oportunidad</text>
-          <!-- Barras crecientes -->
-          <g transform="translate(26,60)">
-            <rect x="0"   y="130" width="36" height="30" rx="4" fill="#d3e8d7"/>
-            <rect x="46"  y="104" width="36" height="56" rx="4" fill="#a9d1b0"/>
-            <rect x="92"  y="72"  width="36" height="88" rx="4" fill="#75b484"/>
-            <rect x="138" y="40"  width="36" height="120" rx="4" fill="#4a9657"/>
-            <rect x="184" y="10"  width="36" height="150" rx="4" fill="#2b7a3a"/>
-            <text x="0"   y="178" font-size="9" fill="#64748b">2022</text>
-            <text x="46"  y="178" font-size="9" fill="#64748b">2023</text>
-            <text x="92"  y="178" font-size="9" fill="#64748b">2024</text>
-            <text x="138" y="178" font-size="9" fill="#64748b">2025</text>
-            <text x="184" y="178" font-size="9" fill="#64748b">2026</text>
-          </g>
-          <text x="26" y="210" font-size="10" fill="#0f172a" font-weight="700">Digitalización PAC + Copernicus Data Space</text>
-          <text x="26" y="226" font-size="9" fill="#64748b">Ventana regulatoria y de datos favorable.</text>
-        </svg>
+      <div class="panel-visual reveal investor-panel" aria-hidden="true">
+        <div class="investor-kpi">
+          <div class="kpi-eyebrow">Mercado total</div>
+          <div class="kpi-num">~23,5 M ha</div>
+          <div class="kpi-sub">915 k explotaciones · 3.700 cooperativas</div>
+        </div>
+        <div class="investor-kpi">
+          <div class="kpi-eyebrow">Pro · agricultor</div>
+          <div class="kpi-num">19 €/mes</div>
+          <div class="kpi-sub">228 €/año ARPU · 10–25 % del valor capturado</div>
+        </div>
+        <div class="investor-kpi">
+          <div class="kpi-eyebrow">Cooperativa</div>
+          <div class="kpi-num">6 — 24 k €/año</div>
+          <div class="kpi-sub">Licencia anual · todos los socios incluidos</div>
+        </div>
+        <div class="investor-kpi kpi-accent">
+          <div class="kpi-eyebrow">Enterprise</div>
+          <div class="kpi-num">25–150 k €/año</div>
+          <div class="kpi-sub">Aseguradoras · banca rural · administración</div>
+        </div>
       </div>
     </div>
   </div>
@@ -1559,10 +1638,17 @@
           </tr>
           <tr>
             <th scope="row">Alertas automáticas</th>
-            <td>En roadmap Q3 2026</td>
+            <td class="yes">Incluidas en Pro</td>
             <td class="yes">Sí</td>
             <td class="yes">Sí</td>
             <td class="no">—</td>
+          </tr>
+          <tr>
+            <th scope="row">Plan gratuito real</th>
+            <td class="yes">Hasta 20 ha, para siempre</td>
+            <td class="no">Solo trial</td>
+            <td class="no">No</td>
+            <td>—</td>
           </tr>
         </tbody>
       </table>
@@ -1597,7 +1683,7 @@
       </article>
       <article class="testimonio coming reveal">
         <p class="testimonio-quote"><strong>Plaza early-adopter</strong><br>¿Agricultor profesional curioso? Pruébalo ya y dinos qué cambiarías — te escuchamos.</p>
-        <a class="btn btn-primary btn-sm" href="/app.html">Probar ahora</a>
+        <a class="btn btn-primary btn-sm" href="app.html">Probar ahora</a>
       </article>
     </div>
   </div>
@@ -1610,52 +1696,83 @@
   <div class="wrap">
     <div class="section-header reveal">
       <span class="eyebrow">Precios</span>
-      <h2 class="section-title" id="h-precios">Empieza gratis. Paga solo si escalas.</h2>
-      <p class="section-lead">El plan Agricultor es gratis para siempre — no un trial. Los planes de pago solo existen para quien necesita muchas parcelas, alertas o integración con ERP.</p>
+      <h2 class="section-title" id="h-precios">Precio fijo. Tus socios incluidos. Sin matemáticas.</h2>
+      <p class="section-lead">Tarifas planas por tramo (de superficie o de socios), nunca €/ha lineal. Precio público hasta el último tier — no "consulta a ventas". Si cobramos lo justo, podemos seguir mejorando el producto.</p>
     </div>
     <div class="pricing">
       <article class="price-card reveal">
-        <div class="price-name">Agricultor</div>
+        <div class="price-name">Gratis</div>
         <div class="price-tag">0 €</div>
-        <div class="price-unit">Gratis para siempre · 1 parcela</div>
+        <div class="price-unit">Para siempre · hasta 20 ha</div>
         <ul class="price-list">
+          <li>Parcelas ilimitadas dentro del límite de superficie</li>
           <li>NDVI, NDMI y humedad del suelo</li>
-          <li>Histórico rodante de 8 semanas</li>
-          <li>Recomendación semanal por cultivo</li>
-          <li>Funciona en cualquier móvil</li>
+          <li>Histórico rodante de 4 semanas</li>
+          <li>Resumen semanal por email</li>
+          <li>Recomendación por cultivo</li>
         </ul>
-        <a class="btn btn-ghost" href="/app.html">Empezar — sin tarjeta</a>
+        <a class="btn btn-ghost" href="app.html">Empezar — sin tarjeta</a>
         <div class="price-micro">Sin registro obligatorio · listo en 30 s</div>
       </article>
-      <article class="price-card reveal">
-        <div class="price-name">Profesional</div>
-        <div class="price-tag">Pronto</div>
-        <div class="price-unit">Reserva tu plaza · sin compromiso</div>
-        <ul class="price-list">
-          <li>Hasta 20 parcelas en una cartera</li>
-          <li>Alertas por email y Telegram</li>
-          <li>Histórico de 1 año completo</li>
-          <li>Exportación a PDF y CSV</li>
-          <li>Soporte prioritario por email</li>
-        </ul>
-        <a class="btn btn-ghost" href="#lista-espera">Reservar plaza</a>
-        <div class="price-micro">Early-adopters: precio congelado el primer año</div>
-      </article>
+
       <article class="price-card featured reveal">
-        <div class="price-name">Cooperativa / ADV</div>
-        <div class="price-tag">A medida</div>
-        <div class="price-unit">Licencia anual · nunca €/ha</div>
-        <ul class="price-list">
-          <li>Parcelas de todos los socios, en un panel</li>
-          <li>Alertas centralizadas y exportables</li>
-          <li>Integración con ERP, PAC y trazabilidad</li>
-          <li>Soporte dedicado y formación a técnicos</li>
-          <li><strong>Piloto 2026 gratuito</strong> para las primeras 3–5 cooperativas</li>
+        <div class="price-name">Pro</div>
+        <div class="price-tag">19&nbsp;€<span style="font-size:1rem;font-weight:500;color:var(--muted);">/mes</span></div>
+        <div class="price-unit">190&nbsp;€/año <span class="price-save">2 meses gratis</span></div>
+        <ul class="price-tiers" aria-label="Tarifas Pro por tramo de superficie">
+          <li>Hasta 100 ha <strong>19 €/mes</strong></li>
+          <li>Hasta 500 ha <strong>49 €/mes</strong></li>
+          <li>+ de 500 ha <strong>Pasa a Enterprise</strong></li>
         </ul>
-        <a class="btn btn-primary" href="#lista-espera">Hablemos — demo 30 min</a>
-        <div class="price-micro">Sin contrato anual forzado · cancelación libre</div>
+        <ul class="price-list">
+          <li>Parcelas ilimitadas dentro del tramo</li>
+          <li>Histórico anual completo</li>
+          <li>Alertas en tiempo real (email + Telegram)</li>
+          <li>Mapas NDVI intra-parcela</li>
+          <li>Exportación a PDF y CSV</li>
+        </ul>
+        <a class="btn btn-primary" href="#lista-espera">Empezar prueba de 14 días</a>
+        <div class="price-micro">Un riego mal evitado al año amortiza 2 años de Pro</div>
+      </article>
+
+      <article class="price-card reveal">
+        <div class="price-name">Cooperativa / ADV</div>
+        <div class="price-tag">desde 6.000 €<span style="font-size:1rem;font-weight:500;color:var(--muted);">/año</span></div>
+        <div class="price-unit">Todos los socios incluidos · sin €/ha</div>
+        <ul class="price-tiers" aria-label="Tarifas por tramo de socios">
+          <li>≤ 50 socios <strong>6.000 €/año</strong></li>
+          <li>51–200 socios <strong>12.000 €/año</strong></li>
+          <li>201–500 socios <strong>24.000 €/año</strong></li>
+          <li>500+ socios <strong>A medida</strong></li>
+        </ul>
+        <ul class="price-list">
+          <li>Panel agregado y alertas centralizadas</li>
+          <li>API de integración con ERP / PAC</li>
+          <li>Onboarding y formación a técnicos</li>
+          <li>Soporte dedicado</li>
+        </ul>
+        <a class="btn btn-ghost" href="#lista-espera">Agendar demo 30 min</a>
+        <div class="price-micro">Piloto 2026 gratuito para las primeras 3 cooperativas</div>
+      </article>
+
+      <article class="price-card enterprise reveal">
+        <div class="price-name">Empresa</div>
+        <div class="price-tag">desde 25.000 €<span style="font-size:1rem;font-weight:500;color:#94a3b8;">/año</span></div>
+        <div class="price-unit">Aseguradoras · banca · administración</div>
+        <ul class="price-list">
+          <li>Scoring agronómico para crédito y PAC</li>
+          <li>Verificación de declaraciones para seguros agrarios</li>
+          <li>Monitorización regional para CCAA</li>
+          <li>API empresarial con SLA</li>
+          <li>Datos agregados (con consentimiento)</li>
+        </ul>
+        <a class="btn btn-ghost" href="mailto:marticarol003@gmail.com?subject=Kylia%20Empresa">Hablar con ventas</a>
+        <div class="price-micro">Tarificación por superficie cubierta o consulta API</div>
       </article>
     </div>
+    <p class="reveal" style="text-align:center; margin-top:32px; font-size:0.88rem; color:var(--muted);">
+      Todos los planes incluyen los datos oficiales SIGPAC y Sentinel-2. IVA no incluido.
+    </p>
   </div>
 </section>
 
@@ -1809,7 +1926,7 @@
       </details>
       <details class="faq">
         <summary>¿Cuánto cuesta?</summary>
-        <div>El uso para agricultor individual con una parcela es gratis y seguirá siendo gratis. Los planes Profesional y Cooperativa (en preparación) cobran por el uso avanzado: alertas, múltiples parcelas, integraciones. Nunca cobraremos por hectárea.</div>
+        <div>Gratis para siempre hasta 20 hectáreas, con parcelas ilimitadas dentro de ese tramo, NDVI, NDMI y resumen semanal. <strong>Pro</strong> a 19 €/mes hasta 100 ha o 49 €/mes hasta 500 ha (con dos meses gratis al pago anual): alertas en tiempo real, mapas intra-parcela y exportación. <strong>Cooperativa</strong> desde 6.000 €/año con todos los socios incluidos — tarifa por tramos (6 k / 12 k / 24 k €/año), nunca €/ha lineal. <strong>Empresa</strong> (aseguradoras, banca rural, administración) desde 25.000 €/año con scoring agronómico y API a medida.</div>
       </details>
       <details class="faq">
         <summary>¿Qué hacéis con mis datos?</summary>
@@ -1817,7 +1934,7 @@
       </details>
       <details class="faq">
         <summary>Represento a una cooperativa. ¿Cómo empezamos?</summary>
-        <div>Estamos seleccionando 3–5 cooperativas para el piloto gratuito de la campaña 2026. Rellena el formulario más abajo y te escribimos personalmente para ver encaje.</div>
+        <div>Estamos seleccionando 3–5 cooperativas para el piloto gratuito de la campaña 2026 — entran al plan Cooperativa sin coste durante toda la campaña a cambio de feedback y un caso de uso público. Rellena el formulario más abajo y te escribimos personalmente en menos de 48 h.</div>
       </details>
     </div>
   </div>
@@ -1870,7 +1987,7 @@
   <h2 id="h-final">Tu próxima decisión de riego, con datos reales.</h2>
   <p>Sin registro, sin tarjeta, sin instalación. Abre Kylia, elige tu parcela y mira qué te dice — 30 segundos.</p>
   <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-    <a class="btn btn-primary btn-lg" href="/app.html">Probar con mi parcela →</a>
+    <a class="btn btn-primary btn-lg" href="app.html">Probar con mi parcela →</a>
     <a class="btn btn-ghost btn-lg" href="#lista-espera">Apuntarme al piloto</a>
   </div>
   <p style="font-size:0.85rem; color: rgba(255,255,255,0.7); margin-top:20px;">Funciona en tu móvil · cualquier parcela SIGPAC de España</p>
@@ -1899,7 +2016,7 @@
       <div>
         <h4>Producto</h4>
         <ul>
-          <li><a href="/app.html">Abrir Kylia</a></li>
+          <li><a href="app.html">Abrir Kylia</a></li>
           <li><a href="#como-funciona">Cómo funciona</a></li>
           <li><a href="#precios">Precios</a></li>
           <li><a href="#faq">FAQ</a></li>
