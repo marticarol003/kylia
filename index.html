@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2b7a3a" />
 <meta name="robots" content="index,follow,max-image-preview:large" />
 
-<title>Kylia — Agricultura de precisión desde el espacio, sin hardware</title>
-<meta name="description" content="Kylia monitoriza cada parcela SIGPAC con satélites europeos Copernicus: vigor, humedad del suelo y alertas en el móvil. Sin sensores, sin coste por hectárea. Para agricultores, cooperativas y el futuro del campo español." />
+<title>Kylia · ¿Cuándo regar tu parcela? Decídelo con el satélite. Desde 99 €/año.</title>
+<meta name="description" content="Vigor (NDVI) y humedad del suelo de cada parcela SIGPAC, leídos desde Sentinel-2. Sin sensores, sin Excel, sin €/ha lineal. Free hasta 30 ha. Productor desde 99 €/año. Garantía 60 días." />
 <meta name="author" content="Kylia" />
 <meta name="keywords" content="agricultura de precisión, satélite, Sentinel-2, Copernicus, SIGPAC, NDVI, NDMI, humedad del suelo, cooperativas, riego, España" />
 
@@ -22,8 +22,8 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Kylia" />
-<meta property="og:title" content="Kylia — Agricultura de precisión desde el espacio, sin hardware" />
-<meta property="og:description" content="Monitoriza cada parcela SIGPAC con satélites europeos. Sin sensores, sin coste por hectárea." />
+<meta property="og:title" content="Kylia · ¿Cuándo regar? Decídelo con el satélite, no con la experiencia." />
+<meta property="og:description" content="NDVI y humedad de suelo de cada parcela SIGPAC. Sin sensores. Free hasta 30 ha. Productor desde 99 €/año." />
 <meta property="og:locale" content="es_ES" />
 <meta property="og:url" content="https://kylia.app/" />
 <meta property="og:image" content="https://kylia.app/assets/img/og-image.png" />
@@ -33,8 +33,8 @@
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="Kylia — Agricultura de precisión desde el espacio" />
-<meta name="twitter:description" content="Monitoriza cada parcela SIGPAC con satélites europeos. Sin hardware, sin coste por hectárea." />
+<meta name="twitter:title" content="Kylia · ¿Cuándo regar? Decídelo con el satélite." />
+<meta name="twitter:description" content="NDVI y humedad de suelo de cada parcela SIGPAC. Sin sensores. Free hasta 30 ha. Productor desde 99 €/año." />
 <meta name="twitter:image" content="https://kylia.app/assets/img/og-image.png" />
 <meta name="twitter:image:alt" content="Kylia — NDVI por parcela SIGPAC desde satélite Sentinel-2." />
 
@@ -183,11 +183,23 @@
     color: #d8ebdb;
     font-size: 0.82rem;
     text-align: center;
-    padding: 8px 16px;
+    padding: 9px 16px;
     letter-spacing: 0.01em;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    flex-wrap: wrap;
   }
   .announce strong { color: #fff; }
   .announce a { color: #fff; text-decoration: underline; }
+  .announce-pulse {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: #a8d894; box-shadow: 0 0 0 0 rgba(168, 216, 148, 0.8);
+    animation: announce-pulse 1.8s ease-out infinite;
+  }
+  @keyframes announce-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(168, 216, 148, 0.7); }
+    70%  { box-shadow: 0 0 0 10px rgba(168, 216, 148, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(168, 216, 148, 0); }
+  }
 
   .nav {
     position: sticky; top: 0; z-index: 50;
@@ -317,8 +329,16 @@
     font-size: clamp(1.05rem, 1.3vw, 1.18rem);
     color: var(--subtle);
     max-width: 540px;
-    margin-bottom: 32px;
+    margin-bottom: 18px;
   }
+  .hero-anchor {
+    font-size: 0.95rem; color: #7a3030;
+    background: #fef3e9; border-left: 3px solid #c54848;
+    padding: 12px 14px; border-radius: 0 8px 8px 0;
+    max-width: 540px; margin-bottom: 28px;
+    line-height: 1.45;
+  }
+  .hero-anchor strong { color: #7a3030; }
   .hero-cta {
     display: flex; gap: 12px; flex-wrap: wrap;
     margin-bottom: 32px;
@@ -490,6 +510,26 @@
   /* ═════════════════════════════════════════════════════════════════
      Problema
      ═════════════════════════════════════════════════════════════════ */
+  .problem-scene {
+    background: linear-gradient(135deg, #fff8f3 0%, #fef3e9 100%);
+    border-left: 4px solid #c54848;
+    border-radius: 0 14px 14px 0;
+    padding: 28px 32px;
+    margin: 8px 0 36px;
+    max-width: 820px;
+  }
+  .scene-tag {
+    display: inline-block; font-size: 0.72rem; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #7a3030; font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .scene-quote p {
+    font-size: 1.02rem; line-height: 1.6; color: var(--text);
+    margin-bottom: 10px;
+  }
+  .scene-quote p:last-child { margin-bottom: 0; }
+  .scene-quote strong { color: #7a3030; font-weight: 700; }
+
   .problem-grid {
     display: grid; gap: 20px;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -595,33 +635,6 @@
     display: flex; align-items: center; justify-content: center;
   }
   .panel-visual img { display: block; }
-  .investor-panel {
-    aspect-ratio: auto;
-    display: grid; gap: 14px;
-    grid-template-columns: 1fr 1fr;
-    padding: 22px;
-    align-items: stretch; justify-items: stretch;
-  }
-  .investor-kpi {
-    background: var(--bg-alt);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 18px 16px;
-    display: flex; flex-direction: column; gap: 4px;
-  }
-  .investor-kpi.kpi-accent {
-    background: linear-gradient(135deg, var(--verde-50) 0%, #fff 100%);
-    border-color: rgba(43,122,58,0.35);
-  }
-  .kpi-eyebrow {
-    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em;
-    color: var(--verde-700); text-transform: uppercase;
-  }
-  .kpi-num {
-    font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em;
-    color: var(--text); line-height: 1.15;
-  }
-  .kpi-sub { font-size: 0.8rem; color: var(--subtle); line-height: 1.4; }
 
   /* ═════════════════════════════════════════════════════════════════
      Features grid
@@ -1073,6 +1086,24 @@
   .final-cta .btn-ghost:hover { background: rgba(255,255,255,0.08); }
 
   /* ═════════════════════════════════════════════════════════════════
+     Sticky CTA mobile (solo en pantalla pequeña)
+     ═════════════════════════════════════════════════════════════════ */
+  .sticky-cta { display: none; }
+  @media (max-width: 760px) {
+    .sticky-cta {
+      display: block;
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
+      padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0));
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: saturate(180%) blur(10px);
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -4px 16px -4px rgba(15, 23, 42, 0.1);
+    }
+    .sticky-cta .btn { width: 100%; padding: 14px 18px; font-size: 1rem; }
+    body { padding-bottom: 76px; }
+  }
+
+  /* ═════════════════════════════════════════════════════════════════
      Footer
      ═════════════════════════════════════════════════════════════════ */
   footer {
@@ -1114,7 +1145,8 @@
 <!-- Announcement bar                                                -->
 <!-- ════════════════════════════════════════════════════════════════ -->
 <div class="announce" role="region" aria-label="Aviso">
-  <strong>Piloto 2026 · plazas limitadas</strong> — gratis para las primeras cooperativas y agricultores. <a href="#lista-espera">Reservar plaza →</a>
+  <span class="announce-pulse" aria-hidden="true"></span>
+  <strong>Piloto 2026 cooperativas</strong> — quedan <strong>4 plazas</strong> gratis para toda la campaña. <a href="#lista-espera">Reservar plaza →</a>
 </div>
 
 <!-- ════════════════════════════════════════════════════════════════ -->
@@ -1154,16 +1186,19 @@
 <section class="hero" id="top" aria-label="Presentación">
   <div class="wrap hero-grid">
     <div>
-      <span class="eyebrow">Agricultura de precisión por satélite</span>
+      <span class="eyebrow">Agricultura de precisión · Sentinel-2 + SIGPAC</span>
       <h1 class="hero-title">
-        Tu campo, vigilado desde el <em>espacio</em>.
+        Decide cuándo regar antes de que la planta <em>se queje</em>.
       </h1>
       <p class="hero-sub">
-        Vigor del cultivo, humedad del suelo y recomendación de riego para cualquier parcela SIGPAC. Sin sensores. Sin Excel. <strong>Desde 99 €/año.</strong> Free hasta 30 hectáreas, para siempre.
+        Vigor (NDVI) y humedad de cada parcela SIGPAC, leídos desde el satélite. Sin sensores en el campo, sin €/ha lineal. <strong>Free hasta 30 ha</strong> · Productor desde <strong>99 €/año</strong> · garantía 60 días.
+      </p>
+      <p class="hero-anchor">
+        El olivar español pierde <strong>200-400 €/ha al año</strong> por estrés hídrico no detectado a tiempo. Pruébalo gratis en 30 segundos con tu parcela.
       </p>
       <div class="hero-cta">
-        <a class="btn btn-primary btn-lg" href="/app">Ver mi parcela gratis →</a>
-        <a class="btn btn-ghost btn-lg" href="#producto">Ver cómo funciona</a>
+        <a class="btn btn-primary btn-lg" href="/app">Probar con mi parcela →</a>
+        <a class="btn btn-ghost btn-lg" href="#como-funciona">Cómo funciona en 2&nbsp;min</a>
       </div>
       <ul class="hero-trust">
         <li><span class="check" aria-hidden="true"></span> Sin registro para probar</li>
@@ -1269,31 +1304,41 @@
   <div class="wrap">
     <div class="section-header reveal">
       <span class="eyebrow">El problema</span>
-      <h2 class="section-title" id="h-problema">La agricultura sigue tomando decisiones a ojo.</h2>
+      <h2 class="section-title" id="h-problema">Sigues decidiendo cuándo regar igual que tu padre.</h2>
       <p class="section-lead">
-        Los datos satelitales existen y son libres desde hace años. Pero la información llega solo a las explotaciones grandes que pueden pagar software agronómico especializado. El resto del campo — la mayoría — decide riego, fertilización y tratamientos sin un solo indicador objetivo.
+        Lo curioso es que los datos del satélite Sentinel-2 existen y son <strong>gratis desde 2015</strong>. Lo que faltaba era una herramienta que los pusiera en tu móvil, en castellano, sin formación previa.
       </p>
     </div>
+
+    <!-- Escena concreta -->
+    <div class="problem-scene reveal">
+      <div class="scene-quote">
+        <span class="scene-tag">Una cooperativa olivarera de Jaén · abril 2026</span>
+        <p>El técnico tiene <strong>412 socios</strong> y un Excel con todas las parcelas. Cuando suena el teléfono, abre tres pestañas distintas (visor SIGPAC, Mapa.es, una libreta) y reconstruye la situación de la parcela durante 20 minutos. Hace eso unas <strong>30 veces a la semana</strong>.</p>
+        <p>Son <strong>10 horas semanales</strong> buscando información que ya existe. <strong>11.000 €/año</strong> tirados solo en localizar lo que el satélite ya está mirando cada 5 días.</p>
+      </div>
+    </div>
+
     <div class="problem-grid">
       <article class="problem-card reveal">
         <div class="problem-card-num">01</div>
-        <h3>Decisiones a ciegas</h3>
-        <p>El agricultor decide cuándo regar, abonar o tratar sin conocer el estado real del cultivo. El error cuesta producción, agua y fitosanitarios.</p>
+        <h3>Decides riego "a ojo"</h3>
+        <p>Sin un indicador objetivo, decides cuándo regar por costumbre o por la previsión meteo. El error cuesta producción, agua y fitosanitarios.</p>
       </article>
       <article class="problem-card reveal">
         <div class="problem-card-num">02</div>
-        <h3>Software pensado para grandes</h3>
-        <p>Las plataformas existentes cobran por hectárea, exigen formación y sirven a explotaciones industriales. El pequeño y mediano se queda fuera.</p>
+        <h3>El software bueno cuesta como un sensor</h3>
+        <p>xarvio, FieldView y similares cobran 2-7 €/ha al año. Para 200 ha son 400-1.400 €. Y necesitas formación.</p>
       </article>
       <article class="problem-card reveal">
         <div class="problem-card-num">03</div>
-        <h3>Cooperativas sin visión conjunta</h3>
-        <p>Las cooperativas no ven el estado agregado de sus socios. Cuando alguien llama preguntando ya es tarde para actuar.</p>
+        <h3>Las cooperativas no ven el conjunto</h3>
+        <p>Cuando un socio llama preocupado, ya es tarde. El técnico debería ver el estrés <em>antes</em> de la llamada, no después.</p>
       </article>
       <article class="problem-card reveal">
         <div class="problem-card-num">04</div>
-        <h3>Datos libres, subutilizados</h3>
-        <p>Copernicus, SIGPAC y los modelos meteorológicos públicos son gratis. La información está ahí — faltaba un producto que la hiciera útil.</p>
+        <h3>Sentinel-2 es gratis y nadie te lo cuenta</h3>
+        <p>El satélite que paga la UE pasa sobre tu parcela cada 5 días con resolución 10 m. Faltaba alguien que te lo tradujera a "regar el martes".</p>
       </article>
     </div>
   </div>
@@ -1356,7 +1401,6 @@
     <div class="tabs" role="tablist" aria-label="Públicos de Kylia">
       <button class="tab active" role="tab" id="tab-agricultor"  aria-selected="true"  aria-controls="panel-agricultor"  tabindex="0"  data-panel="agricultor">Agricultores</button>
       <button class="tab"        role="tab" id="tab-cooperativa" aria-selected="false" aria-controls="panel-cooperativa" tabindex="-1" data-panel="cooperativa">Cooperativas y ADV</button>
-      <button class="tab"        role="tab" id="tab-inversor"    aria-selected="false" aria-controls="panel-inversor"    tabindex="-1" data-panel="inversor">Inversores y socios</button>
     </div>
 
     <div class="tab-panel active" id="panel-agricultor" role="tabpanel" aria-labelledby="tab-agricultor">
@@ -1423,42 +1467,6 @@
       </div>
     </div>
 
-    <div class="tab-panel" id="panel-inversor" role="tabpanel" aria-labelledby="tab-inversor">
-      <div class="reveal">
-        <h3>Inversores y socios: un vehículo para entrar en AgTech europeo.</h3>
-        <p>Mercado enorme, datos abiertos que antes eran de pago, coste marginal por usuario cercano a cero, ventana regulatoria favorable. Tres líneas de monetización ya identificadas: B2C Pro, B2B cooperativas y B2G/Enterprise.</p>
-        <ul class="tab-list">
-          <li>Mercado español: ~23,5 M ha de SAU, ~915 k explotaciones y ~3.700 cooperativas agroalimentarias.</li>
-          <li>Pricing público (sin €/ha lineal): Productor desde <strong>99 €/año</strong> con escala decreciente, Cooperativa desde <strong>2.900 €/año</strong> en paquete cerrado, Enterprise desde <strong>30.000 €/año</strong>.</li>
-          <li>Vector Enterprise: aseguradoras agrarias, banca rural y administración (CCAA, Confederaciones) — tickets de 30 a 150 k €/año.</li>
-          <li>Stack 100 % sobre infraestructura pública europea: Copernicus, SIGPAC, DWD ICON. Sin proveedor privado crítico.</li>
-          <li>Coste variable Copernicus ≈ 0,30 € por usuario Productor al mes — gross margin objetivo &gt; 88 %.</li>
-        </ul>
-        <a class="btn btn-primary" href="mailto:marticarol003@gmail.com?subject=Kylia%20-%20conversaci%C3%B3n%20inversi%C3%B3n">Hablemos →</a>
-      </div>
-      <div class="panel-visual reveal investor-panel" aria-hidden="true">
-        <div class="investor-kpi">
-          <div class="kpi-eyebrow">Mercado total</div>
-          <div class="kpi-num">~23,5 M ha</div>
-          <div class="kpi-sub">915 k explotaciones · 3.700 cooperativas</div>
-        </div>
-        <div class="investor-kpi">
-          <div class="kpi-eyebrow">Productor · agricultor</div>
-          <div class="kpi-num">99 — 559 €/año</div>
-          <div class="kpi-sub">€/ha decreciente · ARPU medio ~150 €/año</div>
-        </div>
-        <div class="investor-kpi">
-          <div class="kpi-eyebrow">Cooperativa</div>
-          <div class="kpi-num">2,9 — 11,9 k €/año</div>
-          <div class="kpi-sub">3 paquetes cerrados · todos los socios incluidos</div>
-        </div>
-        <div class="investor-kpi kpi-accent">
-          <div class="kpi-eyebrow">Enterprise</div>
-          <div class="kpi-num">30–150 k €/año</div>
-          <div class="kpi-sub">Aseguradoras · banca rural · administración</div>
-        </div>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -1527,50 +1535,6 @@
   </div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════════ -->
-<!-- Stack diagram                                                   -->
-<!-- ════════════════════════════════════════════════════════════════ -->
-<section class="alt" aria-labelledby="h-stack">
-  <div class="wrap">
-    <div class="section-header reveal">
-      <span class="eyebrow">Cómo está construido</span>
-      <h2 class="section-title" id="h-stack">Infraestructura pública europea. Capa de producto propia.</h2>
-      <p class="section-lead">No dependemos de proveedores privados de imagen satelital. Todo nuestro stack se apoya en infraestructura pública europea de largo plazo.</p>
-    </div>
-    <div class="stack-diagram">
-      <div class="stack-card reveal">
-        <span class="badge">Satélite</span>
-        <h4>Copernicus · Sentinel-2</h4>
-        <p>Programa espacial europeo (ESA/UE). Imagen multiespectral gratuita a 10 m cada ~5 días desde 2015.</p>
-      </div>
-      <div class="stack-card reveal">
-        <span class="badge">Parcelario</span>
-        <h4>SIGPAC · MAPA</h4>
-        <p>Registro oficial español de parcelas agrícolas. Vector tiles abiertos, mismos datos que usa la PAC.</p>
-      </div>
-      <div class="stack-card reveal">
-        <span class="badge">Meteo</span>
-        <h4>Open-Meteo · DWD ICON</h4>
-        <p>Humedad del suelo por capas y meteo horaria. API pública sin clave, limitada a usos razonables.</p>
-      </div>
-      <div class="stack-card reveal">
-        <span class="badge">Producto</span>
-        <h4>Arquitectura serverless</h4>
-        <p>Funciones serverless en Vercel. Sin base de datos propia en esta fase. Coste marginal cero.</p>
-      </div>
-      <div class="stack-card reveal">
-        <span class="badge">Procesado</span>
-        <h4>Sentinel Hub Statistical API</h4>
-        <p>Agregación de NDVI/NDMI sobre la geometría exacta de la parcela, con filtrado de nubes SCL.</p>
-      </div>
-      <div class="stack-card reveal">
-        <span class="badge">Cliente</span>
-        <h4>Web nativa</h4>
-        <p>HTML + Leaflet. Cero instalación. Funciona en cualquier móvil u ordenador.</p>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- ════════════════════════════════════════════════════════════════ -->
 <!-- Comparativa                                                     -->
@@ -1819,68 +1783,7 @@
   </div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════════ -->
-<!-- Impacto                                                         -->
-<!-- ════════════════════════════════════════════════════════════════ -->
-<section aria-labelledby="h-impacto">
-  <div class="wrap">
-    <div class="section-header reveal">
-      <span class="eyebrow">Impacto</span>
-      <h2 class="section-title" id="h-impacto">Por qué Kylia importa, más allá del producto.</h2>
-      <p class="section-lead">Tres razones estructurales que hacen que este proyecto tenga sentido ahora y no hace cinco años.</p>
-    </div>
-    <div class="impact-grid">
-      <article class="impact-card reveal">
-        <h3><span class="mark">💧</span> Ahorro de agua</h3>
-        <p>Regar en el momento correcto, con el volumen correcto, es la palanca ambiental más grande de la agricultura mediterránea. Kylia ayuda a no regar de más — ni de menos.</p>
-      </article>
-      <article class="impact-card reveal">
-        <h3><span class="mark">🇪🇺</span> Soberanía de datos</h3>
-        <p>Nos apoyamos en infraestructura europea pública (Copernicus, SIGPAC). Los datos agrícolas del campo español no terminan en servidores privados fuera de la UE.</p>
-      </article>
-      <article class="impact-card reveal">
-        <h3><span class="mark">🌱</span> Democratización</h3>
-        <p>Agricultura de precisión no es un lujo de grandes explotaciones. Kylia pone herramientas profesionales en el móvil del pequeño agricultor, gratis.</p>
-      </article>
-    </div>
-  </div>
-</section>
 
-<!-- ════════════════════════════════════════════════════════════════ -->
-<!-- Inversor highlight (dark)                                       -->
-<!-- ════════════════════════════════════════════════════════════════ -->
-<section class="dark" aria-labelledby="h-investor">
-  <div class="wrap">
-    <div class="section-header reveal">
-      <span class="eyebrow">Para inversores</span>
-      <h2 class="section-title" id="h-investor">Una tesis de inversión simple.</h2>
-      <p class="section-lead">AgTech europeo, sin hardware, apoyado en infraestructura pública. Coste marginal por usuario cercano a cero.</p>
-    </div>
-    <div class="investor-grid">
-      <div class="reveal">
-        <ul class="pill-list">
-          <li><strong>Mercado masivo.</strong> España tiene ~23,5 M ha de SAU y ~915 k explotaciones agrarias. La UE, 9 M de agricultores. La mayor parte, sin software agronómico hoy.</li>
-          <li><strong>Ventana favorable.</strong> Copernicus Data Space (UE, 2023) abrió imagen satelital de alta calidad sin coste. SIGPAC digitalizado y obligatorio en PAC. El substrato ya está.</li>
-          <li><strong>Coste marginal ~0.</strong> Arquitectura serverless + datos abiertos = cada usuario adicional cuesta céntimos. Escala sin CAPEX.</li>
-          <li><strong>Go-to-market B2B2C.</strong> La venta a cooperativa arrastra cientos de socios-usuario. El freemium capta al agricultor individual.</li>
-          <li><strong>Defensibilidad.</strong> La capa agronómica (umbrales por cultivo, fenología, traducción a recomendación) se calibra con uso real: ventaja acumulativa.</li>
-        </ul>
-      </div>
-      <div class="reveal">
-        <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:28px;">
-          <div style="font-size:0.76rem; letter-spacing:0.1em; color:#8ab599; text-transform:uppercase; margin-bottom:10px;">Tracción actual</div>
-          <ul style="display:grid;gap:14px;font-size:0.94rem;color:#dbe8de;">
-            <li>✓ Producto en producción (Vercel)</li>
-            <li>✓ Arquitectura validada con parcelas reales</li>
-            <li>✓ Stack 100 % sobre infraestructura pública</li>
-            <li>→ Piloto cooperativas abierto para campaña 2026</li>
-          </ul>
-          <a class="btn btn-primary" href="#lista-espera" style="margin-top:24px;">Agendar conversación →</a>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- ════════════════════════════════════════════════════════════════ -->
 <!-- FAQ                                                             -->
@@ -1972,14 +1875,22 @@
 <!-- Final CTA                                                       -->
 <!-- ════════════════════════════════════════════════════════════════ -->
 <section class="final-cta" aria-labelledby="h-final">
-  <h2 id="h-final">Tu próxima decisión de riego, con datos reales.</h2>
-  <p>Sin registro, sin tarjeta, sin instalación. Abre Kylia, elige tu parcela y mira qué te dice — 30 segundos.</p>
+  <span style="display:inline-block;font-size:0.74rem;letter-spacing:0.18em;text-transform:uppercase;color:#a8d894;font-weight:700;margin-bottom:14px;">⚡ Quedan 67 plazas a 99 €/año</span>
+  <h2 id="h-final">Tu próxima decisión de riego, en 30 segundos.</h2>
+  <p>Pulsa abajo, haz clic sobre tu parcela en el mapa y mira qué te dice el satélite. Sin registro, sin tarjeta, sin instalación. Si no te aporta valor, hay garantía de devolución 60 días.</p>
   <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
     <a class="btn btn-primary btn-lg" href="/app">Probar con mi parcela →</a>
-    <a class="btn btn-ghost btn-lg" href="#lista-espera">Apuntarme al piloto</a>
+    <a class="btn btn-ghost btn-lg" href="#lista-espera">Apuntarme al piloto cooperativas</a>
   </div>
-  <p style="font-size:0.85rem; color: rgba(255,255,255,0.7); margin-top:20px;">Funciona en tu móvil · cualquier parcela SIGPAC de España</p>
+  <p style="font-size:0.85rem; color: rgba(255,255,255,0.7); margin-top:20px;">Funciona en tu móvil · cualquier parcela SIGPAC de España · garantía 60 días</p>
 </section>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- Sticky CTA mobile (solo visible en pantalla pequeña)            -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div class="sticky-cta" aria-hidden="false">
+  <a class="btn btn-primary" href="/app">Probar con mi parcela gratis →</a>
+</div>
 
 </main>
 
@@ -2021,13 +1932,24 @@
       <div>
         <h4>Contacto</h4>
         <ul>
-          <li><a href="mailto:marticarol003@gmail.com">marticarol003@gmail.com</a></li>
-          <li><a href="#lista-espera">Piloto 2026</a></li>
+          <li><a href="mailto:hola@kylia.app">hola@kylia.app</a> · agricultor</li>
+          <li><a href="mailto:cooperativas@kylia.app">cooperativas@kylia.app</a></li>
+          <li><a href="mailto:enterprise@kylia.app">enterprise@kylia.app</a></li>
+          <li><a href="#lista-espera">Piloto 2026 cooperativas</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="/legal/">Documentos legales</a></li>
+          <li><a href="/legal/terminos">Términos</a></li>
+          <li><a href="/legal/privacidad">Privacidad</a></li>
+          <li><a href="/legal/cookies">Cookies</a></li>
         </ul>
       </div>
     </div>
     <div class="footer-meta">
-      <div>© 2026 Kylia · Monitorización agronómica por satélite</div>
+      <div>© 2026 Kylia · Monitorización agronómica por satélite · Hecho en España</div>
       <div>Construido con datos <a href="https://dataspace.copernicus.eu/" rel="noopener">Copernicus</a>, <a href="https://sigpac.mapa.gob.es/" rel="noopener">SIGPAC</a> y <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a>.</div>
     </div>
   </div>
@@ -2072,7 +1994,6 @@
   const panels = {
     agricultor:  document.getElementById("panel-agricultor"),
     cooperativa: document.getElementById("panel-cooperativa"),
-    inversor:    document.getElementById("panel-inversor"),
   };
   function activateTab(target, focus = true) {
     tabs.forEach(x => {
