@@ -3,63 +3,133 @@
 Monitorización agronómica por satélite para parcelas SIGPAC.
 Vigor del cultivo (NDVI), humedad (NDMI) y recomendación de riego — sin sensores, sin formación, sin €/ha lineal.
 
-**Stack**: HTML + JS vanilla en frontend · Vercel serverless functions en backend · Sentinel-2 (Copernicus) + DWD ICON + SIGPAC como fuentes de datos.
+**Stack**: HTML + JS vanilla en frontend · Vercel serverless functions en backend · Sentinel-2 (Copernicus DataSpace) + SIGPAC + DWD ICON / Open-Meteo como fuentes de datos. Postgres (Supabase) cuando entre la auth.
+
+---
 
 ## Estructura del repositorio
 
 ```
 kylia-1/
-├── index.html              Landing comercial
-├── app.html                Producto (vista parcela)
-├── 404.html                Error page
-├── robots.txt              SEO
-├── sitemap.xml             SEO
-├── og-image.png            Open Graph (en root para previsualizaciones)
-├── vercel.json             Configuración deploy + headers
-├── api/                    Vercel Serverless Functions
-│   ├── waitlist.js         POST captura de leads
-│   ├── sigpac.js           Proxy SIGPAC
-│   └── sentinel.js         Proxy Sentinel Hub Processing API
+│
+│ ── Web pública (servida por Vercel) ──
+├── index.html              Landing comercial (URL: /)
+├── precios.html            Pricing (URL: /precios)
+├── cooperativas.html       Landing B2B coops (URL: /cooperativas)
+├── 404.html                Página de error
+├── robots.txt              SEO — bots
+├── sitemap.xml             SEO — URLs indexables
+│
+│ ── Producto ──
+├── app/
+│   └── index.html          Producto (URL: /app)
+│
+│ ── Backend ──
+├── api/                    Serverless Functions (Vercel/Node)
+│   ├── waitlist.js         POST captura de leads pre-launch
+│   ├── sigpac.js           Lookup SIGPAC por lat/lon
+│   ├── sentinel.js         OAuth Copernicus + Statistics API
+│   └── parcela.js          Orquestador (sigpac + sentinel + interpretación)
+├── db/
+│   └── schema.sql          Esquema Postgres (Supabase) con RLS
+│
+│ ── Estáticos ──
 ├── assets/
-│   └── img/                Mockups del producto
-└── docs/
-    ├── inversores.pdf      One-pager para inversores
-    ├── tecnico.pdf         Resumen técnico
-    ├── go-to-market.md     Plan 90 días
-    ├── social-media.md     Estrategia de contenido (sin cara del fundador)
-    └── telegram-leads.md   Captación en Telegram + canales verificados
+│   └── img/                og-image, mockups y screenshots del producto
+│
+│ ── Páginas legales ──
+├── legal/                  RGPD-compliant, marcadores [REVISAR]
+│   ├── terminos.md
+│   ├── privacidad.md
+│   ├── cookies.md
+│   └── dpa-enterprise.md
+│
+│ ── Documentación interna ──
+├── docs/                   Ver docs/README.md
+│   ├── tecnico/            Arquitectura y dossier técnico
+│   ├── negocio/            Go-to-market y dossier inversores
+│   └── marketing/          Redes, Telegram, emails y calendario editorial
+│
+│ ── Configuración del repo ──
+├── vercel.json             Deploy config + headers + rewrites + redirects
+├── README.md               Este archivo
+├── LICENSE                 Software propietario
+└── .gitignore
 ```
 
 ## Modelo de negocio
 
 | Tier | Precio | Para |
 |---|---|---|
-| Free | 0 € · hasta 20 ha | Captación |
-| Pro | 19 €/mes (≤100 ha) · 49 €/mes (≤500 ha) | Agricultor profesional |
-| Cooperativa | 6.000 / 12.000 / 24.000 €/año | ADV, ATRIA, cooperativas |
-| Enterprise | desde 25.000 €/año | Aseguradoras, banca rural, administración |
+| Free | 0 € · hasta 30 ha · 2 parcelas | Captación, huertos familiares |
+| Productor | desde 99 €/año (€/ha decreciente) | Agricultor profesional |
+| Cooperativa | 2.900 / 5.900 / 11.900 €/año (paquete) | ADV, ATRIA, cooperativas |
+| Enterprise | desde 30.000 €/año | Aseguradoras, banca rural, administración |
 
-Tarifas planas por tramo, nunca €/ha lineal.
+Productor: mínimo 99 €/año hasta 100 ha, +0,40 €/ha hasta 500 ha, +0,20 €/ha hasta 2.000 ha. Cooperativa: paquete cerrado por tamaño (Esencial 200 socios, Profesional 600 socios, Avanzado 2.000 socios). Garantía de devolución 60 días.
+Detalle en [/precios](https://kylia.app/precios) y [/cooperativas](https://kylia.app/cooperativas).
 
 ## Desarrollo local
 
+Requisitos: Node ≥ 18.
+
 ```bash
-npx serve .          # sirve la landing estática en :3000
-vercel dev           # arranca también las funciones de /api
+# Servir landing estática
+npx serve .                          # http://localhost:3000
+
+# Servir landing + funciones serverless
+npx vercel dev                       # http://localhost:3000 con /api/*
 ```
 
-Variables de entorno necesarias en `.env.local`:
+Variables de entorno (`.env.local`):
 
 ```
-SENTINEL_HUB_CLIENT_ID=
-SENTINEL_HUB_CLIENT_SECRET=
+# Copernicus DataSpace (gratis tras registro en dataspace.copernicus.eu)
+SH_CLIENT_ID=
+SH_CLIENT_SECRET=
+
+# Supabase (cuando entre la auth)
 SUPABASE_URL=
+SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+
+# Stripe (cuando entren los planes Pro)
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+# Resend (email transaccional)
+RESEND_API_KEY=
 ```
+
+## Endpoints públicos
+
+| Endpoint | Método | Params | Devuelve |
+|----------|--------|--------|----------|
+| `/api/waitlist` | POST | `{ email, origen }` | `{ ok: true }` |
+| `/api/sigpac` | GET | `lat`, `lon` | geometría parcela WGS84 |
+| `/api/sentinel` | GET | `geometry`, `days` | NDVI, NDMI, fecha |
+| `/api/parcela` | GET | `lat`, `lon` o `ref`, `days` | parcela + índices + interpretación |
 
 ## Deploy
 
-`git push` a `main` despliega automáticamente en Vercel. La configuración vive en `vercel.json`.
+`git push origin main` despliega automáticamente en Vercel. El dominio de producción es `kylia.app` (cuando esté registrado y configurado).
+
+PR previews automáticas en cada Pull Request.
+
+## Tareas abiertas (orden de prioridad)
+
+1. Registrar dominio `kylia.app` y conectar a Vercel.
+2. Crear cuentas: LinkedIn empresa, Telegram canal, Beehiiv newsletter, Cloudflare DNS.
+3. Implementar auth con Supabase + persistir parcelas en BD.
+4. Cron semanal de alertas (Vercel Cron + Resend).
+5. Stripe Billing en planes Pro 100 / Pro 500.
+6. Bot Telegram `@kylia_alertas_bot` para alertas push.
+
+Detalle en [`docs/tecnico/arquitectura.md`](docs/tecnico/arquitectura.md). Índice completo de documentación en [`docs/README.md`](docs/README.md).
+
+## Licencia
+
+Software propietario. Ver [`LICENSE`](LICENSE).
 
 ## Contacto
 

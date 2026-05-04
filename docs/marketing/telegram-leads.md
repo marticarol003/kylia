@@ -122,7 +122,7 @@ Tras 4–6 respuestas útiles ya eres una cuenta con reputación en el grupo.
 
 Cuando alguien pregunte algo donde Kylia ayudaría directamente ("¿alguien sabe de servicios para ver el vigor de mis parcelas?", "necesito monitorizar los riegos esta campaña sin gastarme un dineral en sensores"), respondes:
 
-> "Para eso usamos imágenes Sentinel-2. Si quieres echarle un ojo sin pagar nada hasta 20 ha, en kylia.app puedes meter tu parcela SIGPAC y ver el NDVI y NDMI directamente. Sin registro para probar."
+> "Para eso usamos imágenes Sentinel-2. Si quieres echarle un ojo sin pagar nada hasta 30 ha, en kylia.app puedes meter tu parcela SIGPAC y ver el NDVI y NDMI directamente. Sin registro para probar."
 
 Concreto, útil, un solo enlace, una sola línea sobre el producto. Nada más.
 

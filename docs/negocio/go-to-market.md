@@ -36,7 +36,7 @@ Métricas a final de mes: 30+ usuarios Free activos, 3 visitas presenciales, 1 c
 
 La cooperativa que diga sí entra al **piloto 2026 gratuito**. La condición no es dinero: es que te dejan publicar un caso de uso, te ponen en contacto con sus socios para feedback, y se comprometen a una decisión de compra a final de campaña (octubre 2026). Esto te da: testimonio real, calibrado de producto, y un pipeline natural a la cooperativa de pago en otoño.
 
-En paralelo, sigues empujando agricultores Pro. Ahora ya tienes 30 usuarios Free de Mes 1; **el 20–30 % de ellos debería pasar a Pro si el producto vale**. Si no convierten, hay un problema de valor — entonces: llamada uno a uno con cinco usuarios Free, "¿qué te falta para que esto te valga 19 €?". La respuesta a esa pregunta es tu roadmap.
+En paralelo, sigues empujando agricultores Productor. Ahora ya tienes 30 usuarios Free de Mes 1; **el 20–30 % de ellos debería pasar a Productor si el producto vale**. Si no convierten, hay un problema de valor — entonces: llamada uno a uno con cinco usuarios Free, "¿qué te falta para que esto te valga 99 €/año?". La respuesta a esa pregunta es tu roadmap.
 
 La parte de Enterprise es la más rara y la más valiosa. Coges LinkedIn y mandas un mensaje breve a 5 personas concretas: el director de innovación de Agroseguro, el responsable de banca agraria de Caja Rural Granada o de Cajamar Caja Rural, alguien de innovación de Mapfre Agropecuario. Mensaje: "Hemos construido X, basado en infraestructura europea pública. ¿Te interesa una demo de 30 minutos para ver si encaja con vuestro pipeline de scoring/seguros?". Una de cada cinco contesta. Y con que una conversación se materialice ya tienes el ancla del Enterprise.
 
@@ -70,6 +70,6 @@ No construyas features sin un cliente que las pida y se comprometa a pagar por e
 
 El mayor riesgo es **construir sin vender**. Es la trampa clásica del fundador técnico solitario: te encierras a programar la siguiente feature porque es más cómodo que llamar a un técnico de cooperativa. Cuando notes que llevas tres días seguidos sin hablar con un usuario, para. No abras el editor. Coge el teléfono.
 
-El segundo riesgo es **bajar precios para cerrar la primera coop**. No lo hagas. Si una cooperativa no quiere pagar 6.000 €/año por un producto que les ahorraría 30.000 € en pérdidas de campaña, el problema no es el precio: es que no has demostrado el valor. Sigue construyendo el caso. La primera coop que firme sin negociar precio vale cinco que firmen al 50 %.
+El segundo riesgo es **bajar precios para cerrar la primera coop**. No lo hagas. Si una cooperativa no quiere pagar 2.900 €/año (Esencial) por un producto que les ahorraría 30.000 € en pérdidas de campaña, el problema no es el precio: es que no has demostrado el valor. Sigue construyendo el caso. La primera coop que firme sin negociar precio vale cinco que firmen al 50 %.
 
 El tercer riesgo es **distraerse con AI hype**. Vas a tener la tentación de añadir un "asistente IA" porque está de moda. Resiste. Lo que tu cliente quiere es saber si tiene que regar mañana, no chatear con un bot. Si añades IA, que sea invisible (mejorar la recomendación, automatizar la detección de estrés), no como feature visible.

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#2b7a3a" />
+<meta name="robots" content="index,follow" />
+<title>Kylia para cooperativas — Visión agregada de todos los socios</title>
+<meta name="description" content="Vista única de todas las parcelas de tus socios. Alertas de estrés hídrico tempranas para que el técnico actúe antes. Desde 2.900 €/año, todos los socios incluidos. 3 paquetes según tamaño." />
+<link rel="canonical" href="https://kylia.app/cooperativas" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Kylia para cooperativas" />
+<meta property="og:description" content="Panel del técnico: todas las parcelas de todos los socios, en una sola vista." />
+<meta property="og:image" content="https://kylia.app/assets/img/og-image.png" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%232b7a3a%22/><path d=%22M10 20 Q16 10 22 20 Z%22 fill=%22white%22/></svg>" />
+
+<style>
+:root {
+  --verde:#2b7a3a; --verde-700:#1f5a2b; --verde-900:#0f3617; --verde-50:#e8f3ea;
+  --slate-900:#0f172a; --slate-700:#334155; --slate-500:#64748b; --slate-300:#cbd5e1; --slate-200:#e2e8f0; --slate-50:#f8fafc;
+  --text:var(--slate-900); --muted:var(--slate-500); --subtle:var(--slate-700); --border:var(--slate-200);
+  --max:1180px; --radius:16px; --radius-sm:10px;
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+*,*::before,*::after { box-sizing:border-box; }
+html,body,h1,h2,h3,p,ul { margin:0; padding:0; }
+ul { list-style:none; }
+body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, system-ui, sans-serif;
+       color:var(--text); line-height:1.6; -webkit-font-smoothing:antialiased; }
+a { color:var(--verde); text-decoration:none; }
+a:hover { text-decoration:underline; }
+.wrap { max-width:var(--max); margin:0 auto; padding:0 24px; }
+
+.nav { position:sticky; top:0; z-index:50; background:rgba(255,255,255,0.88);
+       backdrop-filter:saturate(180%) blur(10px); border-bottom:1px solid var(--border); }
+.nav-inner { display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:24px; }
+.brand { display:inline-flex; align-items:center; gap:8px; color:var(--verde-900); font-weight:800; letter-spacing:-0.02em; font-size:1.1rem; }
+.brand-dot { width:14px; height:14px; border-radius:50%; background:var(--verde); }
+.nav-links { display:flex; gap:24px; align-items:center; font-size:0.95rem; }
+.nav-links a { color:var(--subtle); }
+.nav-links a:hover { color:var(--text); text-decoration:none; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px 20px;
+       font-weight:600; border-radius:10px; border:1.5px solid transparent; transition:all 0.15s var(--ease); cursor:pointer; font-size:0.95rem; }
+.btn-primary { background:var(--verde); color:#fff; border-color:var(--verde); }
+.btn-primary:hover { background:var(--verde-700); border-color:var(--verde-700); text-decoration:none; }
+.btn-secondary { background:#fff; color:var(--verde-900); border-color:var(--border); }
+
+/* Hero */
+.hero { padding:96px 0 64px; background:linear-gradient(180deg, #fff 0%, var(--verde-50) 100%); }
+.hero-grid { display:grid; grid-template-columns:1.1fr 0.9fr; gap:48px; align-items:center; }
+@media (max-width:880px) { .hero-grid { grid-template-columns:1fr; } }
+.eyebrow { display:inline-block; background:#fff; border:1px solid var(--verde); color:var(--verde-700);
+           padding:6px 14px; border-radius:999px; font-weight:700; font-size:0.78rem; letter-spacing:0.18em; text-transform:uppercase; }
+h1 { font-size:clamp(2.2rem, 5vw, 3.4rem); line-height:1.05; margin:24px 0 16px; color:var(--verde-900); letter-spacing:-0.02em; }
+.lead { font-size:1.18rem; color:var(--subtle); max-width:560px; }
+.hero-cta { margin-top:28px; display:flex; gap:12px; flex-wrap:wrap; }
+
+.dashboard-mock { background:#fff; border:1px solid var(--border); border-radius:18px; box-shadow:0 28px 60px -28px rgba(15,54,23,0.45); padding:18px; }
+.dashboard-mock .head { display:flex; align-items:center; gap:8px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+.dashboard-mock .dot { width:10px; height:10px; border-radius:50%; }
+.dashboard-mock .dot-r { background:#ff5f56; } .dashboard-mock .dot-y { background:#ffbd2e; } .dashboard-mock .dot-g { background:#27c93f; }
+.dashboard-mock .body { padding:14px 4px 6px; }
+.dashboard-mock .row { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:8px; font-size:0.92rem; }
+.dashboard-mock .row:nth-child(odd) { background:var(--slate-50); }
+.dashboard-mock .ndvi-good { color:var(--verde); font-weight:700; }
+.dashboard-mock .ndvi-warn { color:#d4a82a; font-weight:700; }
+.dashboard-mock .ndvi-bad  { color:#9b3a3a; font-weight:700; }
+.dashboard-mock .footer { padding:10px 4px 0; color:var(--muted); font-size:0.8rem; }
+
+/* Bloques */
+section.block { padding:64px 0; }
+section.block.alt { background:var(--slate-50); }
+.section-title { text-align:center; max-width:680px; margin:0 auto 40px; }
+.section-title h2 { font-size:clamp(1.8rem,3.8vw,2.4rem); color:var(--verde-900); letter-spacing:-0.02em; }
+.section-title p { color:var(--subtle); margin-top:10px; }
+
+.features { display:grid; grid-template-columns:repeat(3, 1fr); gap:24px; }
+@media (max-width:880px) { .features { grid-template-columns:1fr; } }
+.feature { background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:28px; box-shadow:var(--shadow-md); }
+.feature .icon { width:48px; height:48px; border-radius:12px; background:var(--verde-50); color:var(--verde-700); display:flex; align-items:center; justify-content:center; font-size:1.4rem; font-weight:800; }
+.feature h3 { margin:16px 0 8px; color:var(--verde-900); font-size:1.15rem; }
+.feature p { color:var(--subtle); font-size:0.96rem; }
+
+/* ROI */
+.roi-grid { display:grid; grid-template-columns:1fr 1fr; gap:32px; align-items:center; }
+@media (max-width:880px) { .roi-grid { grid-template-columns:1fr; } }
+.roi-num { font-size:3.4rem; font-weight:800; color:var(--verde); line-height:1; letter-spacing:-0.03em; }
+.roi-label { color:var(--subtle); margin-top:8px; }
+.roi-line { height:1px; background:var(--border); margin:24px 0; }
+
+/* CTA final */
+.cta-final { background:var(--verde-900); color:#fff; padding:80px 0; text-align:center; }
+.cta-final h2 { color:#fff; font-size:clamp(1.8rem,3.8vw,2.4rem); }
+.cta-final p { color:#bcd6c2; max-width:580px; margin:12px auto 28px; }
+.cta-final .btn-primary { background:#fff; color:var(--verde-900); border-color:#fff; }
+.cta-final .btn-primary:hover { background:var(--verde-50); border-color:var(--verde-50); }
+
+footer { background:var(--verde-900); color:#bcd6c2; padding:48px 0 32px; }
+footer .wrap { display:flex; flex-wrap:wrap; gap:32px; justify-content:space-between; }
+footer a { color:#fff; }
+footer .small { font-size:0.85rem; color:#7fa089; }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/"><span class="brand-dot"></span> Kylia</a>
+    <nav class="nav-links" aria-label="Principal">
+      <a href="/#producto">Producto</a>
+      <a href="/cooperativas" aria-current="page">Cooperativas</a>
+      <a href="/precios">Precios</a>
+      <a class="btn btn-primary" href="mailto:cooperativas@kylia.app">Hablar con nosotros</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-grid">
+        <div>
+          <span class="eyebrow">Para cooperativas y comunidades de regantes</span>
+          <h1>Una vista. Todas las parcelas de tus socios.</h1>
+          <p class="lead">El técnico de campo abre Kylia y ve, en segundos, qué socio tiene NDMI por debajo del umbral, qué parcela ha caído de vigor esta semana y dónde priorizar la próxima visita.</p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="mailto:cooperativas@kylia.app?subject=Demo%20Kylia%20Cooperativa">Pedir demo (30 min)</a>
+            <a class="btn btn-secondary" href="/precios#cooperativa">Ver precio</a>
+          </div>
+        </div>
+        <div class="dashboard-mock" aria-hidden="true">
+          <div class="head">
+            <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+            <span style="margin-left:auto; font-size:0.85rem; color:var(--muted);">SCA Olivar de Jaén · 412 socios</span>
+          </div>
+          <div class="body">
+            <div class="row"><span>Socio · Pérez Ruiz</span><span>Olivar 12 ha</span><span class="ndvi-good">NDVI 0,72</span></div>
+            <div class="row"><span>Socio · Cooperativa SE</span><span>Olivar 38 ha</span><span class="ndvi-warn">NDMI 0,28 ⚠</span></div>
+            <div class="row"><span>Socio · López</span><span>Cereal 84 ha</span><span class="ndvi-good">NDVI 0,58</span></div>
+            <div class="row"><span>Socio · Martín</span><span>Olivar 22 ha</span><span class="ndvi-bad">NDMI 0,18 🚨</span></div>
+            <div class="row"><span>Socio · García</span><span>Olivar 16 ha</span><span class="ndvi-good">NDVI 0,68</span></div>
+          </div>
+          <div class="footer">Última pasada Sentinel-2: 22 abr 2026</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="section-title">
+        <h2>Lo que hace tu técnico con Kylia</h2>
+        <p>El trabajo no cambia. Cambia el orden de la jornada: primero las parcelas que tienen un dato fuera de rango.</p>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="icon">1</div>
+          <h3>Triaje cada lunes</h3>
+          <p>El técnico abre el panel y ve un ranking de los socios cuyas parcelas tienen señales tempranas de estrés. La mañana del lunes ya tiene la ruta de la semana.</p>
+        </div>
+        <div class="feature">
+          <div class="icon">2</div>
+          <h3>Visita con datos</h3>
+          <p>Llega a la parcela con NDVI, NDMI y humedad de suelo en el móvil. La conversación con el socio empieza por "lo que vimos" en vez de "vamos a ver".</p>
+        </div>
+        <div class="feature">
+          <div class="icon">3</div>
+          <h3>Cierre de campaña</h3>
+          <p>Histórico completo de la campaña por socio. Reporte final exportable, casos para la asamblea, base para mejorar el plan agronómico del año siguiente.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block alt">
+    <div class="wrap">
+      <div class="section-title">
+        <h2>El cálculo de retorno</h2>
+        <p>Cifras conservadoras basadas en estudios académicos sobre detección temprana de estrés hídrico en olivar y cereal.</p>
+      </div>
+      <div class="roi-grid">
+        <div>
+          <div class="roi-num">desde €2.900</div>
+          <div class="roi-label">Coste anual del paquete Cooperativa Esencial — todos los socios incluidos, sin coste por hectárea adicional.</div>
+          <div class="roi-line"></div>
+          <div class="roi-num">~36 ha</div>
+          <div class="roi-label">El paquete Esencial se paga si una sola intervención temprana evita pérdida en ~36 ha de olivar a 80 €/ha. Una buena campaña amortiza varias veces el plan.</div>
+        </div>
+        <div>
+          <div class="roi-num">10 h/sem</div>
+          <div class="roi-label">Tiempo del técnico que se libera al automatizar el triaje semanal de socios. Equivale a ~5.000 €/año en horas técnicas recuperadas.</div>
+          <div class="roi-line"></div>
+          <div class="roi-num">7-12 días</div>
+          <div class="roi-label">Adelanto típico del NDMI sobre el síntoma visual de estrés hídrico (estudios Univ. Córdoba, IFAPA).</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PAQUETES ── -->
+  <section class="block" id="paquetes">
+    <div class="wrap">
+      <div class="section-title">
+        <h2>Tres paquetes, según el tamaño de la cooperativa</h2>
+        <p>Sin €/ha, sin negociar. Pago anual. Los socios no pagan nada — la licencia está cubierta por la cooperativa.</p>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="icon" style="background:var(--verde-50);color:var(--verde-700);">S</div>
+          <h3>Esencial · 2.900 €/año</h3>
+          <p style="color:var(--subtle);font-size:0.95rem;">Hasta <strong>200 socios</strong> y <strong>3.000 ha</strong>. Para ATRIA, ADV pequeñas, cooperativas locales.</p>
+          <ul style="margin-top:14px; font-size:0.92rem; color:var(--subtle);">
+            <li style="margin-bottom:6px;">✓ Dashboard del técnico</li>
+            <li style="margin-bottom:6px;">✓ Triaje semanal automático</li>
+            <li style="margin-bottom:6px;">✓ Soporte por email</li>
+            <li>✓ Carga inicial de socios incluida</li>
+          </ul>
+        </div>
+        <div class="feature" style="border-color:var(--verde); box-shadow:0 14px 36px -16px rgba(43,122,58,0.4); position:relative;">
+          <div style="position:absolute; top:-13px; left:50%; transform:translateX(-50%); background:var(--verde); color:#fff; padding:4px 12px; border-radius:999px; font-size:0.7rem; font-weight:800; letter-spacing:0.1em; white-space:nowrap;">⭐ MÁS COMÚN</div>
+          <div class="icon" style="background:var(--verde);color:#fff;">M</div>
+          <h3>Profesional · 5.900 €/año</h3>
+          <p style="color:var(--subtle);font-size:0.95rem;">Hasta <strong>600 socios</strong> y <strong>10.000 ha</strong>. Cooperativas medianas, comunidades de regantes consolidadas.</p>
+          <ul style="margin-top:14px; font-size:0.92rem; color:var(--subtle);">
+            <li style="margin-bottom:6px;">✓ Todo lo del Esencial</li>
+            <li style="margin-bottom:6px;">✓ Formación al equipo técnico (sesión 90 min)</li>
+            <li style="margin-bottom:6px;">✓ Soporte priority (respuesta en 24h)</li>
+            <li>✓ Reuniones trimestrales de revisión</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <div class="icon" style="background:var(--verde-900);color:#fff;">L</div>
+          <h3>Avanzado · 11.900 €/año</h3>
+          <p style="color:var(--subtle);font-size:0.95rem;">Hasta <strong>2.000 socios</strong> y <strong>30.000 ha</strong>. Cooperativas de segundo grado, agrupaciones territoriales.</p>
+          <ul style="margin-top:14px; font-size:0.92rem; color:var(--subtle);">
+            <li style="margin-bottom:6px;">✓ Todo lo del Profesional</li>
+            <li style="margin-bottom:6px;">✓ Account manager dedicado</li>
+            <li style="margin-bottom:6px;">✓ Integración con vuestro ERP</li>
+            <li>✓ Datos exportables por web service</li>
+          </ul>
+        </div>
+      </div>
+      <p style="text-align:center; margin-top:32px; color:var(--muted); font-size:0.92rem;">
+        ¿Más de 30.000 ha o caso especial? Tenemos plan <a href="mailto:enterprise@kylia.app" style="color:var(--verde);font-weight:600;">Enterprise</a> a medida.<br/>
+        Garantía de devolución 60 días en todos los paquetes. IVA no incluido.
+      </p>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="section-title">
+        <h2>Cómo es el alta</h2>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="icon">A</div>
+          <h3>Reunión inicial — 60 min</h3>
+          <p>Una llamada con los técnicos. Qué cultivos, qué socios, qué quieren mirar primero.</p>
+        </div>
+        <div class="feature">
+          <div class="icon">B</div>
+          <h3>Carga de socios — 1 semana</h3>
+          <p>Nosotros cargamos las referencias SIGPAC de los socios desde un CSV o desde la PAC declarada. Sin trabajo manual del técnico.</p>
+        </div>
+        <div class="feature">
+          <div class="icon">C</div>
+          <h3>Formación al equipo — 90 min</h3>
+          <p>Sesión virtual con el técnico (y opcionalmente con socios interesados). Documentación escrita en castellano.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-final">
+    <div class="wrap">
+      <h2>¿Pedimos una demo de 30 minutos?</h2>
+      <p>Te enseñamos el panel con datos reales de una zona similar a la tuya. Sin compromiso, sin venta agresiva.</p>
+      <a class="btn btn-primary" href="mailto:cooperativas@kylia.app?subject=Demo%20Kylia%20Cooperativa">cooperativas@kylia.app</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="brand" style="color:#fff;"><span class="brand-dot"></span> Kylia</div>
+      <p class="small" style="margin-top:12px; max-width:320px;">Monitorización por satélite Sentinel-2 sobre parcelas SIGPAC. Sin sensores, sin €/ha.</p>
+    </div>
+    <div>
+      <div style="font-weight:700; color:#fff; margin-bottom:8px;">Producto</div>
+      <p><a href="/">Inicio</a></p>
+      <p><a href="/precios">Precios</a></p>
+      <p><a href="/cooperativas">Cooperativas</a></p>
+      <p><a href="/app">Probar gratis</a></p>
+    </div>
+    <div>
+      <div style="font-weight:700; color:#fff; margin-bottom:8px;">Legal</div>
+      <p><a href="/legal/terminos">Términos</a></p>
+      <p><a href="/legal/privacidad">Privacidad</a></p>
+      <p><a href="/legal/cookies">Cookies</a></p>
+    </div>
+    <div class="small" style="flex-basis:100%;">© 2026 Kylia · Construido sobre Copernicus, SIGPAC, DWD ICON</div>
+  </div>
+</footer>
+
+</body>
+</html>

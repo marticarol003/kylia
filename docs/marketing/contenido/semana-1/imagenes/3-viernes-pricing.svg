@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" font-family="-apple-system,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+  <rect width="1080" height="1080" fill="#ffffff"/>
+
+  <text x="80" y="120" font-size="22" font-weight="700" letter-spacing="3" fill="#2b7a3a">PRICING TRANSPARENTE</text>
+
+  <text x="80" y="200" font-size="58" font-weight="800" fill="#0f3617">Tramos planos.</text>
+  <text x="80" y="270" font-size="58" font-weight="800" fill="#0f3617">No €/ha lineal.</text>
+
+  <text x="80" y="320" font-size="20" font-weight="500" fill="#445">Tu vecino paga lo mismo que tú si está en tu tramo. Sin negociar, sin descuentos por volumen.</text>
+
+  <!-- Cabecera tabla -->
+  <g transform="translate(80,400)">
+    <rect width="920" height="60" fill="#0f3617" rx="10"/>
+    <text x="40" y="38" font-size="20" font-weight="700" fill="#fff">Superficie</text>
+    <text x="380" y="38" font-size="20" font-weight="700" fill="#fff">€/ha lineal (típico mercado)</text>
+    <text x="780" y="38" font-size="20" font-weight="700" fill="#fff">Kylia</text>
+  </g>
+
+  <!-- Filas -->
+  <g transform="translate(80,470)" font-size="22" font-weight="600" fill="#0f3617">
+    <rect width="920" height="80" fill="#f6f7f8" stroke="#e6e7e8"/>
+    <text x="40" y="48">80 ha</text>
+    <text x="380" y="48" fill="#9b3a3a">800 €/año</text>
+    <text x="780" y="48" fill="#2b7a3a">228 €/año</text>
+  </g>
+  <g transform="translate(80,550)" font-size="22" font-weight="600" fill="#0f3617">
+    <rect width="920" height="80" fill="#ffffff" stroke="#e6e7e8"/>
+    <text x="40" y="48">200 ha</text>
+    <text x="380" y="48" fill="#9b3a3a">2.000 €/año</text>
+    <text x="780" y="48" fill="#2b7a3a">588 €/año</text>
+  </g>
+  <g transform="translate(80,630)" font-size="22" font-weight="600" fill="#0f3617">
+    <rect width="920" height="80" fill="#f6f7f8" stroke="#e6e7e8"/>
+    <text x="40" y="48">500 ha</text>
+    <text x="380" y="48" fill="#9b3a3a">5.000 €/año</text>
+    <text x="780" y="48" fill="#2b7a3a">588 €/año</text>
+  </g>
+  <g transform="translate(80,710)" font-size="22" font-weight="600" fill="#0f3617">
+    <rect width="920" height="80" fill="#ffffff" stroke="#e6e7e8"/>
+    <text x="40" y="48">800 ha</text>
+    <text x="380" y="48" fill="#9b3a3a">8.000 €/año</text>
+    <text x="780" y="48" fill="#0f3617">Enterprise</text>
+  </g>
+
+  <!-- Bottom callout -->
+  <g transform="translate(80,820)">
+    <rect width="920" height="150" rx="16" fill="#e8f3ea" stroke="#2b7a3a" stroke-width="2"/>
+    <text x="32" y="50" font-size="20" font-weight="700" letter-spacing="2" fill="#2b7a3a">RESUMEN</text>
+    <text x="32" y="92" font-size="22" font-weight="600" fill="#0f3617">El modelo €/ha lineal castiga al que crece.</text>
+    <text x="32" y="124" font-size="22" font-weight="600" fill="#0f3617">El modelo plano por tramos es predecible para todos.</text>
+  </g>
+
+  <text x="80" y="1020" font-size="22" font-weight="600" fill="#0f3617">kylia.app/precios</text>
+</svg>

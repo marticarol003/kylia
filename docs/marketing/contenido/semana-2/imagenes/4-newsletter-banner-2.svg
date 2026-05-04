@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" font-family="-apple-system,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bgG" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#0f3617"/>
+      <stop offset="100%" stop-color="#2b7a3a"/>
+    </linearGradient>
+    <linearGradient id="capa1" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#a8d894"/>
+      <stop offset="100%" stop-color="#5eb169"/>
+    </linearGradient>
+    <linearGradient id="capa2" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#5eb169"/>
+      <stop offset="100%" stop-color="#2b7a3a"/>
+    </linearGradient>
+    <linearGradient id="capa3" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#2b7a3a"/>
+      <stop offset="100%" stop-color="#0f3617"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="400" fill="url(#bgG)"/>
+
+  <!-- Capas de suelo decorativas -->
+  <g transform="translate(880,60)" opacity="0.92">
+    <rect x="0"   y="0"   width="260" height="80" fill="url(#capa1)" stroke="#0f3617" stroke-width="1.5"/>
+    <rect x="0"   y="80"  width="260" height="100" fill="url(#capa2)" stroke="#0f3617" stroke-width="1.5"/>
+    <rect x="0"   y="180" width="260" height="100" fill="url(#capa3)" stroke="#0f3617" stroke-width="1.5"/>
+    <text x="130" y="46"  font-size="14" font-weight="700" fill="#0f3617" text-anchor="middle">0–7 cm</text>
+    <text x="130" y="138" font-size="14" font-weight="700" fill="#0f3617" text-anchor="middle">7–28 cm</text>
+    <text x="130" y="238" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">28–100 cm</text>
+  </g>
+
+  <text x="60" y="100" font-size="18" font-weight="700" letter-spacing="3" fill="#a8d894">EL DATO DEL CAMPO · KYLIA</text>
+  <text x="60" y="190" font-size="60" font-weight="800" fill="#ffffff">Edición #2</text>
+  <text x="60" y="250" font-size="26" font-weight="600" fill="#e8f3ea">Humedad de suelo: el dato</text>
+  <text x="60" y="285" font-size="26" font-weight="600" fill="#e8f3ea">que el NDVI no te cuenta.</text>
+
+  <text x="60" y="350" font-size="16" font-weight="500" fill="#a8d894">Newsletter semanal · Lunes 9:00</text>
+</svg>

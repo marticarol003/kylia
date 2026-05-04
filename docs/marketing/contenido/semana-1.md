@@ -1,14 +1,14 @@
-# Contenido Kylia — Semana 1
+# Contenido Kylia — Semana 1 · LISTO PARA PUBLICAR
 
-Todo el contenido de esta semana, listo para pegar en cada plataforma. Tú solo tienes que producir las capturas indicadas y publicar a las horas sugeridas.
+Todas las imágenes están generadas en `semana-1/imagenes/`. No tienes que diseñar nada ni abrir Canva. Solo descargar la imagen, copiar el texto y pegar en cada plataforma a las horas indicadas.
+
+> Las imágenes están en formato PNG cuadrado (1080×1080) o vertical (1080×1350) según red social. Newsletter 1200×400.
 
 ---
 
-## LUNES · 9:00 · LinkedIn (Kylia, página de empresa)
+## LUNES · 9:00 · LinkedIn (página de empresa Kylia)
 
-**Tema**: lanzamiento abierto de Kylia con el modelo de pricing transparente.
-
-**Visual**: captura del producto en mobile (la que ya tienes en `assets/img/product-mobile.png`) con el dato de NDVI/NDMI visible. Si quieres más impacto, monta un mockup en Figma con el iPhone enmarcado.
+**Imagen**: `semana-1/imagenes/1-lunes-anuncio.png` (1080×1080)
 
 **Texto del post**:
 
@@ -25,7 +25,7 @@ Lo que NO hace:
 · Pedir sensores en campo
 · Esconder precios detrás de "consulta a ventas"
 
-El plan Free es de verdad: hasta 20 hectáreas, parcelas ilimitadas dentro del límite, para siempre. Pro a 19 €/mes hasta 100 ha. Cooperativas desde 6.000 €/año con todos los socios incluidos. Enterprise desde 25.000 €/año para aseguradoras, banca rural y administración.
+El plan Free es de verdad: hasta 30 hectáreas y 2 parcelas, para siempre, sin tarjeta. Productor desde 99 €/año (escala con tu superficie sin €/ha lineal). Cooperativas desde 2.900 €/año en paquete cerrado, todos los socios incluidos. Enterprise desde 30.000 €/año para aseguradoras, banca rural y administración.
 
 Construido sobre infraestructura pública europea: Copernicus, SIGPAC, DWD ICON. Sin proveedor privado crítico.
 
@@ -34,10 +34,10 @@ Pruébalo con tu parcela: kylia.app
 #agricultura #agtech #sentinel2 #copernicus
 ```
 
-**Variante A/B (más corta, más directa) si quieres testear**:
+**Variante A/B (más corta) si quieres testear**:
 
 ```
-NDVI, humedad y recomendación de riego para cualquier parcela SIGPAC, gratis hasta 20 hectáreas.
+NDVI, humedad y recomendación de riego para cualquier parcela SIGPAC, gratis hasta 30 hectáreas.
 
 Sin sensores, sin €/ha, sin "consulta a ventas".
 
@@ -52,9 +52,7 @@ kylia.app
 
 ## MIÉRCOLES · 9:00 · LinkedIn (Kylia)
 
-**Tema**: dato del sector que justifica la existencia de Kylia. Educa más que vende.
-
-**Visual**: gráfica simple de barras (puedes hacerla en Canva en 10 min) mostrando: 88 % decide a ojo · 12 % usa alguna herramienta digital. Fondo blanco, barras en verde Kylia (#2b7a3a) y gris.
+**Imagen**: `semana-1/imagenes/2-miercoles-88-12.png` (1080×1080)
 
 **Texto del post**:
 
@@ -76,11 +74,7 @@ Eso es exactamente lo que estamos resolviendo en Kylia.
 
 ## VIERNES · 9:00 · LinkedIn (Kylia)
 
-**Tema**: posicionamiento técnico — por qué el modelo plano por tramos en vez de €/ha lineal.
-
-**Visual**: una tabla simple en imagen (Canva) comparando:
-- "Modelo €/ha lineal" (ejemplo competencia): 80 ha × 10 €/ha = 800 €/año · 200 ha × 10 €/ha = 2.000 €/año · 500 ha × 10 €/ha = 5.000 €/año
-- "Modelo Kylia tramos planos": 80 ha = 19 €/mes (228 €/año) · 200 ha = 49 €/mes (588 €/año) · 500 ha = 49 €/mes (588 €/año)
+**Imagen**: `semana-1/imagenes/3-viernes-pricing.png` (1080×1080)
 
 **Texto del post**:
 
@@ -100,7 +94,9 @@ Detalles del pricing en kylia.app/precios
 
 ---
 
-## LUNES · 9:00 (programada el viernes anterior) · Newsletter
+## LUNES · 9:00 (programada) · Newsletter
+
+**Banner cabecera**: `semana-1/imagenes/4-newsletter-banner.png` (1200×400) — sube como header en Beehiiv/Substack.
 
 **Asunto del email**: `El dato de la semana en el campo español · NDMI, riego y por qué importa`
 
@@ -143,14 +139,14 @@ La decisión: adelantar el segundo aporte de riego de la campaña dos semanas. C
 
 ────────────────
 
-¿Quieres ver tus parcelas? Es gratis hasta 20 hectáreas en kylia.app · Hasta el lunes que viene · Kylia
+¿Quieres ver tus parcelas? Es gratis hasta 30 hectáreas en kylia.app · Hasta el lunes que viene · Kylia
 ```
 
 ---
 
-## MIÉRCOLES · 9:00 · Telegram (canal propio Kylia, una vez creado)
+## MIÉRCOLES · 9:00 · Telegram (canal propio Kylia)
 
-**Tipo**: dato semanal, formato corto.
+**Imagen**: `semana-1/imagenes/5-telegram-resumen.png` (1080×1350)
 
 **Texto**:
 
@@ -173,13 +169,15 @@ Mapa por provincia y datos por parcela en kylia.app
 
 **Título**: "NDVI explicado para agricultores en 5 minutos"
 
-**Descripción**:
+**Producción sin cara**: usa OBS para grabar pantalla con la app de Kylia + ElevenLabs para la voz (clona una voz neutra masculina o femenina en español-ES, ~10 € al mes). Edición en CapCut Web (gratis).
+
+**Descripción YouTube**:
 
 ```
 Qué es NDVI, cómo se calcula, qué significan los valores, y por qué un solo píxel puede engañarte. Sin filtros de marketing, solo lo que de verdad necesitas saber para interpretar bien el dato.
 
 Recursos:
-· Probar Kylia gratis hasta 20 ha → kylia.app
+· Probar Kylia gratis hasta 30 ha → kylia.app
 · Hilo en LinkedIn → [enlace al post del miércoles]
 
 00:00 Qué problema resuelve NDVI
@@ -238,23 +236,53 @@ Pruébalo con tu parcela en kylia dot app, gratis hasta veinte hectáreas. Sin t
 
 ---
 
-## Capturas que necesitas producir esta semana (1 sola sesión, ~1 hora)
+## Resumen ejecutivo de la semana
 
-1. Mockup mobile con NDVI alto en parcela de olivar (lunes)
-2. Gráfica de barras 88 % vs 12 % (miércoles, en Canva)
-3. Tabla comparativa €/ha lineal vs tramos planos (viernes, en Canva)
-4. Tres capturas del producto: vista parcela, vista cooperativa, mapa intra-parcela (vídeo)
-5. Captura de la newsletter con tu paleta verde para previsualización
+| Día | Canal | Pieza | Imagen | Tiempo de publicar |
+|---|---|---|---|---|
+| Lun 9:00 | LinkedIn | Anuncio lanzamiento | `1-lunes-anuncio.png` | 3 min |
+| Lun 9:00 | Newsletter | Edición #1 NDMI | `4-newsletter-banner.png` | 10 min (cargar y enviar) |
+| Mié 9:00 | LinkedIn | Dato del 88 % vs 12 % | `2-miercoles-88-12.png` | 3 min |
+| Mié 9:00 | Telegram | Resumen pasada Sentinel-2 | `5-telegram-resumen.png` | 3 min |
+| Vie 9:00 | LinkedIn | Posicionamiento pricing | `3-viernes-pricing.png` | 3 min |
+| Sáb tarde | YouTube | Vídeo #1 NDVI (sin cara) | OBS + ElevenLabs | 60 min |
+
+**Total tiempo de tu semana publicando: 22 min** (más los 60 min de grabar el vídeo el sábado).
 
 ---
 
-## Resumen de la semana
+## Cómo publicar paso a paso
 
-| Día | Canal | Pieza | Tiempo |
-|---|---|---|---|
-| Lun 9:00 | LinkedIn + Newsletter | Anuncio + edición #1 newsletter | 5 min publicar |
-| Mié 9:00 | LinkedIn + Telegram | Dato sector + dato semanal | 5 min publicar |
-| Vie 9:00 | LinkedIn | Posicionamiento pricing | 5 min publicar |
-| Sáb tarde | YouTube | Grabar vídeo #1 (NDVI) | 60 min |
+**LinkedIn** (página Kylia):
+1. Entra a la página de empresa
+2. "Crear publicación" → adjuntar imagen del archivo
+3. Pegar el texto del bloque correspondiente
+4. Programar a 9:00 del día indicado
 
-**Total tiempo de tu semana: 75 minutos** + producción inicial de plantillas Canva (90 min, una sola vez).
+**Newsletter (Beehiiv recomendado, gratis hasta 2.500 suscriptores)**:
+1. Crear "Post" nuevo
+2. Subir `4-newsletter-banner.png` como banner
+3. Pegar cuerpo del email
+4. Programar envío lunes 9:00
+
+**Telegram** (canal Kylia España):
+1. Crear canal público `@kylia_es` si aún no existe
+2. Enviar la imagen primero
+3. Enviar el texto debajo
+4. Anclar el mensaje
+
+**YouTube**:
+1. Grabar pantalla con OBS siguiendo el guión
+2. Generar voz con ElevenLabs (voz "Carlos" o "Sofia" en español-ES)
+3. Editar en CapCut: alternar pantalla con texto en overlay
+4. Subir el sábado por la tarde, programar publicación domingo 19:00
+
+---
+
+## Próxima semana (semana 2)
+
+Te genero el contenido y las imágenes el viernes anterior, mismo formato. Plan tentativo:
+- Lunes: caso real anonimizado de cooperativa olivarera (post LinkedIn + newsletter)
+- Miércoles: comparativa Kylia vs herramienta tradicional (LinkedIn)
+- Viernes: deep dive técnico — cómo agregamos píxeles Sentinel-2 a parcela SIGPAC (LinkedIn)
+- Sábado: vídeo #2 — "Cómo se lee un mapa NDMI en 3 minutos"

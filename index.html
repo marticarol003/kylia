@@ -26,7 +26,7 @@
 <meta property="og:description" content="Monitoriza cada parcela SIGPAC con satélites europeos. Sin sensores, sin coste por hectárea." />
 <meta property="og:locale" content="es_ES" />
 <meta property="og:url" content="https://kylia.app/" />
-<meta property="og:image" content="https://kylia.app/og-image.png" />
+<meta property="og:image" content="https://kylia.app/assets/img/og-image.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
 <meta property="og:image:alt" content="Kylia — Agricultura de precisión por satélite. Cada parcela SIGPAC de España, sin hardware." />
@@ -35,7 +35,7 @@
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Kylia — Agricultura de precisión desde el espacio" />
 <meta name="twitter:description" content="Monitoriza cada parcela SIGPAC con satélites europeos. Sin hardware, sin coste por hectárea." />
-<meta name="twitter:image" content="https://kylia.app/og-image.png" />
+<meta name="twitter:image" content="https://kylia.app/assets/img/og-image.png" />
 <meta name="twitter:image:alt" content="Kylia — NDVI por parcela SIGPAC desde satélite Sentinel-2." />
 
 <!-- Favicon inline (SVG, sin request extra) -->
@@ -773,8 +773,15 @@
     display: grid; gap: 20px;
     grid-template-columns: repeat(4, 1fr);
   }
+  .pricing.pricing-3 {
+    grid-template-columns: repeat(3, 1fr);
+    max-width: 1100px;
+    margin: 0 auto;
+    align-items: stretch;
+  }
   @media (max-width: 1080px) {
     .pricing { grid-template-columns: repeat(2, 1fr); }
+    .pricing.pricing-3 { grid-template-columns: 1fr; max-width: 460px; }
   }
   @media (max-width: 540px) {
     .pricing { grid-template-columns: 1fr; }
@@ -1133,7 +1140,7 @@
       <a href="#publicos">Para quién</a>
       <a href="#precios">Precios</a>
       <a href="#faq">FAQ</a>
-      <a class="btn btn-primary btn-sm nav-cta" href="app.html">Probar gratis</a>
+      <a class="btn btn-primary btn-sm nav-cta" href="/app">Probar gratis</a>
     </nav>
   </div>
   <div class="nav-progress" id="nav-progress" aria-hidden="true"></div>
@@ -1152,10 +1159,10 @@
         Tu campo, vigilado desde el <em>espacio</em>.
       </h1>
       <p class="hero-sub">
-        Vigor del cultivo, humedad del suelo y recomendación de riego para cualquier parcela SIGPAC. En el móvil, en segundos. Gratis hasta 20 hectáreas.
+        Vigor del cultivo, humedad del suelo y recomendación de riego para cualquier parcela SIGPAC. Sin sensores. Sin Excel. <strong>Desde 99 €/año.</strong> Free hasta 30 hectáreas, para siempre.
       </p>
       <div class="hero-cta">
-        <a class="btn btn-primary btn-lg" href="app.html">Ver mi parcela gratis →</a>
+        <a class="btn btn-primary btn-lg" href="/app">Ver mi parcela gratis →</a>
         <a class="btn btn-ghost btn-lg" href="#producto">Ver cómo funciona</a>
       </div>
       <ul class="hero-trust">
@@ -1363,7 +1370,7 @@
           <li>Historial de 8 semanas para ver si la parcela mejora o empeora.</li>
           <li>Funciona en cualquier móvil. Sin descargas, sin cuentas complicadas.</li>
         </ul>
-        <a class="btn btn-primary" href="app.html">Probar con mi parcela →</a>
+        <a class="btn btn-primary" href="/app">Probar con mi parcela →</a>
       </div>
       <div class="panel-visual reveal" aria-hidden="true">
         <svg viewBox="0 0 300 260" width="260">
@@ -1422,10 +1429,10 @@
         <p>Mercado enorme, datos abiertos que antes eran de pago, coste marginal por usuario cercano a cero, ventana regulatoria favorable. Tres líneas de monetización ya identificadas: B2C Pro, B2B cooperativas y B2G/Enterprise.</p>
         <ul class="tab-list">
           <li>Mercado español: ~23,5 M ha de SAU, ~915 k explotaciones y ~3.700 cooperativas agroalimentarias.</li>
-          <li>Pricing público y por tramos planos (sin €/ha lineal): Pro desde <strong>19 €/mes</strong>, Cooperativa desde <strong>6.000 €/año</strong>, Enterprise desde <strong>25.000 €/año</strong>.</li>
-          <li>Vector Enterprise: aseguradoras agrarias, banca rural y administración (CCAA, Confederaciones) — tickets de 25 a 150 k €/año.</li>
+          <li>Pricing público (sin €/ha lineal): Productor desde <strong>99 €/año</strong> con escala decreciente, Cooperativa desde <strong>2.900 €/año</strong> en paquete cerrado, Enterprise desde <strong>30.000 €/año</strong>.</li>
+          <li>Vector Enterprise: aseguradoras agrarias, banca rural y administración (CCAA, Confederaciones) — tickets de 30 a 150 k €/año.</li>
           <li>Stack 100 % sobre infraestructura pública europea: Copernicus, SIGPAC, DWD ICON. Sin proveedor privado crítico.</li>
-          <li>Coste variable Sentinel Hub ≈ 0,40 € por usuario Pro al mes — gross margin objetivo &gt; 85 %.</li>
+          <li>Coste variable Copernicus ≈ 0,30 € por usuario Productor al mes — gross margin objetivo &gt; 88 %.</li>
         </ul>
         <a class="btn btn-primary" href="mailto:marticarol003@gmail.com?subject=Kylia%20-%20conversaci%C3%B3n%20inversi%C3%B3n">Hablemos →</a>
       </div>
@@ -1436,18 +1443,18 @@
           <div class="kpi-sub">915 k explotaciones · 3.700 cooperativas</div>
         </div>
         <div class="investor-kpi">
-          <div class="kpi-eyebrow">Pro · agricultor</div>
-          <div class="kpi-num">19 €/mes</div>
-          <div class="kpi-sub">228 €/año ARPU · 10–25 % del valor capturado</div>
+          <div class="kpi-eyebrow">Productor · agricultor</div>
+          <div class="kpi-num">99 — 559 €/año</div>
+          <div class="kpi-sub">€/ha decreciente · ARPU medio ~150 €/año</div>
         </div>
         <div class="investor-kpi">
           <div class="kpi-eyebrow">Cooperativa</div>
-          <div class="kpi-num">6 — 24 k €/año</div>
-          <div class="kpi-sub">Licencia anual · todos los socios incluidos</div>
+          <div class="kpi-num">2,9 — 11,9 k €/año</div>
+          <div class="kpi-sub">3 paquetes cerrados · todos los socios incluidos</div>
         </div>
         <div class="investor-kpi kpi-accent">
           <div class="kpi-eyebrow">Enterprise</div>
-          <div class="kpi-num">25–150 k €/año</div>
+          <div class="kpi-num">30–150 k €/año</div>
           <div class="kpi-sub">Aseguradoras · banca rural · administración</div>
         </div>
       </div>
@@ -1638,14 +1645,14 @@
           </tr>
           <tr>
             <th scope="row">Alertas automáticas</th>
-            <td class="yes">Incluidas en Pro</td>
+            <td class="yes">Incluidas en Productor</td>
             <td class="yes">Sí</td>
             <td class="yes">Sí</td>
             <td class="no">—</td>
           </tr>
           <tr>
             <th scope="row">Plan gratuito real</th>
-            <td class="yes">Hasta 20 ha, para siempre</td>
+            <td class="yes">Hasta 30 ha, para siempre</td>
             <td class="no">Solo trial</td>
             <td class="no">No</td>
             <td>—</td>
@@ -1683,7 +1690,7 @@
       </article>
       <article class="testimonio coming reveal">
         <p class="testimonio-quote"><strong>Plaza early-adopter</strong><br>¿Agricultor profesional curioso? Pruébalo ya y dinos qué cambiarías — te escuchamos.</p>
-        <a class="btn btn-primary btn-sm" href="app.html">Probar ahora</a>
+        <a class="btn btn-primary btn-sm" href="/app">Probar ahora</a>
       </article>
     </div>
   </div>
@@ -1696,82 +1703,63 @@
   <div class="wrap">
     <div class="section-header reveal">
       <span class="eyebrow">Precios</span>
-      <h2 class="section-title" id="h-precios">Precio fijo. Tus socios incluidos. Sin matemáticas.</h2>
-      <p class="section-lead">Tarifas planas por tramo (de superficie o de socios), nunca €/ha lineal. Precio público hasta el último tier — no "consulta a ventas". Si cobramos lo justo, podemos seguir mejorando el producto.</p>
+      <h2 class="section-title" id="h-precios">Desde 99 €/año. Tu superficie decide tu precio.</h2>
+      <p class="section-lead">Sin sensores, sin Excel, sin €/ha lineal que castiga al que crece. Anual, sencillo, garantía de devolución 60 días.</p>
     </div>
-    <div class="pricing">
+    <div class="pricing pricing-3">
       <article class="price-card reveal">
-        <div class="price-name">Gratis</div>
-        <div class="price-tag">0 €</div>
-        <div class="price-unit">Para siempre · hasta 20 ha</div>
+        <div class="price-name">Free</div>
+        <div class="price-tag">0 €<span style="font-size:1rem;font-weight:500;color:var(--muted);">/siempre</span></div>
+        <div class="price-unit">30 ha · 2 parcelas</div>
         <ul class="price-list">
-          <li>Parcelas ilimitadas dentro del límite de superficie</li>
-          <li>NDVI, NDMI y humedad del suelo</li>
-          <li>Histórico rodante de 4 semanas</li>
-          <li>Resumen semanal por email</li>
-          <li>Recomendación por cultivo</li>
+          <li>NDVI + NDMI semanal</li>
+          <li>1 alerta por email a la semana</li>
+          <li>Histórico 30 días</li>
+          <li>Sin tarjeta · sin caducidad</li>
         </ul>
-        <a class="btn btn-ghost" href="app.html">Empezar — sin tarjeta</a>
-        <div class="price-micro">Sin registro obligatorio · listo en 30 s</div>
+        <a class="btn btn-ghost" href="/app">Empezar gratis</a>
+        <div class="price-micro">Pensado para huertos familiares y para probar Kylia con tu finca pequeña.</div>
       </article>
 
       <article class="price-card featured reveal">
-        <div class="price-name">Pro</div>
-        <div class="price-tag">19&nbsp;€<span style="font-size:1rem;font-weight:500;color:var(--muted);">/mes</span></div>
-        <div class="price-unit">190&nbsp;€/año <span class="price-save">2 meses gratis</span></div>
-        <ul class="price-tiers" aria-label="Tarifas Pro por tramo de superficie">
-          <li>Hasta 100 ha <strong>19 €/mes</strong></li>
-          <li>Hasta 500 ha <strong>49 €/mes</strong></li>
-          <li>+ de 500 ha <strong>Pasa a Enterprise</strong></li>
+        <div class="price-name">Productor <span style="font-size:0.7rem;background:var(--verde);color:#fff;padding:2px 8px;border-radius:999px;font-weight:800;letter-spacing:0.06em;margin-left:6px;">⭐ MÁS POPULAR</span></div>
+        <div class="price-tag">99&nbsp;€<span style="font-size:1rem;font-weight:500;color:var(--muted);">/año</span> <span style="font-size:1rem;color:var(--muted);text-decoration:line-through;font-weight:600;margin-left:6px;">149 €</span></div>
+        <div class="price-unit">8,25 € al mes · escala con tu superficie</div>
+        <ul class="price-tiers" aria-label="Tramos €/ha">
+          <li>Hasta 100 ha <strong>99 €/año</strong></li>
+          <li>100 – 500 ha <strong>+0,40 €/ha</strong></li>
+          <li>500 – 2.000 ha <strong>+0,20 €/ha</strong></li>
         </ul>
         <ul class="price-list">
-          <li>Parcelas ilimitadas dentro del tramo</li>
-          <li>Histórico anual completo</li>
-          <li>Alertas en tiempo real (email + Telegram)</li>
-          <li>Mapas NDVI intra-parcela</li>
-          <li>Exportación a PDF y CSV</li>
+          <li>Alertas Telegram + email ilimitadas</li>
+          <li>Histórico 5 años · exportación</li>
+          <li>Soporte prioritario por email</li>
         </ul>
-        <a class="btn btn-primary" href="#lista-espera">Empezar prueba de 14 días</a>
-        <div class="price-micro">Un riego mal evitado al año amortiza 2 años de Pro</div>
+        <a class="btn btn-primary" href="/precios#calc">Calcular mi precio</a>
+        <div class="price-micro">Recuperas 1 riego mal evitado y ya está pagado el año.</div>
       </article>
 
       <article class="price-card reveal">
-        <div class="price-name">Cooperativa / ADV</div>
-        <div class="price-tag">desde 6.000 €<span style="font-size:1rem;font-weight:500;color:var(--muted);">/año</span></div>
-        <div class="price-unit">Todos los socios incluidos · sin €/ha</div>
-        <ul class="price-tiers" aria-label="Tarifas por tramo de socios">
-          <li>≤ 50 socios <strong>6.000 €/año</strong></li>
-          <li>51–200 socios <strong>12.000 €/año</strong></li>
-          <li>201–500 socios <strong>24.000 €/año</strong></li>
-          <li>500+ socios <strong>A medida</strong></li>
+        <div class="price-name">Cooperativa</div>
+        <div class="price-tag">desde 2.900 €<span style="font-size:1rem;font-weight:500;color:var(--muted);">/año</span></div>
+        <div class="price-unit">Para ATRIA, ADV y cooperativas de servicios</div>
+        <ul class="price-tiers" aria-label="Paquetes Cooperativa">
+          <li>200 socios · 3.000 ha <strong>2.900 €/año</strong></li>
+          <li>600 socios · 10.000 ha <strong>5.900 €/año</strong></li>
+          <li>2.000 socios · 30.000 ha <strong>11.900 €/año</strong></li>
         </ul>
         <ul class="price-list">
-          <li>Panel agregado y alertas centralizadas</li>
-          <li>API de integración con ERP / PAC</li>
-          <li>Onboarding y formación a técnicos</li>
-          <li>Soporte dedicado</li>
+          <li>Dashboard del técnico con triaje semanal</li>
+          <li>Formación al equipo · soporte priority</li>
+          <li>Reuniones trimestrales de revisión</li>
         </ul>
-        <a class="btn btn-ghost" href="#lista-espera">Agendar demo 30 min</a>
-        <div class="price-micro">Piloto 2026 gratuito para las primeras 3 cooperativas</div>
-      </article>
-
-      <article class="price-card enterprise reveal">
-        <div class="price-name">Empresa</div>
-        <div class="price-tag">desde 25.000 €<span style="font-size:1rem;font-weight:500;color:#94a3b8;">/año</span></div>
-        <div class="price-unit">Aseguradoras · banca · administración</div>
-        <ul class="price-list">
-          <li>Scoring agronómico para crédito y PAC</li>
-          <li>Verificación de declaraciones para seguros agrarios</li>
-          <li>Monitorización regional para CCAA</li>
-          <li>API empresarial con SLA</li>
-          <li>Datos agregados (con consentimiento)</li>
-        </ul>
-        <a class="btn btn-ghost" href="mailto:marticarol003@gmail.com?subject=Kylia%20Empresa">Hablar con ventas</a>
-        <div class="price-micro">Tarificación por superficie cubierta o consulta API</div>
+        <a class="btn btn-ghost" href="/cooperativas">Ver detalle Cooperativas →</a>
+        <div class="price-micro">Recuperas 8 horas semanales del técnico — el primer mes ya paga el año.</div>
       </article>
     </div>
-    <p class="reveal" style="text-align:center; margin-top:32px; font-size:0.88rem; color:var(--muted);">
-      Todos los planes incluyen los datos oficiales SIGPAC y Sentinel-2. IVA no incluido.
+    <p class="reveal" style="text-align:center; margin-top:24px; font-size:0.88rem; color:var(--muted);">
+      ¿Aseguradora, banca o más de 30.000 ha? Plan <a href="mailto:enterprise@kylia.app" style="color:var(--verde);font-weight:600;">Enterprise</a> a medida.<br/>
+      Todos los planes incluyen Sentinel-2 + SIGPAC oficial. IVA no incluido. Garantía de devolución 60 días.
     </p>
   </div>
 </section>
@@ -1926,7 +1914,7 @@
       </details>
       <details class="faq">
         <summary>¿Cuánto cuesta?</summary>
-        <div>Gratis para siempre hasta 20 hectáreas, con parcelas ilimitadas dentro de ese tramo, NDVI, NDMI y resumen semanal. <strong>Pro</strong> a 19 €/mes hasta 100 ha o 49 €/mes hasta 500 ha (con dos meses gratis al pago anual): alertas en tiempo real, mapas intra-parcela y exportación. <strong>Cooperativa</strong> desde 6.000 €/año con todos los socios incluidos — tarifa por tramos (6 k / 12 k / 24 k €/año), nunca €/ha lineal. <strong>Empresa</strong> (aseguradoras, banca rural, administración) desde 25.000 €/año con scoring agronómico y API a medida.</div>
+        <div><strong>Free</strong> para siempre hasta 30 ha, con NDVI, NDMI y alerta semanal. <strong>Productor</strong> desde 99 €/año con escala decreciente: hasta 100 ha 99 €, 250 ha 159 €, 500 ha 259 €, 1.000 ha 359 €. <strong>Cooperativa</strong> en paquete cerrado: 2.900 €/año hasta 200 socios, 5.900 €/año hasta 600 socios, 11.900 €/año hasta 2.000 socios. <strong>Enterprise</strong> (aseguradoras, banca rural, administración) desde 30.000 €/año. Garantía de devolución 60 días en todos los planes de pago. <a href="/precios">Ver detalle completo →</a></div>
       </details>
       <details class="faq">
         <summary>¿Qué hacéis con mis datos?</summary>
@@ -1987,7 +1975,7 @@
   <h2 id="h-final">Tu próxima decisión de riego, con datos reales.</h2>
   <p>Sin registro, sin tarjeta, sin instalación. Abre Kylia, elige tu parcela y mira qué te dice — 30 segundos.</p>
   <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
-    <a class="btn btn-primary btn-lg" href="app.html">Probar con mi parcela →</a>
+    <a class="btn btn-primary btn-lg" href="/app">Probar con mi parcela →</a>
     <a class="btn btn-ghost btn-lg" href="#lista-espera">Apuntarme al piloto</a>
   </div>
   <p style="font-size:0.85rem; color: rgba(255,255,255,0.7); margin-top:20px;">Funciona en tu móvil · cualquier parcela SIGPAC de España</p>
@@ -2016,7 +2004,7 @@
       <div>
         <h4>Producto</h4>
         <ul>
-          <li><a href="app.html">Abrir Kylia</a></li>
+          <li><a href="/app">Abrir Kylia</a></li>
           <li><a href="#como-funciona">Cómo funciona</a></li>
           <li><a href="#precios">Precios</a></li>
           <li><a href="#faq">FAQ</a></li>

@@ -62,7 +62,7 @@ La newsletter funciona perfecta sin cara: es texto, dato y captura. Y el ratio "
   - **El dato de la semana**: una métrica del campo español (humedad media de cereal en Castilla-La Mancha esta semana, vigor medio del olivar en Jaén, etc.). Dos frases.
   - **La mini-clase**: 200 palabras explicando un concepto agronómico aplicado (qué es NDMI, cuándo regar olivar superintensivo, etc.).
   - **Caso real anonimizado**: una parcela real (con permiso) con dos capturas Kylia y la decisión que se tomó.
-- Pie: "Si quieres ver tu parcela, es gratis hasta 20 ha en kylia.app".
+- Pie: "Si quieres ver tu parcela, es gratis hasta 30 ha en kylia.app".
 
 Herramienta: Beehiiv o Substack (ambos gratis hasta 2.500 suscriptores). Beehiiv es mejor para B2B porque permite segmentar por tipo de suscriptor.
 
@@ -103,7 +103,7 @@ Herramienta: Beehiiv o Substack (ambos gratis hasta 2.500 suscriptores). Beehiiv
 9. "Olivar superintensivo: por qué los datos de riego por goteo engañan al satélite"
 10. "Comparativa real: Kylia vs xarvio vs FieldView en una parcela de almendro"
 
-Cada vídeo termina con una pantalla fija: "Probarlo gratis en kylia.app — hasta 20 ha sin tarjeta".
+Cada vídeo termina con una pantalla fija: "Probarlo gratis en kylia.app — hasta 30 ha sin tarjeta".
 
 **Frecuencia**: 1 vídeo cada 2 semanas. Producción: 1 hora por vídeo después de la primera plantilla.
 
