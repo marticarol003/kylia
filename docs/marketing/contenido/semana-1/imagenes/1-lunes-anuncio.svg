@@ -51,14 +51,14 @@
 
   <!-- Pricing chips: 2 filas para no saturar -->
   <g transform="translate(80,870)" font-size="20" font-weight="700">
-    <rect width="280" height="56" rx="28" fill="#e8f3ea" stroke="#2b7a3a" stroke-width="2"/>
-    <text x="40" y="36" fill="#1f5d2b">Free hasta 20 ha</text>
+    <rect width="300" height="56" rx="28" fill="#e8f3ea" stroke="#2b7a3a" stroke-width="2"/>
+    <text x="40" y="36" fill="#1f5d2b">Free hasta 30 ha</text>
 
-    <rect x="300" width="240" height="56" rx="28" fill="#ffffff" stroke="#0f3617" stroke-width="2"/>
-    <text x="338" y="36" fill="#0f3617">Pro 19 €/mes</text>
+    <rect x="320" width="280" height="56" rx="28" fill="#ffffff" stroke="#0f3617" stroke-width="2"/>
+    <text x="355" y="36" fill="#0f3617">Productor 99 €/año</text>
 
-    <rect x="560" width="360" height="56" rx="28" fill="#0f3617"/>
-    <text x="595" y="36" fill="#ffffff">Cooperativa · Enterprise</text>
+    <rect x="620" width="300" height="56" rx="28" fill="#0f3617"/>
+    <text x="648" y="36" fill="#ffffff">Cooperativa · Enterprise</text>
   </g>
 
   <!-- Pie -->
