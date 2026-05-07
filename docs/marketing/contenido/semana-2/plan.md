@@ -1,12 +1,12 @@
 # Contenido Kylia — Semana 2 · LISTO PARA PUBLICAR
 
-Mismo formato que la semana 1: textos copiables y PNGs ya generados en `semana-2/imagenes/`.
+Mismo formato que la semana 1: textos copiables y PNGs ya generados en `imagenes/`.
 
 ---
 
 ## LUNES · 9:00 · LinkedIn (Kylia)
 
-**Imagen**: `semana-2/imagenes/1-lunes-caso-coop.png` (1080×1080)
+**Imagen**: `imagenes/1-lunes-caso-coop.png` (1080×1080)
 
 **Texto del post**:
 
@@ -30,7 +30,7 @@ Si llevas la parte técnica de una cooperativa y quieres ver cómo se ve el pane
 
 ## LUNES · 9:00 · Newsletter #2
 
-**Banner**: `semana-2/imagenes/4-newsletter-banner-2.png` (1200×400)
+**Banner**: `imagenes/4-newsletter-banner-2.png` (1200×400)
 
 **Asunto**: `Humedad del suelo: el dato que el NDVI no te cuenta`
 
@@ -80,7 +80,7 @@ Hasta el lunes que viene · Kylia
 
 ## MIÉRCOLES · 9:00 · LinkedIn (Kylia)
 
-**Imagen**: `semana-2/imagenes/2-miercoles-vs-excel.png` (1080×1080)
+**Imagen**: `imagenes/2-miercoles-vs-excel.png` (1080×1080)
 
 **Texto del post**:
 
@@ -106,7 +106,7 @@ Si llevas la parte técnica de una cooperativa y quieres validar el cálculo con
 
 ## MIÉRCOLES · 9:00 · Telegram
 
-**Imagen**: `semana-2/imagenes/5-telegram-resumen-29abr.png` (1080×1350)
+**Imagen**: `imagenes/5-telegram-resumen-29abr.png` (1080×1350)
 
 **Texto**:
 
@@ -128,7 +128,7 @@ Mapa por provincia y datos por parcela en kylia.app
 
 ## VIERNES · 9:00 · LinkedIn (Kylia) · Post técnico
 
-**Imagen**: `semana-2/imagenes/3-viernes-pixeles-sigpac.png` (1080×1080)
+**Imagen**: `imagenes/3-viernes-pixeles-sigpac.png` (1080×1080)
 
 **Texto del post**:
 

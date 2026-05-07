@@ -61,12 +61,29 @@ a:hover { text-decoration:underline; }
 /* ── Nav ── */
 .nav { position:sticky; top:0; z-index:50; background:rgba(255,255,255,0.92);
        backdrop-filter:saturate(180%) blur(10px); border-bottom:1px solid var(--border); }
-.nav-inner { display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:24px; }
+.nav-inner { display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:24px; position:relative; }
 .brand { display:inline-flex; align-items:center; gap:8px; color:var(--verde-900); font-weight:800; letter-spacing:-0.02em; font-size:1.1rem; }
 .brand-dot { width:14px; height:14px; border-radius:50%; background:var(--verde); }
 .nav-links { display:flex; gap:24px; align-items:center; font-size:0.95rem; }
 .nav-links a { color:var(--subtle); }
 .nav-links a:hover { color:var(--text); text-decoration:none; }
+.nav-toggle { display:none; background:transparent; border:1px solid var(--border); width:40px; height:40px;
+              border-radius:10px; padding:0; color:var(--text); align-items:center; justify-content:center; cursor:pointer; }
+.nav-toggle svg { width:20px; height:20px; pointer-events:none; }
+@media (max-width:760px) {
+  .nav-links { display:none; }
+  .nav-links.open {
+    display:flex; flex-direction:column; align-items:stretch;
+    position:absolute; top:100%; left:-24px; right:-24px;
+    background:#fff; border-bottom:1px solid var(--border);
+    padding:16px 24px; gap:4px;
+    box-shadow:0 8px 24px -8px rgba(15,23,42,0.12); z-index:60;
+  }
+  .nav-links.open a { padding:12px 8px; border-bottom:1px solid var(--slate-50); color:var(--text); font-size:1rem; }
+  .nav-links.open a:last-child { border-bottom:0; }
+  .nav-links.open .btn { margin-top:8px; text-align:center; justify-content:center; border-radius:999px; }
+  .nav-toggle { display:inline-flex; }
+}
 .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 18px;
        font-weight:600; border-radius:10px; border:1.5px solid transparent; transition:all 0.15s var(--ease); cursor:pointer; font-size:0.95rem; }
 .btn-primary { background:var(--verde); color:#fff; border-color:var(--verde); }
@@ -157,17 +174,16 @@ a:hover { text-decoration:underline; }
 .guarantee-text h3 { color:var(--verde-900); font-size:1.3rem; margin-bottom:6px; }
 .guarantee-text p { color:var(--subtle); }
 
-/* ── Testimonios ── */
+/* ── Por qué confiar ── */
 .testimonials { padding:48px 0 64px; background:var(--verde-50); }
 .testimonials h2 { text-align:center; color:var(--verde-900); font-size:clamp(1.6rem,3.5vw,2.2rem); margin-bottom:32px; letter-spacing:-0.02em; }
 .testi-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:20px; max-width:1080px; margin:0 auto; }
 @media (max-width:880px) { .testi-grid { grid-template-columns:1fr; } }
-.testi { background:#fff; border-radius:var(--radius); padding:24px 22px; box-shadow:var(--shadow-md); }
-.testi blockquote { font-size:0.98rem; color:var(--text); line-height:1.55; margin-bottom:16px; }
-.testi blockquote::before { content:"“"; color:var(--verde); font-size:2rem; font-weight:800; line-height:0.5; vertical-align:bottom; }
-.testi .author { font-size:0.88rem; color:var(--subtle); }
-.testi .author strong { color:var(--verde-900); }
-.testi.placeholder blockquote { color:var(--muted); font-style:italic; }
+.testi { background:#fff; border-radius:var(--radius); padding:28px 24px; box-shadow:var(--shadow-md); display:flex; flex-direction:column; gap:16px; }
+.testi blockquote { font-size:1rem; color:var(--subtle); line-height:1.6; flex:1; }
+.testi blockquote::before { content:”\201C”; color:var(--verde); font-size:2rem; font-weight:800; line-height:0; vertical-align:-12px; margin-right:4px; }
+.testi .author { font-size:0.86rem; color:var(--muted); border-top:1px solid var(--slate-200); padding-top:14px; }
+.testi .author strong { color:var(--verde-900); display:block; margin-bottom:2px; }
 
 /* ── FAQ ── */
 .faq { padding:64px 0; max-width:780px; margin:0 auto; }
@@ -199,16 +215,20 @@ footer .small { font-size:0.85rem; color:#7fa089; }
 
 <div class="promo-bar">
   <span class="pulse"></span>
-  Precios de lanzamiento — quedan <strong id="promo-count">73</strong> plazas Productor a 99 €/año (después <s>149 €</s>).
+  Precios de lanzamiento — <strong>99 €/año</strong> (precio estándar <s>149 €</s>). Garantía de devolución 60 días.
 </div>
 
 <header class="nav">
   <div class="wrap nav-inner">
     <a class="brand" href="/"><span class="brand-dot"></span> Kylia</a>
-    <nav class="nav-links" aria-label="Principal">
+    <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-label="Abrir menú">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <nav class="nav-links" id="nav-links" aria-label="Principal">
       <a href="/#producto">Producto</a>
       <a href="/cooperativas">Cooperativas</a>
       <a href="/precios" aria-current="page">Precios</a>
+      <a href="/blog">Blog</a>
       <a class="btn btn-primary" href="/app">Probar gratis</a>
     </nav>
   </div>
@@ -404,22 +424,22 @@ footer .small { font-size:0.85rem; color:#7fa089; }
     </div>
   </section>
 
-  <!-- ── TESTIMONIOS ── -->
+  <!-- ── POR QUÉ CONFIAR ── -->
   <section class="testimonials">
     <div class="wrap">
-      <h2>Lo que dicen los primeros usuarios</h2>
+      <h2>¿Por qué confiar en Kylia sin testimonios todavía?</h2>
       <div class="testi-grid">
-        <div class="testi placeholder">
-          <blockquote>Aquí irán las palabras del primer agricultor Free que pase a Productor. Tu opinión nos da forma.</blockquote>
-          <div class="author">— Próximamente · plan <strong>Productor</strong></div>
+        <div class="testi">
+          <blockquote>Los datos de Sentinel-2 llevan en abierto desde 2015. El problema nunca fue el satélite — fue que nadie te lo traduce a "regar el martes". Eso es lo que construimos.</blockquote>
+          <div class="author"><strong>Martí Carol</strong> — Fundador e Ingeniero</div>
         </div>
-        <div class="testi placeholder">
-          <blockquote>Aquí irá el testimonio de la primera cooperativa que adopte Kylia. Buscamos validación con datos reales en campo.</blockquote>
-          <div class="author">— Próximamente · plan <strong>Cooperativa</strong></div>
+        <div class="testi">
+          <blockquote>Somos muy nuevos. Todavía no tenemos clientes de pago. Preferimos decirlo así, con claridad, que inventarnos puntuaciones de Google o logos de clientes ficticios.</blockquote>
+          <div class="author"><strong>Construcción abierta</strong> — Mayo 2026</div>
         </div>
-        <div class="testi placeholder">
-          <blockquote>Aquí irá el testimonio del primer agricultor Free que decida que merece la pena, después de probarlo en su huerto.</blockquote>
-          <div class="author">— Próximamente · plan <strong>Free</strong></div>
+        <div class="testi">
+          <blockquote>Por eso la garantía de devolución de 60 días está ahí. Si en dos meses Kylia no te ha ahorrado al menos 100 €, te devolvemos el importe completo. Sin formularios, sin negociación.</blockquote>
+          <div class="author"><strong>Garantía real</strong> — No trial, devolución íntegra</div>
         </div>
       </div>
     </div>
@@ -488,6 +508,7 @@ footer .small { font-size:0.85rem; color:#7fa089; }
       <p><a href="/">Inicio</a></p>
       <p><a href="/precios">Precios</a></p>
       <p><a href="/cooperativas">Cooperativas</a></p>
+      <p><a href="/blog">Blog</a></p>
       <p><a href="/app">Probar gratis</a></p>
     </div>
     <div>
@@ -558,5 +579,22 @@ footer .small { font-size:0.85rem; color:#7fa089; }
 })();
 </script>
 
+<script>
+(function(){
+  const t = document.getElementById("nav-toggle");
+  const n = document.getElementById("nav-links");
+  if(!t||!n) return;
+  t.addEventListener("click",()=>{
+    const o = n.classList.toggle("open");
+    t.setAttribute("aria-expanded", o?"true":"false");
+    t.setAttribute("aria-label", o?"Cerrar menú":"Abrir menú");
+  });
+  n.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>{
+    n.classList.remove("open");
+    t.setAttribute("aria-expanded","false");
+    t.setAttribute("aria-label","Abrir menú");
+  }));
+})();
+</script>
 </body>
 </html>

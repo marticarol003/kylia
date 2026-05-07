@@ -14,8 +14,12 @@ kylia-1/
 │
 │ ── Web pública (servida por Vercel) ──
 ├── index.html              Landing comercial (URL: /)
-├── precios.html            Pricing (URL: /precios)
-├── cooperativas.html       Landing B2B coops (URL: /cooperativas)
+├── precios/
+│   └── index.html          Pricing (URL: /precios)
+├── cooperativas/
+│   └── index.html          Landing B2B coops (URL: /cooperativas)
+├── blog/
+│   └── index.html          Blog SEO (URL: /blog) — artículos próximamente
 ├── 404.html                Página de error
 ├── robots.txt              SEO — bots
 ├── sitemap.xml             SEO — URLs indexables
@@ -38,17 +42,30 @@ kylia-1/
 │   └── img/                og-image, mockups y screenshots del producto
 │
 │ ── Páginas legales ──
-├── legal/                  RGPD-compliant, marcadores [REVISAR]
-│   ├── terminos.md
-│   ├── privacidad.md
-│   ├── cookies.md
-│   └── dpa-enterprise.md
+├── legal/                  HTML compilado (RGPD-compliant)
+│   ├── index.html
+│   ├── terminos/index.html
+│   ├── privacidad/index.html
+│   ├── cookies/index.html
+│   └── dpa-enterprise/index.html
 │
 │ ── Documentación interna ──
 ├── docs/                   Ver docs/README.md
 │   ├── tecnico/            Arquitectura y dossier técnico
-│   ├── negocio/            Go-to-market y dossier inversores
+│   ├── negocio/            Go-to-market, dossier inversores y presentación
+│   ├── legal-fuente/       Fuentes .md de las páginas legales (compiladas por scripts/build_legal.py)
 │   └── marketing/          Redes, Telegram, emails y calendario editorial
+│       └── contenido/
+│           ├── semana-1/
+│           │   ├── plan.md       Textos + instrucciones de publicación
+│           │   └── imagenes/     PNGs y SVGs listos para publicar
+│           └── semana-2/
+│               ├── plan.md
+│               └── imagenes/
+│
+│ ── Scripts ──
+├── scripts/
+│   └── build_legal.py      Compila docs/legal-fuente/*.md → legal/*/index.html
 │
 │ ── Configuración del repo ──
 ├── vercel.json             Deploy config + headers + rewrites + redirects

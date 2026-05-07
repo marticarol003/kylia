@@ -34,12 +34,29 @@ a:hover { text-decoration:underline; }
 
 .nav { position:sticky; top:0; z-index:50; background:rgba(255,255,255,0.88);
        backdrop-filter:saturate(180%) blur(10px); border-bottom:1px solid var(--border); }
-.nav-inner { display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:24px; }
+.nav-inner { display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:24px; position:relative; }
 .brand { display:inline-flex; align-items:center; gap:8px; color:var(--verde-900); font-weight:800; letter-spacing:-0.02em; font-size:1.1rem; }
 .brand-dot { width:14px; height:14px; border-radius:50%; background:var(--verde); }
 .nav-links { display:flex; gap:24px; align-items:center; font-size:0.95rem; }
 .nav-links a { color:var(--subtle); }
 .nav-links a:hover { color:var(--text); text-decoration:none; }
+.nav-toggle { display:none; background:transparent; border:1px solid var(--border); width:40px; height:40px;
+              border-radius:10px; padding:0; color:var(--text); align-items:center; justify-content:center; cursor:pointer; }
+.nav-toggle svg { width:20px; height:20px; pointer-events:none; }
+@media (max-width:760px) {
+  .nav-links { display:none; }
+  .nav-links.open {
+    display:flex; flex-direction:column; align-items:stretch;
+    position:absolute; top:100%; left:-24px; right:-24px;
+    background:#fff; border-bottom:1px solid var(--border);
+    padding:16px 24px; gap:4px;
+    box-shadow:0 8px 24px -8px rgba(15,23,42,0.12); z-index:60;
+  }
+  .nav-links.open a { padding:12px 8px; border-bottom:1px solid var(--slate-50); color:var(--text); font-size:1rem; }
+  .nav-links.open a:last-child { border-bottom:0; }
+  .nav-links.open .btn { margin-top:8px; text-align:center; justify-content:center; border-radius:999px; }
+  .nav-toggle { display:inline-flex; }
+}
 .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px 20px;
        font-weight:600; border-radius:10px; border:1.5px solid transparent; transition:all 0.15s var(--ease); cursor:pointer; font-size:0.95rem; }
 .btn-primary { background:var(--verde); color:#fff; border-color:var(--verde); }
@@ -107,11 +124,15 @@ footer .small { font-size:0.85rem; color:#7fa089; }
 <header class="nav">
   <div class="wrap nav-inner">
     <a class="brand" href="/"><span class="brand-dot"></span> Kylia</a>
-    <nav class="nav-links" aria-label="Principal">
+    <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-label="Abrir menú">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <nav class="nav-links" id="nav-links" aria-label="Principal">
       <a href="/#producto">Producto</a>
       <a href="/cooperativas" aria-current="page">Cooperativas</a>
       <a href="/precios">Precios</a>
-      <a class="btn btn-primary" href="mailto:cooperativas@kylia.app">Hablar con nosotros</a>
+      <a href="/blog">Blog</a>
+      <a class="btn btn-primary" href="mailto:cooperativas@kylia.app">Pedir demo</a>
     </nav>
   </div>
 </header>
@@ -207,7 +228,9 @@ footer .small { font-size:0.85rem; color:#7fa089; }
       </div>
       <div class="features">
         <div class="feature">
-          <div class="icon" style="background:var(--verde-50);color:var(--verde-700);">S</div>
+          <div class="icon" style="background:var(--verde-50);color:var(--verde-700);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3L2 20h20L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v5M12 17.5v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
           <h3>Esencial · 2.900 €/año</h3>
           <p style="color:var(--subtle);font-size:0.95rem;">Hasta <strong>200 socios</strong> y <strong>3.000 ha</strong>. Para ATRIA, ADV pequeñas, cooperativas locales.</p>
           <ul style="margin-top:14px; font-size:0.92rem; color:var(--subtle);">
@@ -219,7 +242,9 @@ footer .small { font-size:0.85rem; color:#7fa089; }
         </div>
         <div class="feature" style="border-color:var(--verde); box-shadow:0 14px 36px -16px rgba(43,122,58,0.4); position:relative;">
           <div style="position:absolute; top:-13px; left:50%; transform:translateX(-50%); background:var(--verde); color:#fff; padding:4px 12px; border-radius:999px; font-size:0.7rem; font-weight:800; letter-spacing:0.1em; white-space:nowrap;">⭐ MÁS COMÚN</div>
-          <div class="icon" style="background:var(--verde);color:#fff;">M</div>
+          <div class="icon" style="background:var(--verde);color:#fff;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2"/><path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
           <h3>Profesional · 5.900 €/año</h3>
           <p style="color:var(--subtle);font-size:0.95rem;">Hasta <strong>600 socios</strong> y <strong>10.000 ha</strong>. Cooperativas medianas, comunidades de regantes consolidadas.</p>
           <ul style="margin-top:14px; font-size:0.92rem; color:var(--subtle);">
@@ -230,7 +255,9 @@ footer .small { font-size:0.85rem; color:#7fa089; }
           </ul>
         </div>
         <div class="feature">
-          <div class="icon" style="background:var(--verde-900);color:#fff;">L</div>
+          <div class="icon" style="background:var(--verde-900);color:#fff;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          </div>
           <h3>Avanzado · 11.900 €/año</h3>
           <p style="color:var(--subtle);font-size:0.95rem;">Hasta <strong>2.000 socios</strong> y <strong>30.000 ha</strong>. Cooperativas de segundo grado, agrupaciones territoriales.</p>
           <ul style="margin-top:14px; font-size:0.92rem; color:var(--subtle);">
@@ -255,19 +282,25 @@ footer .small { font-size:0.85rem; color:#7fa089; }
       </div>
       <div class="features">
         <div class="feature">
-          <div class="icon">A</div>
+          <div class="icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <h3>Reunión inicial — 60 min</h3>
-          <p>Una llamada con los técnicos. Qué cultivos, qué socios, qué quieren mirar primero.</p>
+          <p>Una llamada con los técnicos. Qué cultivos, qué socios, qué quieren mirar primero. Sin formularios previos.</p>
         </div>
         <div class="feature">
-          <div class="icon">B</div>
+          <div class="icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 17l6-6 4 4 6-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <h3>Carga de socios — 1 semana</h3>
-          <p>Nosotros cargamos las referencias SIGPAC de los socios desde un CSV o desde la PAC declarada. Sin trabajo manual del técnico.</p>
+          <p>Cargamos las referencias SIGPAC de los socios desde un CSV o desde la PAC declarada. Sin trabajo manual del técnico.</p>
         </div>
         <div class="feature">
-          <div class="icon">C</div>
+          <div class="icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <h3>Formación al equipo — 90 min</h3>
-          <p>Sesión virtual con el técnico (y opcionalmente con socios interesados). Documentación escrita en castellano.</p>
+          <p>Sesión virtual con el técnico y opcionalmente con socios interesados. Documentación en castellano incluida.</p>
         </div>
       </div>
     </div>
@@ -293,6 +326,7 @@ footer .small { font-size:0.85rem; color:#7fa089; }
       <p><a href="/">Inicio</a></p>
       <p><a href="/precios">Precios</a></p>
       <p><a href="/cooperativas">Cooperativas</a></p>
+      <p><a href="/blog">Blog</a></p>
       <p><a href="/app">Probar gratis</a></p>
     </div>
     <div>
@@ -305,5 +339,22 @@ footer .small { font-size:0.85rem; color:#7fa089; }
   </div>
 </footer>
 
+<script>
+(function(){
+  const t = document.getElementById("nav-toggle");
+  const n = document.getElementById("nav-links");
+  if(!t||!n) return;
+  t.addEventListener("click",()=>{
+    const o = n.classList.toggle("open");
+    t.setAttribute("aria-expanded", o?"true":"false");
+    t.setAttribute("aria-label", o?"Cerrar menú":"Abrir menú");
+  });
+  n.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>{
+    n.classList.remove("open");
+    t.setAttribute("aria-expanded","false");
+    t.setAttribute("aria-label","Abrir menú");
+  }));
+})();
+</script>
 </body>
 </html>

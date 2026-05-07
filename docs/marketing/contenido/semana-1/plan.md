@@ -1,6 +1,6 @@
 # Contenido Kylia — Semana 1 · LISTO PARA PUBLICAR
 
-Todas las imágenes están generadas en `semana-1/imagenes/`. No tienes que diseñar nada ni abrir Canva. Solo descargar la imagen, copiar el texto y pegar en cada plataforma a las horas indicadas.
+Todas las imágenes están generadas en `imagenes/`. No tienes que diseñar nada ni abrir Canva. Solo descargar la imagen, copiar el texto y pegar en cada plataforma a las horas indicadas.
 
 > Las imágenes están en formato PNG cuadrado (1080×1080) o vertical (1080×1350) según red social. Newsletter 1200×400.
 
@@ -8,7 +8,7 @@ Todas las imágenes están generadas en `semana-1/imagenes/`. No tienes que dise
 
 ## LUNES · 9:00 · LinkedIn (página de empresa Kylia)
 
-**Imagen**: `semana-1/imagenes/1-lunes-anuncio.png` (1080×1080)
+**Imagen**: `imagenes/1-lunes-anuncio.png` (1080×1080)
 
 **Texto del post**:
 
@@ -52,7 +52,7 @@ kylia.app
 
 ## MIÉRCOLES · 9:00 · LinkedIn (Kylia)
 
-**Imagen**: `semana-1/imagenes/2-miercoles-88-12.png` (1080×1080)
+**Imagen**: `imagenes/2-miercoles-88-12.png` (1080×1080)
 
 **Texto del post**:
 
@@ -74,7 +74,7 @@ Eso es exactamente lo que estamos resolviendo en Kylia.
 
 ## VIERNES · 9:00 · LinkedIn (Kylia)
 
-**Imagen**: `semana-1/imagenes/3-viernes-pricing.png` (1080×1080)
+**Imagen**: `imagenes/3-viernes-pricing.png` (1080×1080)
 
 **Texto del post**:
 
@@ -96,7 +96,7 @@ Detalles del pricing en kylia.app/precios
 
 ## LUNES · 9:00 (programada) · Newsletter
 
-**Banner cabecera**: `semana-1/imagenes/4-newsletter-banner.png` (1200×400) — sube como header en Beehiiv/Substack.
+**Banner cabecera**: `imagenes/4-newsletter-banner.png` (1200×400) — sube como header en Beehiiv/Substack.
 
 **Asunto del email**: `El dato de la semana en el campo español · NDMI, riego y por qué importa`
 
@@ -146,7 +146,7 @@ La decisión: adelantar el segundo aporte de riego de la campaña dos semanas. C
 
 ## MIÉRCOLES · 9:00 · Telegram (canal propio Kylia)
 
-**Imagen**: `semana-1/imagenes/5-telegram-resumen.png` (1080×1350)
+**Imagen**: `imagenes/5-telegram-resumen.png` (1080×1350)
 
 **Texto**:
 

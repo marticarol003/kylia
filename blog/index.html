@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#2b7a3a" />
+<meta name="robots" content="index,follow" />
+
+<title>Blog · Kylia · Agricultura de precisión por satélite</title>
+<meta name="description" content="Guías prácticas sobre NDVI, NDMI, estrés hídrico y monitorización de parcelas por satélite. Sin marketing, solo lo que el agricultor necesita saber." />
+
+<link rel="canonical" href="https://kylia.app/blog" />
+
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Blog · Kylia · Agricultura por satélite explicada" />
+<meta property="og:description" content="Guías sobre NDVI, NDMI, estrés hídrico y Sentinel-2 para agricultores y técnicos de cooperativa." />
+<meta property="og:url" content="https://kylia.app/blog" />
+<meta property="og:image" content="https://kylia.app/assets/img/og-image.png" />
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%232b7a3a%22/><path d=%22M10 20 Q16 10 22 20 Z%22 fill=%22white%22/></svg>" />
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --green: #2b7a3a;
+    --green-light: #e8f5ec;
+    --text: #1a1a1a;
+    --muted: #666;
+    --border: #e0e0e0;
+    --radius: 8px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--text);
+    line-height: 1.6;
+    background: #fff;
+  }
+  a { color: var(--green); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Nav */
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+  }
+  .nav-logo { font-weight: 800; font-size: 1.1rem; color: var(--green); letter-spacing:-0.01em; }
+  .nav-links { display: flex; gap: 24px; font-size: 0.92rem; align-items: center; }
+  .nav-links a { color: #555; }
+  .nav-links a:hover { color: var(--text); text-decoration: none; }
+  .nav-links a[aria-current="page"] { color: var(--green); font-weight: 600; }
+  .nav-cta {
+    background: var(--green); color: #fff !important;
+    padding: 8px 18px; border-radius: 8px; font-weight: 600;
+  }
+  .nav-cta:hover { background: #235f2e; }
+  .nav-toggle {
+    display: none; background: transparent; border: 1px solid var(--border);
+    width: 40px; height: 40px; border-radius: 10px; padding: 0;
+    color: var(--text); align-items: center; justify-content: center; cursor: pointer;
+  }
+  .nav-toggle svg { width: 20px; height: 20px; pointer-events: none; }
+  @media (max-width: 640px) {
+    .nav-links { display: none; }
+    .nav-links.open {
+      display: flex; flex-direction: column; align-items: stretch;
+      position: absolute; top: 60px; left: 0; right: 0;
+      background: #fff; border-bottom: 1px solid var(--border);
+      padding: 16px 24px; gap: 4px;
+      box-shadow: 0 8px 24px -8px rgba(0,0,0,0.12); z-index: 60;
+    }
+    .nav-links.open a { padding: 12px 8px; border-bottom: 1px solid #f1f5f9; color: var(--text); font-size: 1rem; }
+    .nav-links.open a:last-child { border-bottom: 0; }
+    .nav-links.open .nav-cta { margin-top: 8px; text-align: center; border-radius: 8px; }
+    .nav-toggle { display: inline-flex; }
+  }
+
+  /* Header */
+  .blog-header {
+    max-width: 760px;
+    margin: 64px auto 48px;
+    padding: 0 24px;
+  }
+  .blog-header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
+  .blog-header p { color: var(--muted); font-size: 1.05rem; }
+
+  /* Articles grid */
+  .articles {
+    max-width: 760px;
+    margin: 0 auto 80px;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    border-top: 1px solid var(--border);
+  }
+  .article-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 28px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .article-tag {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .article-card h2 { font-size: 1.2rem; font-weight: 700; }
+  .article-card h2 a { color: var(--text); }
+  .article-card h2 a:hover { color: var(--green); text-decoration: none; }
+  .article-card p { color: var(--muted); font-size: 0.95rem; }
+  .article-meta { font-size: 0.82rem; color: #999; }
+  .coming-soon {
+    display: inline-block;
+    font-size: 0.75rem;
+    background: var(--green-light);
+    color: var(--green);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 24px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 600px) {
+    .nav-links { display: none; }
+    .blog-header h1 { font-size: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/">Kylia</a>
+  <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-label="Abrir menú">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <div class="nav-links" id="nav-links">
+    <a href="/#producto">Producto</a>
+    <a href="/precios">Precios</a>
+    <a href="/cooperativas">Cooperativas</a>
+    <a href="/blog" aria-current="page">Blog</a>
+    <a href="/app" class="nav-cta">Probar gratis</a>
+  </div>
+</nav>
+
+<header class="blog-header">
+  <h1>Agricultura por satélite explicada</h1>
+  <p>NDVI, NDMI, estrés hídrico y Sentinel-2 — sin marketing, solo lo que el agricultor necesita saber.</p>
+</header>
+
+<main class="articles">
+
+  <article class="article-card">
+    <span class="article-tag">Índices</span>
+    <h2><a href="/blog/que-es-ndvi">Qué es NDVI y cómo se interpreta<span class="coming-soon">Próximamente</span></a></h2>
+    <p>La medida más usada en agricultura por satélite: qué mide, cómo se calcula sobre Sentinel-2 y qué significan los valores por cultivo.</p>
+  </article>
+
+  <article class="article-card">
+    <span class="article-tag">Riego</span>
+    <h2><a href="/blog/estres-hidrico-cultivo">Cómo saber si tu cultivo tiene estrés hídrico antes de que se vea<span class="coming-soon">Próximamente</span></a></h2>
+    <p>El satélite detecta la pérdida de agua en la hoja 10-15 días antes de que el ojo humano lo vea. Así es cómo funciona.</p>
+  </article>
+
+  <article class="article-card">
+    <span class="article-tag">Satélite</span>
+    <h2><a href="/blog/sentinel-2-explicado">Sentinel-2 a 10 metros: qué ven los satélites de tu parcela cada 5 días<span class="coming-soon">Próximamente</span></a></h2>
+    <p>Copernicus, bandas espectrales, frecuencia de pasada y por qué 10 metros de resolución es suficiente para monitorizar parcelas SIGPAC.</p>
+  </article>
+
+  <article class="article-card">
+    <span class="article-tag">Índices</span>
+    <h2><a href="/blog/diferencia-humedad-ndmi">Diferencia entre humedad del suelo y NDMI: cuándo mirar cada uno<span class="coming-soon">Próximamente</span></a></h2>
+    <p>Son datos distintos que responden preguntas distintas. Confundirlos es el error más común al empezar con monitorización satelital.</p>
+  </article>
+
+  <article class="article-card">
+    <span class="article-tag">Guía práctica</span>
+    <h2><a href="/blog/interpretar-imagenes-satelitales-olivar">Guía para interpretar imágenes satelitales en olivar<span class="coming-soon">Próximamente</span></a></h2>
+    <p>Rangos de NDVI y NDMI específicos para olivar por fase fenológica, con ejemplos reales de parcelas en Andalucía.</p>
+  </article>
+
+  <article class="article-card">
+    <span class="article-tag">Técnico</span>
+    <h2><a href="/blog/por-que-mediana-ndvi-parcela">Por qué calculamos NDVI por mediana y no por media<span class="coming-soon">Próximamente</span></a></h2>
+    <p>Un solo píxel anómalo destruye la media. La mediana ponderada por área dentro de la geometría SIGPAC es la forma robusta de hacerlo.</p>
+  </article>
+
+  <article class="article-card">
+    <span class="article-tag">Cooperativas</span>
+    <h2><a href="/blog/monitorizar-200-parcelas-cooperativa">Cómo monitorizar 200 parcelas de cooperativa desde una sola pantalla<span class="coming-soon">Próximamente</span></a></h2>
+    <p>El panel de cooperativas de Kylia ordenado por NDMI más bajo: cómo un técnico detecta en 2 minutos qué socio necesita atención.</p>
+  </article>
+
+  <article class="article-card">
+    <span class="article-tag">Regulación</span>
+    <h2><a href="/blog/pac-2027-satelites">PAC 2027 y satélites: lo que la nueva regulación va a exigir<span class="coming-soon">Próximamente</span></a></h2>
+    <p>La condicionalidad reforzada de la PAC 2027 y cómo la monitorización satelital cambia de opcional a obligatoria para muchas explotaciones.</p>
+  </article>
+
+</main>
+
+<footer>
+  <p>
+    <a href="/">Kylia</a> ·
+    <a href="/precios">Precios</a> ·
+    <a href="/cooperativas">Cooperativas</a> ·
+    <a href="/blog">Blog</a> ·
+    <a href="/legal">Legal</a> ·
+    <a href="/legal/privacidad">Privacidad</a>
+  </p>
+  <p style="margin-top:8px">© 2026 Kylia · Construido sobre Copernicus, SIGPAC, DWD ICON</p>
+</footer>
+
+<script>
+(function(){
+  const t = document.getElementById("nav-toggle");
+  const n = document.getElementById("nav-links");
+  if(!t||!n) return;
+  t.addEventListener("click",()=>{
+    const o = n.classList.toggle("open");
+    t.setAttribute("aria-expanded", o?"true":"false");
+    t.setAttribute("aria-label", o?"Cerrar menú":"Abrir menú");
+  });
+  n.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>{
+    n.classList.remove("open");
+    t.setAttribute("aria-expanded","false");
+    t.setAttribute("aria-label","Abrir menú");
+  }));
+})();
+</script>
+</body>
+</html>
