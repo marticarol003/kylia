@@ -129,8 +129,8 @@ footer .small { font-size:0.85rem; color:#7fa089; }
     </button>
     <nav class="nav-links" id="nav-links" aria-label="Principal">
       <a href="/#producto">Producto</a>
-      <a href="/cooperativas" aria-current="page">Cooperativas</a>
       <a href="/precios">Precios</a>
+      <a href="/cooperativas" aria-current="page">Cooperativas</a>
       <a href="/blog">Blog</a>
       <a class="btn btn-primary" href="mailto:cooperativas@kylia.app">Pedir demo</a>
     </nav>
@@ -176,17 +176,23 @@ footer .small { font-size:0.85rem; color:#7fa089; }
       </div>
       <div class="features">
         <div class="feature">
-          <div class="icon">1</div>
+          <div class="icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="15" r="1.5" fill="currentColor"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/><circle cx="16" cy="15" r="1.5" fill="currentColor"/></svg>
+          </div>
           <h3>Triaje cada lunes</h3>
           <p>El técnico abre el panel y ve un ranking de los socios cuyas parcelas tienen señales tempranas de estrés. La mañana del lunes ya tiene la ruta de la semana.</p>
         </div>
         <div class="feature">
-          <div class="icon">2</div>
+          <div class="icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="5" y="2" width="14" height="20" rx="2" stroke="currentColor" stroke-width="2"/><path d="M9 7h6M9 11h6M9 15h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="19" r="4" fill="currentColor" stroke="white" stroke-width="1"/><path d="M15.5 19l1 1 2-2" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <h3>Visita con datos</h3>
           <p>Llega a la parcela con NDVI, NDMI y humedad de suelo en el móvil. La conversación con el socio empieza por "lo que vimos" en vez de "vamos a ver".</p>
         </div>
         <div class="feature">
-          <div class="icon">3</div>
+          <div class="icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 17l6-6 4 4 6-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/></svg>
+          </div>
           <h3>Cierre de campaña</h3>
           <p>Histórico completo de la campaña por socio. Reporte final exportable, casos para la asamblea, base para mejorar el plan agronómico del año siguiente.</p>
         </div>
@@ -303,6 +309,19 @@ footer .small { font-size:0.85rem; color:#7fa089; }
           <p>Sesión virtual con el técnico y opcionalmente con socios interesados. Documentación en castellano incluida.</p>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- Panel screenshot -->
+  <section class="block" style="background:var(--verde-900); padding:64px 0;">
+    <div class="wrap" style="text-align:center;">
+      <p style="color:#a8d894; font-size:0.78rem; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; margin-bottom:16px;">El panel que ve el técnico</p>
+      <img src="/assets/img/product-dashboard.png"
+           alt="Panel de cooperativa en Kylia: 124 parcelas, 38 socios, 86 con vigor bueno, 27 moderado, 11 en estrés hídrico con tabla de alertas y distribución."
+           width="1400" height="900"
+           loading="lazy" decoding="async"
+           style="width:100%; max-width:960px; height:auto; border-radius:16px; border:1px solid rgba(255,255,255,0.1); box-shadow:0 32px 72px -24px rgba(0,0,0,0.5);">
+      <p style="color:#7fa089; font-size:0.88rem; margin-top:16px;">Datos reales de una cooperativa olivarera durante la campaña 2026.</p>
     </div>
   </section>
 
