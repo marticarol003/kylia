@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1350" font-family="-apple-system,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+  <!-- Background -->
+  <rect width="1080" height="1350" fill="#071c0c"/>
+
+  <!-- Top branding -->
+  <text x="48" y="68" font-size="28" font-weight="700" fill="white" opacity="0.9">Kylia®</text>
+
+  <!-- Label -->
+  <text x="72" y="280" font-size="28" font-weight="600" fill="#a8d894">Lo único que necesitas:</text>
+  <rect x="72" y="305" width="140" height="3" fill="#5eb169" rx="2"/>
+
+  <!-- Big bold text -->
+  <text x="72" y="480" font-size="86" font-weight="900" fill="white" letter-spacing="-3">La referencia</text>
+  <text x="72" y="590" font-size="86" font-weight="900" fill="#a8d894" letter-spacing="-3">SIGPAC</text>
+  <text x="72" y="700" font-size="86" font-weight="900" fill="white" letter-spacing="-3">de tu parcela.</text>
+
+  <!-- Supporting text -->
+  <text x="72" y="820" font-size="26" fill="#6aaa78">El satélite hace el resto.</text>
+
+  <!-- Separator -->
+  <rect x="72" y="900" width="936" height="1" fill="#1a4d24"/>
+
+  <!-- Additional context -->
+  <text x="72" y="980" font-size="20" fill="#6aaa78" opacity="0.8">Cero instalaciones. Cero hardware. Cero complicaciones.</text>
+
+  <!-- CTA pill -->
+  <rect x="72" y="1140" width="480" height="78" rx="39" fill="#2b7a3a"/>
+  <text x="312" y="1191" font-size="24" font-weight="700" fill="white" text-anchor="middle">Empieza en kylia.app</text>
+
+  <!-- Bottom branding -->
+  <text x="72" y="1295" font-size="20" fill="#a8d894" font-weight="500">kylia.app</text>
+
+  <!-- Pagination -->
+  <text x="1008" y="1295" font-size="14" fill="#a8d894" opacity="0.5" text-anchor="end">2 / 2</text>
+</svg>

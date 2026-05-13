@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" font-family="-apple-system,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+
+  <!-- Fondo blanco -->
+  <rect width="1080" height="1080" fill="#ffffff"/>
+
+  <!-- Eyebrow -->
+  <text x="80" y="90" font-size="20" font-weight="700" letter-spacing="3" fill="#2b7a3a">KYLIA · ANÁLISIS DE ROI</text>
+
+  <!-- Titular -->
+  <text x="80" y="172" font-size="54" font-weight="800" fill="#0f3617">¿Cuánto vale detectar</text>
+  <text x="80" y="238" font-size="54" font-weight="800" fill="#2b7a3a">estrés 9 días antes?</text>
+  <text x="80" y="290" font-size="22" font-weight="400" fill="#445">Hicimos el cálculo. Los números mandan.</text>
+
+  <!-- Separador -->
+  <line x1="80" y1="320" x2="1000" y2="320" stroke="#e8f3ea" stroke-width="3"/>
+
+  <!-- CÁLCULO: 3 filas -->
+
+  <!-- Row 1: Coste de no detectar -->
+  <rect x="80" y="350" width="920" height="110" rx="16" fill="#fff5f5" stroke="#f0d0d0" stroke-width="1.5"/>
+  <rect x="80" y="350" width="8" height="110" rx="4" fill="#c94343"/>
+  <text x="112" y="392" font-size="16" font-weight="700" letter-spacing="2" fill="#c94343">SIN DETECCIÓN TEMPRANA</text>
+  <text x="112" y="424" font-size="26" font-weight="700" fill="#0a0a0a">Pérdida calidad olivar con estrés no detectado:</text>
+  <text x="112" y="454" font-size="22" font-weight="500" fill="#445">200 – 400 €/ha · campaña comprometida en parcelas afectadas</text>
+  <text x="960" y="420" font-size="44" font-weight="800" fill="#c94343" text-anchor="end">-400 €</text>
+  <text x="960" y="450" font-size="16" font-weight="500" fill="#c94343" text-anchor="end">por ha afectada</text>
+
+  <!-- Row 2: Coste de Kylia -->
+  <rect x="80" y="480" width="920" height="110" rx="16" fill="#f6f7f8" stroke="#e0e0e0" stroke-width="1.5"/>
+  <rect x="80" y="480" width="8" height="110" rx="4" fill="#778"/>
+  <text x="112" y="522" font-size="16" font-weight="700" letter-spacing="2" fill="#445">COSTE DE KYLIA (PRODUCTOR)</text>
+  <text x="112" y="554" font-size="26" font-weight="700" fill="#0a0a0a">Plan Productor hasta 100 ha:</text>
+  <text x="112" y="584" font-size="22" font-weight="500" fill="#445">99 €/año · escala por tramos, no por hectárea</text>
+  <text x="960" y="550" font-size="44" font-weight="800" fill="#0a0a0a" text-anchor="end">99 €</text>
+  <text x="960" y="580" font-size="16" font-weight="500" fill="#778" text-anchor="end">por año completo</text>
+
+  <!-- Row 3: Resultado -->
+  <rect x="80" y="610" width="920" height="110" rx="16" fill="#e8f3ea" stroke="#2b7a3a" stroke-width="2.5"/>
+  <rect x="80" y="610" width="8" height="110" rx="4" fill="#2b7a3a"/>
+  <text x="112" y="652" font-size="16" font-weight="700" letter-spacing="2" fill="#2b7a3a">SI DETECTA UN EPISODIO EN UNA PARCELA DE 38 HA</text>
+  <text x="112" y="684" font-size="26" font-weight="700" fill="#0f3617">38 ha × 200 €/ha mínimo conservados = 7.600 €</text>
+  <text x="112" y="714" font-size="22" font-weight="500" fill="#445">Coste herramienta: 99 €. Ratio: 76:1</text>
+  <text x="960" y="680" font-size="44" font-weight="800" fill="#2b7a3a" text-anchor="end">76×</text>
+  <text x="960" y="710" font-size="16" font-weight="500" fill="#2b7a3a" text-anchor="end">ROI mínimo</text>
+
+  <!-- Disclaimer -->
+  <text x="80" y="760" font-size="16" font-weight="400" fill="#aab">* Estimación conservadora. Pérdidas reales dependen de cultivo, variedad, momento del estrés y precio de campaña.</text>
+
+  <!-- Separador -->
+  <line x1="80" y1="790" x2="1000" y2="790" stroke="#e8f3ea" stroke-width="3"/>
+
+  <!-- Insight box -->
+  <rect x="80" y="820" width="920" height="120" rx="20" fill="#0f3617"/>
+  <text x="540" y="866" font-size="18" font-weight="700" letter-spacing="2" fill="#a8d894" text-anchor="middle">LA PREGUNTA CORRECTA</text>
+  <text x="540" y="904" font-size="24" font-weight="700" fill="#ffffff" text-anchor="middle">No es "¿puedo permitirme Kylia?"</text>
+  <text x="540" y="934" font-size="24" font-weight="700" fill="#d4a82a" text-anchor="middle">Es "¿puedo permitirme NO tener Kylia?"</text>
+
+  <!-- Footer -->
+  <text x="80" y="1010" font-size="20" font-weight="600" fill="#0f3617">kylia.app/precios · Free hasta 30 ha · Productor desde 99 €/año</text>
+  <text x="1000" y="1010" font-size="14" fill="#aab" text-anchor="end">Sentinel-2 · SIGPAC</text>
+</svg>

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1350" font-family="-apple-system,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+  <!-- Very dark almost-black background - night sky -->
+  <rect width="1080" height="1350" fill="#030f06"/>
+
+  <!-- Stars scattered -->
+  <circle cx="120" cy="90" r="2" fill="white" opacity="0.5"/>
+  <circle cx="280" cy="45" r="1.5" fill="white" opacity="0.4"/>
+  <circle cx="450" cy="120" r="2.5" fill="white" opacity="0.3"/>
+  <circle cx="620" cy="60" r="1.5" fill="white" opacity="0.5"/>
+  <circle cx="780" cy="100" r="2" fill="white" opacity="0.4"/>
+  <circle cx="940" cy="40" r="1.5" fill="white" opacity="0.35"/>
+  <circle cx="1020" cy="130" r="2" fill="white" opacity="0.4"/>
+  <circle cx="60" cy="200" r="1.5" fill="white" opacity="0.3"/>
+  <circle cx="350" cy="180" r="2" fill="white" opacity="0.25"/>
+  <circle cx="850" cy="220" r="1.5" fill="white" opacity="0.35"/>
+  <circle cx="1000" cy="260" r="2.5" fill="white" opacity="0.3"/>
+  <circle cx="160" cy="310" r="1.5" fill="white" opacity="0.2"/>
+  <circle cx="520" cy="290" r="2" fill="white" opacity="0.3"/>
+  <circle cx="720" cy="340" r="1.5" fill="white" opacity="0.25"/>
+  <circle cx="200" cy="450" r="1" fill="white" opacity="0.2"/>
+  <circle cx="900" cy="400" r="2" fill="white" opacity="0.2"/>
+  <circle cx="1050" cy="500" r="1.5" fill="white" opacity="0.15"/>
+  <circle cx="70" cy="580" r="2" fill="white" opacity="0.15"/>
+  <circle cx="400" cy="520" r="1.5" fill="white" opacity="0.15"/>
+  <circle cx="680" cy="460" r="1" fill="white" opacity="0.2"/>
+
+  <!-- Subtle horizon glow -->
+  <rect x="0" y="600" width="1080" height="60" fill="#0f3617" opacity="0.15"/>
+
+  <!-- Top branding -->
+  <text x="48" y="68" font-size="28" font-weight="700" fill="white" opacity="0.9">Kylia®</text>
+
+  <!-- Giant headline -->
+  <text x="72" y="520" font-size="94" font-weight="900" fill="white" letter-spacing="-2">EL CAMPO</text>
+  <text x="72" y="626" font-size="94" font-weight="900" fill="white" letter-spacing="-2">NO DESCANSA.</text>
+
+  <!-- Accent line -->
+  <rect x="72" y="660" width="200" height="4" fill="#5eb169" rx="2"/>
+
+  <text x="72" y="780" font-size="94" font-weight="900" fill="#a8d894" letter-spacing="-2">NOSOTROS</text>
+  <text x="72" y="886" font-size="94" font-weight="900" fill="#a8d894" letter-spacing="-2">TAMPOCO.</text>
+
+  <!-- Small footer text -->
+  <text x="72" y="1020" font-size="20" fill="#6aaa78" opacity="0.8">Sentinel-2 pasa. Kylia procesa. Tú decides.</text>
+
+  <!-- Bottom branding -->
+  <text x="72" y="1295" font-size="20" fill="#a8d894" font-weight="500">kylia.app</text>
+
+  <!-- Pagination -->
+  <text x="1008" y="1295" font-size="14" fill="#a8d894" opacity="0.5" text-anchor="end">1 / 2</text>
+</svg>

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1350" font-family="-apple-system,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+  <!-- Background -->
+  <rect width="1080" height="1350" fill="#071c0c"/>
+
+  <!-- Top branding -->
+  <text x="48" y="68" font-size="28" font-weight="700" fill="white" opacity="0.9">Kylia®</text>
+
+  <!-- Label -->
+  <text x="72" y="260" font-size="28" font-weight="600" fill="#a8d894">El dato que cambia la decisión:</text>
+  <rect x="72" y="284" width="200" height="3" fill="#5eb169" rx="2"/>
+
+  <!-- Huge stat -->
+  <text x="540" y="620" font-size="260" font-weight="900" fill="white" text-anchor="middle" opacity="0.95">88</text>
+  <text x="930" y="520" font-size="120" font-weight="900" fill="#a8d894">%</text>
+
+  <!-- Stat explanation -->
+  <text x="540" y="720" font-size="26" fill="#6aaa78" text-anchor="middle">del campo español decide sin dato satelital.</text>
+
+  <!-- Separator -->
+  <rect x="72" y="790" width="936" height="1" fill="#1a4d24"/>
+
+  <!-- Call to action text -->
+  <text x="540" y="880" font-size="26" font-weight="700" fill="white" text-anchor="middle">Tú puedes ser del 12 %</text>
+  <text x="540" y="930" font-size="26" font-weight="700" fill="#a8d894" text-anchor="middle">que decide con información.</text>
+
+  <!-- Supporting text -->
+  <text x="540" y="1010" font-size="19" fill="#6aaa78" text-anchor="middle">La tecnología ya existe. El satélite ya vuela.</text>
+  <text x="540" y="1044" font-size="19" fill="#6aaa78" text-anchor="middle">Solo necesitas activar Kylia.</text>
+
+  <!-- CTA pill -->
+  <rect x="180" y="1140" width="720" height="78" rx="39" fill="#2b7a3a"/>
+  <text x="540" y="1191" font-size="24" font-weight="700" fill="white" text-anchor="middle">Empieza gratis → kylia.app</text>
+
+  <!-- Bottom branding -->
+  <text x="72" y="1295" font-size="20" fill="#a8d894" font-weight="500">kylia.app</text>
+
+  <!-- Pagination -->
+  <text x="1008" y="1295" font-size="14" fill="#a8d894" opacity="0.5" text-anchor="end">2 / 2</text>
+</svg>

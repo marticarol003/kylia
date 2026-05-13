@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" font-family="-apple-system,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="euBg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#e8f3ea"/>
+      <stop offset="100%" stop-color="#d3e8d7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fondo -->
+  <rect width="1080" height="1080" fill="#ffffff"/>
+
+  <!-- Eyebrow -->
+  <text x="80" y="90" font-size="20" font-weight="700" letter-spacing="3" fill="#2b7a3a">KYLIA · FUNDAMENTOS</text>
+
+  <!-- Titular -->
+  <text x="80" y="163" font-size="50" font-weight="800" fill="#0f3617">Construido sobre</text>
+  <text x="80" y="225" font-size="50" font-weight="800" fill="#0f3617">infraestructura pública.</text>
+  <text x="80" y="278" font-size="20" font-weight="400" fill="#445">Y por qué eso importa para el agricultor.</text>
+
+  <!-- Separador -->
+  <line x1="80" y1="308" x2="1000" y2="308" stroke="#e8f3ea" stroke-width="3"/>
+
+  <!-- Stack de infraestructura: 3 capas -->
+  <!-- Capa 1: Satélite -->
+  <rect x="80" y="335" width="920" height="130" rx="16" fill="url(#euBg)" stroke="#2b7a3a" stroke-width="2"/>
+  <rect x="80" y="335" width="180" height="130" rx="16" fill="#2b7a3a"/>
+  <text x="170" y="390" font-size="36" text-anchor="middle" fill="#ffffff">🛰️</text>
+  <text x="170" y="432" font-size="14" font-weight="700" fill="#a8d894" text-anchor="middle">SENTINEL-2</text>
+  <text x="170" y="452" font-size="12" fill="#a8d894" text-anchor="middle">ESA / COPERNICUS</text>
+  <text x="290" y="374" font-size="20" font-weight="700" fill="#0f3617">Imágenes multiespectrales cada 5 días</text>
+  <text x="290" y="404" font-size="17" fill="#445">2 satélites, 10 m de resolución, 13 bandas espectrales.</text>
+  <text x="290" y="430" font-size="17" fill="#445">Programa europeo Copernicus — datos abiertos y gratuitos</text>
+  <text x="290" y="456" font-size="17" fill="#2b7a3a">desde 2015. Sin riesgo de que un proveedor cambie el precio.</text>
+
+  <!-- Capa 2: SIGPAC -->
+  <rect x="80" y="485" width="920" height="130" rx="16" fill="#f6f7f8" stroke="#e0e0e0" stroke-width="1.5"/>
+  <rect x="80" y="485" width="180" height="130" rx="16" fill="#1f5a2b"/>
+  <text x="170" y="540" font-size="36" text-anchor="middle" fill="#ffffff">🗺️</text>
+  <text x="170" y="582" font-size="14" font-weight="700" fill="#a8d894" text-anchor="middle">SIGPAC</text>
+  <text x="170" y="602" font-size="12" fill="#a8d894" text-anchor="middle">MAPA · CCAA</text>
+  <text x="290" y="524" font-size="20" font-weight="700" fill="#0f3617">Registro oficial de parcelas agrícolas de España</text>
+  <text x="290" y="554" font-size="17" fill="#445">Geometrías exactas de cada recinto agrícola.</text>
+  <text x="290" y="580" font-size="17" fill="#445">Mantenido por el MAPA y las comunidades autónomas.</text>
+  <text x="290" y="606" font-size="17" fill="#445">El mismo registro que usa la PAC. Referencia oficial.</text>
+
+  <!-- Capa 3: Meteo -->
+  <rect x="80" y="635" width="920" height="130" rx="16" fill="#f6f7f8" stroke="#e0e0e0" stroke-width="1.5"/>
+  <rect x="80" y="635" width="180" height="130" rx="16" fill="#0f3617"/>
+  <text x="170" y="690" font-size="36" text-anchor="middle" fill="#ffffff">🌦️</text>
+  <text x="170" y="730" font-size="14" font-weight="700" fill="#a8d894" text-anchor="middle">DWD ICON</text>
+  <text x="170" y="750" font-size="12" fill="#a8d894" text-anchor="middle">OPEN-METEO · ERA5</text>
+  <text x="290" y="674" font-size="20" font-weight="700" fill="#0f3617">Modelo meteorológico europeo de alta resolución</text>
+  <text x="290" y="704" font-size="17" fill="#445">Datos de temperatura, precipitación, ETP y humedad del suelo</text>
+  <text x="290" y="730" font-size="17" fill="#445">por capas (0-7 cm, 7-28 cm, 28-100 cm).</text>
+  <text x="290" y="756" font-size="17" fill="#445">Open-Meteo: API abierta sobre datos del DWD alemán y ECMWF.</text>
+
+  <!-- Separador -->
+  <line x1="80" y1="782" x2="1000" y2="782" stroke="#e8f3ea" stroke-width="3"/>
+
+  <!-- Por qué importa -->
+  <rect x="80" y="800" width="920" height="140" rx="20" fill="#e8f3ea" stroke="#2b7a3a" stroke-width="2"/>
+  <text x="112" y="840" font-size="18" font-weight="700" letter-spacing="2" fill="#2b7a3a">POR QUÉ IMPORTA PARA TI</text>
+  <text x="112" y="874" font-size="20" font-weight="600" fill="#0f3617">· Ningún proveedor privado puede desconectar el satélite o subir el precio de los datos.</text>
+  <text x="112" y="904" font-size="20" font-weight="600" fill="#0f3617">· Puedes auditar la fuente: Copernicus, SIGPAC y DWD son públicos y verificables.</text>
+  <text x="112" y="934" font-size="20" font-weight="600" fill="#0f3617">· No pagas un margen sobre un dato que ya existe y es tuyo.</text>
+
+  <!-- Footer -->
+  <text x="80" y="1010" font-size="20" font-weight="600" fill="#0f3617">kylia.app · Datos públicos europeos, procesados para el campo español</text>
+  <text x="1000" y="1010" font-size="14" fill="#aab" text-anchor="end">ESA · MAPA · DWD · ECMWF</text>
+</svg>

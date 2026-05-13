@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1350" font-family="-apple-system,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+  <!-- Clean dark background -->
+  <rect width="1080" height="1350" fill="#071c0c"/>
+
+  <!-- Top branding -->
+  <text x="48" y="68" font-size="28" font-weight="700" fill="white" opacity="0.9">Kylia®</text>
+
+  <!-- Vertical separator line -->
+  <rect x="520" y="200" width="3" height="900" fill="#2b7a3a" rx="2"/>
+
+  <!-- Left column - faded/dark (old way) -->
+  <text x="72" y="320" font-size="28" font-weight="400" fill="#4a6b52" letter-spacing="2">Antes:</text>
+  <text x="72" y="450" font-size="56" font-weight="800" fill="#3a5a42" opacity="0.6">Incertidumbre.</text>
+  <text x="72" y="570" font-size="56" font-weight="800" fill="#3a5a42" opacity="0.5">Intuición.</text>
+  <text x="72" y="690" font-size="56" font-weight="800" fill="#3a5a42" opacity="0.4">A ojo.</text>
+
+  <!-- Right column - bright, vivid green (new way) -->
+  <text x="560" y="320" font-size="28" font-weight="600" fill="#5eb169" letter-spacing="2">Ahora:</text>
+  <text x="560" y="450" font-size="56" font-weight="900" fill="white">Certeza.</text>
+  <text x="560" y="570" font-size="56" font-weight="900" fill="#a8d894">Dato.</text>
+  <text x="560" y="690" font-size="56" font-weight="900" fill="#5eb169">Satélite.</text>
+
+  <!-- Separator -->
+  <rect x="72" y="1050" width="936" height="2" fill="#1a4d24"/>
+
+  <!-- Headline below -->
+  <text x="72" y="1140" font-size="80" font-weight="900" fill="white" letter-spacing="-2">MENOS</text>
+  <text x="72" y="1230" font-size="80" font-weight="900" fill="#a8d894" letter-spacing="-2">INCERTIDUMBRE.</text>
+
+  <!-- Bottom branding -->
+  <text x="72" y="1295" font-size="20" fill="#a8d894" font-weight="500">kylia.app</text>
+
+  <!-- Pagination -->
+  <text x="1008" y="1295" font-size="14" fill="#a8d894" opacity="0.5" text-anchor="end">1 / 2</text>
+</svg>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1350" font-family="-apple-system,Segoe UI,Inter,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#071c0c"/>
+      <stop offset="100%" style="stop-color:#040e06"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1080" height="1350" fill="url(#bgGrad)"/>
+
+  <!-- Subtle diagonal lines texture -->
+  <line x1="-100" y1="100" x2="400" y2="600" stroke="#0f3617" stroke-width="40" opacity="0.3"/>
+  <line x1="200" y1="0" x2="800" y2="700" stroke="#0f3617" stroke-width="30" opacity="0.2"/>
+  <line x1="600" y1="0" x2="1200" y2="700" stroke="#0f3617" stroke-width="25" opacity="0.2"/>
+  <line x1="0" y1="400" x2="600" y2="1000" stroke="#0f3617" stroke-width="20" opacity="0.15"/>
+  <line x1="500" y1="300" x2="1200" y2="1100" stroke="#0f3617" stroke-width="20" opacity="0.15"/>
+
+  <!-- Top branding -->
+  <text x="48" y="68" font-size="28" font-weight="700" fill="white" opacity="0.9">Kylia®</text>
+
+  <!-- Notification card -->
+  <rect x="100" y="160" width="880" height="200" rx="20" fill="white" opacity="0.95"/>
+  <!-- Notification header -->
+  <rect x="100" y="160" width="880" height="60" rx="20" fill="#1a4d24"/>
+  <rect x="100" y="200" width="880" height="20" fill="#1a4d24"/>
+  <text x="140" y="200" font-size="18" font-weight="700" fill="white">⚠  Kylia · Alerta</text>
+  <text x="140" y="262" font-size="26" font-weight="700" fill="#071c0c">Estrés hídrico detectado</text>
+  <text x="140" y="312" font-size="19" fill="#555" font-weight="400">Parcela 14-B  ·  NDMI 0,26  ·  Ahora</text>
+
+  <!-- Glow effect under card -->
+  <ellipse cx="540" cy="370" rx="340" ry="20" fill="#2b7a3a" opacity="0.15"/>
+
+  <!-- Headline -->
+  <text x="72" y="560" font-size="64" font-weight="900" fill="white" letter-spacing="-1">Alertas que llegan</text>
+  <text x="72" y="640" font-size="64" font-weight="900" fill="white" letter-spacing="-1">a tiempo.</text>
+  <text x="72" y="760" font-size="64" font-weight="900" fill="#a8d894" letter-spacing="-1">Decisiones que</text>
+  <text x="72" y="840" font-size="64" font-weight="900" fill="#a8d894" letter-spacing="-1">marcan la diferencia.</text>
+
+  <!-- Bottom branding -->
+  <text x="72" y="1295" font-size="20" fill="#a8d894" font-weight="500">kylia.app</text>
+
+  <!-- Pagination -->
+  <text x="1008" y="1295" font-size="14" fill="#a8d894" opacity="0.5" text-anchor="end">1 / 2</text>
+</svg>

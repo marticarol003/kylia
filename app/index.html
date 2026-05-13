@@ -518,6 +518,98 @@
       font-weight: 600;
       text-align: left;
     }
+    /* ── Gate de acceso ── */
+    .gate-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(245, 248, 242, 0.98);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .gate-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 32px 28px;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    }
+    .gate-logo {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+      color: var(--text);
+    }
+    .gate-card h2 {
+      margin: 0 0 8px;
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+    .gate-card > p {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .gate-field { margin-bottom: 14px; }
+    .gate-field label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .gate-field input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: var(--bg);
+      color: var(--text);
+      box-sizing: border-box;
+    }
+    .gate-field input:focus {
+      outline: 2px solid var(--low);
+      border-color: transparent;
+    }
+    #gate-btn {
+      width: 100%;
+      background: var(--text);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 1rem;
+      font-family: inherit;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    #gate-btn:hover { opacity: 0.85; }
+    #gate-btn:disabled { opacity: 0.5; cursor: default; }
+    .gate-status {
+      display: block;
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      min-height: 1.2em;
+    }
+    .gate-status.error { color: var(--high); }
+    .gate-legal {
+      margin: 14px 0 0;
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
     /* ── Mapa parcela ── */
     #mapa-parcela {
       height: 240px;
@@ -554,6 +646,73 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
+  <!-- Gate de identificación — se oculta si ya hay email en localStorage -->
+  <div id="gate" class="gate-overlay">
+    <div class="gate-card">
+      <div class="gate-logo">🌱 Kylia</div>
+      <h2>Introduce tu email para entrar</h2>
+      <p>Es un piloto privado. Solo te pedimos un email para avisarte de novedades y no perdernos.</p>
+      <div class="gate-field">
+        <label for="gate-nombre">Nombre (opcional)</label>
+        <input type="text" id="gate-nombre" placeholder="Ej: Elias" maxlength="40" autocomplete="given-name">
+      </div>
+      <div class="gate-field">
+        <label for="gate-email">Email *</label>
+        <input type="email" id="gate-email" placeholder="tunombre@ejemplo.com" autocomplete="email">
+      </div>
+      <button id="gate-btn" type="button">Entrar →</button>
+      <span id="gate-status" class="gate-status" aria-live="polite"></span>
+      <p class="gate-legal">Sin spam · datos en Europa · puedes pedir eliminación en cualquier momento.</p>
+    </div>
+  </div>
+  <script>
+    // Oculta el gate si ya hay email registrado (runs antes del DOMContentLoaded
+    // para evitar flash del overlay cuando el usuario ya se identificó)
+    (function () {
+      if (localStorage.getItem("kylia_user_email")) {
+        document.getElementById("gate").style.display = "none";
+      }
+
+      document.getElementById("gate-btn").addEventListener("click", async function () {
+        const emailEl  = document.getElementById("gate-email");
+        const nombreEl = document.getElementById("gate-nombre");
+        const statusEl = document.getElementById("gate-status");
+        const btn      = document.getElementById("gate-btn");
+
+        const email  = emailEl.value.trim();
+        const nombre = nombreEl.value.trim();
+
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          statusEl.textContent = "Introduce un email válido.";
+          statusEl.className   = "gate-status error";
+          return;
+        }
+
+        btn.disabled = true;
+        statusEl.textContent = "Guardando...";
+        statusEl.className   = "gate-status";
+
+        try {
+          await fetch("/api/waitlist", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ email, nombre, organizacion: "app-visitor" }),
+          });
+        } catch (_) { /* si falla la red, dejamos pasar igualmente */ }
+
+        localStorage.setItem("kylia_user_email", email);
+        document.getElementById("gate").style.display = "none";
+      });
+
+      // Enter en cualquier campo del gate
+      ["gate-nombre", "gate-email"].forEach(function (id) {
+        document.getElementById(id).addEventListener("keydown", function (e) {
+          if (e.key === "Enter") document.getElementById("gate-btn").click();
+        });
+      });
+    })();
+  </script>
+
   <main class="app">
 
     <!-- Header -->
