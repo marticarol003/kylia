@@ -1604,9 +1604,9 @@
 
     function clasificarNDMI(ndmi) {
       if (ndmi == null) return { clase: "", etiqueta: "--", motivo: "Sin datos satélite recientes." };
-      if (ndmi < 0.2)   return { clase: "estres",   etiqueta: "ESTRÉS HÍDRICO", motivo: "La planta está perdiendo agua. Riega cuanto antes." };
-      if (ndmi < 0.4)   return { clase: "moderada", etiqueta: "VIGILAR",         motivo: "La planta empieza a notar falta de agua." };
-      return                  { clase: "buena",    etiqueta: "HIDRATADA",      motivo: "Buen contenido de agua en la hoja." };
+      if (ndmi < 0.0)   return { clase: "estres",   etiqueta: "ESTRÉS HÍDRICO", motivo: "La planta muestra déficit hídrico claro. Revisa el riego." };
+      if (ndmi < 0.2)   return { clase: "moderada", etiqueta: "VIGILAR",         motivo: "Contenido de agua bajo para la época. Monitoriza el riego." };
+      return                  { clase: "buena",    etiqueta: "HIDRATADA",       motivo: "Buen contenido de agua en la hoja." };
     }
 
     function renderNDMI() {
