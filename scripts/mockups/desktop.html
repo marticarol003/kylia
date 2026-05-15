@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1600px; height: 1000px;
+    background: #f0f2f0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* macOS window */
+  .window {
+    width: 1480px; height: 900px;
+    background: #1e1e1e;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.5),
+      0 40px 100px rgba(0,0,0,0.5),
+      0 16px 40px rgba(0,0,0,0.3);
+    display: flex; flex-direction: column;
+  }
+
+  /* Title bar */
+  .titlebar {
+    height: 48px;
+    background: #2a2a2a;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center;
+    padding: 0 16px;
+    flex-shrink: 0;
+    gap: 16px;
+  }
+  .traffic-lights { display: flex; gap: 8px; align-items: center; }
+  .tl { width: 12px; height: 12px; border-radius: 50%; }
+  .tl.red    { background: #ff5f57; }
+  .tl.yellow { background: #febc2e; }
+  .tl.green  { background: #28c840; }
+
+  /* Tab bar -->  */
+  .tab-bar {
+    display: flex; align-items: center; gap: 2px;
+    flex: 1;
+    margin: 0 20px;
+  }
+  .tab-active {
+    background: #3a3a3a;
+    border-radius: 8px 8px 0 0;
+    padding: 8px 16px;
+    font-size: 12px; color: #e0e0e0;
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 500;
+    min-width: 200px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    border-left: 1px solid rgba(255,255,255,0.06);
+    border-right: 1px solid rgba(255,255,255,0.06);
+  }
+  .tab-favicon {
+    width: 14px; height: 14px;
+    background: #2b7a3a; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* Address bar -->  */
+  .addressbar {
+    background: #1a1a1a;
+    border-radius: 8px; padding: 5px 12px;
+    font-size: 12px; color: #9a9a9a;
+    width: 320px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .lock-icon { color: #5a5a5a; font-size: 10px; }
+
+  /* Main layout -->  */
+  .layout {
+    display: flex; flex: 1; overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 260px; flex-shrink: 0;
+    background: #252525;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-header {
+    padding: 18px 16px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .sidebar-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #666;
+    margin-bottom: 10px;
+  }
+  .search-bar {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px; padding: 7px 10px;
+    font-size: 12px; color: #999;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .sidebar-list { overflow-y: auto; flex: 1; padding: 8px 0; }
+  .parcel-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; cursor: pointer;
+    transition: background 0.1s;
+  }
+  .parcel-item.active { background: rgba(43,122,58,0.18); }
+  .parcel-item:hover:not(.active) { background: rgba(255,255,255,0.04); }
+  .parcel-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-green  { background: #2b7a3a; }
+  .dot-yellow { background: #d4a82a; }
+  .dot-red    { background: #c94343; }
+  .parcel-info { flex: 1; min-width: 0; }
+  .parcel-item-name { font-size: 12.5px; font-weight: 600; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .parcel-item-meta { font-size: 10px; color: #888; margin-top: 1px; }
+  .parcel-ndvi {
+    font-size: 13px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .ndvi-good  { color: #5ac87a; }
+  .ndvi-mid   { color: #d4a82a; }
+  .ndvi-bad   { color: #c94343; }
+  .status-tag {
+    font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .tag-good { background: rgba(43,122,58,0.25); color: #5ac87a; }
+  .tag-mid  { background: rgba(212,168,42,0.2); color: #d4a82a; }
+
+  /* Map area */
+  .map-area {
+    flex: 1;
+    background: #1a2820;
+    position: relative; overflow: hidden;
+  }
+
+  /* Right panel */
+  .right-panel {
+    width: 320px; flex-shrink: 0;
+    background: #1e1e1e;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    overflow-y: auto;
+    padding: 0;
+  }
+  .panel-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .panel-parcel-name {
+    font-size: 17px; font-weight: 800; color: #fff;
+    letter-spacing: -0.4px; margin-bottom: 3px;
+  }
+  .panel-parcel-meta { font-size: 11px; color: #888; }
+  .panel-section { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .panel-section-label {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #666;
+    margin-bottom: 10px;
+  }
+  .metric-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .metric-row:last-child { margin-bottom: 0; }
+  .metric-label { font-size: 12px; color: #999; }
+  .metric-value { font-size: 14px; font-weight: 700; color: #e0e0e0; }
+  .metric-value.good { color: #5ac87a; }
+  .metric-value.mid  { color: #d4a82a; }
+  .metric-badge {
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+  }
+  .badge-good { background: rgba(43,122,58,0.25); color: #5ac87a; }
+
+  /* NDVI gauge in panel */
+  .gauge-wrap { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+
+  /* Sparkline */
+  .sparkline-wrap { margin-top: 10px; }
+  .sparkline-label { font-size: 10px; color: #666; margin-bottom: 4px; }
+
+  /* Recommendation card */
+  .reco-card {
+    margin: 16px 20px;
+    background: rgba(43,122,58,0.12);
+    border: 1px solid rgba(43,122,58,0.25);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .reco-label { font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #5ac87a; margin-bottom: 6px; }
+  .reco-title { font-size: 14px; font-weight: 800; color: #fff; letter-spacing: -0.3px; margin-bottom: 4px; }
+  .reco-desc { font-size: 11px; color: #9cb59e; line-height: 1.45; }
+
+  /* Humidity cards in panel */
+  .hum-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .hum-card {
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px; padding: 8px 8px;
+    text-align: center;
+  }
+  .hum-label { font-size: 8px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #666; margin-bottom: 4px; }
+  .hum-value { font-size: 16px; font-weight: 800; color: #e0e0e0; }
+  .hum-sub { font-size: 9px; color: #666; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="window">
+
+  <!-- Title bar -->
+  <div class="titlebar">
+    <div class="traffic-lights">
+      <div class="tl red"></div>
+      <div class="tl yellow"></div>
+      <div class="tl green"></div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab-active">
+        <div class="tab-favicon">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+            <path d="M4 18 Q12 6 20 18 Z" fill="white"/>
+          </svg>
+        </div>
+        kylia.app/app
+      </div>
+    </div>
+    <div class="addressbar">
+      <span class="lock-icon">🔒</span>
+      <span>kylia.app/app</span>
+    </div>
+  </div>
+
+  <!-- Main layout -->
+  <div class="layout">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Mis parcelas</div>
+        <div class="search-bar">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="#888" stroke-width="2"/>
+            <path d="M20 20l-3-3" stroke="#888" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span>Buscar parcela…</span>
+        </div>
+      </div>
+      <div class="sidebar-list">
+        <div class="parcel-item active">
+          <div class="parcel-dot dot-green"></div>
+          <div class="parcel-info">
+            <div class="parcel-item-name">Olivar principal</div>
+            <div class="parcel-item-meta">Rec. 03 · 8.5 ha</div>
+          </div>
+          <span class="parcel-ndvi ndvi-good">0.72</span>
+          <span class="status-tag tag-good">bueno</span>
+        </div>
+        <div class="parcel-item">
+          <div class="parcel-dot dot-green"></div>
+          <div class="parcel-info">
+            <div class="parcel-item-name">Almendro Sur</div>
+            <div class="parcel-item-meta">Rec. 08 · 3.2 ha</div>
+          </div>
+          <span class="parcel-ndvi ndvi-good">0.48</span>
+          <span class="status-tag tag-good">bueno</span>
+        </div>
+        <div class="parcel-item">
+          <div class="parcel-dot dot-yellow"></div>
+          <div class="parcel-info">
+            <div class="parcel-item-name">Viña La Serra</div>
+            <div class="parcel-item-meta">Rec. 11 · 5.7 ha</div>
+          </div>
+          <span class="parcel-ndvi ndvi-mid">0.63</span>
+          <span class="status-tag tag-mid">vigilar</span>
+        </div>
+        <div class="parcel-item">
+          <div class="parcel-dot dot-green"></div>
+          <div class="parcel-info">
+            <div class="parcel-item-name">Cereal Norte</div>
+            <div class="parcel-item-meta">Rec. 02 · 12.1 ha</div>
+          </div>
+          <span class="parcel-ndvi ndvi-good">0.54</span>
+          <span class="status-tag tag-good">bueno</span>
+        </div>
+        <div class="parcel-item">
+          <div class="parcel-dot dot-green"></div>
+          <div class="parcel-info">
+            <div class="parcel-item-name">Almendro H-12</div>
+            <div class="parcel-item-meta">Rec. 05 · 2.8 ha</div>
+          </div>
+          <span class="parcel-ndvi ndvi-good">0.68</span>
+          <span class="status-tag tag-good">bueno</span>
+        </div>
+        <div class="parcel-item">
+          <div class="parcel-dot dot-yellow"></div>
+          <div class="parcel-info">
+            <div class="parcel-item-name">Olivar Sec</div>
+            <div class="parcel-item-meta">Rec. 09 · 4.3 ha</div>
+          </div>
+          <span class="parcel-ndvi ndvi-mid">0.41</span>
+          <span class="status-tag tag-mid">vigilar</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="map-area">
+      <svg width="100%" height="100%" viewBox="0 0 900 852" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <!-- Subtle grid pattern for map background -->
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/>
+          </pattern>
+          <filter id="parcel-shadow">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.4)"/>
+          </filter>
+        </defs>
+
+        <!-- Base map -->
+        <rect width="900" height="852" fill="#1a2820"/>
+        <rect width="900" height="852" fill="url(#grid)"/>
+
+        <!-- Road/path lines -->
+        <path d="M 0 320 Q 200 310 400 330 Q 600 350 900 340" stroke="rgba(255,255,255,0.06)" stroke-width="3" fill="none"/>
+        <path d="M 350 0 Q 360 200 355 400 Q 350 600 360 852" stroke="rgba(255,255,255,0.06)" stroke-width="2" fill="none"/>
+        <path d="M 0 560 Q 300 550 600 570 Q 750 580 900 565" stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/>
+
+        <!-- NDVI overlay parcels — irregular polygons for realism -->
+
+        <!-- Olivar principal (selected, bright green) -->
+        <polygon points="180,180 310,170 340,200 330,310 290,340 170,320 155,270 160,200"
+          fill="rgba(43,122,58,0.75)" stroke="#4ade80" stroke-width="2.5" filter="url(#parcel-shadow)"/>
+        <!-- Selected highlight ring -->
+        <polygon points="180,180 310,170 340,200 330,310 290,340 170,320 155,270 160,200"
+          fill="none" stroke="#7bd89a" stroke-width="1.5" stroke-dasharray="0"/>
+        <!-- Parcel label -->
+        <rect x="185" y="235" width="125" height="34" rx="6" fill="rgba(0,0,0,0.72)" filter="url(#parcel-shadow)"/>
+        <circle cx="198" cy="252" r="5" fill="#4ade80"/>
+        <text x="209" y="248" font-size="10" font-weight="700" font-family="sans-serif" fill="#fff">Olivar principal</text>
+        <text x="209" y="261" font-size="9" font-family="sans-serif" fill="#9ca3af">NDVI 0.72 · bueno</text>
+
+        <!-- Almendro Sur (medium green) -->
+        <polygon points="380,140 500,130 530,160 520,240 490,260 370,250 360,210 365,155"
+          fill="rgba(74,186,74,0.55)" stroke="rgba(74,186,74,0.4)" stroke-width="1.5"/>
+
+        <!-- Viña La Serra (yellow-green, vigilar) -->
+        <polygon points="560,200 680,190 710,230 700,340 660,360 545,350 530,300 535,220"
+          fill="rgba(212,168,42,0.5)" stroke="rgba(212,168,42,0.4)" stroke-width="1.5"/>
+
+        <!-- Cereal Norte (bright green, big field) -->
+        <polygon points="100,390 320,370 360,380 380,500 350,530 270,550 100,540 75,480 80,410"
+          fill="rgba(43,122,58,0.6)" stroke="rgba(43,122,58,0.35)" stroke-width="1.5"/>
+
+        <!-- Almendro H-12 -->
+        <polygon points="390,380 480,370 510,390 505,460 480,480 385,470 372,430 376,395"
+          fill="rgba(74,186,74,0.6)" stroke="rgba(74,186,74,0.4)" stroke-width="1.5"/>
+
+        <!-- Olivar Sec (yellow, vigilar) -->
+        <polygon points="530,370 650,360 680,390 670,480 640,500 525,490 510,445 515,385"
+          fill="rgba(212,168,42,0.45)" stroke="rgba(212,168,42,0.35)" stroke-width="1.5"/>
+
+        <!-- More background parcels (neutral/unknown) -->
+        <polygon points="100,130 170,120 185,160 175,240 160,255 95,245 82,200 85,145"
+          fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <polygon points="720,150 820,140 850,180 840,280 810,300 715,290 700,240 705,165"
+          fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+        <polygon points="730,380 830,370 860,400 850,490 820,510 725,500 710,455 715,395"
+          fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+        <polygon points="120,570 270,555 300,580 290,670 260,690 115,680 100,640 105,585"
+          fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+        <polygon points="340,580 470,565 500,595 490,680 460,700 335,690 320,645 325,600"
+          fill="rgba(43,122,58,0.35)" stroke="rgba(43,122,58,0.25)" stroke-width="1"/>
+        <polygon points="530,560 660,550 690,575 680,660 650,680 525,670 510,630 515,570"
+          fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+        <polygon points="680,130 750,120 770,150 765,230 745,250 675,245 660,200 665,145"
+          fill="rgba(74,186,74,0.35)" stroke="rgba(74,186,74,0.2)" stroke-width="1"/>
+
+        <!-- Scale bar -->
+        <rect x="30" y="810" width="80" height="3" rx="1.5" fill="rgba(255,255,255,0.5)"/>
+        <text x="30" y="826" font-size="10" font-family="sans-serif" fill="rgba(255,255,255,0.5)">200 m</text>
+
+        <!-- Map attribution -->
+        <text x="860" y="845" font-size="9" font-family="sans-serif" fill="rgba(255,255,255,0.25)" text-anchor="end">© Kylia · Sentinel-2</text>
+      </svg>
+
+      <!-- Zoom controls -->
+      <div style="position:absolute; right:20px; top:20px; display:flex; flex-direction:column; gap:2px;">
+        <div style="width:32px;height:32px;background:rgba(30,30,30,0.9);border:1px solid rgba(255,255,255,0.1);border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:300;cursor:pointer;">+</div>
+        <div style="width:32px;height:32px;background:rgba(30,30,30,0.9);border:1px solid rgba(255,255,255,0.1);border-bottom:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:300;">−</div>
+        <div style="width:32px;height:32px;background:rgba(30,30,30,0.9);border:1px solid rgba(255,255,255,0.1);border-radius:0 0 8px 8px;display:flex;align-items:center;justify-content:center;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 8H4l8-8z" fill="rgba(255,255,255,0.5)"/><path d="M12 21l-8-8h16l-8 8z" fill="rgba(255,255,255,0.5)"/></svg>
+        </div>
+      </div>
+
+      <!-- Layer switcher -->
+      <div style="position:absolute;left:20px;bottom:20px;background:rgba(20,20,20,0.9);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 10px;font-size:11px;color:#aaa;display:flex;gap:8px;align-items:center;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" stroke="#aaa" stroke-width="2" rx="1"/><rect x="14" y="3" width="7" height="7" stroke="#aaa" stroke-width="2" rx="1"/><rect x="3" y="14" width="7" height="7" stroke="#aaa" stroke-width="2" rx="1"/><rect x="14" y="14" width="7" height="7" stroke="#aaa" stroke-width="2" rx="1"/></svg>
+        NDVI · Sentinel-2 · 21 abr 2026
+      </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="right-panel">
+      <div class="panel-header">
+        <div class="panel-parcel-name">Olivar principal</div>
+        <div class="panel-parcel-meta">Rec. 03 · Polígon 7 · 8.5 ha · Olivar</div>
+      </div>
+
+      <!-- NDVI section -->
+      <div class="panel-section">
+        <div class="panel-section-label">Vigor del cultivo</div>
+        <div class="gauge-wrap">
+          <svg width="72" height="50" viewBox="0 0 72 50">
+            <path d="M 5 46 A 31 31 0 0 1 67 46" stroke="rgba(255,255,255,0.08)" stroke-width="6" fill="none" stroke-linecap="round"/>
+            <!-- 0.72 coverage -->
+            <path d="M 5 46 A 31 31 0 0 1 54.4 23.4" stroke="#2b7a3a" stroke-width="6" fill="none" stroke-linecap="round"/>
+            <circle cx="54.4" cy="23.4" r="4" fill="#4ade80"/>
+            <text x="36" y="41" text-anchor="middle" font-size="15" font-weight="800" font-family="sans-serif" fill="#e0e0e0">0.72</text>
+          </svg>
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#4ade80;letter-spacing:-0.3px;">Buen estado</div>
+            <div style="font-size:11px;color:#888;margin-top:2px;">Por encima del umbral sano</div>
+          </div>
+        </div>
+        <!-- Mini sparkline -->
+        <div class="sparkline-wrap">
+          <div class="sparkline-label">Evolución NDVI · últimas 8 semanas</div>
+          <svg width="100%" height="36" viewBox="0 0 270 36" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#2b7a3a" stop-opacity="0.25"/>
+                <stop offset="100%" stop-color="#2b7a3a" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M 0 26 L 38 23 L 76 19 L 114 21 L 152 16 L 190 18 L 228 14 L 270 15 L 270 36 L 0 36 Z" fill="url(#sg)"/>
+            <polyline points="0,26 38,23 76,19 114,21 152,16 190,18 228,14 270,15"
+              fill="none" stroke="#2b7a3a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="270" cy="15" r="3.5" fill="#1e1e1e" stroke="#4ade80" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Humidity -->
+      <div class="panel-section">
+        <div class="panel-section-label">Humedad</div>
+        <div class="hum-grid">
+          <div class="hum-card">
+            <div class="hum-label">NDMI</div>
+            <div class="hum-value" style="color:#fbbf24;">0.34</div>
+            <div class="hum-sub">Hoja hidrat.</div>
+          </div>
+          <div class="hum-card">
+            <div class="hum-label">Suelo</div>
+            <div class="hum-value" style="color:#4ade80;">28%</div>
+            <div class="hum-sub">0–27 cm ok</div>
+          </div>
+          <div class="hum-card">
+            <div class="hum-label">Lluvia 7d</div>
+            <div class="hum-value" style="color:#60a5fa;">12mm</div>
+            <div class="hum-sub">48h seco</div>
+          </div>
+        </div>
+        <div class="metric-row" style="margin-top:10px;">
+          <span class="metric-label">Tendencia suelo</span>
+          <span class="metric-value" style="color:#888;font-size:12px;">→ Estable esta semana</span>
+        </div>
+      </div>
+
+      <!-- Recommendation -->
+      <div class="reco-card">
+        <div class="reco-label">Recomendación</div>
+        <div class="reco-title">No regar hasta el lunes</div>
+        <div class="reco-desc">Suelo adecuado y lluvia prevista. Re-evalúa el lunes 27 cuando el satélite vuelva a pasar.</div>
+      </div>
+
+      <!-- Meta -->
+      <div class="panel-section">
+        <div class="metric-row">
+          <span class="metric-label">Última imagen</span>
+          <span class="metric-value">21 abr 2026</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Píxeles válidos</span>
+          <span class="metric-value">843</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Resolución</span>
+          <span class="metric-value">10 m · Sentinel-2</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /layout -->
+</div><!-- /window -->
+</body>
+</html>

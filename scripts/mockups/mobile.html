@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 620px; height: 940px;
+    background: radial-gradient(ellipse 120% 80% at 70% 20%, #1a3d25, #0b1f13 60%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Ambient glow behind phone */
+  .glow {
+    position: absolute;
+    width: 320px; height: 580px;
+    background: radial-gradient(ellipse, rgba(43,122,58,0.35), transparent 70%);
+    filter: blur(40px);
+    border-radius: 50%;
+  }
+
+  /* iPhone 15 Pro frame */
+  .phone {
+    position: relative; z-index: 1;
+    width: 320px; height: 676px;
+    background: linear-gradient(160deg, #3a3a3c 0%, #2c2c2e 40%, #242426 100%);
+    border-radius: 52px;
+    padding: 11px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.12),
+      inset 0 1px 0 rgba(255,255,255,0.18),
+      0 0 0 1px rgba(0,0,0,0.6),
+      0 32px 80px rgba(0,0,0,0.7),
+      0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  /* Side buttons */
+  .phone::before {
+    content: '';
+    position: absolute;
+    left: -3px; top: 130px;
+    width: 3px; height: 36px;
+    background: #3a3a3c;
+    border-radius: 2px 0 0 2px;
+    box-shadow: 0 50px 0 #3a3a3c, 0 100px 0 #3a3a3c;
+  }
+  .phone::after {
+    content: '';
+    position: absolute;
+    right: -3px; top: 170px;
+    width: 3px; height: 70px;
+    background: #3a3a3c;
+    border-radius: 0 2px 2px 0;
+  }
+
+  .screen {
+    width: 100%; height: 100%;
+    background: #ffffff;
+    border-radius: 42px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Dynamic Island */
+  .island {
+    position: absolute;
+    top: 13px; left: 50%; transform: translateX(-50%);
+    width: 118px; height: 34px;
+    background: #000;
+    border-radius: 20px;
+    z-index: 20;
+  }
+
+  /* Status bar */
+  .status-bar {
+    height: 56px;
+    padding: 18px 22px 0;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px; font-weight: 600; letter-spacing: -0.3px;
+    color: #000;
+  }
+  .status-right { display: flex; align-items: center; gap: 6px; }
+
+  /* App scrollable content */
+  .app-content {
+    padding: 6px 18px 16px;
+    height: calc(100% - 56px);
+    overflow: hidden;
+  }
+
+  /* Brand bar */
+  .brand-bar {
+    display: flex; align-items: center; gap: 7px;
+    margin-bottom: 12px;
+  }
+  .brand-icon {
+    width: 24px; height: 24px;
+    background: #0b1f13; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .brand-name { font-size: 14px; font-weight: 700; color: #0b1f13; letter-spacing: -0.3px; }
+
+  /* Parcel header */
+  .parcel-name {
+    font-size: 18px; font-weight: 800; color: #0b1f13;
+    letter-spacing: -0.5px; margin-bottom: 2px;
+    line-height: 1.15;
+  }
+  .parcel-meta {
+    font-size: 11px; font-weight: 600; color: #2b7a3a;
+    letter-spacing: 0.02em; margin-bottom: 14px;
+  }
+
+  /* NDVI card */
+  .ndvi-card {
+    background: #e8f5ea;
+    border-radius: 18px;
+    padding: 14px 16px 12px;
+    margin-bottom: 10px;
+  }
+  .card-eyebrow {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #1f5a2b;
+    margin-bottom: 10px;
+  }
+  .ndvi-row { display: flex; align-items: center; gap: 12px; }
+  .ndvi-gauge-wrap { flex-shrink: 0; }
+  .ndvi-text { flex: 1; }
+  .ndvi-status { font-size: 17px; font-weight: 800; color: #0f3617; letter-spacing: -0.4px; }
+  .ndvi-desc { font-size: 11px; color: #2b7a3a; margin-top: 2px; font-weight: 500; }
+  .ndvi-date { font-size: 10px; color: #64748b; margin-top: 8px; }
+  .sparkline { margin-top: 10px; }
+
+  /* Mini cards */
+  .mini-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .mini-card { border-radius: 14px; padding: 10px 12px; }
+  .mini-card.ndmi  { background: #fef3cd; }
+  .mini-card.suelo { background: #e8f5ea; }
+  .mini-card.rain  { background: #dbeafe; }
+  .mini-eyebrow { font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .mini-card.ndmi  .mini-eyebrow { color: #92610d; }
+  .mini-card.suelo .mini-eyebrow { color: #1f5a2b; }
+  .mini-card.rain  .mini-eyebrow { color: #1e40af; }
+  .mini-val { font-size: 21px; font-weight: 800; margin: 4px 0 2px; letter-spacing: -0.5px; }
+  .mini-card.ndmi  .mini-val { color: #78470a; }
+  .mini-card.suelo .mini-val { color: #0f3617; }
+  .mini-card.rain  .mini-val { color: #1e3a8a; }
+  .mini-sub { font-size: 9px; color: #64748b; font-weight: 500; }
+
+  /* Recommendation */
+  .reco-card {
+    background: #fff;
+    border: 1.5px solid #d3e8d7;
+    border-radius: 16px; padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .reco-eyebrow { font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #1f5a2b; margin-bottom: 5px; }
+  .reco-title { font-size: 15px; font-weight: 800; color: #0f3617; letter-spacing: -0.3px; margin-bottom: 4px; }
+  .reco-desc { font-size: 10.5px; color: #475569; line-height: 1.45; }
+
+  /* CTA */
+  .cta-btn {
+    width: 100%; height: 48px;
+    background: linear-gradient(135deg, #2b7a3a 0%, #1f5a2b 100%);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #fff;
+    letter-spacing: -0.2px;
+    box-shadow: 0 4px 12px rgba(27,70,35,0.35);
+  }
+
+  /* Home indicator */
+  .home-indicator {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    width: 134px; height: 5px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="phone">
+  <div class="screen">
+    <div class="island"></div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <span>9:41</span>
+      <div class="status-right">
+        <!-- Signal bars -->
+        <svg width="17" height="12" viewBox="0 0 17 12">
+          <rect x="0" y="7" width="3" height="5" rx="0.8" fill="#000"/>
+          <rect x="4.5" y="5" width="3" height="7" rx="0.8" fill="#000"/>
+          <rect x="9" y="3" width="3" height="9" rx="0.8" fill="#000"/>
+          <rect x="13.5" y="0" width="3" height="12" rx="0.8" fill="#000"/>
+        </svg>
+        <!-- WiFi -->
+        <svg width="16" height="12" viewBox="0 0 16 12">
+          <path d="M8 9.5 L8 9.5" stroke="#000" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M5 7 Q8 5 11 7" stroke="#000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M2 4 Q8 0.5 14 4" stroke="#000" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        </svg>
+        <!-- Battery -->
+        <svg width="26" height="12" viewBox="0 0 26 12">
+          <rect x="0.5" y="0.5" width="22" height="11" rx="2.5" stroke="#000" stroke-width="1" fill="none"/>
+          <rect x="22.5" y="3.5" width="3" height="5" rx="1" fill="#000" opacity="0.35"/>
+          <rect x="2" y="2" width="17" height="8" rx="1.5" fill="#34c759"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- App content -->
+    <div class="app-content">
+      <!-- Brand bar -->
+      <div class="brand-bar">
+        <div class="brand-icon">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <path d="M4 18 Q12 6 20 18 Z" fill="white"/>
+            <circle cx="12" cy="8.5" r="1.5" fill="white"/>
+          </svg>
+        </div>
+        <span class="brand-name">Kylia</span>
+      </div>
+
+      <div class="parcel-name">Olivar · Terres de l'Ebre</div>
+      <div class="parcel-meta">Polígon 7 · Parcela 24 · 2.3 ha</div>
+
+      <!-- NDVI card -->
+      <div class="ndvi-card">
+        <div class="card-eyebrow">Vigor del cultivo</div>
+        <div class="ndvi-row">
+          <!-- Arc gauge -->
+          <div class="ndvi-gauge-wrap">
+            <svg width="86" height="60" viewBox="0 0 86 60">
+              <!-- Shadow/glow on active arc -->
+              <defs>
+                <filter id="glow">
+                  <feGaussianBlur stdDeviation="2" result="blur"/>
+                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <!-- Background arc -->
+              <path d="M 8 54 A 35 35 0 0 1 78 54"
+                stroke="#c8e6cc" stroke-width="7" fill="none" stroke-linecap="round"/>
+              <!-- Active arc: NDVI 0.72 → 72% of 180° = 129.6° -->
+              <!-- center (43,54) radius 35 -->
+              <!-- start: (8, 54) angle 180° -->
+              <!-- end angle = 180 - 129.6 = 50.4° from east -->
+              <!-- x = 43 + 35*cos(50.4°) = 43 + 35*0.637 = 43+22.3 = 65.3 -->
+              <!-- y = 54 - 35*sin(50.4°) = 54 - 35*0.771 = 54-27.0 = 27.0 -->
+              <path d="M 8 54 A 35 35 0 0 1 65.3 27.0"
+                stroke="#2b7a3a" stroke-width="7" fill="none" stroke-linecap="round" filter="url(#glow)"/>
+              <!-- Dot at end of arc -->
+              <circle cx="65.3" cy="27.0" r="5" fill="#2b7a3a"/>
+              <!-- Center value -->
+              <text x="43" y="49" text-anchor="middle"
+                font-size="19" font-weight="800"
+                font-family="-apple-system, BlinkMacSystemFont, sans-serif"
+                fill="#0f3617" letter-spacing="-0.5">0.72</text>
+            </svg>
+          </div>
+          <div class="ndvi-text">
+            <div class="ndvi-status">Buen estado</div>
+            <div class="ndvi-desc">Por encima del umbral sano.</div>
+            <div class="ndvi-date">Últ. imagen: 21 abr 2026</div>
+          </div>
+        </div>
+        <!-- Sparkline -->
+        <div class="sparkline">
+          <svg width="100%" height="28" viewBox="0 0 260 28" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="spark-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#2b7a3a" stop-opacity="0.18"/>
+                <stop offset="100%" stop-color="#2b7a3a" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- Filled area -->
+            <path d="M 0 20 L 37 17 L 74 14 L 111 15 L 148 12 L 185 13 L 222 10 L 260 11 L 260 28 L 0 28 Z"
+              fill="url(#spark-fill)"/>
+            <!-- Line -->
+            <polyline
+              points="0,20 37,17 74,14 111,15 148,12 185,13 222,10 260,11"
+              fill="none" stroke="#2b7a3a" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+            <!-- Last point dot -->
+            <circle cx="260" cy="11" r="3.5" fill="#fff" stroke="#2b7a3a" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Mini cards row -->
+      <div class="mini-row">
+        <div class="mini-card ndmi">
+          <div class="mini-eyebrow">NDMI</div>
+          <div class="mini-val">0.34</div>
+          <div class="mini-sub">Hoja hidratada</div>
+        </div>
+        <div class="mini-card suelo">
+          <div class="mini-eyebrow">Suelo</div>
+          <div class="mini-val">28%</div>
+          <div class="mini-sub">0–27 cm · ok</div>
+        </div>
+        <div class="mini-card rain">
+          <div class="mini-eyebrow">Lluvia 7d</div>
+          <div class="mini-val">12mm</div>
+          <div class="mini-sub">48h sin lluvia</div>
+        </div>
+      </div>
+
+      <!-- Recommendation -->
+      <div class="reco-card">
+        <div class="reco-eyebrow">Recomendación</div>
+        <div class="reco-title">No regar hasta el lunes</div>
+        <div class="reco-desc">Suelo adecuado y lluvia prevista. Re-evalúa el lunes 27 cuando el satélite vuelva a pasar.</div>
+      </div>
+
+      <!-- CTA -->
+      <div class="cta-btn">Ver detalle →</div>
+    </div>
+
+    <div class="home-indicator"></div>
+  </div>
+</div>
+</body>
+</html>
