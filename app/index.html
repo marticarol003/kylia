@@ -1484,12 +1484,31 @@
         estres:   "Estrés detectado en la imagen del satélite. Si regaste a tiempo, el verdor irá recuperando en los próximos días.",
       };
 
-      estadoEl.textContent = etiquetas[entrada.estado];
-      estadoEl.className   = `ndvi-badge ${entrada.estado}`;
+      // Si hay riego registrado y datos ET₀, el badge refleja el estado estimado
+      // actual en vez del dato histórico del satélite.
+      let estadoMostrar = entrada.estado;
+      if (ultimoRiego && ultimoET0) {
+        const sum = ultimoET0
+          .filter(({ date }) => date >= ultimoRiego)
+          .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+        if (sum < 15)      estadoMostrar = "recuperacion";
+        else if (sum < 30) estadoMostrar = "moderada";
+        else               estadoMostrar = entrada.estado;
+      }
+
+      const etiquetasMostrar = { ...etiquetas, recuperacion: "EN RECUPERACIÓN" };
+      const textosMostrar    = ultimoRiego ? {
+        ...textosConRiego,
+        recuperacion: "Regado recientemente. El verdor irá mejorando en los próximos días.",
+      } : textos;
+      const clasesMostrar = { buena: "buena", moderada: "moderada", estres: "estres", recuperacion: "moderada" };
+      const nivelCard     = { buena: "bajo", moderada: "medio", estres: "alto", recuperacion: "bajo" };
+
+      estadoEl.textContent = etiquetasMostrar[estadoMostrar] || etiquetas[estadoMostrar];
+      estadoEl.className   = `ndvi-badge ${clasesMostrar[estadoMostrar] || estadoMostrar}`;
       cardEl.classList.remove("alto", "medio", "bajo");
-      cardEl.classList.add(entrada.estado === "buena" ? "bajo" : entrada.estado === "moderada" ? "medio" : "alto");
-      const textosMostrar = ultimoRiego ? textosConRiego : textos;
-      motivoEl.textContent = textosMostrar[entrada.estado];
+      cardEl.classList.add(nivelCard[estadoMostrar] || "bajo");
+      motivoEl.textContent = textosMostrar[estadoMostrar] || textos[estadoMostrar] || "";
 
       const fechaImg = entrada.imagenFecha || entrada.date;
       const origen   = cfg.parcela ? "parcela SIGPAC" : "entorno de la ubicación";
