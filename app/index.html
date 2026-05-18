@@ -1478,12 +1478,18 @@
         moderada: "Estrés leve detectado. Vigila tus cultivos.",
         estres:   "Estrés severo detectado desde satélite. Revisa urgentemente.",
       };
+      const textosConRiego = {
+        buena:    "El campo está en buen estado.",
+        moderada: "Estrés leve en la imagen del satélite. Has regado — monitoriza la evolución.",
+        estres:   "Estrés detectado en la imagen del satélite. Si regaste a tiempo, el verdor irá recuperando en los próximos días.",
+      };
 
       estadoEl.textContent = etiquetas[entrada.estado];
       estadoEl.className   = `ndvi-badge ${entrada.estado}`;
       cardEl.classList.remove("alto", "medio", "bajo");
       cardEl.classList.add(entrada.estado === "buena" ? "bajo" : entrada.estado === "moderada" ? "medio" : "alto");
-      motivoEl.textContent = textos[entrada.estado];
+      const textosMostrar = ultimoRiego ? textosConRiego : textos;
+      motivoEl.textContent = textosMostrar[entrada.estado];
 
       const fechaImg = entrada.imagenFecha || entrada.date;
       const origen   = cfg.parcela ? "parcela SIGPAC" : "entorno de la ubicación";
