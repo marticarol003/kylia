@@ -513,8 +513,30 @@
     .indicador-fila {
       display: flex; justify-content: space-between; align-items: center;
       padding: 10px 12px; background: var(--bg); border-radius: 10px;
-      border: 1px solid var(--border);
+      border: 1px solid var(--border); cursor: pointer;
+      transition: background 0.12s;
     }
+    .indicador-fila:active { background: var(--border); }
+    .ind-detalle-panel {
+      display: none; margin-top: -4px; padding: 10px 12px;
+      background: var(--card); border: 1px solid var(--border);
+      border-top: none; border-radius: 0 0 10px 10px;
+      font-size: 0.82rem; color: var(--muted); line-height: 1.5;
+    }
+    .ind-detalle-panel.visible { display: block; }
+    .btn-por-que {
+      display: inline-block; margin-top: 10px; padding: 0;
+      background: none; border: none; font-family: inherit;
+      font-size: 0.78rem; color: var(--muted); cursor: pointer;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    .hoy-detalle {
+      margin-top: 10px; padding: 10px 12px;
+      background: rgba(0,0,0,0.05); border-radius: 8px;
+      font-size: 0.82rem; color: var(--text); line-height: 1.5;
+      display: none;
+    }
+    .hoy-detalle.visible { display: block; }
     .ind-nombre { font-size: 0.9rem; color: var(--text); font-weight: 500; }
     .ind-derecha { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
     .ind-badge {
@@ -842,6 +864,7 @@
     <!-- Acción del día -->
     <section class="card card-hoy" id="card-hoy" aria-label="Acción del día">
       <div id="hoy-contenido"><p class="hoy-cargando">Cargando datos...</p></div>
+      <div class="hoy-detalle" id="det-hoy"></div>
     </section>
 
     <!-- Tu parcela -->
@@ -852,27 +875,30 @@
       </div>
 
       <div class="indicadores-grid">
-        <div class="indicador-fila">
+        <div class="indicador-fila" id="row-vigor" role="button" aria-expanded="false">
           <span class="ind-nombre">Vigor del cultivo</span>
           <div class="ind-derecha">
             <span class="ind-badge" id="ind-vigor">--</span>
             <span class="ind-sub" id="ind-vigor-sub"></span>
           </div>
         </div>
-        <div class="indicador-fila">
+        <div class="ind-detalle-panel" id="det-vigor"></div>
+        <div class="indicador-fila" id="row-agua" role="button" aria-expanded="false">
           <span class="ind-nombre">Agua en la planta</span>
           <div class="ind-derecha">
             <span class="ind-badge" id="ind-agua">--</span>
             <span class="ind-sub" id="ind-agua-sub"></span>
           </div>
         </div>
-        <div class="indicador-fila">
+        <div class="ind-detalle-panel" id="det-agua"></div>
+        <div class="indicador-fila" id="row-suelo" role="button" aria-expanded="false">
           <span class="ind-nombre">Humedad del suelo</span>
           <div class="ind-derecha">
             <span class="ind-badge" id="ind-suelo">--</span>
             <span class="ind-sub" id="ind-suelo-sub"></span>
           </div>
         </div>
+        <div class="ind-detalle-panel" id="det-suelo"></div>
       </div>
 
       <div class="riego-registro" id="riego-registro"></div>
@@ -1668,31 +1694,42 @@
         }
       }
 
+      const porQue = `<button class="btn-por-que" id="btn-por-que-hoy">¿Por qué?</button>`;
       if (alerta) {
         card.className = "card card-hoy urgente";
         el.innerHTML =
           `<div class="hoy-icono">💧</div>`
           + `<div class="hoy-accion">Regar hoy</div>`
           + `<p class="hoy-razon">Desde ${alerta.desde}, han evaporado <strong>${alerta.et0.toFixed(0)} mm</strong> de agua del suelo.</p>`
-          + `<button class="btn-regar-grande" id="btn-regar-hoy">He regado hoy</button>`;
+          + `<button class="btn-regar-grande" id="btn-regar-hoy">He regado hoy</button>`
+          + porQue;
       } else if (alertaModesta) {
         card.className = "card card-hoy atencion";
         el.innerHTML =
           `<div class="hoy-icono">⚠️</div>`
           + `<div class="hoy-accion">Revisar el riego</div>`
           + `<p class="hoy-razon">La planta puede empezar a notar la falta de agua (${alertaModesta.et0.toFixed(0)} mm evaporados). Revisa si toca regar.</p>`
-          + `<button class="btn-regar-grande btn-regar-sec" id="btn-regar-hoy">He regado hoy</button>`;
+          + `<button class="btn-regar-grande btn-regar-sec" id="btn-regar-hoy">He regado hoy</button>`
+          + porQue;
       } else {
         const diasRiego = ultimoRiego ? Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000)) : null;
         card.className = "card card-hoy bien";
         el.innerHTML =
           `<div class="hoy-icono">✓</div>`
           + `<div class="hoy-accion">Todo en orden</div>`
-          + `<p class="hoy-razon">${diasRiego !== null ? `Regado hace ${diasRiego} día${diasRiego !== 1 ? "s" : ""}. Sin alertas urgentes.` : "Sin alertas urgentes. Sigue con tu rutina habitual."}</p>`;
+          + `<p class="hoy-razon">${diasRiego !== null ? `Regado hace ${diasRiego} día${diasRiego !== 1 ? "s" : ""}. Sin alertas urgentes.` : "Sin alertas urgentes. Sigue con tu rutina habitual."}</p>`
+          + porQue;
       }
 
       const btn = document.getElementById("btn-regar-hoy");
       if (btn) btn.addEventListener("click", registrarRiego);
+      const btnPq = document.getElementById("btn-por-que-hoy");
+      if (btnPq) btnPq.addEventListener("click", () => {
+        const det = document.getElementById("det-hoy");
+        if (!det) return;
+        det.textContent = generarDetalleHoy();
+        det.classList.toggle("visible");
+      });
     }
 
     // ─── Indicadores de la tarjeta "Tu parcela" ───────────────────────────────
@@ -2094,6 +2131,60 @@
       renderRiegoRegistro();
     }
 
+    // ─── Textos explicativos (¿Por qué?) ─────────────────────────────────────
+    function generarDetalleVigor() {
+      if (!ultimoNDVI) return "Sin datos del satélite disponibles todavía.";
+      const { ndvi, fecha, estado } = ultimoNDVI;
+      const base = `El satélite captó el verdor del cultivo (índice NDVI = ${ndvi}) el ${fecha}. `;
+      if (estado === "recuperacion") {
+        const dias = ultimoRiego ? Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000)) : "?";
+        return base + `Has regado hace ${dias} días. El verdor tarda unos días en recuperarse — es completamente normal.`;
+      }
+      if (estado === "buena")    return base + "Un valor por encima de 0.6 indica que la planta está verde, activa y en plena forma.";
+      if (estado === "moderada") return base + "Entre 0.35 y 0.6: el cultivo está activo pero con margen de mejora. Vigila el riego y los nutrientes.";
+      return base + "Por debajo de 0.35: el verdor es bajo. Puede ser por falta de agua, nutrientes insuficientes o una enfermedad. Revisa las plantas visualmente.";
+    }
+
+    function generarDetalleAgua() {
+      if (!ultimoNDMI) return "Sin datos del satélite disponibles todavía.";
+      if (ultimoRiego && ultimoET0) {
+        const sum  = ultimoET0.filter(({ date }) => date >= ultimoRiego).reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+        const dias = Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000));
+        const estado = sum < 15 ? "La planta sigue bien hidratada." : sum < 30 ? "La planta empieza a notarlo — vigila." : "La planta necesita reponer agua urgentemente.";
+        return `Has regado hace ${dias} día${dias !== 1 ? "s" : ""}. Desde entonces, el calor ha evaporado ${sum.toFixed(1)} mm de agua del suelo. Para la mayoría de cultivos mediterráneos, la planta empieza a notarlo a partir de los 15 mm. ${estado}`;
+      }
+      const { ndmi, fecha } = ultimoNDMI;
+      const base = `El satélite midió el agua en las hojas (índice NDMI = ${ndmi}) el ${fecha}. `;
+      if (ndmi >= 0.2) return base + "Por encima de 0.2: la planta conserva bien el agua, no hay estrés.";
+      if (ndmi >= 0)   return base + "Entre 0 y 0.2: nivel de agua normal para cultivos mediterráneos en verano. Monitoriza.";
+      return base + "Por debajo de 0: la planta está perdiendo agua activamente. Conviene regar pronto.";
+    }
+
+    function generarDetalleSuelo() {
+      if (!ultimoSuelo) return "Datos de suelo no disponibles todavía.";
+      const val  = ultimoSuelo.hoy[0];
+      const pct  = val != null ? `${(val * 100).toFixed(0)}%` : "--";
+      const { clase } = clasificarHumedadSuelo(val);
+      const base = `Humedad del suelo: ${pct} de volumen de agua (m³/m³) a 0–9 cm de profundidad, según modelo meteorológico Open-Meteo (actualizado cada hora). `;
+      if (clase === "seco")     return base + "Por debajo del 15%: el suelo puede limitar la absorción de agua en las raíces.";
+      if (clase === "adecuado") return base + "Entre 15% y 35%: nivel correcto para la mayoría de cultivos.";
+      return base + "Por encima del 35%: suelo saturado. No hace falta regar; vigila el drenaje para evitar pudrición de raíz.";
+    }
+
+    function generarDetalleHoy() {
+      const alerta = calcularAlertaRiego();
+      if (alerta) {
+        return `Desde ${alerta.desde}, el calor ha evaporado ${alerta.et0.toFixed(1)} mm de agua. Para la mayoría de cultivos, superar los 28–30 mm sin reponer supone riesgo real de estrés hídrico — por eso aparece la alerta.`;
+      }
+      const ref = ultimoRiego || ultimoNDMI?.fecha;
+      if (ref && ultimoET0) {
+        const sum    = ultimoET0.filter(({ date }) => date >= ref).reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+        const origen = ultimoRiego ? "último riego registrado" : "imagen del satélite";
+        return `Desde el ${origen}, solo se han evaporado ${sum.toFixed(1)} mm de agua. La planta normalmente empieza a notar la falta de agua a partir de los 15–28 mm, así que de momento está bien.`;
+      }
+      return "Los datos de satélite y meteorología no indican ninguna alerta urgente en este momento.";
+    }
+
     // ─── Arranque ─────────────────────────────────────────────────────────────
     document.addEventListener("DOMContentLoaded", () => {
       actualizarHeader();
@@ -2119,6 +2210,23 @@
       document.getElementById("riego-registro").addEventListener("click", (e) => {
         if (e.target.id === "btn-registrar-riego") registrarRiego();
         else if (e.target.id === "btn-borrar-riego") borrarRiego();
+      });
+
+      // Filas de indicadores: clic abre/cierra panel de explicación
+      [
+        { id: "row-vigor", det: "det-vigor", gen: generarDetalleVigor },
+        { id: "row-agua",  det: "det-agua",  gen: generarDetalleAgua  },
+        { id: "row-suelo", det: "det-suelo", gen: generarDetalleSuelo },
+      ].forEach(({ id, det, gen }) => {
+        const row   = document.getElementById(id);
+        const panel = document.getElementById(det);
+        if (!row || !panel) return;
+        row.addEventListener("click", () => {
+          const abierto = panel.classList.contains("visible");
+          panel.textContent = gen();
+          panel.classList.toggle("visible", !abierto);
+          row.setAttribute("aria-expanded", String(!abierto));
+        });
       });
     });
   </script>
