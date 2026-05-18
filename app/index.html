@@ -458,6 +458,29 @@
       line-height: 1.55;
     }
     .et0-fila { display: block; }
+    .btn-riego {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 5px 14px;
+      background: var(--low-bg);
+      color: var(--low);
+      border: 1px solid var(--low);
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-riego-reset {
+      display: inline-block;
+      margin-top: 5px;
+      padding: 0;
+      background: none;
+      color: var(--muted);
+      border: none;
+      font-size: 0.75rem;
+      cursor: pointer;
+      text-decoration: underline;
+    }
 
     .recomendacion-texto {
       margin: 0;
@@ -1342,6 +1365,7 @@
     let ultimoSuelo = null;  // { hoy: [s1,s2,s3], hace7: [s1,s2,s3] }
     let ultimoNDMI  = null;  // { ndmi, stdev, fecha }
     let ultimoET0   = null;  // [{date: "2026-05-10", et0: 4.2}, ...]
+    let ultimoRiego = localStorage.getItem("kylia_ultimo_riego") || null; // "2026-05-18"
 
     // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
     // seleccionada, cae al lat/lon del pueblo/configuración.
@@ -1678,34 +1702,44 @@
       }
 
       if (!et0El) return;
-      if (ultimoET0 && fecha) {
-        const entradas = ultimoET0.filter(({ date }) => date >= fecha);
+      if (!ultimoET0) {
+        et0El.innerHTML = fecha
+          ? `<span class="et0-fila" style="color:var(--muted)">Calculando evapotranspiración…</span>`
+          : "";
+        return;
+      }
+
+      if (ultimoRiego) {
+        // Escenario: el usuario ha marcado que regó
+        const diasDesde = Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000));
+        const entradas  = ultimoET0.filter(({ date }) => date >= ultimoRiego);
+        const sum       = entradas.reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+        let estadoTexto, estadoColor;
+        if (sum < 15)      { estadoTexto = "Planta estimada HIDRATADA";        estadoColor = "var(--low)"; }
+        else if (sum < 30) { estadoTexto = "Empieza a necesitar agua";          estadoColor = "var(--medium)"; }
+        else               { estadoTexto = "Momento de volver a regar";         estadoColor = "var(--high)"; }
+        et0El.innerHTML =
+          `<span class="et0-fila" style="color:var(--muted)">Último riego registrado: hace ${diasDesde} día${diasDesde !== 1 ? "s" : ""}</span>`
+          + `<span class="et0-fila">ET₀ desde entonces: <strong>${sum.toFixed(1)} mm</strong></span>`
+          + `<span class="et0-fila" style="color:${estadoColor};font-weight:600">→ ${estadoTexto}</span>`
+          + `<button class="btn-riego-reset" id="btn-riego-reset">Borrar fecha de riego</button>`;
+      } else {
+        // Escenario: sin riego registrado → mostrar ET₀ desde la imagen del satélite
+        const entradas = fecha ? ultimoET0.filter(({ date }) => date >= fecha) : [];
         if (entradas.length) {
           const sum  = entradas.reduce((s, { et0 }) => s + (et0 ?? 0), 0);
           const dias = entradas.length;
-          let textoSinRiego, colorSinRiego;
-          if (sum < 12) {
-            textoSinRiego  = "La planta probablemente mantiene hidratación";
-            colorSinRiego  = "var(--low)";
-          } else if (sum < 28) {
-            textoSinRiego  = "Empieza a acusar la falta de agua";
-            colorSinRiego  = "var(--medium)";
-          } else {
-            textoSinRiego  = "Estrés probable si no ha regado";
-            colorSinRiego  = "var(--high)";
-          }
+          let textoEstado, colorEstado;
+          if (sum < 12)      { textoEstado = "probablemente hidratada";          colorEstado = "var(--low)"; }
+          else if (sum < 28) { textoEstado = "puede empezar a acusar el calor"; colorEstado = "var(--medium)"; }
+          else               { textoEstado = "estrés probable";                  colorEstado = "var(--high)"; }
           et0El.innerHTML =
-            `<span class="et0-fila" style="color:var(--muted)">Desde la imagen (hace ${dias} día${dias !== 1 ? "s" : ""}):</span>`
-            + `<span class="et0-fila">Evapotranspiración acumulada: <strong>${sum.toFixed(1)} mm</strong></span>`
-            + `<span class="et0-fila" style="color:${colorSinRiego}">→ Sin riego: ${textoSinRiego}</span>`
-            + `<span class="et0-fila" style="color:var(--low)">→ Si ha regado: planta estimada HIDRATADA</span>`;
+            `<span class="et0-fila" style="color:var(--muted)">Desde la imagen (hace ${dias} día${dias !== 1 ? "s" : ""}):`
+            + ` ET₀ acumulada <strong>${sum.toFixed(1)} mm</strong> → <span style="color:${colorEstado}">${textoEstado}</span></span>`
+            + `<button class="btn-riego" id="btn-riego">He regado hoy</button>`;
         } else {
-          et0El.innerHTML = "";
+          et0El.innerHTML = `<button class="btn-riego" id="btn-riego">He regado hoy</button>`;
         }
-      } else if (!ultimoET0 && fecha) {
-        et0El.innerHTML = `<span class="et0-fila" style="color:var(--muted)">Calculando evapotranspiración…</span>`;
-      } else {
-        et0El.innerHTML = "";
       }
     }
 
@@ -2065,6 +2099,19 @@
         cargarNDVI(true);
         cargarHumedadSuelo();
         cargarET0();
+      });
+
+      // Delegación: botones "He regado" y "Borrar" se renderizan dinámicamente
+      document.getElementById("ndmi-et0").addEventListener("click", (e) => {
+        if (e.target.id === "btn-riego") {
+          ultimoRiego = new Date().toISOString().slice(0, 10);
+          localStorage.setItem("kylia_ultimo_riego", ultimoRiego);
+          renderNDMI();
+        } else if (e.target.id === "btn-riego-reset") {
+          ultimoRiego = null;
+          localStorage.removeItem("kylia_ultimo_riego");
+          renderNDMI();
+        }
       });
     });
   </script>
