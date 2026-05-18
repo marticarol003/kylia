@@ -2203,8 +2203,7 @@
           lluvia:    data.daily.precipitation_sum[0],
           vientoMax: data.daily.wind_speed_10m_max[0],
         };
-        ultimoMeteo     = datosHoy;
-        ultimoPrevision = diasFuturos;
+        ultimoMeteo = datosHoy;
 
         const diasFuturos = data.daily.time.slice(1, 4).map((fecha, i) => ({
           nombreDia: formatearDiaSemana(fecha),
@@ -2219,6 +2218,7 @@
         document.getElementById("wind-value").textContent     = `${viento} km/h`;
         document.getElementById("rain-value").textContent     = `${datosHoy.lluvia} mm`;
 
+        ultimoPrevision = diasFuturos;
         renderizarAlertas(datosHoy, diasFuturos);
         renderRecomendaciones();
 
