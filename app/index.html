@@ -482,6 +482,61 @@
       text-decoration: underline;
     }
 
+    /* ── Acción del día ── */
+    .card-hoy { border-left: 4px solid var(--border); padding: 20px 16px; }
+    .card-hoy.urgente { border-left-color: var(--high); background: var(--high-bg); }
+    .card-hoy.atencion { border-left-color: var(--medium); background: var(--medium-bg); }
+    .card-hoy.bien { border-left-color: var(--low); background: var(--low-bg); }
+    .hoy-icono { font-size: 1.5rem; line-height: 1; margin-bottom: 6px; }
+    .hoy-accion { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .hoy-razon { margin: 0 0 14px; font-size: 0.9rem; color: var(--text); line-height: 1.45; }
+    .hoy-cargando { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    .btn-regar-grande {
+      display: inline-block; padding: 11px 22px;
+      background: var(--low); color: #fff; border: none;
+      border-radius: 10px; font-size: 0.95rem; font-weight: 700;
+      font-family: inherit; cursor: pointer; width: 100%;
+    }
+    .btn-regar-grande:hover { opacity: 0.88; }
+    .btn-regar-sec { background: var(--medium); }
+
+    /* ── Tu parcela ── */
+    .parcela-cabecera {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+    }
+    .parcela-titulo {
+      font-size: 0.78rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--muted);
+    }
+    .indicadores-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .indicador-fila {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 12px; background: var(--bg); border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .ind-nombre { font-size: 0.9rem; color: var(--text); font-weight: 500; }
+    .ind-derecha { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+    .ind-badge {
+      display: inline-block; padding: 3px 11px; border-radius: 14px;
+      font-size: 0.82rem; font-weight: 700; letter-spacing: 0.02em;
+    }
+    .ind-badge.buena    { background: var(--low-bg);    color: var(--low); }
+    .ind-badge.moderada { background: var(--medium-bg); color: var(--medium); }
+    .ind-badge.estres   { background: var(--high-bg);   color: var(--high); }
+    .ind-sub { font-size: 0.68rem; color: var(--muted); }
+    .riego-registro {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-top: 1px solid var(--border); margin-bottom: 12px;
+    }
+    .riego-etiqueta { font-size: 0.85rem; color: var(--muted); }
+    .parcela-historial { padding-top: 12px; border-top: 1px solid var(--border); }
+    .parcela-historial-titulo {
+      font-size: 0.78rem; color: var(--muted); margin-bottom: 6px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .parcela-historial-titulo span:last-child { font-weight: 600; color: var(--text); }
+
     .recomendacion-texto {
       margin: 0;
       font-size: 0.9rem;
@@ -748,7 +803,6 @@
 
   <main class="app">
 
-    <!-- Header -->
     <div class="header">
       <div class="header-text">
         <h1 id="greeting">Hola</h1>
@@ -757,7 +811,6 @@
       <button class="btn-config" id="btn-config" aria-label="Abrir configuración">&#9881;</button>
     </div>
 
-    <!-- Panel de configuración -->
     <div class="config-panel" id="config-panel" aria-label="Configuración">
       <h2>Configuración</h2>
       <div class="config-field">
@@ -776,7 +829,6 @@
         <div id="mapa-parcela"></div>
         <button class="btn-confirmar-parcela" id="btn-confirmar-parcela" type="button">&#10003; Confirmar parcela</button>
       </div>
-
       <div class="config-field">
         <label>Mis cultivos</label>
         <div class="cultivos-grid" id="cultivos-grid"></div>
@@ -787,58 +839,57 @@
       </div>
     </div>
 
-    <!-- Alertas dinámicas -->
-    <div id="alertas-container"></div>
+    <!-- Acción del día -->
+    <section class="card card-hoy" id="card-hoy" aria-label="Acción del día">
+      <div id="hoy-contenido"><p class="hoy-cargando">Cargando datos...</p></div>
+    </section>
 
-    <!-- Salud del cultivo (Sentinel-2 NDVI) -->
-    <section class="card card-alerta" id="card-ndvi" aria-label="Salud del cultivo">
-      <div class="weather-header">
-        <span class="alerta-titulo" style="margin-bottom:0;">Salud del cultivo · Sentinel-2</span>
-        <button class="btn-refresh" id="btn-refresh-ndvi" aria-label="Actualizar NDVI">&#8635; Actualizar</button>
+    <!-- Tu parcela -->
+    <section class="card" id="card-parcela" aria-label="Tu parcela">
+      <div class="parcela-cabecera">
+        <span class="parcela-titulo">Tu parcela</span>
+        <button class="btn-refresh" id="btn-refresh-parcela" aria-label="Actualizar">&#8635;</button>
       </div>
-      <span class="ndvi-badge" id="ndvi-estado">--</span>
-      <p class="risk-reason" id="ndvi-motivo"></p>
-      <p class="ndvi-sub" id="ndvi-fecha"></p>
-      <p class="ndvi-variabilidad" id="ndvi-variabilidad"></p>
-      <p class="ndvi-tendencia" id="ndvi-tendencia"></p>
-      <div class="ndvi-historial" id="ndvi-historial">
-        <div class="ndvi-historial-titulo">
-          <span>Evolución del NDVI</span>
+
+      <div class="indicadores-grid">
+        <div class="indicador-fila">
+          <span class="ind-nombre">Vigor del cultivo</span>
+          <div class="ind-derecha">
+            <span class="ind-badge" id="ind-vigor">--</span>
+            <span class="ind-sub" id="ind-vigor-sub"></span>
+          </div>
+        </div>
+        <div class="indicador-fila">
+          <span class="ind-nombre">Agua en la planta</span>
+          <div class="ind-derecha">
+            <span class="ind-badge" id="ind-agua">--</span>
+            <span class="ind-sub" id="ind-agua-sub"></span>
+          </div>
+        </div>
+        <div class="indicador-fila">
+          <span class="ind-nombre">Humedad del suelo</span>
+          <div class="ind-derecha">
+            <span class="ind-badge" id="ind-suelo">--</span>
+            <span class="ind-sub" id="ind-suelo-sub"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="riego-registro" id="riego-registro"></div>
+
+      <div class="parcela-historial">
+        <div class="parcela-historial-titulo">
+          <span>Evolución del vigor</span>
           <span id="ndvi-historial-rango"></span>
         </div>
         <div id="ndvi-historial-contenido"></div>
       </div>
     </section>
 
-    <!-- Humedad: suelo + planta (NDMI) + recomendación -->
-    <section class="card card-alerta" id="card-humedad" aria-label="Humedad del suelo y la planta">
-      <div class="weather-header">
-        <span class="alerta-titulo" style="margin-bottom:0;">Humedad</span>
-        <button class="btn-refresh" id="btn-refresh-humedad" aria-label="Actualizar humedad">&#8635; Actualizar</button>
-      </div>
+    <!-- Alertas plagas -->
+    <div id="alertas-container"></div>
 
-      <div class="humedad-bloque">
-        <div class="humedad-titulo">Humedad del suelo</div>
-        <div class="suelo-grid" id="suelo-grid"></div>
-        <p class="suelo-tendencia" id="suelo-tendencia"></p>
-      </div>
-
-      <div class="humedad-bloque">
-        <div class="humedad-titulo">Humedad en la planta (NDMI)</div>
-        <span class="ndvi-badge" id="ndmi-estado">--</span>
-        <p class="risk-reason" id="ndmi-motivo"></p>
-        <p class="ndvi-sub" id="ndmi-fecha"></p>
-        <p class="ndvi-variabilidad" id="ndmi-variabilidad"></p>
-        <div class="et0-bloque" id="ndmi-et0"></div>
-      </div>
-
-      <div class="humedad-bloque">
-        <div class="humedad-titulo">Recomendación</div>
-        <p class="recomendacion-texto" id="humedad-recomendacion">Cargando datos...</p>
-      </div>
-    </section>
-
-    <!-- Condiciones meteorológicas -->
+    <!-- Tiempo -->
     <section class="card" aria-label="Condiciones meteorológicas">
       <div class="weather-header">
         <span class="weather-label">Ahora mismo</span>
@@ -1361,11 +1412,12 @@
       return e && ("stdev" in e) && ("pixeles" in e) && ("imagenFecha" in e) && ("ndmi" in e);
     }
 
-    // Estado compartido para la tarjeta "Humedad"
+    // Estado compartido para las tarjetas
     let ultimoSuelo = null;  // { hoy: [s1,s2,s3], hace7: [s1,s2,s3] }
     let ultimoNDMI  = null;  // { ndmi, stdev, fecha }
     let ultimoET0   = null;  // [{date: "2026-05-10", et0: 4.2}, ...]
     let ultimoRiego = localStorage.getItem("kylia_ultimo_riego") || null; // "2026-05-18"
+    let ultimoNDVI  = null;  // { estado, ndvi, fecha } — para renderIndicadores
 
     // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
     // seleccionada, cae al lat/lon del pueblo/configuración.
@@ -1393,13 +1445,7 @@
     }
 
     async function cargarNDVI(forzar = false) {
-      const estadoEl       = document.getElementById("ndvi-estado");
-      const motivoEl       = document.getElementById("ndvi-motivo");
-      const fechaEl        = document.getElementById("ndvi-fecha");
-      const cardEl         = document.getElementById("card-ndvi");
-      const variabilidadEl = document.getElementById("ndvi-variabilidad");
-      const tendenciaEl    = document.getElementById("ndvi-tendencia");
-      const btnNdvi        = document.getElementById("btn-refresh-ndvi");
+      const btnRefreshParcela = document.getElementById("btn-refresh-parcela");
 
       const hoy     = new Date().toISOString().slice(0, 10);
       let   history = loadNdviHistory();
@@ -1415,8 +1461,7 @@
       if (forzar) entrada = null;
 
       if (!entrada) {
-        if (btnNdvi) btnNdvi.disabled = true;
-        motivoEl.textContent = "Consultando satélite...";
+        if (btnRefreshParcela) btnRefreshParcela.disabled = true;
         try {
           const geometryParam = cfg.parcela
             ? `&geometry=${encodeURIComponent(JSON.stringify(cfg.parcela))}`
@@ -1431,24 +1476,11 @@
           try { data = await res.json(); } catch (_) { data = null; }
 
           if (!res.ok) {
-            const detalle = data?.detail || data?.error || `HTTP ${res.status}`;
-            motivoEl.textContent = `Error del servidor NDVI: ${detalle}`;
-            estadoEl.textContent = "--";
-            estadoEl.className   = "ndvi-badge";
-            fechaEl.textContent  = "";
-            variabilidadEl.textContent = "";
-            tendenciaEl.textContent    = "";
             renderNdviChart(history);
             return;
           }
 
           if (data.ndvi === null || data.ndvi === undefined) {
-            estadoEl.textContent = "--";
-            estadoEl.className   = "ndvi-badge";
-            motivoEl.textContent = "Sin imágenes recientes disponibles (nubes o sin datos en los últimos 30 días).";
-            fechaEl.textContent  = "";
-            variabilidadEl.textContent = "";
-            tendenciaEl.textContent    = "";
             renderNdviChart(history);
             return;
           }
@@ -1465,70 +1497,36 @@
           };
           history = saveNdviEntry(entrada);
         } catch (err) {
-          motivoEl.textContent = `No se ha podido contactar con /api/sentinel (${err.message}).`;
+          console.error("Error contactando /api/sentinel:", err.message);
           return;
         } finally {
-          if (btnNdvi) btnNdvi.disabled = false;
+          if (btnRefreshParcela) btnRefreshParcela.disabled = false;
         }
       }
 
-      const etiquetas = { buena: "BUENA", moderada: "VIGILAR", estres: "ESTRÉS" };
-      const textos    = {
-        buena:    "El campo está en buen estado.",
-        moderada: "Estrés leve detectado. Vigila tus cultivos.",
-        estres:   "Estrés severo detectado desde satélite. Revisa urgentemente.",
-      };
-      const textosConRiego = {
-        buena:    "El campo está en buen estado.",
-        moderada: "Estrés leve en la imagen del satélite. Has regado — monitoriza la evolución.",
-        estres:   "Estrés detectado en la imagen del satélite. Si regaste a tiempo, el verdor irá recuperando en los próximos días.",
-      };
-
-      // Si hay riego registrado y datos ET₀, el badge refleja el estado estimado
-      // actual en vez del dato histórico del satélite.
+      // Determinar estado con riego registrado (igual que antes)
       let estadoMostrar = entrada.estado;
       if (ultimoRiego && ultimoET0) {
-        const sum = ultimoET0
-          .filter(({ date }) => date >= ultimoRiego)
-          .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+        const sum = ultimoET0.filter(({ date }) => date >= ultimoRiego).reduce((s, { et0 }) => s + (et0 ?? 0), 0);
         if (sum < 15)      estadoMostrar = "recuperacion";
         else if (sum < 30) estadoMostrar = "moderada";
         else               estadoMostrar = entrada.estado;
       }
 
-      const etiquetasMostrar = { ...etiquetas, recuperacion: "EN RECUPERACIÓN" };
-      const textosMostrar    = ultimoRiego ? {
-        ...textosConRiego,
-        recuperacion: "Regado recientemente. El verdor irá mejorando en los próximos días.",
-      } : textos;
-      const clasesMostrar = { buena: "buena", moderada: "moderada", estres: "estres", recuperacion: "moderada" };
-      const nivelCard     = { buena: "bajo", moderada: "medio", estres: "alto", recuperacion: "bajo" };
+      // Guardar estado para renderIndicadores
+      ultimoNDVI = { estado: estadoMostrar, ndvi: entrada.ndvi, fecha: entrada.imagenFecha || entrada.date };
 
-      estadoEl.textContent = etiquetasMostrar[estadoMostrar] || etiquetas[estadoMostrar];
-      estadoEl.className   = `ndvi-badge ${clasesMostrar[estadoMostrar] || estadoMostrar}`;
-      cardEl.classList.remove("alto", "medio", "bajo");
-      cardEl.classList.add(nivelCard[estadoMostrar] || "bajo");
-      motivoEl.textContent = textosMostrar[estadoMostrar] || textos[estadoMostrar] || "";
-
-      const fechaImg = entrada.imagenFecha || entrada.date;
-      const origen   = cfg.parcela ? "parcela SIGPAC" : "entorno de la ubicación";
-      const pxInfo   = entrada.pixeles ? ` · ${entrada.pixeles} px` : "";
-      fechaEl.textContent = `NDVI ${entrada.ndvi} (${origen}${pxInfo}) · imagen del ${fechaImg}`;
-
-      if (entrada.stdev != null && entrada.stdev >= 0) {
-        let nota = "";
-        if (entrada.stdev >= 0.15)      nota = " — el campo es muy heterogéneo, hay zonas con peor vigor.";
-        else if (entrada.stdev >= 0.08) nota = " — hay variabilidad apreciable dentro de la parcela.";
-        else                            nota = " — el vigor es homogéneo en la parcela.";
-        variabilidadEl.textContent = `Variabilidad dentro del campo: ±${entrada.stdev}${nota}`;
-      } else {
-        variabilidadEl.textContent = "";
+      // Actualizar borde de card-parcela
+      const cardParcelaEl = document.getElementById("card-parcela");
+      if (cardParcelaEl) {
+        cardParcelaEl.classList.remove("alto", "medio", "bajo");
+        const nivelCard = { buena: "bajo", moderada: "medio", estres: "alto", recuperacion: "bajo" };
+        cardParcelaEl.classList.add(nivelCard[estadoMostrar] || "bajo");
       }
 
       const tendencia = calcularTendencia(history);
       const { texto, clase } = textoTendencia(tendencia);
-      tendenciaEl.textContent = texto || "";
-      tendenciaEl.className   = `ndvi-tendencia${clase ? " " + clase : ""}`;
+      // (tendencia kept for future detail view — not shown in simplified UI)
 
       renderNdviChart(history);
 
@@ -1536,18 +1534,15 @@
       ultimoNDMI = entrada.ndmi != null
         ? { ndmi: entrada.ndmi, stdev: entrada.ndmiStdev, fecha: entrada.imagenFecha || entrada.date }
         : null;
-      renderNDMI();
-      renderRecomendacion();
-      renderAlertaRiego();
+      renderIndicadores();
+      renderHoy();
+      renderRiegoRegistro();
     }
 
     // ─── Humedad del suelo (Open-Meteo DWD ICON) ──────────────────────────────
     // Capas nativas del modelo DWD ICON: 0-1, 1-3, 3-9, 9-27, 27-81 cm.
     // Agrupamos en tres franjas agronómicas: superficie, raíz media, raíz profunda.
     async function cargarHumedadSuelo() {
-      const gridEl  = document.getElementById("suelo-grid");
-      const trendEl = document.getElementById("suelo-tendencia");
-
       try {
         // Usamos el centroide de la parcela (si hay) en vez del pueblo, para que
         // la humedad del suelo cambie al elegir otra parcela — aunque DWD ICON
@@ -1597,12 +1592,11 @@
           hace7: [media(idxHace7), d[idxHace7] ?? null, e[idxHace7] ?? null],
         };
         renderSuelo();
-        renderRecomendacion();
+        renderIndicadores();
+        renderHoy();
       } catch (err) {
-        gridEl.innerHTML = "";
-        trendEl.textContent = `No se ha podido cargar la humedad del suelo (${err.message}).`;
         ultimoSuelo = null;
-        renderRecomendacion();
+        renderHoy();
       }
     }
 
@@ -1626,8 +1620,9 @@
       } catch (_) {
         ultimoET0 = null;
       }
-      renderNDMI();
-      renderAlertaRiego();
+      renderIndicadores();
+      renderHoy();
+      renderRiegoRegistro();
     }
 
     // ─── Renderizado: suelo, NDMI y recomendación ─────────────────────────────
@@ -1638,55 +1633,7 @@
       return                { clase: "adecuado", etiqueta: "ADECUADO" };
     }
 
-    function renderSuelo() {
-      const gridEl  = document.getElementById("suelo-grid");
-      const trendEl = document.getElementById("suelo-tendencia");
-      if (!ultimoSuelo) {
-        gridEl.innerHTML = "";
-        trendEl.textContent = "";
-        return;
-      }
-
-      const capas = [
-        { label: "0-9 cm",    i: 0 },  // superficie (media ponderada de 0-1, 1-3, 3-9)
-        { label: "9-27 cm",   i: 1 },  // raíces hortícolas
-        { label: "27-81 cm",  i: 2 },  // raíces profundas
-      ];
-
-      gridEl.innerHTML = "";
-      capas.forEach(({ label, i }) => {
-        const v = ultimoSuelo.hoy[i];
-        const { clase, etiqueta } = clasificarHumedadSuelo(v);
-        const pct = v != null ? `${Math.round(v * 100)}%` : "--";
-        const card = document.createElement("div");
-        card.className = `suelo-card ${clase}`;
-        card.innerHTML =
-          `<p class="suelo-profundidad">${label}</p>` +
-          `<p class="suelo-valor">${pct}</p>` +
-          `<p class="suelo-estado">${etiqueta}</p>`;
-        gridEl.appendChild(card);
-      });
-
-      // Tendencia 7 días en la capa 9-27 cm (zona de raíces de la mayoría de hortalizas)
-      const ahora = ultimoSuelo.hoy[1];
-      const hace7 = ultimoSuelo.hace7[1];
-      if (ahora != null && hace7 != null) {
-        const diff = ahora - hace7;
-        const diffPct = (diff * 100).toFixed(1);
-        if (diff <= -0.04) {
-          trendEl.textContent = `↓ El suelo se ha secado ${Math.abs(diffPct)}% en la última semana.`;
-          trendEl.className   = "suelo-tendencia bajando";
-        } else if (diff >= 0.04) {
-          trendEl.textContent = `↑ El suelo ha ganado ${diffPct}% de humedad en la última semana.`;
-          trendEl.className   = "suelo-tendencia subiendo";
-        } else {
-          trendEl.textContent = `→ La humedad del suelo está estable respecto a hace 7 días.`;
-          trendEl.className   = "suelo-tendencia";
-        }
-      } else {
-        trendEl.textContent = "";
-      }
-    }
+    function renderSuelo() { /* simplified — data shown via renderIndicadores */ }
 
     function clasificarNDMI(ndmi) {
       if (ndmi == null) return { clase: "", etiqueta: "--", motivo: "Sin datos satélite recientes." };
@@ -1696,146 +1643,132 @@
     }
 
     function renderNDMI() {
-      const estadoEl = document.getElementById("ndmi-estado");
-      const motivoEl = document.getElementById("ndmi-motivo");
-      const fechaEl  = document.getElementById("ndmi-fecha");
-      const varEl    = document.getElementById("ndmi-variabilidad");
-      const et0El    = document.getElementById("ndmi-et0");
+      renderIndicadores();
+      renderHoy();
+      renderRiegoRegistro();
+    }
 
-      if (!ultimoNDMI) {
-        estadoEl.textContent = "--";
-        estadoEl.className   = "ndvi-badge";
-        motivoEl.textContent = "Sin datos de satélite para NDMI.";
-        fechaEl.textContent  = "";
-        varEl.textContent    = "";
-        if (et0El) et0El.innerHTML = "";
-        return;
+    function renderRecomendacion() { /* replaced by renderHoy */ }
+
+    // ─── Card "Acción del día" ─────────────────────────────────────────────────
+    function renderHoy() {
+      const el   = document.getElementById("hoy-contenido");
+      const card = document.getElementById("card-hoy");
+      if (!el || !card) return;
+
+      const alerta = calcularAlertaRiego();
+
+      // Alerta moderada: 15-28mm evaporados desde imagen o desde último riego
+      let alertaModesta = null;
+      if (!alerta && ultimoET0) {
+        const ref = ultimoRiego || ultimoNDMI?.fecha;
+        if (ref) {
+          const sum = ultimoET0.filter(({ date }) => date >= ref).reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+          if (sum >= 15) alertaModesta = { et0: sum };
+        }
       }
 
-      const { ndmi, stdev, fecha } = ultimoNDMI;
-
-      // Si el usuario ha registrado riego y ya hay datos ET₀, el badge refleja
-      // el estado estimado actual en vez del dato histórico del satélite.
-      if (ultimoRiego && ultimoET0) {
-        const sum = ultimoET0
-          .filter(({ date }) => date >= ultimoRiego)
-          .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
-        let clase, etiqueta, motivo;
-        if (sum < 15)      { clase = "buena";    etiqueta = "HIDRATADA";    motivo = "Estimado por ET₀ desde el último riego registrado."; }
-        else if (sum < 30) { clase = "moderada"; etiqueta = "VIGILAR";      motivo = "Han pasado varios días desde el riego. Monitoriza."; }
-        else               { clase = "estres";   etiqueta = "REGAR PRONTO"; motivo = "El cultivo ha perdido mucha agua desde el último riego."; }
-        estadoEl.textContent = etiqueta;
-        estadoEl.className   = `ndvi-badge ${clase}`;
-        motivoEl.textContent = motivo;
-        fechaEl.textContent  = `Satélite: NDMI ${ndmi} · imagen del ${fecha}`;
+      if (alerta) {
+        card.className = "card card-hoy urgente";
+        el.innerHTML =
+          `<div class="hoy-icono">💧</div>`
+          + `<div class="hoy-accion">Regar hoy</div>`
+          + `<p class="hoy-razon">Desde ${alerta.desde}, han evaporado <strong>${alerta.et0.toFixed(0)} mm</strong> de agua del suelo.</p>`
+          + `<button class="btn-regar-grande" id="btn-regar-hoy">He regado hoy</button>`;
+      } else if (alertaModesta) {
+        card.className = "card card-hoy atencion";
+        el.innerHTML =
+          `<div class="hoy-icono">⚠️</div>`
+          + `<div class="hoy-accion">Revisar el riego</div>`
+          + `<p class="hoy-razon">La planta puede empezar a notar la falta de agua (${alertaModesta.et0.toFixed(0)} mm evaporados). Revisa si toca regar.</p>`
+          + `<button class="btn-regar-grande btn-regar-sec" id="btn-regar-hoy">He regado hoy</button>`;
       } else {
-        const { clase, etiqueta, motivo } = clasificarNDMI(ndmi);
-        estadoEl.textContent = etiqueta;
-        estadoEl.className   = `ndvi-badge ${clase}`;
-        motivoEl.textContent = motivo;
-        fechaEl.textContent  = `NDMI ${ndmi} · imagen del ${fecha}`;
-      }
-      if (stdev != null) {
-        let nota = "";
-        if (stdev >= 0.12)      nota = " — hay zonas de la parcela más secas que otras.";
-        else if (stdev >= 0.06) nota = " — algo de variación entre zonas.";
-        else                    nota = " — hidratación homogénea.";
-        varEl.textContent = `Variabilidad: ±${stdev}${nota}`;
-      } else {
-        varEl.textContent = "";
+        const diasRiego = ultimoRiego ? Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000)) : null;
+        card.className = "card card-hoy bien";
+        el.innerHTML =
+          `<div class="hoy-icono">✓</div>`
+          + `<div class="hoy-accion">Todo en orden</div>`
+          + `<p class="hoy-razon">${diasRiego !== null ? `Regado hace ${diasRiego} día${diasRiego !== 1 ? "s" : ""}. Sin alertas urgentes.` : "Sin alertas urgentes. Sigue con tu rutina habitual."}</p>`;
       }
 
-      if (!et0El) return;
-      if (!ultimoET0) {
-        et0El.innerHTML = fecha
-          ? `<span class="et0-fila" style="color:var(--muted)">Calculando evapotranspiración…</span>`
-          : "";
-        return;
-      }
+      const btn = document.getElementById("btn-regar-hoy");
+      if (btn) btn.addEventListener("click", registrarRiego);
+    }
 
-      if (ultimoRiego) {
-        // Escenario: el usuario ha marcado que regó
-        const diasDesde = Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000));
-        const entradas  = ultimoET0.filter(({ date }) => date >= ultimoRiego);
-        const sum       = entradas.reduce((s, { et0 }) => s + (et0 ?? 0), 0);
-        let estadoTexto, estadoColor;
-        if (sum < 15)      { estadoTexto = "Planta estimada HIDRATADA";        estadoColor = "var(--low)"; }
-        else if (sum < 30) { estadoTexto = "Empieza a necesitar agua";          estadoColor = "var(--medium)"; }
-        else               { estadoTexto = "Momento de volver a regar";         estadoColor = "var(--high)"; }
-        et0El.innerHTML =
-          `<span class="et0-fila" style="color:var(--muted)">Último riego registrado: hace ${diasDesde} día${diasDesde !== 1 ? "s" : ""}</span>`
-          + `<span class="et0-fila">ET₀ desde entonces: <strong>${sum.toFixed(1)} mm</strong></span>`
-          + `<span class="et0-fila" style="color:${estadoColor};font-weight:600">→ ${estadoTexto}</span>`
-          + `<button class="btn-riego-reset" id="btn-riego-reset">Borrar fecha de riego</button>`;
-      } else {
-        // Escenario: sin riego registrado → mostrar ET₀ desde la imagen del satélite
-        const entradas = fecha ? ultimoET0.filter(({ date }) => date >= fecha) : [];
-        if (entradas.length) {
-          const sum  = entradas.reduce((s, { et0 }) => s + (et0 ?? 0), 0);
-          const dias = entradas.length;
-          let textoEstado, colorEstado;
-          if (sum < 12)      { textoEstado = "probablemente hidratada";          colorEstado = "var(--low)"; }
-          else if (sum < 28) { textoEstado = "puede empezar a acusar el calor"; colorEstado = "var(--medium)"; }
-          else               { textoEstado = "estrés probable";                  colorEstado = "var(--high)"; }
-          et0El.innerHTML =
-            `<span class="et0-fila" style="color:var(--muted)">Desde la imagen (hace ${dias} día${dias !== 1 ? "s" : ""}):`
-            + ` ET₀ acumulada <strong>${sum.toFixed(1)} mm</strong> → <span style="color:${colorEstado}">${textoEstado}</span></span>`
-            + `<button class="btn-riego" id="btn-riego">He regado hoy</button>`;
+    // ─── Indicadores de la tarjeta "Tu parcela" ───────────────────────────────
+    function renderIndicadores() {
+      // Vigor (NDVI)
+      const vigorEl  = document.getElementById("ind-vigor");
+      const vigorSub = document.getElementById("ind-vigor-sub");
+      if (vigorEl) {
+        if (!ultimoNDVI) {
+          vigorEl.textContent = "--"; vigorEl.className = "ind-badge";
+          if (vigorSub) vigorSub.textContent = "";
         } else {
-          et0El.innerHTML = `<button class="btn-riego" id="btn-riego">He regado hoy</button>`;
+          const map = { buena: ["Muy bueno","buena"], moderada: ["Normal","moderada"], estres: ["Bajo","estres"], recuperacion: ["Recuperando","moderada"] };
+          const [txt, cls] = map[ultimoNDVI.estado] || [ultimoNDVI.estado, ""];
+          vigorEl.textContent = txt; vigorEl.className = `ind-badge ${cls}`;
+          if (vigorSub) vigorSub.textContent = ultimoNDVI.fecha ? `satélite del ${ultimoNDVI.fecha}` : "";
+        }
+      }
+
+      // Agua en la planta (NDMI + ET₀)
+      const aguaEl  = document.getElementById("ind-agua");
+      const aguaSub = document.getElementById("ind-agua-sub");
+      if (aguaEl) {
+        if (!ultimoNDMI) {
+          aguaEl.textContent = "--"; aguaEl.className = "ind-badge";
+          if (aguaSub) aguaSub.textContent = "";
+        } else {
+          let txt, cls, sub;
+          if (ultimoRiego && ultimoET0) {
+            const sum = ultimoET0.filter(({ date }) => date >= ultimoRiego).reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+            if (sum < 15)      { txt = "Hidratada"; cls = "buena"; }
+            else if (sum < 30) { txt = "Vigilar";   cls = "moderada"; }
+            else               { txt = "Sedienta";  cls = "estres"; }
+            sub = "estimado desde el riego";
+          } else {
+            const { ndmi, fecha } = ultimoNDMI;
+            if (ndmi >= 0.2)    { txt = "Hidratada"; cls = "buena"; }
+            else if (ndmi >= 0) { txt = "Vigilar";   cls = "moderada"; }
+            else                { txt = "Sedienta";  cls = "estres"; }
+            sub = `satélite del ${fecha}`;
+          }
+          aguaEl.textContent = txt; aguaEl.className = `ind-badge ${cls}`;
+          if (aguaSub) aguaSub.textContent = sub;
+        }
+      }
+
+      // Humedad del suelo
+      const sueloEl  = document.getElementById("ind-suelo");
+      const sueloSub = document.getElementById("ind-suelo-sub");
+      if (sueloEl) {
+        if (!ultimoSuelo) {
+          sueloEl.textContent = "--"; sueloEl.className = "ind-badge";
+          if (sueloSub) sueloSub.textContent = "";
+        } else {
+          const val = ultimoSuelo.hoy[0];
+          const { clase } = clasificarHumedadSuelo(val);
+          const map = { seco: ["Seco","estres"], adecuado: ["Normal","buena"], saturado: ["Muy húmedo","moderada"] };
+          const [txt, cls] = map[clase] || ["--", ""];
+          sueloEl.textContent = txt; sueloEl.className = `ind-badge ${cls}`;
+          if (sueloSub) sueloSub.textContent = "tiempo real";
         }
       }
     }
 
-    function renderRecomendacion() {
-      const recEl = document.getElementById("humedad-recomendacion");
-
-      // Profundidad relevante según cultivos seleccionados
-      const cultivos = cfg.cultivos || [];
-      const haceProfundo = cultivos.some((c) => ["tomate", "pimiento", "berenjena"].includes(c));
-      const capaRel      = haceProfundo ? 2 : (cultivos.some((c) => ["brassica", "calabacin"].includes(c)) ? 1 : 0);
-      const labelCapa    = ["0-9 cm", "9-27 cm", "27-81 cm"][capaRel];
-
-      if (!ultimoSuelo && !ultimoNDMI) {
-        recEl.textContent = "Cargando datos...";
-        return;
-      }
-
-      const vSuelo = ultimoSuelo ? ultimoSuelo.hoy[capaRel] : null;
-      const sueloCl = clasificarHumedadSuelo(vSuelo).clase;  // seco | adecuado | saturado | ""
-      const ndmiCl  = ultimoNDMI ? clasificarNDMI(ultimoNDMI.ndmi).clase : ""; // estres | moderada | buena | ""
-
-      let texto = "";
-
-      if (sueloCl === "seco" && ndmiCl === "estres") {
-        texto = `⚠️ Suelo seco a ${labelCapa} y la planta ya muestra estrés hídrico. Riega hoy mismo.`;
-      } else if (sueloCl === "seco" && ndmiCl === "moderada") {
-        texto = `Suelo seco a ${labelCapa}; la planta empieza a notarlo. Conviene regar en las próximas horas.`;
-      } else if (sueloCl === "seco" && ndmiCl === "buena") {
-        texto = `El suelo está seco a ${labelCapa} pero la planta aún conserva reservas. Riega en los próximos 1-2 días.`;
-      } else if (sueloCl === "seco" && !ndmiCl) {
-        texto = `Suelo seco a ${labelCapa}. Riega pronto (sin datos recientes de la planta).`;
-      } else if (sueloCl === "saturado" && ndmiCl === "buena") {
-        texto = `Hay exceso de agua en el suelo y la planta está bien hidratada. Evita regar y vigila posibles hongos.`;
-      } else if (sueloCl === "saturado") {
-        texto = `El suelo está saturado. No riegues y asegura un buen drenaje para evitar pudrición de raíz.`;
-      } else if (sueloCl === "adecuado" && ndmiCl === "estres") {
-        texto = `El suelo tiene humedad aceptable pero la planta está estresada. Revisa calor, viento o posibles enfermedades.`;
-      } else if (sueloCl === "adecuado" && ndmiCl === "moderada") {
-        texto = `La humedad del suelo es correcta; la planta está algo justa. Observa las próximas 24 h antes de regar.`;
-      } else if (sueloCl === "adecuado" && ndmiCl === "buena") {
-        texto = `Todo en orden: suelo y planta están en buenas condiciones de humedad.`;
-      } else if (sueloCl === "adecuado") {
-        texto = `Humedad del suelo correcta a ${labelCapa}. Sin datos satélite recientes de la planta.`;
-      } else if (!sueloCl && ndmiCl === "estres") {
-        texto = `La planta muestra estrés hídrico. Sin datos del suelo; riega con precaución.`;
-      } else if (!sueloCl && ndmiCl === "buena") {
-        texto = `La planta está bien hidratada según el último paso del satélite.`;
+    // ─── Info de riego en "Tu parcela" ────────────────────────────────────────
+    function renderRiegoRegistro() {
+      const el = document.getElementById("riego-registro");
+      if (!el) return;
+      if (ultimoRiego) {
+        const dias = Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000));
+        el.innerHTML =
+          `<span class="riego-etiqueta">Último riego: hace ${dias} día${dias !== 1 ? "s" : ""}</span>`
+          + `<button class="btn-riego-reset" id="btn-borrar-riego">Borrar</button>`;
       } else {
-        texto = "Datos insuficientes para una recomendación fiable.";
+        el.innerHTML = `<button class="btn-riego" id="btn-registrar-riego">+ He regado hoy</button>`;
       }
-
-      recEl.textContent = texto;
     }
 
     // ─── Alerta de riego ──────────────────────────────────────────────────────
@@ -1857,26 +1790,7 @@
       return null;
     }
 
-    function renderAlertaRiego() {
-      const container = document.getElementById("alertas-container");
-      if (!container) return;
-      const existing = document.getElementById("card-alerta-riego");
-      if (existing) existing.remove();
-
-      const alerta = calcularAlertaRiego();
-      if (!alerta) return;
-
-      const card = document.createElement("section");
-      card.id        = "card-alerta-riego";
-      card.className = "card card-alerta alto";
-      card.setAttribute("aria-label", "Alerta de riego");
-      card.innerHTML =
-        `<div class="alerta-titulo">Necesidad de riego</div>`
-        + `<span class="risk-badge alto">URGENTE</span>`
-        + `<p class="risk-reason">Desde ${alerta.desde}, la evapotranspiración acumulada es <strong>${alerta.et0.toFixed(1)} mm</strong>. El cultivo puede estar en estrés hídrico.</p>`
-        + `<button class="btn-riego" id="btn-riego-alerta">He regado hoy</button>`;
-      container.insertBefore(card, container.firstChild);
-    }
+    function renderAlertaRiego() { /* replaced by renderHoy */ }
 
     // ─── Carga de datos ───────────────────────────────────────────────────────
     async function cargarDatos() {
@@ -2164,11 +2078,28 @@
       });
     }
 
+    // ─── Riego ────────────────────────────────────────────────────────────────
+    function registrarRiego() {
+      ultimoRiego = new Date().toISOString().slice(0, 10);
+      localStorage.setItem("kylia_ultimo_riego", ultimoRiego);
+      renderIndicadores();
+      renderHoy();
+      renderRiegoRegistro();
+    }
+    function borrarRiego() {
+      ultimoRiego = null;
+      localStorage.removeItem("kylia_ultimo_riego");
+      renderIndicadores();
+      renderHoy();
+      renderRiegoRegistro();
+    }
+
     // ─── Arranque ─────────────────────────────────────────────────────────────
     document.addEventListener("DOMContentLoaded", () => {
       actualizarHeader();
       initConfigPanel();
       renderizarAlertas();
+      renderRiegoRegistro();
       cargarDatos();
       cargarNDVI();
       cargarHumedadSuelo();
@@ -2178,33 +2109,16 @@
       setInterval(cargarHumedadSuelo, 60 * 60 * 1000);   // cada hora (Open-Meteo es horario)
       setInterval(cargarET0, 6 * 60 * 60 * 1000);        // cada 6h (ET₀ diaria, cambia poco)
       document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
-      document.getElementById("btn-refresh-ndvi").addEventListener("click", () => cargarNDVI(true));
-      document.getElementById("btn-refresh-humedad").addEventListener("click", () => {
+      document.getElementById("btn-refresh-parcela").addEventListener("click", () => {
         cargarNDVI(true);
         cargarHumedadSuelo();
         cargarET0();
       });
 
-      // Delegación: botones "He regado" y "Borrar" se renderizan dinámicamente
-      function registrarRiego() {
-        ultimoRiego = new Date().toISOString().slice(0, 10);
-        localStorage.setItem("kylia_ultimo_riego", ultimoRiego);
-        renderNDMI();
-        renderAlertaRiego();
-      }
-      function borrarRiego() {
-        ultimoRiego = null;
-        localStorage.removeItem("kylia_ultimo_riego");
-        renderNDMI();
-        renderAlertaRiego();
-      }
-
-      document.getElementById("ndmi-et0").addEventListener("click", (e) => {
-        if (e.target.id === "btn-riego")       registrarRiego();
-        else if (e.target.id === "btn-riego-reset") borrarRiego();
-      });
-      document.getElementById("alertas-container").addEventListener("click", (e) => {
-        if (e.target.id === "btn-riego-alerta") registrarRiego();
+      // Delegación: botones de riego en riego-registro se renderizan dinámicamente
+      document.getElementById("riego-registro").addEventListener("click", (e) => {
+        if (e.target.id === "btn-registrar-riego") registrarRiego();
+        else if (e.target.id === "btn-borrar-riego") borrarRiego();
       });
     });
   </script>
