@@ -449,6 +449,16 @@
     .suelo-tendencia.bajando  { color: var(--high); }
     .suelo-tendencia.subiendo { color: var(--low);  }
 
+    .et0-bloque {
+      margin-top: 10px;
+      padding: 9px 11px;
+      background: color-mix(in srgb, var(--border) 40%, transparent);
+      border-radius: 8px;
+      font-size: 0.82rem;
+      line-height: 1.55;
+    }
+    .et0-fila { display: block; }
+
     .recomendacion-texto {
       margin: 0;
       font-size: 0.9rem;
@@ -796,6 +806,7 @@
         <p class="risk-reason" id="ndmi-motivo"></p>
         <p class="ndvi-sub" id="ndmi-fecha"></p>
         <p class="ndvi-variabilidad" id="ndmi-variabilidad"></p>
+        <div class="et0-bloque" id="ndmi-et0"></div>
       </div>
 
       <div class="humedad-bloque">
@@ -1330,6 +1341,7 @@
     // Estado compartido para la tarjeta "Humedad"
     let ultimoSuelo = null;  // { hoy: [s1,s2,s3], hace7: [s1,s2,s3] }
     let ultimoNDMI  = null;  // { ndmi, stdev, fecha }
+    let ultimoET0   = null;  // [{date: "2026-05-10", et0: 4.2}, ...]
 
     // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
     // seleccionada, cae al lat/lon del pueblo/configuración.
@@ -1544,6 +1556,29 @@
       }
     }
 
+    // ─── Evapotranspiración diaria (Open-Meteo) ────────────────────────────────
+    // Datos diarios ET₀ FAO-56 de los últimos 14 días.
+    // Se usa para estimar cuánta agua ha perdido la planta desde la última imagen
+    // del satélite, permitiendo al usuario saber si la planta está hidratada
+    // aunque el NDMI sea de hace días.
+    async function cargarET0() {
+      try {
+        const p   = puntoConsulta();
+        const url = `https://api.open-meteo.com/v1/forecast`
+          + `?latitude=${p.lat.toFixed(5)}&longitude=${p.lon.toFixed(5)}`
+          + `&daily=et0_fao_evapotranspiration&past_days=14&forecast_days=0&timezone=auto`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) return;
+        const data  = await res.json();
+        const dates = data?.daily?.time || [];
+        const vals  = data?.daily?.et0_fao_evapotranspiration || [];
+        ultimoET0 = dates.map((date, i) => ({ date, et0: vals[i] ?? 0 }));
+      } catch (_) {
+        ultimoET0 = null;
+      }
+      renderNDMI();
+    }
+
     // ─── Renderizado: suelo, NDMI y recomendación ─────────────────────────────
     function clasificarHumedadSuelo(valor) {
       if (valor == null || Number.isNaN(valor)) return { clase: "", etiqueta: "--" };
@@ -1614,6 +1649,7 @@
       const motivoEl = document.getElementById("ndmi-motivo");
       const fechaEl  = document.getElementById("ndmi-fecha");
       const varEl    = document.getElementById("ndmi-variabilidad");
+      const et0El    = document.getElementById("ndmi-et0");
 
       if (!ultimoNDMI) {
         estadoEl.textContent = "--";
@@ -1621,6 +1657,7 @@
         motivoEl.textContent = "Sin datos de satélite para NDMI.";
         fechaEl.textContent  = "";
         varEl.textContent    = "";
+        if (et0El) et0El.innerHTML = "";
         return;
       }
 
@@ -1638,6 +1675,37 @@
         varEl.textContent = `Variabilidad: ±${stdev}${nota}`;
       } else {
         varEl.textContent = "";
+      }
+
+      if (!et0El) return;
+      if (ultimoET0 && fecha) {
+        const entradas = ultimoET0.filter(({ date }) => date >= fecha);
+        if (entradas.length) {
+          const sum  = entradas.reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+          const dias = entradas.length;
+          let textoSinRiego, colorSinRiego;
+          if (sum < 12) {
+            textoSinRiego  = "La planta probablemente mantiene hidratación";
+            colorSinRiego  = "var(--low)";
+          } else if (sum < 28) {
+            textoSinRiego  = "Empieza a acusar la falta de agua";
+            colorSinRiego  = "var(--medium)";
+          } else {
+            textoSinRiego  = "Estrés probable si no ha regado";
+            colorSinRiego  = "var(--high)";
+          }
+          et0El.innerHTML =
+            `<span class="et0-fila" style="color:var(--muted)">Desde la imagen (hace ${dias} día${dias !== 1 ? "s" : ""}):</span>`
+            + `<span class="et0-fila">Evapotranspiración acumulada: <strong>${sum.toFixed(1)} mm</strong></span>`
+            + `<span class="et0-fila" style="color:${colorSinRiego}">→ Sin riego: ${textoSinRiego}</span>`
+            + `<span class="et0-fila" style="color:var(--low)">→ Si ha regado: planta estimada HIDRATADA</span>`;
+        } else {
+          et0El.innerHTML = "";
+        }
+      } else if (!ultimoET0 && fecha) {
+        et0El.innerHTML = `<span class="et0-fila" style="color:var(--muted)">Calculando evapotranspiración…</span>`;
+      } else {
+        et0El.innerHTML = "";
       }
     }
 
@@ -1835,6 +1903,7 @@
           "Parcela guardada. El NDVI usará este contorno exacto.";
         cargarNDVI(true);
         cargarHumedadSuelo();
+        cargarET0();
       });
     }
 
@@ -1860,6 +1929,7 @@
         await cargarDatos();
         cargarNDVI(true);
         cargarHumedadSuelo();
+        cargarET0();
       }
 
       function setFeedback(texto, esError = false) {
@@ -1984,14 +2054,17 @@
       cargarDatos();
       cargarNDVI();
       cargarHumedadSuelo();
+      cargarET0();
       setInterval(cargarDatos, REFRESH_MS);
       setInterval(cargarNDVI, 6 * 60 * 60 * 1000);       // cada 6h (Sentinel-2 revisita ~5 días)
       setInterval(cargarHumedadSuelo, 60 * 60 * 1000);   // cada hora (Open-Meteo es horario)
+      setInterval(cargarET0, 6 * 60 * 60 * 1000);        // cada 6h (ET₀ diaria, cambia poco)
       document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
       document.getElementById("btn-refresh-ndvi").addEventListener("click", () => cargarNDVI(true));
       document.getElementById("btn-refresh-humedad").addEventListener("click", () => {
         cargarNDVI(true);
         cargarHumedadSuelo();
+        cargarET0();
       });
     });
   </script>
