@@ -1686,11 +1686,28 @@
       }
 
       const { ndmi, stdev, fecha } = ultimoNDMI;
-      const { clase, etiqueta, motivo } = clasificarNDMI(ndmi);
-      estadoEl.textContent = etiqueta;
-      estadoEl.className   = `ndvi-badge ${clase}`;
-      motivoEl.textContent = motivo;
-      fechaEl.textContent  = `NDMI ${ndmi} · imagen del ${fecha}`;
+
+      // Si el usuario ha registrado riego y ya hay datos ET₀, el badge refleja
+      // el estado estimado actual en vez del dato histórico del satélite.
+      if (ultimoRiego && ultimoET0) {
+        const sum = ultimoET0
+          .filter(({ date }) => date >= ultimoRiego)
+          .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+        let clase, etiqueta, motivo;
+        if (sum < 15)      { clase = "buena";    etiqueta = "HIDRATADA";    motivo = "Estimado por ET₀ desde el último riego registrado."; }
+        else if (sum < 30) { clase = "moderada"; etiqueta = "VIGILAR";      motivo = "Han pasado varios días desde el riego. Monitoriza."; }
+        else               { clase = "estres";   etiqueta = "REGAR PRONTO"; motivo = "El cultivo ha perdido mucha agua desde el último riego."; }
+        estadoEl.textContent = etiqueta;
+        estadoEl.className   = `ndvi-badge ${clase}`;
+        motivoEl.textContent = motivo;
+        fechaEl.textContent  = `Satélite: NDMI ${ndmi} · imagen del ${fecha}`;
+      } else {
+        const { clase, etiqueta, motivo } = clasificarNDMI(ndmi);
+        estadoEl.textContent = etiqueta;
+        estadoEl.className   = `ndvi-badge ${clase}`;
+        motivoEl.textContent = motivo;
+        fechaEl.textContent  = `NDMI ${ndmi} · imagen del ${fecha}`;
+      }
       if (stdev != null) {
         let nota = "";
         if (stdev >= 0.12)      nota = " — hay zonas de la parcela más secas que otras.";
