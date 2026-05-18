@@ -1538,6 +1538,7 @@
         : null;
       renderNDMI();
       renderRecomendacion();
+      renderAlertaRiego();
     }
 
     // ─── Humedad del suelo (Open-Meteo DWD ICON) ──────────────────────────────
@@ -1626,6 +1627,7 @@
         ultimoET0 = null;
       }
       renderNDMI();
+      renderAlertaRiego();
     }
 
     // ─── Renderizado: suelo, NDMI y recomendación ─────────────────────────────
@@ -1834,6 +1836,46 @@
       }
 
       recEl.textContent = texto;
+    }
+
+    // ─── Alerta de riego ──────────────────────────────────────────────────────
+    function calcularAlertaRiego() {
+      if (!ultimoET0) return null;
+      if (ultimoRiego) {
+        const sum     = ultimoET0.filter(({ date }) => date >= ultimoRiego)
+                                  .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+        const dias    = Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000));
+        if (sum >= 30) return { et0: sum, desde: `el último riego registrado (hace ${dias} días)` };
+        return null;
+      }
+      if (ultimoNDMI?.fecha) {
+        const entradas = ultimoET0.filter(({ date }) => date >= ultimoNDMI.fecha);
+        const sum      = entradas.reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+        const dias     = entradas.length;
+        if (sum >= 28) return { et0: sum, desde: `la imagen del satélite (hace ${dias} días)` };
+      }
+      return null;
+    }
+
+    function renderAlertaRiego() {
+      const container = document.getElementById("alertas-container");
+      if (!container) return;
+      const existing = document.getElementById("card-alerta-riego");
+      if (existing) existing.remove();
+
+      const alerta = calcularAlertaRiego();
+      if (!alerta) return;
+
+      const card = document.createElement("section");
+      card.id        = "card-alerta-riego";
+      card.className = "card card-alerta alto";
+      card.setAttribute("aria-label", "Alerta de riego");
+      card.innerHTML =
+        `<div class="alerta-titulo">Necesidad de riego</div>`
+        + `<span class="risk-badge alto">URGENTE</span>`
+        + `<p class="risk-reason">Desde ${alerta.desde}, la evapotranspiración acumulada es <strong>${alerta.et0.toFixed(1)} mm</strong>. El cultivo puede estar en estrés hídrico.</p>`
+        + `<button class="btn-riego" id="btn-riego-alerta">He regado hoy</button>`;
+      container.insertBefore(card, container.firstChild);
     }
 
     // ─── Carga de datos ───────────────────────────────────────────────────────
@@ -2144,16 +2186,25 @@
       });
 
       // Delegación: botones "He regado" y "Borrar" se renderizan dinámicamente
+      function registrarRiego() {
+        ultimoRiego = new Date().toISOString().slice(0, 10);
+        localStorage.setItem("kylia_ultimo_riego", ultimoRiego);
+        renderNDMI();
+        renderAlertaRiego();
+      }
+      function borrarRiego() {
+        ultimoRiego = null;
+        localStorage.removeItem("kylia_ultimo_riego");
+        renderNDMI();
+        renderAlertaRiego();
+      }
+
       document.getElementById("ndmi-et0").addEventListener("click", (e) => {
-        if (e.target.id === "btn-riego") {
-          ultimoRiego = new Date().toISOString().slice(0, 10);
-          localStorage.setItem("kylia_ultimo_riego", ultimoRiego);
-          renderNDMI();
-        } else if (e.target.id === "btn-riego-reset") {
-          ultimoRiego = null;
-          localStorage.removeItem("kylia_ultimo_riego");
-          renderNDMI();
-        }
+        if (e.target.id === "btn-riego")       registrarRiego();
+        else if (e.target.id === "btn-riego-reset") borrarRiego();
+      });
+      document.getElementById("alertas-container").addEventListener("click", (e) => {
+        if (e.target.id === "btn-riego-alerta") registrarRiego();
       });
     });
   </script>
