@@ -1587,7 +1587,8 @@
     let ultimoET0   = null;  // [{date: "2026-05-10", et0: 4.2}, ...]
     let ultimoRiego = localStorage.getItem("kylia_ultimo_riego") || null; // "2026-05-18"
     let ultimoNDVI  = null;  // { estado, ndvi, fecha } — para renderIndicadores
-    let ultimoMeteo = null;  // { tempMax, humMax, lluvia, vientoMax } — para recomendaciones
+    let ultimoMeteo    = null;  // { tempMax, humMax, lluvia, vientoMax } — para recomendaciones
+    let ultimoPrevision = [];  // [{ nombreDia, tempMax, humMax, lluvia, vientoMax }] próximos 3 días
 
     // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
     // seleccionada, cae al lat/lon del pueblo/configuración.
@@ -1960,7 +1961,13 @@
       const mes    = new Date().getMonth() + 1;
       const enTemp = mes >= 3 && mes <= 10;
 
-      // 1. RIEGO — cuánto y cuándo
+      // Resumen de lluvia prevista (próximos 3 días)
+      const lluviaPrevista  = ultimoPrevision.reduce((s, d) => s + (d.lluvia ?? 0), 0);
+      const diaLluvia       = ultimoPrevision.find(d => (d.lluvia ?? 0) >= 4); // primer día con lluvia significativa
+      const lluviaInminente = ultimoPrevision.slice(0, 2).some(d => (d.lluvia ?? 0) >= 4);
+      const lluviaExcesiva  = ultimoPrevision.some(d => (d.lluvia ?? 0) > 15);
+
+      // 1. RIEGO — ajustado a la lluvia prevista
       if (ultimoET0) {
         const ref = ultimoRiego || ultimoNDMI?.fecha;
         if (ref) {
@@ -1970,28 +1977,45 @@
           if (et0sum >= 15) {
             const urgente = et0sum >= 30;
             const litros  = Math.ceil(et0sum);
-            const horario = (ultimoMeteo?.tempMax > 33)
-              ? "mañana temprano (antes de las 9h)"
-              : "esta tarde-noche (entre las 18h y las 21h)";
-            const dias = ultimoRiego
+            const dias    = ultimoRiego
               ? Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000))
               : null;
-            recs.push({
-              id: "riego",
-              categoria: "RIEGO",
-              catClass: "riego",
-              titulo: urgente
-                ? `Riega hoy: aplica ${litros} L/m²`
-                : `Riega ${litros} L/m² ${horario}`,
-              detalle: `Han evaporado ${et0sum.toFixed(0)} mm de agua${dias !== null ? ` en los últimos ${dias} días` : ""}. Aplica ${litros} litros por metro cuadrado ${horario}. Regar a esa hora evita que el sol evapore el agua antes de que llegue a las raíces — el riego es entre 2 y 3 veces más eficiente que al mediodía.`,
-              prod: null,
-              prioridad: urgente ? 1 : 3,
-            });
+            const deficit = `Han evaporado ${et0sum.toFixed(0)} mm${dias !== null ? ` en los últimos ${dias} días` : ""}.`;
+
+            if (!urgente && lluviaPrevista >= et0sum * 0.7) {
+              // La lluvia cubre >70% del déficit → no hace falta regar
+              recs.push({
+                id: "riego", categoria: "RIEGO", catClass: "riego",
+                titulo: `No riegues — la lluvia prevista (${lluviaPrevista.toFixed(0)} mm) ya lo cubre`,
+                detalle: `${deficit} Se prevén ${lluviaPrevista.toFixed(0)} mm de lluvia en los próximos días, suficiente para reponer la pérdida. Regar ahora desperdiciaría agua y energía.`,
+                prod: null, prioridad: 3,
+              });
+            } else if (!urgente && diaLluvia) {
+              // Algo de lluvia pero no cubre todo → riego reducido
+              const restante = Math.max(5, Math.ceil(et0sum - lluviaPrevista));
+              recs.push({
+                id: "riego", categoria: "RIEGO", catClass: "riego",
+                titulo: `Riega solo ${restante} L/m² — el ${diaLluvia.nombreDia} llueve`,
+                detalle: `${deficit} Se prevén ${lluviaPrevista.toFixed(0)} mm de lluvia el ${diaLluvia.nombreDia}. Riega ahora solo ${restante} litros/m² — la lluvia completará el resto. Así usas el mínimo de agua necesario.`,
+                prod: null, prioridad: 3,
+              });
+            } else {
+              // Sin lluvia suficiente o urgente → regar normalmente
+              const horario = (ultimoMeteo?.tempMax > 33)
+                ? "mañana temprano (antes de las 9h)"
+                : "esta tarde-noche (entre las 18h y las 21h)";
+              recs.push({
+                id: "riego", categoria: "RIEGO", catClass: "riego",
+                titulo: urgente ? `Riega hoy: aplica ${litros} L/m²` : `Riega ${litros} L/m² ${horario}`,
+                detalle: `${deficit} Aplica ${litros} litros por metro cuadrado ${horario}. Regar a esa hora evita que el sol evapore el agua antes de llegar a las raíces — el riego es 2-3 veces más eficiente que al mediodía.`,
+                prod: null, prioridad: urgente ? 1 : 3,
+              });
+            }
           }
         }
       }
 
-      // 2. TRATAMIENTO — producto específico cuando el riesgo es ALTO
+      // 2. TRATAMIENTO — riesgo de hoy y aviso preventivo de los próximos días
       if (ultimoMeteo && cfg.cultivos?.length) {
         const alertasActivas = new Set();
         cfg.cultivos.forEach(cId => {
@@ -2001,23 +2025,31 @@
         alertasActivas.forEach(alertaId => {
           const alerta = ALERTAS[alertaId];
           if (!alerta) return;
-          const { nivel } = alerta.calcFn(ultimoMeteo);
-          if (nivel !== "ALTO") return;
-          const prod = PRODUCTOS_PLAGA[alertaId];
+          const nivelHoy = alerta.calcFn(ultimoMeteo).nivel;
+          const diaAlto  = ultimoPrevision.find(d => alerta.calcFn(d).nivel === "ALTO");
+          const prod     = PRODUCTOS_PLAGA[alertaId];
           if (!prod) return;
-          recs.push({
-            id: `trat_${alertaId}`,
-            categoria: "TRATAMIENTO",
-            catClass: "tratamiento",
-            titulo: `Riesgo alto de ${prod.titulo.toLowerCase()} — actúa antes de que se extienda`,
-            detalle: `Las condiciones de hoy son ideales para el ${prod.titulo.toLowerCase()}. Actuar de forma preventiva ahora es mucho más eficaz que hacerlo cuando la plaga ya está establecida.`,
-            prod,
-            prioridad: 2,
-          });
+
+          if (nivelHoy === "ALTO") {
+            recs.push({
+              id: `trat_${alertaId}`, categoria: "TRATAMIENTO", catClass: "tratamiento",
+              titulo: `Riesgo alto de ${prod.titulo.toLowerCase()} — actúa antes de que se extienda`,
+              detalle: `Las condiciones de hoy son ideales para el ${prod.titulo.toLowerCase()}. Actuar ahora de forma preventiva es mucho más eficaz que hacerlo cuando la plaga ya está establecida.`,
+              prod, prioridad: 2,
+            });
+          } else if (diaAlto) {
+            // Riesgo alto previsto pero no hoy → aviso preventivo
+            recs.push({
+              id: `trat_prev_${alertaId}`, categoria: "TRATAMIENTO", catClass: "tratamiento",
+              titulo: `Prepárate: riesgo de ${prod.titulo.toLowerCase()} el ${diaAlto.nombreDia}`,
+              detalle: `Hoy el riesgo es bajo, pero el ${diaAlto.nombreDia} las condiciones serán favorables para el ${prod.titulo.toLowerCase()}. Prepara el producto con antelación para poder actuar en el momento justo.`,
+              prod, prioridad: 4,
+            });
+          }
         });
       }
 
-      // 3. NUTRICIÓN — fertilizante según cultivo y estado NDVI
+      // 3. NUTRICIÓN — ajustada a la lluvia prevista
       if (ultimoNDVI && enTemp && cfg.cultivos?.length) {
         const { ndvi } = ultimoNDVI;
         const sueloSaturado = ultimoSuelo?.hoy[0] != null && ultimoSuelo.hoy[0] > 0.38;
@@ -2025,14 +2057,28 @@
           const grupo = grupoFertilizante(cfg.cultivos);
           if (grupo) {
             const fert = FERTILIZANTES_CULTIVO[grupo];
+            let titulo, detalle, prioridad;
+
+            if (lluviaExcesiva) {
+              titulo   = "Espera para abonar — lluvia intensa prevista";
+              detalle  = `Se prevé lluvia intensa en los próximos días. Abonar ahora podría hacer que los nutrientes se lixivien antes de llegar a las raíces. Abona después de que pase la lluvia.`;
+              prioridad = 5;
+            } else if (lluviaInminente) {
+              const diaRain = ultimoPrevision.find(d => (d.lluvia ?? 0) >= 4);
+              titulo   = `Abona hoy antes de la lluvia del ${diaRain.nombreDia} — ahorra el riego`;
+              detalle  = `${fert.porQue} Si abonas en cobertera hoy, la lluvia del ${diaRain.nombreDia} disolverá y llevará el nutriente a las raíces sin necesidad de riego adicional — máximo aprovechamiento con mínimo gasto.`;
+              prioridad = 3;
+            } else {
+              titulo   = "Abona el cultivo esta semana";
+              detalle  = fert.porQue;
+              prioridad = 5;
+            }
+
             recs.push({
-              id: "nutricion",
-              categoria: "NUTRICIÓN",
-              catClass: "nutricion",
-              titulo: `Abona el cultivo esta semana`,
-              detalle: fert.porQue,
+              id: "nutricion", categoria: "NUTRICIÓN", catClass: "nutricion",
+              titulo, detalle,
               prod: { titulo: fert.titulo, eco: fert.eco, conv: fert.conv },
-              prioridad: 4,
+              prioridad,
             });
           }
         }
@@ -2157,7 +2203,8 @@
           lluvia:    data.daily.precipitation_sum[0],
           vientoMax: data.daily.wind_speed_10m_max[0],
         };
-        ultimoMeteo = datosHoy;
+        ultimoMeteo     = datosHoy;
+        ultimoPrevision = diasFuturos;
 
         const diasFuturos = data.daily.time.slice(1, 4).map((fecha, i) => ({
           nombreDia: formatearDiaSemana(fecha),
