@@ -833,6 +833,30 @@
       color: var(--muted);
       font-size: 0.88rem;
     }
+
+    /* ── Bloque análisis IA ── */
+    .ia-bloque {
+      background: color-mix(in srgb, var(--border) 30%, transparent);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      color: var(--text);
+    }
+    .ia-label {
+      font-size: 0.63rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .ia-texto { font-style: italic; }
+    .ia-cargando { color: var(--muted); font-size: 0.82rem; font-style: italic; }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1589,6 +1613,7 @@
     let ultimoNDVI  = null;  // { estado, ndvi, fecha } — para renderIndicadores
     let ultimoMeteo    = null;  // { tempMax, humMax, lluvia, vientoMax } — para recomendaciones
     let ultimoPrevision = [];  // [{ nombreDia, tempMax, humMax, lluvia, vientoMax }] próximos 3 días
+    let textoIA         = null; // análisis generado por Gemini
 
     // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
     // seleccionada, cae al lat/lon del pueblo/configuración.
@@ -1709,6 +1734,7 @@
       renderHoy();
       renderRiegoRegistro();
       renderRecomendaciones();
+      cargarAnalisisIA();
     }
 
     // ─── Humedad del suelo (Open-Meteo DWD ICON) ──────────────────────────────
@@ -2087,6 +2113,69 @@
       return recs.sort((a, b) => a.prioridad - b.prioridad);
     }
 
+    // ─── Análisis IA (Gemini) ─────────────────────────────────────────────────
+    async function cargarAnalisisIA() {
+      if (!ultimoNDVI || !ultimoMeteo) return;
+
+      // Calcular datos derivados para el prompt
+      const ref    = ultimoRiego || ultimoNDMI?.fecha;
+      const et0sum = ref && ultimoET0
+        ? ultimoET0.filter(({ date }) => date >= ref).reduce((s, { et0 }) => s + (et0 ?? 0), 0)
+        : null;
+      const diasSinRiego = ultimoRiego
+        ? Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000))
+        : null;
+
+      const lluviaPrevista = ultimoPrevision.reduce((s, d) => s + (d.lluvia ?? 0), 0);
+      const diaLluvia      = ultimoPrevision.find(d => (d.lluvia ?? 0) >= 4)?.nombreDia || null;
+
+      // Estado NDMI como texto
+      let ndmiEstado = null;
+      if (ultimoNDMI) {
+        const v = ultimoRiego && ultimoET0 ? null : ultimoNDMI.ndmi;
+        if (v !== null && v !== undefined) {
+          ndmiEstado = v >= 0.2 ? "hidratada" : v >= 0 ? "vigilar" : "estres";
+        } else if (ultimoRiego && et0sum !== null) {
+          ndmiEstado = et0sum < 15 ? "hidratada" : et0sum < 30 ? "vigilar" : "estres";
+        }
+      }
+
+      // Estado suelo
+      let sueloEstado = null;
+      if (ultimoSuelo?.hoy[0] != null) {
+        const v = ultimoSuelo.hoy[0];
+        sueloEstado = v < 0.15 ? "seco" : v > 0.35 ? "saturado" : "adecuado";
+      }
+
+      // Mostrar "Analizando..." mientras carga
+      textoIA = "cargando";
+      renderRecomendaciones();
+
+      try {
+        const resp = await fetch("/api/recomendacion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cultivos: cfg.cultivos || [],
+            ndviEstado: ultimoNDVI.estado,
+            ndviFecha:  ultimoNDVI.fecha,
+            ndmiEstado,
+            sueloEstado,
+            et0Acumulado: et0sum,
+            diasSinRiego,
+            tempMax:       ultimoMeteo.tempMax,
+            lluviaPrevista,
+            diaLluvia,
+          }),
+        });
+        const data = await resp.json();
+        textoIA = data.texto || null;
+      } catch (_) {
+        textoIA = null;
+      }
+      renderRecomendaciones();
+    }
+
     function renderRecomendaciones() {
       const container = document.getElementById("recomendaciones-container");
       if (!container) return;
@@ -2103,6 +2192,20 @@
       header.className = "rec-section-header";
       header.textContent = "Recomendaciones";
       section.appendChild(header);
+
+      // Bloque análisis IA
+      if (textoIA) {
+        const bloque = document.createElement("div");
+        bloque.className = "ia-bloque";
+        if (textoIA === "cargando") {
+          bloque.innerHTML = `<p class="ia-cargando">Analizando tu parcela...</p>`;
+        } else {
+          bloque.innerHTML =
+            `<div class="ia-label"><span>&#10024;</span> Análisis</div>`
+            + `<p class="ia-texto">${textoIA}</p>`;
+        }
+        section.appendChild(bloque);
+      }
 
       if (recs.length === 0) {
         const vacia = document.createElement("div");
