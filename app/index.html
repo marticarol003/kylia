@@ -751,6 +751,88 @@
       margin-top: 4px;
       margin-bottom: 0;
     }
+
+    /* ── Recomendaciones ── */
+    .rec-section-header {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .rec-lista { display: flex; flex-direction: column; gap: 6px; }
+    .rec-fila {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 11px 12px;
+      background: var(--bg);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .rec-fila:active { background: var(--border); }
+    .rec-cat {
+      font-size: 0.63rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 8px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .rec-cat.riego       { background: #dbeafe; color: #1d4ed8; }
+    .rec-cat.tratamiento { background: var(--high-bg); color: var(--high); }
+    .rec-cat.nutricion   { background: #d1fae5; color: #065f46; }
+    .rec-titulo {
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1.35;
+      flex: 1;
+    }
+    .rec-detalle-panel {
+      display: none;
+      margin-top: -2px;
+      padding: 10px 12px 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 10px 10px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .rec-detalle-panel.visible { display: block; }
+    .rec-detalle-panel p { margin: 0 0 10px; }
+    .rec-producto {
+      margin-top: 6px;
+      padding: 9px 10px;
+      background: var(--bg);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .rec-producto + .rec-producto { margin-top: 5px; }
+    .rec-producto-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .rec-vacia {
+      text-align: center;
+      padding: 18px 12px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -911,6 +993,9 @@
         <div id="ndvi-historial-contenido"></div>
       </div>
     </section>
+
+    <!-- Recomendaciones -->
+    <div id="recomendaciones-container"></div>
 
     <!-- Alertas plagas -->
     <div id="alertas-container"></div>
@@ -1282,6 +1367,64 @@
       { id: "calabacin", nombre: "Calabacín",       alertas: ["mosca_blanca"] },
     ];
 
+    // ─── Catálogo de productos fitosanitarios ─────────────────────────────────
+    const PRODUCTOS_PLAGA = {
+      pulgon: {
+        titulo: "Pulgón",
+        eco:  { nombre: "Jabón potásico (p.ej. Neudosan / Pirecid)", dosis: "5-10 mL/L de agua", modo: "Pulveriza cubriendo bien el envés de las hojas. Repite cada 5-7 días." },
+        conv: { nombre: "Imidacloprid 20% SL (p.ej. Confidor)", dosis: "0.35 mL/L de agua", modo: "No aplicar durante la floración. Plazo de seguridad: 7-14 días según cultivo." },
+      },
+      mildiu: {
+        titulo: "Mildiu",
+        eco:  { nombre: "Oxicloruro de cobre (p.ej. Cuprocol 50 WG)", dosis: "3-4 g/L de agua", modo: "Preventivo. Aplica antes de lluvia o cuando la humedad supere el 80%." },
+        conv: { nombre: "Metalaxil-M + Mancozeb (p.ej. Ridomil Gold MZ)", dosis: "2.5 g/L de agua", modo: "Curativo. Alterna con cobre cada 2 aplicaciones para evitar resistencias." },
+      },
+      oruga_col: {
+        titulo: "Oruga de la col",
+        eco:  { nombre: "Bacillus thuringiensis kurstaki (p.ej. Dipel WG)", dosis: "1-2 g/L de agua", modo: "Aplica al atardecer, cuando las larvas están activas. Repite a los 7 días." },
+        conv: { nombre: "Spinosad SC (p.ej. Conserve)", dosis: "0.5 mL/L de agua", modo: "Máximo 4 aplicaciones por temporada para prevenir resistencias." },
+      },
+      mosca_blanca: {
+        titulo: "Mosca blanca",
+        eco:  { nombre: "Jabón potásico + piretrina (p.ej. Spruzit Concentrado)", dosis: "10 mL/L de agua", modo: "Cubre bien el envés. Repite cada 5-7 días. Eficaz en adultos y ninfas jóvenes." },
+        conv: { nombre: "Spirotetramat (p.ej. Movento 150 OD)", dosis: "0.75 mL/L de agua", modo: "Sistémico: actúa en 7-10 días. Consulta el plazo de seguridad del envase." },
+      },
+      arana_roja: {
+        titulo: "Araña roja",
+        eco:  { nombre: "Aceite de neem (p.ej. Neemrot) o azufre mojable", dosis: "5 mL/L + mojante (neem) · 3 g/L (azufre)", modo: "Aplica tarde-noche. Evita temperaturas >32°C. Repite cada 7 días." },
+        conv: { nombre: "Abamectina 1.8% CE (p.ej. Vertimec Pro)", dosis: "1.5 mL/L de agua", modo: "Alta eficacia contra huevos y larvas. Plazo de seguridad: 3-7 días según cultivo." },
+      },
+    };
+
+    // ─── Catálogo de fertilizantes por grupo de cultivo ───────────────────────
+    const FERTILIZANTES_CULTIVO = {
+      hojas: {
+        titulo: "Abono nitrogenado para cultivos de hoja",
+        porQue: "Las plantas de hoja verde necesitan nitrógeno (N) para producir clorofila. El índice NDVI por debajo de 0.5 indica que las plantas tienen menos clorofila de lo normal — aportar N ahora acelerará la recuperación del verdor y el crecimiento de las hojas.",
+        eco:  { nombre: "Guano líquido o extracto de algas (p.ej. Algamar, Biplantol)", dosis: "5-8 mL/L en fertirriego", modo: "Por la mañana temprano o al atardecer. No aplicar con más de 28°C." },
+        conv: { nombre: "N-P-K 20-20-20 + micros (p.ej. Wuxal Universal) o NAC 27%", dosis: "2-3 g/L en fertirriego, o 2 g/m² de NAC en cobertera", modo: "NAC en cobertera: riega después para que el nitrógeno baje a las raíces." },
+      },
+      fruto: {
+        titulo: "Abono rico en potasio (K) para cultivos de fruto",
+        porQue: "En fase de floración y cuaje, el potasio (K) mejora la calidad del fruto y ayuda a la planta a tolerar el calor y el estrés hídrico. El NDVI bajo sugiere que el cultivo puede estar sin los nutrientes suficientes para sostener el crecimiento del fruto.",
+        eco:  { nombre: "Sulfato potásico (SOP 50% K₂O)", dosis: "2-3 g/L en fertirriego", modo: "Con el primer riego del día o al atardecer. Nunca en el calor del mediodía." },
+        conv: { nombre: "N-P-K 5-10-30 + Mg (p.ej. Compo Frutero, Fertiberia Frutero)", dosis: "3-4 g/L en fertirriego, una vez a la semana", modo: "Riega antes y después para diluir. Nunca a pleno sol." },
+      },
+      brassica: {
+        titulo: "Cobertera nitrogenada para col y coliflor",
+        porQue: "Las coles y coliflores son cultivos muy exigentes en nitrógeno. El NDVI bajo señala posible carencia de N: la cobertera aporta nitrógeno de forma rápida y directa cerca de las raíces.",
+        eco:  { nombre: "Guano sólido granulado o compost maduro", dosis: "100-150 g/m² de guano, o 2-3 kg/m² de compost", modo: "En cobertera. Riega después para que los nutrientes lleguen a las raíces." },
+        conv: { nombre: "Nitrato amónico 33.5% (NAC)", dosis: "15-20 g/m²", modo: "En cobertera. No dejes gránulos sobre las hojas: pueden quemarlas. Riega después." },
+      },
+    };
+
+    function grupoFertilizante(cultivosActivos) {
+      if (cultivosActivos.some(id => ["tomate","pimiento","berenjena","calabacin"].includes(id))) return "fruto";
+      if (cultivosActivos.some(id => ["lechuga","espinaca"].includes(id))) return "hojas";
+      if (cultivosActivos.includes("brassica")) return "brassica";
+      return null;
+    }
+
     // ─── UI helpers ───────────────────────────────────────────────────────────
     function formatearDiaSemana(fechaIso) {
       return new Date(`${fechaIso}T12:00:00`).toLocaleDateString("es-ES", { weekday: "long" });
@@ -1444,6 +1587,7 @@
     let ultimoET0   = null;  // [{date: "2026-05-10", et0: 4.2}, ...]
     let ultimoRiego = localStorage.getItem("kylia_ultimo_riego") || null; // "2026-05-18"
     let ultimoNDVI  = null;  // { estado, ndvi, fecha } — para renderIndicadores
+    let ultimoMeteo = null;  // { tempMax, humMax, lluvia, vientoMax } — para recomendaciones
 
     // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
     // seleccionada, cae al lat/lon del pueblo/configuración.
@@ -1563,6 +1707,7 @@
       renderIndicadores();
       renderHoy();
       renderRiegoRegistro();
+      renderRecomendaciones();
     }
 
     // ─── Humedad del suelo (Open-Meteo DWD ICON) ──────────────────────────────
@@ -1649,6 +1794,7 @@
       renderIndicadores();
       renderHoy();
       renderRiegoRegistro();
+      renderRecomendaciones();
     }
 
     // ─── Renderizado: suelo, NDMI y recomendación ─────────────────────────────
@@ -1808,6 +1954,165 @@
       }
     }
 
+    // ─── Recomendaciones ─────────────────────────────────────────────────────
+    function generarRecomendaciones() {
+      const recs   = [];
+      const mes    = new Date().getMonth() + 1;
+      const enTemp = mes >= 3 && mes <= 10;
+
+      // 1. RIEGO — cuánto y cuándo
+      if (ultimoET0) {
+        const ref = ultimoRiego || ultimoNDMI?.fecha;
+        if (ref) {
+          const et0sum = ultimoET0
+            .filter(({ date }) => date >= ref)
+            .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+          if (et0sum >= 15) {
+            const urgente = et0sum >= 30;
+            const litros  = Math.ceil(et0sum);
+            const horario = (ultimoMeteo?.tempMax > 33)
+              ? "mañana temprano (antes de las 9h)"
+              : "esta tarde-noche (entre las 18h y las 21h)";
+            const dias = ultimoRiego
+              ? Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000))
+              : null;
+            recs.push({
+              id: "riego",
+              categoria: "RIEGO",
+              catClass: "riego",
+              titulo: urgente
+                ? `Riega hoy: aplica ${litros} L/m²`
+                : `Riega ${litros} L/m² ${horario}`,
+              detalle: `Han evaporado ${et0sum.toFixed(0)} mm de agua${dias !== null ? ` en los últimos ${dias} días` : ""}. Aplica ${litros} litros por metro cuadrado ${horario}. Regar a esa hora evita que el sol evapore el agua antes de que llegue a las raíces — el riego es entre 2 y 3 veces más eficiente que al mediodía.`,
+              prod: null,
+              prioridad: urgente ? 1 : 3,
+            });
+          }
+        }
+      }
+
+      // 2. TRATAMIENTO — producto específico cuando el riesgo es ALTO
+      if (ultimoMeteo && cfg.cultivos?.length) {
+        const alertasActivas = new Set();
+        cfg.cultivos.forEach(cId => {
+          const c = CULTIVOS.find(x => x.id === cId);
+          if (c) c.alertas.forEach(a => alertasActivas.add(a));
+        });
+        alertasActivas.forEach(alertaId => {
+          const alerta = ALERTAS[alertaId];
+          if (!alerta) return;
+          const { nivel } = alerta.calcFn(ultimoMeteo);
+          if (nivel !== "ALTO") return;
+          const prod = PRODUCTOS_PLAGA[alertaId];
+          if (!prod) return;
+          recs.push({
+            id: `trat_${alertaId}`,
+            categoria: "TRATAMIENTO",
+            catClass: "tratamiento",
+            titulo: `Riesgo alto de ${prod.titulo.toLowerCase()} — actúa antes de que se extienda`,
+            detalle: `Las condiciones de hoy son ideales para el ${prod.titulo.toLowerCase()}. Actuar de forma preventiva ahora es mucho más eficaz que hacerlo cuando la plaga ya está establecida.`,
+            prod,
+            prioridad: 2,
+          });
+        });
+      }
+
+      // 3. NUTRICIÓN — fertilizante según cultivo y estado NDVI
+      if (ultimoNDVI && enTemp && cfg.cultivos?.length) {
+        const { ndvi } = ultimoNDVI;
+        const sueloSaturado = ultimoSuelo?.hoy[0] != null && ultimoSuelo.hoy[0] > 0.38;
+        if (ndvi < 0.5 && !sueloSaturado) {
+          const grupo = grupoFertilizante(cfg.cultivos);
+          if (grupo) {
+            const fert = FERTILIZANTES_CULTIVO[grupo];
+            recs.push({
+              id: "nutricion",
+              categoria: "NUTRICIÓN",
+              catClass: "nutricion",
+              titulo: `Abona el cultivo esta semana`,
+              detalle: fert.porQue,
+              prod: { titulo: fert.titulo, eco: fert.eco, conv: fert.conv },
+              prioridad: 4,
+            });
+          }
+        }
+      }
+
+      return recs.sort((a, b) => a.prioridad - b.prioridad);
+    }
+
+    function renderRecomendaciones() {
+      const container = document.getElementById("recomendaciones-container");
+      if (!container) return;
+      if (!ultimoET0 && !ultimoNDVI && !ultimoMeteo) return;
+
+      const recs = generarRecomendaciones();
+      container.innerHTML = "";
+
+      const section = document.createElement("section");
+      section.className = "card";
+      section.setAttribute("aria-label", "Recomendaciones");
+
+      const header = document.createElement("div");
+      header.className = "rec-section-header";
+      header.textContent = "Recomendaciones";
+      section.appendChild(header);
+
+      if (recs.length === 0) {
+        const vacia = document.createElement("div");
+        vacia.className = "rec-vacia";
+        vacia.textContent = "Sin acciones urgentes hoy. El cultivo está bien.";
+        section.appendChild(vacia);
+        container.appendChild(section);
+        return;
+      }
+
+      const lista = document.createElement("div");
+      lista.className = "rec-lista";
+      section.appendChild(lista);
+      container.appendChild(section);
+
+      recs.forEach(rec => {
+        const fila = document.createElement("div");
+        fila.className = "rec-fila";
+        fila.setAttribute("role", "button");
+        fila.setAttribute("aria-expanded", "false");
+        fila.innerHTML =
+          `<span class="rec-cat ${rec.catClass}">${rec.categoria}</span>`
+          + `<span class="rec-titulo">${rec.titulo}</span>`;
+        lista.appendChild(fila);
+
+        const panel = document.createElement("div");
+        panel.className = "rec-detalle-panel";
+
+        let html = `<p>${rec.detalle}</p>`;
+        if (rec.prod?.eco && rec.prod?.conv) {
+          html += `<div class="rec-producto">
+            <div class="rec-producto-label">Opción ecológica</div>
+            <strong>${rec.prod.eco.nombre}</strong>${rec.prod.eco.dosis ? ` &middot; ${rec.prod.eco.dosis}` : ""}
+            ${rec.prod.eco.modo ? `<br><small>${rec.prod.eco.modo}</small>` : ""}
+          </div>`;
+          html += `<div class="rec-producto">
+            <div class="rec-producto-label">Opción convencional</div>
+            <strong>${rec.prod.conv.nombre}</strong>${rec.prod.conv.dosis ? ` &middot; ${rec.prod.conv.dosis}` : ""}
+            ${rec.prod.conv.modo ? `<br><small>${rec.prod.conv.modo}</small>` : ""}
+          </div>`;
+        }
+        panel.innerHTML = html;
+        lista.appendChild(panel);
+
+        fila.addEventListener("click", () => {
+          const abierto = panel.classList.contains("visible");
+          lista.querySelectorAll(".rec-detalle-panel").forEach(p => p.classList.remove("visible"));
+          lista.querySelectorAll(".rec-fila").forEach(f => f.setAttribute("aria-expanded", "false"));
+          if (!abierto) {
+            panel.classList.add("visible");
+            fila.setAttribute("aria-expanded", "true");
+          }
+        });
+      });
+    }
+
     // ─── Alerta de riego ──────────────────────────────────────────────────────
     function calcularAlertaRiego() {
       if (!ultimoET0) return null;
@@ -1852,6 +2157,7 @@
           lluvia:    data.daily.precipitation_sum[0],
           vientoMax: data.daily.wind_speed_10m_max[0],
         };
+        ultimoMeteo = datosHoy;
 
         const diasFuturos = data.daily.time.slice(1, 4).map((fecha, i) => ({
           nombreDia: formatearDiaSemana(fecha),
@@ -1867,6 +2173,7 @@
         document.getElementById("rain-value").textContent     = `${datosHoy.lluvia} mm`;
 
         renderizarAlertas(datosHoy, diasFuturos);
+        renderRecomendaciones();
 
         const hora = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
         setStatus(`Actualizado a las ${hora}`);
@@ -2122,6 +2429,7 @@
       renderIndicadores();
       renderHoy();
       renderRiegoRegistro();
+      renderRecomendaciones();
     }
     function borrarRiego() {
       ultimoRiego = null;
@@ -2129,6 +2437,7 @@
       renderIndicadores();
       renderHoy();
       renderRiegoRegistro();
+      renderRecomendaciones();
     }
 
     // ─── Textos explicativos (¿Por qué?) ─────────────────────────────────────
@@ -2191,6 +2500,7 @@
       initConfigPanel();
       renderizarAlertas();
       renderRiegoRegistro();
+      renderRecomendaciones();
       cargarDatos();
       cargarNDVI();
       cargarHumedadSuelo();
