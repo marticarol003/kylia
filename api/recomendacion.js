@@ -47,13 +47,20 @@ module.exports = async (req, res) => {
       : "Lluvia prevista: no se espera lluvia próximamente",
   ].filter(Boolean).join("\n");
 
-  const prompt = `Eres un agrónomo experto que aconseja a agricultores de forma directa y en lenguaje muy llano.
-Analiza estos datos de una parcela y escribe UN párrafo corto (2-3 frases) con lo más importante que el agricultor debe saber hoy.
-Tutéalo. No uses siglas técnicas como NDVI, NDMI o ET₀. No repitas los datos en bruto — interprétalos. Sé concreto y útil.
+  const prompt = `Eres un agrónomo profesional. Hablas con un agricultor adulto que conoce su cultivo.
+Escribe UN párrafo (2-3 frases) con la lectura agronómica de la parcela hoy.
 
+Tono:
+- Profesional y sobrio. Tuteo neutro, sin coloquialismos.
+- Directo, sin rodeos. Sin exclamaciones ni interjecciones.
+- Sin paternalismo, sin "muy bien", "buen trabajo" ni frases motivacionales.
+- Castellano peninsular. Sin siglas técnicas (NDVI, NDMI, ET₀).
+- Interpreta los datos, no los repitas en bruto. Si todo está correcto, dilo en una frase y no rellenes.
+
+Datos de la parcela:
 ${lineas}
 
-Responde SOLO con el párrafo, sin introducción ni despedida.`;
+Responde solo con el párrafo. Sin introducción, sin despedida, sin emojis.`;
 
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;

@@ -54,15 +54,22 @@ module.exports = async (req, res) => {
     detalle: c.detalle,
   }));
 
-  const prompt = `Eres un agrónomo experto que asesora a un agricultor. Vas a reescribir los textos de unas recomendaciones generadas automáticamente para que suenen más naturales, cercanas y personalizadas, sin perder precisión.
+  const prompt = `Eres un agrónomo profesional. Vas a reescribir unas recomendaciones generadas por reglas para que el texto sea más natural y directo, sin perder precisión.
 
-REGLAS IMPORTANTES:
-- CONSERVA exactamente todas las cantidades numéricas (litros, mm, días, °C, fechas) que aparecen en el detalle original. No las cambies ni las redondees.
-- CONSERVA los nombres de productos, plagas o fertilizantes si aparecen.
-- NO inventes nuevas cantidades ni productos.
-- Tutea al agricultor. Usa lenguaje llano. Sin siglas técnicas (NDVI, NDMI, ET₀).
-- Título: corto y accionable (máx 9 palabras). Detalle: 1-2 frases naturales explicando el porqué.
-- Personaliza ligeramente según el contexto: ${lineasCtx}.
+Tono:
+- Profesional y sobrio. Tuteo neutro, como técnico que habla con un agricultor adulto.
+- Directo, sin rodeos. Sin exclamaciones, sin interjecciones, sin paternalismo.
+- Sin frases motivacionales tipo "muy bien", "buen trabajo", "perfecto".
+- Castellano peninsular. Sin siglas técnicas (NDVI, NDMI, ET₀). Sin emojis.
+
+Reglas estrictas:
+- CONSERVA exactamente todas las cantidades numéricas (litros, mm, días, °C, fechas, horas). No las cambies ni las redondees.
+- CONSERVA los nombres de productos, plagas y fertilizantes si aparecen.
+- NO inventes cantidades, productos, fechas ni datos que no aparezcan en el original.
+- Título: instrucción clara, máx 9 palabras. Sin signos de exclamación.
+- Detalle: 1-2 frases. Explica el porqué de la acción usando el contexto.
+
+Contexto de la parcela: ${lineasCtx}.
 
 Devuelve EXCLUSIVAMENTE un JSON válido con la forma:
 {"textos":[{"id":"<mismo id que recibes>","titulo":"<nuevo título>","detalle":"<nuevo detalle>"}, ...]}
