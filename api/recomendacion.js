@@ -8,15 +8,8 @@ module.exports = async (req, res) => {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    // Diagnóstico: lista nombres de env vars relacionadas (sin valores) para detectar typos
-    const candidatas = Object.keys(process.env).filter(k => /gem|gemini|google/i.test(k));
-    return res.status(500).json({
-      error: "GEMINI_API_KEY no configurada",
-      envHint: candidatas.length ? `vars detectadas: ${candidatas.join(", ")}` : "ninguna var con 'gem/gemini/google' visible en runtime",
-    });
-  }
+  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY no configurada" });
 
   let body = req.body;
   if (typeof body === "string") {
@@ -69,7 +62,11 @@ Responde SOLO con el párrafo, sin introducción ni despedida.`;
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 200 },
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 400,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
     });
 
