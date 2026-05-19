@@ -9,7 +9,14 @@ module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY no configurada" });
+  if (!apiKey) {
+    // Diagnóstico: lista nombres de env vars relacionadas (sin valores) para detectar typos
+    const candidatas = Object.keys(process.env).filter(k => /gem|gemini|google/i.test(k));
+    return res.status(500).json({
+      error: "GEMINI_API_KEY no configurada",
+      envHint: candidatas.length ? `vars detectadas: ${candidatas.join(", ")}` : "ninguna var con 'gem/gemini/google' visible en runtime",
+    });
+  }
 
   let body = req.body;
   if (typeof body === "string") {
