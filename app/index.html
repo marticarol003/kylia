@@ -2197,8 +2197,15 @@
           }),
         });
         const data = await resp.json();
-        textoIA = data.texto || null;
-      } catch (_) {
+        if (!resp.ok) {
+          console.warn("[Kylia] /api/recomendacion respondió", resp.status, data);
+          textoIA = null;
+        } else {
+          textoIA = data.texto || null;
+          if (!textoIA) console.warn("[Kylia] /api/recomendacion sin campo 'texto'", data);
+        }
+      } catch (err) {
+        console.warn("[Kylia] Error al llamar /api/recomendacion:", err);
         textoIA = null;
       }
       renderRecomendaciones();
