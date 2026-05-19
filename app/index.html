@@ -879,6 +879,85 @@
     }
     .ia-texto { font-style: italic; }
     .ia-cargando { color: var(--muted); font-size: 0.82rem; font-style: italic; }
+
+    /* ── Historial de riegos ── */
+    .historial-riegos {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .historial-riegos li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .historial-riegos .h-r-fecha { font-weight: 600; font-size: 0.92rem; }
+    .historial-riegos .h-r-meta  { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+    .historial-riegos .h-r-litros {
+      font-weight: 700; font-size: 0.92rem; color: var(--low);
+      background: var(--low-bg);
+      padding: 4px 9px; border-radius: 999px;
+    }
+    .historial-riegos .h-r-litros.sin-cantidad {
+      color: var(--muted); background: var(--border);
+    }
+    .historial-riegos .h-r-borrar {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 1.1rem; line-height: 1;
+      padding: 4px 8px; border-radius: 6px;
+      font-family: inherit;
+    }
+    .historial-riegos .h-r-borrar:hover { background: var(--border); color: var(--high); }
+    .historial-riegos .h-r-row {
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    /* ── Modal genérico ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15, 23, 22, 0.55);
+      z-index: 9998;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      animation: modal-fade 0.15s ease-out;
+    }
+    .modal-overlay[hidden] { display: none; }
+    @keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+    .modal-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 22px;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.18);
+    }
+    .modal-card h2 {
+      margin: 0 0 14px;
+      font-size: 1.1rem; font-weight: 700;
+    }
+    .modal-hint {
+      margin: 6px 0 0;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .modal-actions {
+      display: flex; justify-content: flex-end; gap: 8px;
+      margin-top: 18px;
+    }
+    .btn-modal-cancel {
+      background: none; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 9px 16px; font-size: 0.9rem;
+      font-family: inherit; cursor: pointer;
+    }
+    .btn-modal-cancel:hover { background: var(--border); color: var(--text); }
   </style>
 </head>
 <body>
@@ -1046,6 +1125,12 @@
       </div>
     </section>
 
+    <!-- Tus últimos riegos -->
+    <section class="card" id="card-historial-riegos" aria-label="Tus últimos riegos" hidden>
+      <div class="rec-section-header">Tus últimos riegos</div>
+      <ul id="historial-riegos-lista" class="historial-riegos"></ul>
+    </section>
+
     <!-- Recomendaciones -->
     <div id="recomendaciones-container"></div>
 
@@ -1080,6 +1165,27 @@
     </section>
 
   </main>
+
+  <!-- Modal: registrar riego -->
+  <div id="modal-riego" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-riego-titulo" hidden>
+    <div class="modal-card">
+      <h2 id="modal-riego-titulo">Registrar riego</h2>
+      <div class="config-field">
+        <label for="modal-riego-fecha">Fecha</label>
+        <input type="date" id="modal-riego-fecha">
+      </div>
+      <div class="config-field">
+        <label for="modal-riego-litros">Cantidad (L/m²)</label>
+        <input type="number" id="modal-riego-litros" min="0" max="100" step="1" inputmode="numeric" placeholder="Ej: 5">
+        <p class="modal-hint" id="modal-riego-sugerido"></p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" id="modal-riego-cancelar" type="button">Cancelar</button>
+        <button class="btn-save" id="modal-riego-guardar" type="button">Guardar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ─── Constantes ───────────────────────────────────────────────────────────
     const REFRESH_MS  = 30 * 60 * 1000;
@@ -1637,11 +1743,104 @@
     let ultimoSuelo = null;  // { hoy: [s1,s2,s3], hace7: [s1,s2,s3] }
     let ultimoNDMI  = null;  // { ndmi, stdev, fecha }
     let ultimoET0   = null;  // [{date: "2026-05-10", et0: 4.2}, ...]
-    let ultimoRiego = localStorage.getItem("kylia_ultimo_riego") || null; // "2026-05-18"
+    let riegos      = [];    // [{ date: "2026-05-18", litros: 5|null }, ...] ordenado asc
+    let ultimoRiego = null;  // string "2026-05-18" — derivado de riegos para retrocompat
     let ultimoNDVI  = null;  // { estado, ndvi, fecha } — para renderIndicadores
     let ultimoMeteo    = null;  // { tempMax, humMax, lluvia, vientoMax } — para recomendaciones
     let ultimoPrevision = [];  // [{ nombreDia, tempMax, humMax, lluvia, vientoMax }] próximos 3 días
     let textoIA         = null; // análisis generado por Gemini
+    let recomendacionesIA = null; // { [recId]: { titulo, detalle } } reescritas por Gemini
+
+    // ─── Balance hídrico (déficit residual cuando el riego fue insuficiente) ─
+    // Devuelve null si no hay datos suficientes. Cuando el último riego tiene
+    // litros registrados, mide si el riego anterior cubrió la ET₀ del intervalo
+    // previo y, después, si el último riego compensó ese déficit acumulado.
+    function calcularBalanceHidrico() {
+      if (!ultimoET0 || !ultimoET0.length) return null;
+      const ultRiego = riegos[riegos.length - 1] || null;
+      const refDate = ultRiego?.date || ultimoNDMI?.fecha;
+      if (!refDate) return null;
+
+      const et0DesdeUltimo = ultimoET0
+        .filter(({ date }) => date >= refDate)
+        .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+
+      // Déficit residual tras el último riego: lo que el último riego no
+      // consiguió compensar del intervalo anterior. Solo se calcula si el
+      // último riego tiene litros (sin ese dato no podemos saberlo).
+      let deficitResidual = 0;
+      let excedenteUlt = 0;
+      let intervaloPrev = null;
+      if (ultRiego?.litros != null && riegos.length >= 2) {
+        const prev = riegos[riegos.length - 2];
+        const et0Intervalo = ultimoET0
+          .filter(({ date }) => date >= prev.date && date < ultRiego.date)
+          .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+        // Riego previo: si tiene litros usamos su valor; si no, asumimos que
+        // cubrió justo el intervalo (compatibilidad con registros antiguos).
+        const litrosPrev = prev.litros != null ? prev.litros : et0Intervalo;
+        const deficitAntesUlt = Math.max(0, et0Intervalo - litrosPrev);
+        deficitResidual = Math.max(0, deficitAntesUlt - ultRiego.litros);
+        excedenteUlt    = Math.max(0, ultRiego.litros - deficitAntesUlt);
+        intervaloPrev = { et0: et0Intervalo, litrosPrev, deficitAntesUlt };
+      }
+
+      // El balance final puede reducirse por el excedente del último riego
+      // (lo que sobró tras cubrir el déficit anterior queda en el suelo y
+      // amortigua parte de la nueva ET₀).
+      const balanceTotal = Math.max(0, et0DesdeUltimo + deficitResidual - excedenteUlt);
+
+      const diasDesdeUltimoRiego = ultRiego
+        ? Math.max(0, Math.round((Date.now() - new Date(ultRiego.date)) / 86400000))
+        : null;
+
+      return {
+        et0DesdeUltimo,
+        deficitResidual,
+        excedenteUlt,
+        balanceTotal,
+        refDate,
+        diasDesdeUltimoRiego,
+        ultimoLitros: ultRiego?.litros ?? null,
+        intervaloPrev,
+      };
+    }
+
+    // ─── Storage de riegos (con cantidad) ────────────────────────────────────
+    // Migración suave desde `kylia_ultimo_riego` (string, sin litros) a
+    // `kylia_riegos` (array). Si el usuario ya tenía un registro previo, se
+    // conserva como entrada sin cantidad.
+    const RIEGOS_KEY = "kylia_riegos";
+    function loadRiegos() {
+      try {
+        const raw = localStorage.getItem(RIEGOS_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (_) { /* ignorar JSON inválido */ }
+      const legacy = localStorage.getItem("kylia_ultimo_riego");
+      if (legacy) {
+        const arr = [{ date: legacy, litros: null }];
+        localStorage.setItem(RIEGOS_KEY, JSON.stringify(arr));
+        localStorage.removeItem("kylia_ultimo_riego");
+        return arr;
+      }
+      return [];
+    }
+    function saveRiegos(arr) {
+      riegos = arr.slice().sort((a, b) => a.date.localeCompare(b.date));
+      localStorage.setItem(RIEGOS_KEY, JSON.stringify(riegos));
+      ultimoRiego = riegos.length ? riegos[riegos.length - 1].date : null;
+    }
+    function addRiego(date, litros) {
+      const arr = riegos.filter(r => r.date !== date);
+      arr.push({ date, litros: litros != null && !Number.isNaN(litros) ? +litros : null });
+      saveRiegos(arr);
+    }
+    function removeRiego(date) {
+      saveRiegos(riegos.filter(r => r.date !== date));
+    }
+    // Inicialización: carga el historial y deriva la fecha del último riego
+    riegos = loadRiegos();
+    ultimoRiego = riegos.length ? riegos[riegos.length - 1].date : null;
 
     // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
     // seleccionada, cae al lat/lon del pueblo/configuración.
@@ -1885,14 +2084,12 @@
 
       const alerta = calcularAlertaRiego();
 
-      // Alerta moderada: 15-28mm evaporados desde imagen o desde último riego
+      // Alerta moderada: 15-28mm de balance (ET₀ evaporada + déficit residual
+      // si el último riego no compensó el intervalo anterior)
       let alertaModesta = null;
       if (!alerta && ultimoET0) {
-        const ref = ultimoRiego || ultimoNDMI?.fecha;
-        if (ref) {
-          const sum = ultimoET0.filter(({ date }) => date >= ref).reduce((s, { et0 }) => s + (et0 ?? 0), 0);
-          if (sum >= 15) alertaModesta = { et0: sum };
-        }
+        const bal = calcularBalanceHidrico();
+        if (bal && bal.balanceTotal >= 15) alertaModesta = { et0: bal.balanceTotal };
       }
 
       const porQue = `<button class="btn-por-que" id="btn-por-que-hoy">¿Por qué?</button>`;
@@ -1959,12 +2156,13 @@
           if (aguaSub) aguaSub.textContent = "";
         } else {
           let txt, cls, sub;
-          if (ultimoRiego && ultimoET0) {
-            const sum = ultimoET0.filter(({ date }) => date >= ultimoRiego).reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+          const balance = calcularBalanceHidrico();
+          if (ultimoRiego && balance) {
+            const sum = balance.balanceTotal;
             if (sum < 15)      { txt = "Hidratada"; cls = "buena"; }
             else if (sum < 30) { txt = "Vigilar";   cls = "moderada"; }
             else               { txt = "Sedienta";  cls = "estres"; }
-            sub = "estimado desde el riego";
+            sub = balance.deficitResidual >= 5 ? "déficit del riego anterior" : "estimado desde el riego";
           } else {
             const { ndmi, fecha } = ultimoNDMI;
             if (ndmi >= 0.2)    { txt = "Hidratada"; cls = "buena"; }
@@ -2001,12 +2199,48 @@
       if (!el) return;
       if (ultimoRiego) {
         const dias = Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000));
+        const litros = riegos[riegos.length - 1]?.litros;
+        const litrosTxt = litros != null ? ` · ${litros} L/m²` : "";
         el.innerHTML =
-          `<span class="riego-etiqueta">Último riego: hace ${dias} día${dias !== 1 ? "s" : ""}</span>`
-          + `<button class="btn-riego-reset" id="btn-borrar-riego">Borrar</button>`;
+          `<span class="riego-etiqueta">Último riego: hace ${dias} día${dias !== 1 ? "s" : ""}${litrosTxt}</span>`
+          + `<button class="btn-riego" id="btn-registrar-riego">+ Nuevo riego</button>`;
       } else {
         el.innerHTML = `<button class="btn-riego" id="btn-registrar-riego">+ He regado hoy</button>`;
       }
+    }
+
+    // ─── Historial de riegos (card propia) ───────────────────────────────────
+    function renderHistorialRiegos() {
+      const card  = document.getElementById("card-historial-riegos");
+      const lista = document.getElementById("historial-riegos-lista");
+      if (!card || !lista) return;
+      if (!riegos.length) { card.hidden = true; return; }
+      card.hidden = false;
+      const ultimos = riegos.slice(-7).reverse(); // más reciente primero
+      lista.innerHTML = "";
+      ultimos.forEach((r, i) => {
+        const previa = ultimos[i + 1];
+        const dDesde = previa
+          ? Math.round((new Date(r.date) - new Date(previa.date)) / 86400000)
+          : null;
+        const meta = dDesde != null ? `Cada ${dDesde} día${dDesde !== 1 ? "s" : ""}` : "Primer riego registrado";
+        const litros = r.litros != null
+          ? `<span class="h-r-litros">${r.litros} L/m²</span>`
+          : `<span class="h-r-litros sin-cantidad">sin cantidad</span>`;
+        const li = document.createElement("li");
+        li.innerHTML =
+          `<div>`
+          + `<div class="h-r-fecha">${formatearFechaCorta(r.date)}</div>`
+          + `<div class="h-r-meta">${meta}</div>`
+          + `</div>`
+          + `<div class="h-r-row">${litros}<button class="h-r-borrar" data-date="${r.date}" aria-label="Borrar riego del ${r.date}">✕</button></div>`;
+        lista.appendChild(li);
+      });
+    }
+
+    function formatearFechaCorta(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
     }
 
     // ─── Recomendaciones ─────────────────────────────────────────────────────
@@ -2021,20 +2255,20 @@
       const lluviaInminente = ultimoPrevision.slice(0, 2).some(d => (d.lluvia ?? 0) >= 4);
       const lluviaExcesiva  = ultimoPrevision.some(d => (d.lluvia ?? 0) > 15);
 
-      // 1. RIEGO — ajustado a la lluvia prevista
-      if (ultimoET0) {
-        const ref = ultimoRiego || ultimoNDMI?.fecha;
-        if (ref) {
-          const et0sum = ultimoET0
-            .filter(({ date }) => date >= ref)
-            .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
-          if (et0sum >= 15) {
-            const urgente = et0sum >= 30;
-            const litros  = Math.ceil(et0sum);
-            const dias    = ultimoRiego
-              ? Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000))
-              : null;
-            const deficit = `Han evaporado ${et0sum.toFixed(0)} mm${dias !== null ? ` en los últimos ${dias} días` : ""}.`;
+      // 1. RIEGO — ajustado a la lluvia prevista. Usa balance hídrico
+      // (ET₀ desde el último riego + déficit residual si el riego anterior
+      // no compensó la evaporación del intervalo).
+      const balance = calcularBalanceHidrico();
+      if (balance) {
+        const et0sum = balance.balanceTotal;
+        if (et0sum >= 15) {
+          const urgente = et0sum >= 30;
+          const litros  = Math.ceil(et0sum);
+          const dias    = balance.diasDesdeUltimoRiego;
+          const notaDeficit = balance.deficitResidual >= 5
+            ? ` (tu último riego se quedó corto: ${Math.round(balance.deficitResidual)} mm sin reponer)`
+            : "";
+          const deficit = `Han evaporado ${balance.et0DesdeUltimo.toFixed(0)} mm${dias !== null ? ` en los últimos ${dias} días` : ""}${notaDeficit}.`;
 
             if (!urgente && lluviaPrevista >= et0sum * 0.7) {
               // La lluvia cubre >70% del déficit → no hace falta regar
@@ -2065,7 +2299,6 @@
                 prod: null, prioridad: urgente ? 1 : 3,
               });
             }
-          }
         }
       }
 
@@ -2211,12 +2444,75 @@
       renderRecomendaciones();
     }
 
+    // Hash sencillo de los candidatos (id+titulo+detalle) para evitar
+    // reescrituras IA repetidas cuando el conjunto no cambia.
+    let recomendacionesUltimoHash = null;
+    function hashRecs(recs) {
+      return recs.map(r => `${r.id}|${r.titulo}|${r.detalle}`).join("§");
+    }
+
+    async function cargarRecomendacionesIA(recs) {
+      if (!recs.length) return;
+      const hash = hashRecs(recs);
+      if (hash === recomendacionesUltimoHash) return; // sin cambios
+      recomendacionesUltimoHash = hash;
+
+      const ref    = ultimoRiego || ultimoNDMI?.fecha;
+      const et0sum = ref && ultimoET0
+        ? ultimoET0.filter(({ date }) => date >= ref).reduce((s, { et0 }) => s + (et0 ?? 0), 0)
+        : null;
+      const diasSinRiego = ultimoRiego
+        ? Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000))
+        : null;
+      const lluviaPrevista = ultimoPrevision.reduce((s, d) => s + (d.lluvia ?? 0), 0);
+
+      try {
+        const resp = await fetch("/api/recomendaciones-texto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cultivos: cfg.cultivos || [],
+            contexto: {
+              ndviEstado: ultimoNDVI?.estado,
+              ndmiEstado: ultimoNDMI ? (ultimoNDMI.ndmi >= 0.2 ? "hidratada" : ultimoNDMI.ndmi >= 0 ? "vigilar" : "estres") : null,
+              sueloEstado: ultimoSuelo?.hoy[0] != null
+                ? (ultimoSuelo.hoy[0] < 0.15 ? "seco" : ultimoSuelo.hoy[0] > 0.35 ? "saturado" : "adecuado")
+                : null,
+              tempMax: ultimoMeteo?.tempMax,
+              diasSinRiego,
+              et0Acumulado: et0sum,
+              lluviaPrevista,
+            },
+            candidatos: recs.map(r => ({
+              id: r.id, categoria: r.categoria,
+              titulo: r.titulo, detalle: r.detalle,
+            })),
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          console.warn("[Kylia] /api/recomendaciones-texto respondió", resp.status, data);
+          return;
+        }
+        if (!Array.isArray(data.textos) || !data.textos.length) return;
+        const mapa = {};
+        data.textos.forEach(t => { mapa[t.id] = { titulo: t.titulo, detalle: t.detalle }; });
+        recomendacionesIA = mapa;
+        renderRecomendaciones();
+      } catch (err) {
+        console.warn("[Kylia] Error al llamar /api/recomendaciones-texto:", err);
+      }
+    }
+
     function renderRecomendaciones() {
       const container = document.getElementById("recomendaciones-container");
       if (!container) return;
       if (!ultimoET0 && !ultimoNDVI && !ultimoMeteo) return;
 
       const recs = generarRecomendaciones();
+      // Dispara reescritura IA en background (la primera llamada renderiza
+      // con textos de reglas; la segunda, con los reescritos por Gemini)
+      cargarRecomendacionesIA(recs);
       container.innerHTML = "";
 
       const section = document.createElement("section");
@@ -2257,19 +2553,24 @@
       container.appendChild(section);
 
       recs.forEach(rec => {
+        // Si la IA reescribió este id, usamos sus textos; si no, los de las reglas
+        const reescrito = recomendacionesIA?.[rec.id];
+        const titulo  = reescrito?.titulo  || rec.titulo;
+        const detalle = reescrito?.detalle || rec.detalle;
+
         const fila = document.createElement("div");
         fila.className = "rec-fila";
         fila.setAttribute("role", "button");
         fila.setAttribute("aria-expanded", "false");
         fila.innerHTML =
           `<span class="rec-cat ${rec.catClass}">${rec.categoria}</span>`
-          + `<span class="rec-titulo">${rec.titulo}</span>`;
+          + `<span class="rec-titulo">${titulo}</span>`;
         lista.appendChild(fila);
 
         const panel = document.createElement("div");
         panel.className = "rec-detalle-panel";
 
-        let html = `<p>${rec.detalle}</p>`;
+        let html = `<p>${detalle}</p>`;
         if (rec.prod?.eco && rec.prod?.conv) {
           html += `<div class="rec-producto">
             <div class="rec-producto-label">Opción ecológica</div>
@@ -2301,10 +2602,12 @@
     function calcularAlertaRiego() {
       if (!ultimoET0) return null;
       if (ultimoRiego) {
-        const sum     = ultimoET0.filter(({ date }) => date >= ultimoRiego)
-                                  .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
-        const dias    = Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000));
-        if (sum >= 30) return { et0: sum, desde: `el último riego registrado (hace ${dias} días)` };
+        const bal = calcularBalanceHidrico();
+        if (!bal) return null;
+        if (bal.balanceTotal >= 30) {
+          const dias = bal.diasDesdeUltimoRiego ?? 0;
+          return { et0: bal.balanceTotal, desde: `el último riego registrado (hace ${dias} días)` };
+        }
         return null;
       }
       if (ultimoNDMI?.fecha) {
@@ -2635,21 +2938,70 @@
     }
 
     // ─── Riego ────────────────────────────────────────────────────────────────
-    function registrarRiego() {
-      ultimoRiego = new Date().toISOString().slice(0, 10);
-      localStorage.setItem("kylia_ultimo_riego", ultimoRiego);
+    function refrescarTrasCambioRiego() {
       renderIndicadores();
       renderHoy();
       renderRiegoRegistro();
+      renderHistorialRiegos();
       renderRecomendaciones();
+      cargarAnalisisIA();
     }
-    function borrarRiego() {
-      ultimoRiego = null;
-      localStorage.removeItem("kylia_ultimo_riego");
-      renderIndicadores();
-      renderHoy();
-      renderRiegoRegistro();
-      renderRecomendaciones();
+
+    // Calcula los litros sugeridos para precargar el modal: si hay
+    // recomendación de riego activa con cantidad concreta, la usamos.
+    function litrosSugeridosHoy() {
+      if (!ultimoET0) return null;
+      const ref = ultimoRiego || ultimoNDMI?.fecha;
+      if (!ref) return null;
+      const et0sum = ultimoET0
+        .filter(({ date }) => date >= ref)
+        .reduce((s, { et0 }) => s + (et0 ?? 0), 0);
+      if (et0sum < 5) return null;
+      return Math.ceil(et0sum);
+    }
+
+    function registrarRiego() {
+      abrirModalRiego();
+    }
+
+    function borrarUltimoRiego() {
+      if (!riegos.length) return;
+      const ultima = riegos[riegos.length - 1];
+      if (!confirm(`¿Borrar el riego del ${ultima.date}?`)) return;
+      removeRiego(ultima.date);
+      refrescarTrasCambioRiego();
+    }
+    // Alias mantenido por compatibilidad con manejadores antiguos
+    const borrarRiego = borrarUltimoRiego;
+
+    // ─── Modal de registro de riego ───────────────────────────────────────────
+    function abrirModalRiego() {
+      const modal     = document.getElementById("modal-riego");
+      const fechaEl   = document.getElementById("modal-riego-fecha");
+      const litrosEl  = document.getElementById("modal-riego-litros");
+      const sugerEl   = document.getElementById("modal-riego-sugerido");
+      const hoy       = new Date().toISOString().slice(0, 10);
+      const sugerido  = litrosSugeridosHoy();
+
+      fechaEl.value = hoy;
+      fechaEl.max   = hoy;
+      litrosEl.value = sugerido != null ? sugerido : "";
+      sugerEl.textContent = sugerido != null
+        ? `Sugerido por la app: ${sugerido} L/m² (compensa lo evaporado).`
+        : "Si lo prefieres, puedes dejarlo vacío.";
+      modal.hidden = false;
+      requestAnimationFrame(() => litrosEl.focus());
+    }
+    function cerrarModalRiego() {
+      document.getElementById("modal-riego").hidden = true;
+    }
+    function guardarModalRiego() {
+      const fecha  = document.getElementById("modal-riego-fecha").value;
+      const litros = document.getElementById("modal-riego-litros").value;
+      if (!fecha) return;
+      addRiego(fecha, litros === "" ? null : Number(litros));
+      cerrarModalRiego();
+      refrescarTrasCambioRiego();
     }
 
     // ─── Textos explicativos (¿Por qué?) ─────────────────────────────────────
@@ -2712,6 +3064,7 @@
       initConfigPanel();
       renderizarAlertas();
       renderRiegoRegistro();
+      renderHistorialRiegos();
       renderRecomendaciones();
       cargarDatos();
       cargarNDVI();
@@ -2732,6 +3085,26 @@
       document.getElementById("riego-registro").addEventListener("click", (e) => {
         if (e.target.id === "btn-registrar-riego") registrarRiego();
         else if (e.target.id === "btn-borrar-riego") borrarRiego();
+      });
+
+      // Modal de riego
+      document.getElementById("modal-riego-cancelar").addEventListener("click", cerrarModalRiego);
+      document.getElementById("modal-riego-guardar").addEventListener("click", guardarModalRiego);
+      document.getElementById("modal-riego").addEventListener("click", (e) => {
+        if (e.target.id === "modal-riego") cerrarModalRiego();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !document.getElementById("modal-riego").hidden) cerrarModalRiego();
+      });
+
+      // Historial de riegos: borrado individual
+      document.getElementById("historial-riegos-lista").addEventListener("click", (e) => {
+        const btn = e.target.closest(".h-r-borrar");
+        if (!btn) return;
+        const fecha = btn.dataset.date;
+        if (!confirm(`¿Borrar el riego del ${fecha}?`)) return;
+        removeRiego(fecha);
+        refrescarTrasCambioRiego();
       });
 
       // Filas de indicadores: clic abre/cierra panel de explicación
