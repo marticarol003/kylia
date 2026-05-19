@@ -2,8 +2,29 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kylia</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1f13">
+  <meta name="description" content="Kylia — tu parcela vista desde el satélite. Vigor, humedad y la siguiente acción de riego, en un vistazo.">
+  <meta name="robots" content="noindex,follow">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Kylia · Tu parcela desde el satélite">
+  <meta property="og:description" content="Vigor, humedad y la siguiente acción de riego, en un vistazo.">
+  <meta property="og:locale" content="es_ES">
+  <meta property="og:image" content="https://kylia.app/assets/img/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%230b1f13%22/><path d=%22M10 20 Q16 10 22 20 Z%22 fill=%22white%22/></svg>">
+  <link rel="apple-touch-icon" href="/assets/img/og-image.png">
+
+  <link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
+  <link rel="preconnect" href="https://geocoding-api.open-meteo.com" crossorigin>
+  <link rel="dns-prefetch" href="https://unpkg.com">
+  <link rel="dns-prefetch" href="https://server.arcgisonline.com">
+  <link rel="dns-prefetch" href="https://tile.openstreetmap.org">
+  <link rel="dns-prefetch" href="https://api.bigdatacloud.net">
+
+  <title>Kylia · Tu parcela desde el satélite</title>
   <style>
     :root {
       --bg:         #f5f8f2;
@@ -639,6 +660,7 @@
       justify-content: center;
       padding: 20px;
     }
+    .gate-overlay[hidden] { display: none; }
     .gate-card {
       background: var(--card);
       border: 1px solid var(--border);
@@ -858,23 +880,21 @@
     .ia-texto { font-style: italic; }
     .ia-cargando { color: var(--muted); font-size: 0.82rem; font-style: italic; }
   </style>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
   <!-- Gate de identificación — se oculta si ya hay email en localStorage -->
-  <div id="gate" class="gate-overlay">
+  <div id="gate" class="gate-overlay" role="dialog" aria-modal="true" aria-labelledby="gate-title" aria-describedby="gate-desc" hidden>
     <div class="gate-card">
-      <div class="gate-logo">🌱 Kylia</div>
-      <h2>Introduce tu email para entrar</h2>
-      <p>Es un piloto privado. Solo te pedimos un email para avisarte de novedades y no perdernos.</p>
+      <div class="gate-logo" aria-hidden="true">🌱 Kylia</div>
+      <h2 id="gate-title">Introduce tu email para entrar</h2>
+      <p id="gate-desc">Es un piloto privado. Solo te pedimos un email para avisarte de novedades y no perdernos.</p>
       <div class="gate-field">
         <label for="gate-nombre">Nombre (opcional)</label>
         <input type="text" id="gate-nombre" placeholder="Ej: Elias" maxlength="40" autocomplete="given-name">
       </div>
       <div class="gate-field">
         <label for="gate-email">Email *</label>
-        <input type="email" id="gate-email" placeholder="tunombre@ejemplo.com" autocomplete="email">
+        <input type="email" id="gate-email" placeholder="tunombre@ejemplo.com" autocomplete="email" required>
       </div>
       <button id="gate-btn" type="button">Entrar →</button>
       <span id="gate-status" class="gate-status" aria-live="polite"></span>
@@ -882,11 +902,18 @@
     </div>
   </div>
   <script>
-    // Oculta el gate si ya hay email registrado (runs antes del DOMContentLoaded
-    // para evitar flash del overlay cuando el usuario ya se identificó)
+    // El gate parte con [hidden]; se muestra solo si NO hay email guardado.
+    // De esta forma no hay flash del overlay para quien ya se identificó.
     (function () {
-      if (localStorage.getItem("kylia_user_email")) {
-        document.getElementById("gate").style.display = "none";
+      const gate = document.getElementById("gate");
+      const yaIdentificado = !!localStorage.getItem("kylia_user_email");
+
+      if (!yaIdentificado) {
+        gate.hidden = false;
+        // Focus al primer campo accionable para accesibilidad por teclado
+        requestAnimationFrame(() => {
+          document.getElementById("gate-nombre").focus();
+        });
       }
 
       document.getElementById("gate-btn").addEventListener("click", async function () {
@@ -901,6 +928,7 @@
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           statusEl.textContent = "Introduce un email válido.";
           statusEl.className   = "gate-status error";
+          emailEl.focus();
           return;
         }
 
@@ -917,7 +945,7 @@
         } catch (_) { /* si falla la red, dejamos pasar igualmente */ }
 
         localStorage.setItem("kylia_user_email", email);
-        document.getElementById("gate").style.display = "none";
+        gate.hidden = true;
       });
 
       // Enter en cualquier campo del gate
@@ -2359,9 +2387,36 @@
       );
     }
 
-    function initMapaParcela() {
+    // Carga Leaflet bajo demanda (solo cuando se abre el panel de configuración).
+    // Devuelve una promesa que resuelve cuando window.L ya está disponible.
+    let leafletPromise = null;
+    function cargarLeaflet() {
+      if (window.L) return Promise.resolve();
+      if (leafletPromise) return leafletPromise;
+      leafletPromise = new Promise((resolve, reject) => {
+        const css = document.createElement("link");
+        css.rel = "stylesheet";
+        css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(css);
+        const js = document.createElement("script");
+        js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        js.async = true;
+        js.onload = () => resolve();
+        js.onerror = () => reject(new Error("leaflet-load-failed"));
+        document.head.appendChild(js);
+      });
+      return leafletPromise;
+    }
+
+    async function initMapaParcela() {
+      const info = document.getElementById("parcela-info");
+      try {
+        await cargarLeaflet();
+      } catch (_) {
+        if (info) info.textContent = "Leaflet no se ha podido cargar (¿bloqueado por el navegador o sin conexión?).";
+        return;
+      }
       if (typeof L === "undefined") {
-        const info = document.getElementById("parcela-info");
         if (info) info.textContent = "Leaflet no se ha podido cargar (¿bloqueado por el navegador o sin conexión?).";
         return;
       }

@@ -18,6 +18,8 @@
 <link rel="preconnect" href="https://api.open-meteo.com" crossorigin />
 <link rel="dns-prefetch" href="https://sigpac.mapa.gob.es" />
 
+<link rel="preload" as="image" href="assets/img/product-mobile.png" fetchpriority="high" />
+
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Kylia" />
 <meta property="og:title" content="Kylia · El satélite ya mira tu parcela. Ahora tú también." />
@@ -744,7 +746,7 @@
     text-align: center;
     box-shadow: var(--shadow-lg);
   }
-  .waitlist-card h3 {
+  .waitlist-card h2 {
     font-size: clamp(1.4rem, 2vw, 1.8rem);
     font-weight: 800; margin-bottom: 10px;
     letter-spacing: -.02em;
@@ -1340,7 +1342,7 @@
 <section id="lista-espera" class="alt" aria-labelledby="h-waitlist">
   <div class="wrap">
     <div class="waitlist-card reveal">
-      <h3 id="h-waitlist">Entra en el piloto 2026</h3>
+      <h2 id="h-waitlist">Entra en el piloto 2026</h2>
       <p>Si eres cooperativa, ADV o agricultor profesional, probar Kylia esta campaña es <strong>gratis</strong>. Déjanos tu contacto y te escribimos en menos de 48 h.</p>
       <form class="waitlist" id="form-waitlist" novalidate>
         <div>
@@ -1450,15 +1452,22 @@
 </footer>
 
 <script>
-  // Scroll progress bar
+  // Scroll progress bar (rAF-throttled)
   const progress = document.getElementById("nav-progress");
-  function onScroll() {
+  let scrollTicking = false;
+  function updateProgress() {
     const h = document.documentElement;
     const max = h.scrollHeight - h.clientHeight;
     progress.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + "%";
+    scrollTicking = false;
   }
-  document.addEventListener("scroll", onScroll, { passive: true });
-  onScroll();
+  document.addEventListener("scroll", () => {
+    if (!scrollTicking) {
+      requestAnimationFrame(updateProgress);
+      scrollTicking = true;
+    }
+  }, { passive: true });
+  updateProgress();
 
   // Reveal on scroll
   const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
