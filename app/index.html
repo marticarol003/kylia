@@ -511,6 +511,22 @@
     .hoy-icono { font-size: 1.5rem; line-height: 1; margin-bottom: 6px; }
     .hoy-accion { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
     .hoy-razon { margin: 0 0 14px; font-size: 0.9rem; color: var(--text); line-height: 1.45; }
+    .hoy-plazos {
+      margin-top: 14px;
+      padding: 10px 12px;
+      background: var(--high-bg);
+      border: 1px solid var(--high);
+      border-radius: 10px;
+      color: var(--high);
+      font-size: 0.85rem;
+    }
+    .hoy-plazos-titulo {
+      font-weight: 700; font-size: 0.78rem;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+    .hoy-plazos ul { margin: 0; padding-left: 16px; }
+    .hoy-plazos li { margin: 3px 0; }
     .hoy-cargando { margin: 0; color: var(--muted); font-size: 0.9rem; }
     .btn-regar-grande {
       display: inline-block; padding: 11px 22px;
@@ -985,6 +1001,22 @@
     .btn-elegir-producto.activo {
       background: var(--medium); color: #fff; border-color: var(--medium);
     }
+    .prod-acciones {
+      display: flex; flex-direction: column; gap: 4px;
+      align-items: stretch;
+    }
+    .btn-aplicar-producto {
+      background: var(--low);
+      color: #fff;
+      border: 1px solid var(--low);
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 0.74rem;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-aplicar-producto:hover { opacity: 0.85; }
     .producto-detalle {
       display: none;
     }
@@ -1048,6 +1080,76 @@
     .historial-riegos .h-r-row {
       display: flex; align-items: center; gap: 10px;
     }
+
+    /* ── Historial de aplicaciones ── */
+    .apl-cabecera {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; flex-wrap: wrap;
+    }
+    .apl-acciones {
+      display: flex; gap: 6px;
+    }
+    .btn-apl-csv, .btn-apl-nueva {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 5px 10px;
+      font-family: inherit;
+      font-size: 0.78rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .btn-apl-csv:hover { background: var(--border); color: var(--text); }
+    .btn-apl-nueva { background: var(--low); color: #fff; border-color: var(--low); }
+    .btn-apl-nueva:hover { opacity: 0.88; }
+    .historial-aplicaciones {
+      list-style: none;
+      padding: 0;
+      margin: 10px 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .historial-aplicaciones li {
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .historial-aplicaciones .apl-fila-1 {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; flex-wrap: wrap;
+    }
+    .historial-aplicaciones .apl-nombre {
+      font-weight: 600; font-size: 0.92rem;
+    }
+    .historial-aplicaciones .apl-meta {
+      font-size: 0.78rem; color: var(--muted);
+      margin-top: 2px;
+    }
+    .historial-aplicaciones .apl-detalle {
+      font-size: 0.78rem; color: var(--subtle);
+      margin-top: 4px; line-height: 1.45;
+    }
+    .historial-aplicaciones .apl-plazo {
+      display: inline-block;
+      font-weight: 600; font-size: 0.74rem;
+      padding: 3px 8px; border-radius: 999px;
+      margin-top: 4px;
+    }
+    .historial-aplicaciones .apl-plazo.activo {
+      background: var(--high-bg); color: var(--high);
+    }
+    .historial-aplicaciones .apl-plazo.libre {
+      background: var(--low-bg); color: var(--low);
+    }
+    .historial-aplicaciones .apl-borrar {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 1.1rem; line-height: 1;
+      padding: 4px 8px; border-radius: 6px;
+      font-family: inherit;
+    }
+    .historial-aplicaciones .apl-borrar:hover { background: var(--border); color: var(--high); }
 
     /* ── Modal genérico ── */
     .modal-overlay {
@@ -1261,6 +1363,18 @@
       <ul id="historial-riegos-lista" class="historial-riegos"></ul>
     </section>
 
+    <!-- Tus últimas aplicaciones -->
+    <section class="card" id="card-historial-aplicaciones" aria-label="Tus últimas aplicaciones" hidden>
+      <div class="apl-cabecera">
+        <span class="rec-section-header">Tus últimas aplicaciones</span>
+        <div class="apl-acciones">
+          <button class="btn-apl-csv" id="btn-aplicaciones-csv" type="button">Descargar CSV</button>
+          <button class="btn-apl-nueva" id="btn-aplicacion-nueva" type="button">+ Nueva</button>
+        </div>
+      </div>
+      <ul id="historial-aplicaciones-lista" class="historial-aplicaciones"></ul>
+    </section>
+
     <!-- Recomendaciones -->
     <div id="recomendaciones-container"></div>
 
@@ -1295,6 +1409,43 @@
     </section>
 
   </main>
+
+  <!-- Modal: registrar aplicación de producto -->
+  <div id="modal-aplicacion" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-aplicacion-titulo" hidden>
+    <div class="modal-card">
+      <h2 id="modal-aplicacion-titulo">Registrar aplicación</h2>
+      <div class="config-field">
+        <label for="modal-apl-fecha">Fecha</label>
+        <input type="date" id="modal-apl-fecha">
+      </div>
+      <div class="config-field">
+        <label for="modal-apl-producto">Producto</label>
+        <input type="text" id="modal-apl-producto" placeholder="Ej: Jabón potásico">
+        <p class="modal-hint" id="modal-apl-sustancia"></p>
+      </div>
+      <div class="config-field">
+        <label for="modal-apl-dosis">Dosis aplicada</label>
+        <input type="text" id="modal-apl-dosis" placeholder="Ej: 1.5 % o 2 kg/ha">
+      </div>
+      <div class="config-field">
+        <label for="modal-apl-cultivo">Cultivo</label>
+        <select id="modal-apl-cultivo"></select>
+      </div>
+      <div class="config-field">
+        <label for="modal-apl-plazo">Plazo de seguridad (días)</label>
+        <input type="number" id="modal-apl-plazo" min="0" max="60" step="1" placeholder="0">
+        <p class="modal-hint">Días sin recolectar tras la aplicación. Cero si no aplica.</p>
+      </div>
+      <div class="config-field">
+        <label for="modal-apl-notas">Notas (opcional)</label>
+        <input type="text" id="modal-apl-notas" placeholder="Ej: foco localizado en fila norte">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" id="modal-apl-cancelar" type="button">Cancelar</button>
+        <button class="btn-save" id="modal-apl-guardar" type="button">Guardar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal: registrar riego -->
   <div id="modal-riego" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-riego-titulo" hidden>
@@ -1972,6 +2123,54 @@
     riegos = loadRiegos();
     ultimoRiego = riegos.length ? riegos[riegos.length - 1].date : null;
 
+    // ─── Storage de aplicaciones de productos ────────────────────────────────
+    // Cuaderno de aplicaciones del agricultor. Entradas:
+    // { date, productoId|null, productoNombre, sustanciaActiva, tipo, dosis,
+    //   cultivo, plazoSeguridad, notas, fueOtro }
+    // 'fueOtro: true' indica que el producto no estaba en el catálogo.
+    const APLICACIONES_KEY = "kylia_aplicaciones";
+    let aplicaciones = [];
+    function loadAplicaciones() {
+      try {
+        const raw = localStorage.getItem(APLICACIONES_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (_) { return []; }
+    }
+    function saveAplicaciones(arr) {
+      aplicaciones = arr.slice().sort((a, b) => a.date.localeCompare(b.date));
+      localStorage.setItem(APLICACIONES_KEY, JSON.stringify(aplicaciones));
+    }
+    function addAplicacion(entrada) {
+      const arr = aplicaciones.slice();
+      arr.push(entrada);
+      saveAplicaciones(arr);
+    }
+    function removeAplicacion(date, productoNombre) {
+      saveAplicaciones(
+        aplicaciones.filter(a => !(a.date === date && a.productoNombre === productoNombre))
+      );
+    }
+    aplicaciones = loadAplicaciones();
+
+    // Devuelve aplicaciones con plazo de seguridad aún activo (fecha + plazo > hoy)
+    function aplicacionesConPlazoActivo() {
+      const hoy = new Date().toISOString().slice(0, 10);
+      return aplicaciones.filter(a => {
+        if (!a.plazoSeguridad || a.plazoSeguridad <= 0) return false;
+        const limite = new Date(a.date);
+        limite.setDate(limite.getDate() + a.plazoSeguridad);
+        return limite.toISOString().slice(0, 10) > hoy;
+      }).map(a => {
+        const limite = new Date(a.date);
+        limite.setDate(limite.getDate() + a.plazoSeguridad);
+        return {
+          ...a,
+          fechaLimite: limite.toISOString().slice(0, 10),
+          diasRestantes: Math.max(0, Math.ceil((limite - new Date()) / 86400000)),
+        };
+      });
+    }
+
     // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
     // seleccionada, cae al lat/lon del pueblo/configuración.
     // Esto es importante para Open-Meteo: si no usamos el centroide, toda la
@@ -2249,6 +2448,18 @@
           + porQue;
       }
 
+      // Aviso de plazo de seguridad activo si hay aplicaciones recientes
+      const plazos = aplicacionesConPlazoActivo();
+      if (plazos.length) {
+        const items = plazos.map(p =>
+          `<li><strong>${p.productoNombre}</strong> — no recolectar hasta ${formatearFechaCorta(p.fechaLimite)} (${p.diasRestantes} día${p.diasRestantes !== 1 ? "s" : ""})</li>`
+        ).join("");
+        el.innerHTML += `<div class="hoy-plazos">
+          <div class="hoy-plazos-titulo">Plazo de seguridad activo</div>
+          <ul>${items}</ul>
+        </div>`;
+      }
+
       const btn = document.getElementById("btn-regar-hoy");
       if (btn) btn.addEventListener("click", registrarRiego);
       const btnPq = document.getElementById("btn-por-que-hoy");
@@ -2371,6 +2582,79 @@
     function formatearFechaCorta(iso) {
       const d = new Date(iso);
       return d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+    }
+
+    // ─── Historial de aplicaciones de productos ──────────────────────────────
+    function renderHistorialAplicaciones() {
+      const card  = document.getElementById("card-historial-aplicaciones");
+      const lista = document.getElementById("historial-aplicaciones-lista");
+      if (!card || !lista) return;
+      if (!aplicaciones.length) { card.hidden = true; return; }
+      card.hidden = false;
+      const ultimas = aplicaciones.slice(-7).reverse();
+      lista.innerHTML = "";
+      const hoy = new Date().toISOString().slice(0, 10);
+      ultimas.forEach(a => {
+        const plazo = a.plazoSeguridad || 0;
+        let badge = "";
+        if (plazo > 0) {
+          const limite = new Date(a.date);
+          limite.setDate(limite.getDate() + plazo);
+          const limiteIso = limite.toISOString().slice(0, 10);
+          if (limiteIso > hoy) {
+            const dias = Math.max(0, Math.ceil((limite - new Date()) / 86400000));
+            badge = `<span class="apl-plazo activo">No recolectar hasta ${formatearFechaCorta(limiteIso)} · faltan ${dias} día${dias !== 1 ? "s" : ""}</span>`;
+          } else {
+            badge = `<span class="apl-plazo libre">Ya puedes recolectar</span>`;
+          }
+        }
+        const sustancia = a.sustanciaActiva ? ` · ${a.sustanciaActiva}` : "";
+        const cultivo   = a.cultivo ? ` · ${a.cultivo}` : "";
+        const dosis     = a.dosis ? ` · ${a.dosis}` : "";
+        const notas     = a.notas ? `<div class="apl-detalle">${a.notas}</div>` : "";
+        const li = document.createElement("li");
+        li.innerHTML =
+          `<div class="apl-fila-1">`
+          + `<div>`
+          +   `<div class="apl-nombre">${a.productoNombre}${a.fueOtro ? " <small style=\"font-weight:400;color:var(--muted);\">(fuera de catálogo)</small>" : ""}</div>`
+          +   `<div class="apl-meta">${formatearFechaCorta(a.date)}${sustancia}${cultivo}${dosis}</div>`
+          + `</div>`
+          + `<button class="apl-borrar" data-date="${a.date}" data-nombre="${a.productoNombre.replace(/"/g, "&quot;")}" aria-label="Borrar aplicación">✕</button>`
+          + `</div>`
+          + badge
+          + notas;
+        lista.appendChild(li);
+      });
+    }
+
+    function aplicacionesACsv() {
+      if (!aplicaciones.length) return "";
+      const cols = ["fecha", "producto", "sustancia_activa", "tipo", "dosis", "cultivo", "plazo_seguridad_dias", "notas", "fuera_catalogo"];
+      const escapa = (v) => {
+        if (v == null) return "";
+        const s = String(v);
+        return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const filas = aplicaciones.map(a => [
+        a.date, a.productoNombre, a.sustanciaActiva, a.tipo,
+        a.dosis, a.cultivo, a.plazoSeguridad, a.notas,
+        a.fueOtro ? "si" : "no",
+      ].map(escapa).join(";"));
+      return cols.join(";") + "\n" + filas.join("\n");
+    }
+    function descargarAplicacionesCsv() {
+      const csv = aplicacionesACsv();
+      if (!csv) return;
+      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      const hoy  = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `kylia-aplicaciones-${hoy}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
 
     // ─── Recomendaciones ─────────────────────────────────────────────────────
@@ -2781,7 +3065,10 @@
             <td>${costeTxt}</td>
             <td>${plazoTxt}</td>
             <td class="eficacia ${p.eficacia}">${p.eficacia}</td>
-            <td><button type="button" class="btn-elegir-producto ${elegirClase}" data-rec="${rec.id}" data-producto-id="${p.id}">${elegirTxt}</button></td>
+            <td class="prod-acciones">
+              <button type="button" class="btn-elegir-producto ${elegirClase}" data-rec="${rec.id}" data-producto-id="${p.id}">${elegirTxt}</button>
+              <button type="button" class="btn-aplicar-producto" data-rec="${rec.id}" data-producto-id="${p.id}" title="Registrar aplicación">He aplicado</button>
+            </td>
           </tr>
           <tr class="producto-detalle" id="pd-${rec.id}-${p.id}">
             <td colspan="5">
@@ -3382,6 +3669,72 @@
       refrescarTrasCambioRiego();
     }
 
+    // ─── Modal de registro de aplicación de producto ─────────────────────────
+    // El argumento `prefill` puede traer producto preseleccionado desde la
+    // tabla comparativa. Si no, modal abierto en blanco para entrada libre.
+    function abrirModalAplicacion(prefill = {}) {
+      const modal = document.getElementById("modal-aplicacion");
+      const hoy = new Date().toISOString().slice(0, 10);
+
+      document.getElementById("modal-apl-fecha").value = hoy;
+      document.getElementById("modal-apl-fecha").max = hoy;
+      document.getElementById("modal-apl-producto").value = prefill.productoNombre || "";
+      document.getElementById("modal-apl-producto").dataset.productoId = prefill.productoId || "";
+      document.getElementById("modal-apl-producto").dataset.sustanciaActiva = prefill.sustanciaActiva || "";
+      document.getElementById("modal-apl-producto").dataset.tipo = prefill.tipo || "";
+      document.getElementById("modal-apl-dosis").value = prefill.dosis || "";
+      document.getElementById("modal-apl-plazo").value = prefill.plazoSeguridad ?? "";
+      document.getElementById("modal-apl-notas").value = "";
+
+      const hint = document.getElementById("modal-apl-sustancia");
+      hint.textContent = prefill.sustanciaActiva ? `Sustancia activa: ${prefill.sustanciaActiva}` : "Si el producto no está en el catálogo, escríbelo libremente.";
+
+      // Poblar dropdown de cultivos con los del config
+      const sel = document.getElementById("modal-apl-cultivo");
+      const NOMBRES = { lechuga: "lechuga", espinaca: "espinaca", brassica: "col/coliflor", tomate: "tomate", pimiento: "pimiento", berenjena: "berenjena", calabacin: "calabacín" };
+      sel.innerHTML = "";
+      (cfg.cultivos || []).forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c; opt.textContent = NOMBRES[c] || c;
+        sel.appendChild(opt);
+      });
+      if (prefill.cultivo) sel.value = prefill.cultivo;
+
+      modal.hidden = false;
+      requestAnimationFrame(() => document.getElementById("modal-apl-producto").focus());
+    }
+    function cerrarModalAplicacion() {
+      document.getElementById("modal-aplicacion").hidden = true;
+    }
+    function guardarModalAplicacion() {
+      const fecha = document.getElementById("modal-apl-fecha").value;
+      const productoEl = document.getElementById("modal-apl-producto");
+      const producto = productoEl.value.trim();
+      const dosis = document.getElementById("modal-apl-dosis").value.trim();
+      const cultivo = document.getElementById("modal-apl-cultivo").value;
+      const plazo = document.getElementById("modal-apl-plazo").value;
+      const notas = document.getElementById("modal-apl-notas").value.trim();
+
+      if (!fecha || !producto) return;
+
+      const entrada = {
+        date: fecha,
+        productoId: productoEl.dataset.productoId || null,
+        productoNombre: producto,
+        sustanciaActiva: productoEl.dataset.sustanciaActiva || null,
+        tipo: productoEl.dataset.tipo || null,
+        dosis: dosis || null,
+        cultivo: cultivo || null,
+        plazoSeguridad: plazo === "" ? 0 : Number(plazo),
+        notas: notas || null,
+        fueOtro: !productoEl.dataset.productoId,
+      };
+      addAplicacion(entrada);
+      cerrarModalAplicacion();
+      renderHistorialAplicaciones();
+      renderHoy();
+    }
+
     // ─── Textos explicativos (¿Por qué?) ─────────────────────────────────────
     function generarDetalleVigor() {
       if (!ultimoNDVI) return "Sin datos del satélite disponibles todavía.";
@@ -3443,6 +3796,7 @@
       renderizarAlertas();
       renderRiegoRegistro();
       renderHistorialRiegos();
+      renderHistorialAplicaciones();
       cargarCatalogoProductos();
       renderRecomendaciones();
       cargarDatos();
@@ -3472,8 +3826,18 @@
       document.getElementById("modal-riego").addEventListener("click", (e) => {
         if (e.target.id === "modal-riego") cerrarModalRiego();
       });
+
+      // Modal de aplicación
+      document.getElementById("modal-apl-cancelar").addEventListener("click", cerrarModalAplicacion);
+      document.getElementById("modal-apl-guardar").addEventListener("click", guardarModalAplicacion);
+      document.getElementById("modal-aplicacion").addEventListener("click", (e) => {
+        if (e.target.id === "modal-aplicacion") cerrarModalAplicacion();
+      });
+
       document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && !document.getElementById("modal-riego").hidden) cerrarModalRiego();
+        if (e.key !== "Escape") return;
+        if (!document.getElementById("modal-riego").hidden)      cerrarModalRiego();
+        if (!document.getElementById("modal-aplicacion").hidden) cerrarModalAplicacion();
       });
 
       // Historial de riegos: borrado individual
@@ -3485,6 +3849,20 @@
         removeRiego(fecha);
         refrescarTrasCambioRiego();
       });
+
+      // Historial de aplicaciones: borrado, CSV y "Nueva aplicación"
+      document.getElementById("historial-aplicaciones-lista").addEventListener("click", (e) => {
+        const btn = e.target.closest(".apl-borrar");
+        if (!btn) return;
+        const fecha = btn.dataset.date;
+        const nombre = btn.dataset.nombre;
+        if (!confirm(`¿Borrar la aplicación de "${nombre}" del ${fecha}?`)) return;
+        removeAplicacion(fecha, nombre);
+        renderHistorialAplicaciones();
+        renderHoy();
+      });
+      document.getElementById("btn-aplicaciones-csv").addEventListener("click", descargarAplicacionesCsv);
+      document.getElementById("btn-aplicacion-nueva").addEventListener("click", () => abrirModalAplicacion());
 
       // Tabla comparativa de productos (filtros, orden, elegir, expandir)
       const recoContainer = document.getElementById("recomendaciones-container");
@@ -3511,6 +3889,29 @@
       });
 
       recoContainer.addEventListener("click", (e) => {
+        // Botón "He aplicado" → abre modal de aplicación con producto preseleccionado
+        const btnAplicar = e.target.closest(".btn-aplicar-producto");
+        if (btnAplicar) {
+          e.stopPropagation();
+          const recId = btnAplicar.dataset.rec;
+          const prodId = btnAplicar.dataset.productoId;
+          const rec = recPorId(recId);
+          if (!rec) return;
+          const todos = filtrarProductosCatalogo(rec.productoCriterio, cfg);
+          const prod = todos.find(p => p.id === prodId);
+          if (!prod) return;
+          abrirModalAplicacion({
+            productoId: prod.id,
+            productoNombre: prod.nombre,
+            sustanciaActiva: prod.sustanciaActiva,
+            tipo: prod.tipo,
+            dosis: prod.dosis,
+            plazoSeguridad: prod.plazoSeguridad,
+            cultivo: (cfg.cultivos || [])[0] || null,
+          });
+          return;
+        }
+
         // Botón "Voy a usar este"
         const btnElegir = e.target.closest(".btn-elegir-producto");
         if (btnElegir) {

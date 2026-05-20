@@ -19,6 +19,8 @@ Kylia es un SPA monolítico (`/app/index.html`) desplegado en Vercel y servido s
 | Histórico NDVI | Producción | Sparkline 56 días con bandas de color |
 | Seguimiento de riego | Producción | Modal para registrar fecha + cantidad (L/m²). Card con últimos 7 riegos. Balance hídrico detecta déficit residual cuando un riego se queda corto |
 | Recomendaciones | Producción | RIEGO, TRATAMIENTO, NUTRICIÓN. Calculadas por reglas duras con cantidades. Reescritas por IA para tono natural |
+| Comparativa productos | Producción | Tabla con filtros y orden sobre catálogo curado, sugerencia IA contextual, botón "Voy a usar este" |
+| Registro de aplicaciones | Producción | Modal de registro, historial con plazo de seguridad activo, exportación CSV, aviso proactivo en card del día |
 | Análisis IA | Producción | Párrafo 2-3 frases sobre el estado global de la parcela. Bloque "✨ Análisis" |
 | Alertas plagas | Producción | Cálculo por reglas según meteo + cultivos seleccionados |
 | Mapa de parcela | Producción | Selección SIGPAC en mapa Leaflet, contorno oficial guardado en localStorage |
@@ -138,9 +140,10 @@ Kylia es un SPA monolítico (`/app/index.html`) desplegado en Vercel y servido s
 
 ### 5.2 Siguiente, después de validar la comparativa
 
-- Registro de aplicaciones (igual que riego: "He aplicado X hoy") con histórico.
-- Card "Tus últimas aplicaciones" con días desde aplicación y próximo plazo de seguridad.
-- Alerta proactiva si el agricultor intenta recolectar dentro del plazo de seguridad.
+- ✅ **Registro de aplicaciones** (2026-05-20): modal "He aplicado este" desde la tabla comparativa o entrada manual con campos libres. Storage `kylia_aplicaciones` con array de eventos.
+- ✅ **Card "Tus últimas aplicaciones"**: lista las últimas 7 con producto, sustancia, dosis, cultivo, fecha. Badges automáticos de plazo de seguridad (rojo si activo, verde si ya libre).
+- ✅ **Aviso proactivo en la card de "Acción del día"**: si hay aplicaciones con plazo vigente, aparece bloque rojo "No recolectar hasta DD/MM".
+- ✅ **Exportación CSV**: botón en la card del historial — útil para cuaderno de explotación obligatorio.
 
 ---
 
