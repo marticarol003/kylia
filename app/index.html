@@ -880,6 +880,136 @@
     .ia-texto { font-style: italic; }
     .ia-cargando { color: var(--muted); font-size: 0.82rem; font-style: italic; }
 
+    /* ── Tabla comparativa de productos ── */
+    .productos-bloque { margin-top: 12px; }
+    .productos-filtros {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+    }
+    .productos-filtros label {
+      display: inline-flex; align-items: center; gap: 4px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .productos-filtros select, .productos-filtros input[type="number"] {
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-family: inherit;
+      font-size: 0.82rem;
+      background: var(--card);
+      color: var(--text);
+      min-width: 70px;
+    }
+    .productos-ia {
+      background: #f1f7ec;
+      border: 1px solid #d4e3c4;
+      border-radius: 10px;
+      padding: 9px 11px;
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+    }
+    .productos-ia-label {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-weight: 600; color: var(--low);
+      margin-bottom: 3px;
+      font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .productos-tabla-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .productos-tabla {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      min-width: 430px;
+    }
+    .productos-tabla th, .productos-tabla td {
+      padding: 8px 7px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .productos-tabla th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: var(--bg);
+    }
+    .productos-tabla tr.sugerido td { background: #f1f7ec; }
+    .productos-tabla tr.elegido td { background: #fff8e1; }
+    .productos-tabla .badge-tipo {
+      display: inline-block;
+      font-size: 0.72rem; font-weight: 600;
+      padding: 2px 7px; border-radius: 999px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .productos-tabla .badge-tipo.eco { background: var(--low-bg); color: var(--low); }
+    .productos-tabla .badge-tipo.convencional { background: var(--medium-bg); color: var(--medium); }
+    .productos-tabla .badge-sugerido {
+      display: inline-block;
+      font-size: 0.7rem; font-weight: 700;
+      padding: 1px 6px; border-radius: 999px;
+      background: var(--low); color: #fff;
+      margin-left: 6px; vertical-align: middle;
+    }
+    .productos-tabla .badge-elegido {
+      display: inline-block;
+      font-size: 0.7rem; font-weight: 700;
+      padding: 1px 6px; border-radius: 999px;
+      background: var(--medium); color: #fff;
+      margin-left: 6px; vertical-align: middle;
+    }
+    .productos-tabla .producto-nombre { font-weight: 600; color: var(--text); }
+    .productos-tabla .eficacia {
+      text-transform: capitalize;
+    }
+    .productos-tabla .eficacia.alta  { color: var(--low); font-weight: 600; }
+    .productos-tabla .eficacia.media { color: var(--medium); }
+    .productos-tabla .eficacia.baja  { color: var(--muted); }
+    .btn-elegir-producto {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 0.74rem;
+      font-family: inherit;
+      cursor: pointer;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .btn-elegir-producto:hover { background: var(--border); color: var(--text); }
+    .btn-elegir-producto.activo {
+      background: var(--medium); color: #fff; border-color: var(--medium);
+    }
+    .producto-detalle {
+      display: none;
+    }
+    .producto-detalle.visible { display: table-row; }
+    .producto-detalle td {
+      background: var(--bg);
+      font-size: 0.8rem;
+      color: var(--subtle);
+      padding: 9px 12px;
+    }
+    .producto-detalle .pd-fila { margin-bottom: 4px; }
+    .producto-detalle .pd-fila strong { color: var(--text); }
+    .productos-disclaimer {
+      margin-top: 9px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .productos-vacio {
+      padding: 14px 10px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
     /* ── Historial de riegos ── */
     .historial-riegos {
       list-style: none;
@@ -2323,6 +2453,7 @@
               titulo: `Riesgo alto de ${prod.titulo.toLowerCase()} — actúa antes de que se extienda`,
               detalle: `Las condiciones de hoy son ideales para el ${prod.titulo.toLowerCase()}. Actuar ahora de forma preventiva es mucho más eficaz que hacerlo cuando la plaga ya está establecida.`,
               prod, prioridad: 2,
+              productoCriterio: { tipo: "plaga", clave: alertaId },
             });
           } else if (diaAlto) {
             // Riesgo alto previsto pero no hoy → aviso preventivo
@@ -2331,6 +2462,7 @@
               titulo: `Prepárate: riesgo de ${prod.titulo.toLowerCase()} el ${diaAlto.nombreDia}`,
               detalle: `Hoy el riesgo es bajo, pero el ${diaAlto.nombreDia} las condiciones serán favorables para el ${prod.titulo.toLowerCase()}. Prepara el producto con antelación para poder actuar en el momento justo.`,
               prod, prioridad: 4,
+              productoCriterio: { tipo: "plaga", clave: alertaId },
             });
           }
         });
@@ -2366,6 +2498,7 @@
               titulo, detalle,
               prod: { titulo: fert.titulo, eco: fert.eco, conv: fert.conv },
               prioridad,
+              productoCriterio: { tipo: "fertilizante", clave: grupo },
             });
           }
         }
@@ -2442,6 +2575,246 @@
         textoIA = null;
       }
       renderRecomendaciones();
+    }
+
+    // ─── Catálogo de productos (curado, verificado contra MAPA) ──────────────
+    let CATALOGO = null; // { tratamientos: [], fertilizantes: [], escalaEficacia: {} }
+    async function cargarCatalogoProductos() {
+      if (CATALOGO) return CATALOGO;
+      try {
+        const resp = await fetch("/data/productos.json", { cache: "force-cache" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        CATALOGO = await resp.json();
+      } catch (err) {
+        console.warn("[Kylia] No se ha podido cargar el catálogo de productos:", err);
+        CATALOGO = { tratamientos: [], fertilizantes: [], escalaEficacia: {} };
+      }
+      return CATALOGO;
+    }
+
+    // Preferencias de producto del agricultor (qué eligió la última vez para
+    // cada plaga/fertilizante). Persistido en localStorage.
+    const PREF_PRODUCTOS_KEY = "kylia_preferencias_producto";
+    function getPreferenciasProducto() {
+      try { return JSON.parse(localStorage.getItem(PREF_PRODUCTOS_KEY) || "{}"); }
+      catch (_) { return {}; }
+    }
+    function setPreferenciaProducto(criterioKey, idProducto) {
+      const prefs = getPreferenciasProducto();
+      prefs[criterioKey] = idProducto;
+      localStorage.setItem(PREF_PRODUCTOS_KEY, JSON.stringify(prefs));
+    }
+    function criterioKey(criterio) {
+      return `${criterio.tipo}:${criterio.clave}`;
+    }
+
+    // Estado por recomendación: filtros, orden, sugerencia IA, elección.
+    const productosEstado = {}; // recId → { tipoFiltro, presupuestoMax, plazoMax, orden, idSugerido, razonamientoIA, idElegido }
+
+    // Devuelve los productos del catálogo que aplican a la recomendación
+    function filtrarProductosCatalogo(criterio, cfg) {
+      if (!CATALOGO || !criterio) return [];
+      const cultivosActivos = (cfg.cultivos || []).map(c => c.toLowerCase());
+
+      if (criterio.tipo === "plaga") {
+        return (CATALOGO.tratamientos || []).filter(p =>
+          (p.plagas || []).includes(criterio.clave)
+          && (p.cultivos || []).some(c => cultivosActivos.includes(c))
+        );
+      }
+      if (criterio.tipo === "fertilizante") {
+        return (CATALOGO.fertilizantes || []).filter(p => {
+          if (p.tipoFertilizante === criterio.clave) return true;
+          // 'fondo' y 'bioestimulante' aplican a cualquier grupo
+          if (["fondo", "bioestimulante"].includes(p.tipoFertilizante)) {
+            return (p.cultivos || []).some(c => cultivosActivos.includes(c));
+          }
+          return false;
+        });
+      }
+      return [];
+    }
+
+    // Aplica filtros del agricultor y orden actual
+    function aplicarFiltrosYOrden(productos, estado) {
+      let lista = productos.slice();
+      if (estado.tipoFiltro && estado.tipoFiltro !== "todos") {
+        lista = lista.filter(p => p.tipo === estado.tipoFiltro);
+      }
+      if (estado.presupuestoMax) {
+        lista = lista.filter(p => (p.costeMin ?? 0) <= estado.presupuestoMax);
+      }
+      if (estado.plazoMax != null) {
+        lista = lista.filter(p => (p.plazoSeguridad ?? 0) <= estado.plazoMax);
+      }
+      const ord = estado.orden || "barato";
+      const eficaciaRank = { alta: 3, media: 2, baja: 1 };
+      lista.sort((a, b) => {
+        switch (ord) {
+          case "barato":  return (a.costeMin ?? 0) - (b.costeMin ?? 0);
+          case "eco":     return (a.tipo === "eco" ? 0 : 1) - (b.tipo === "eco" ? 0 : 1);
+          case "plazo":   return (a.plazoSeguridad ?? 0) - (b.plazoSeguridad ?? 0);
+          case "eficaz":  return (eficaciaRank[b.eficacia] || 0) - (eficaciaRank[a.eficacia] || 0);
+        }
+        return 0;
+      });
+      return lista;
+    }
+
+    // Llama al endpoint de sugerencia IA para una recomendación concreta.
+    // Solo se llama si hay >1 candidato tras filtrar.
+    async function cargarSugerenciaProducto(rec, candidatos) {
+      const ctx = {
+        cultivo: (cfg.cultivos || [])[0] || null,
+        plaga: rec.productoCriterio?.tipo === "plaga" ? rec.productoCriterio.clave : null,
+        tipoFertilizante: rec.productoCriterio?.tipo === "fertilizante" ? rec.productoCriterio.clave : null,
+        ndviEstado: ultimoNDVI?.estado || null,
+        tempMax: ultimoMeteo?.tempMax,
+        diasSinRiego: ultimoRiego
+          ? Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000))
+          : null,
+        et0Acumulado: (function () {
+          const bal = calcularBalanceHidrico();
+          return bal ? bal.balanceTotal : null;
+        })(),
+        lluviaPrevista: ultimoPrevision.reduce((s, d) => s + (d.lluvia ?? 0), 0),
+      };
+      try {
+        const resp = await fetch("/api/sugerencia-producto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contexto: ctx, candidatos }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          console.warn("[Kylia] /api/sugerencia-producto", resp.status, data);
+          return;
+        }
+        const estado = productosEstado[rec.id];
+        if (!estado) return;
+        estado.idSugerido = data.idElegido || null;
+        estado.razonamientoIA = data.razonamiento || "";
+        renderProductosTabla(rec);
+      } catch (err) {
+        console.warn("[Kylia] Error al llamar /api/sugerencia-producto:", err);
+      }
+    }
+
+    // Renderiza la tabla comparativa dentro del panel expandido de una rec.
+    function renderProductosTabla(rec) {
+      const panel = document.getElementById(`prod-bloque-${rec.id}`);
+      if (!panel) return;
+      const estado = productosEstado[rec.id];
+      if (!estado) return;
+
+      const todos = filtrarProductosCatalogo(rec.productoCriterio, cfg);
+      const lista = aplicarFiltrosYOrden(todos, estado);
+
+      const elegidoStorage = getPreferenciasProducto()[criterioKey(rec.productoCriterio)] || null;
+      const idElegido = estado.idElegido || elegidoStorage;
+      const idSugerido = estado.idSugerido;
+
+      // Bloque sugerencia IA
+      let html = "";
+      if (estado.razonamientoIA && idSugerido) {
+        const sug = todos.find(p => p.id === idSugerido);
+        if (sug) {
+          html += `<div class="productos-ia">
+            <div class="productos-ia-label">✨ Sugerencia para tu parcela</div>
+            <strong>${sug.nombre}</strong>. ${estado.razonamientoIA}
+          </div>`;
+        }
+      }
+
+      // Filtros
+      const presupuestoVal = estado.presupuestoMax ?? "";
+      const plazoVal = estado.plazoMax ?? "";
+      html += `<div class="productos-filtros">
+        <label>Tipo:
+          <select data-rec="${rec.id}" data-campo="tipoFiltro">
+            <option value="todos"${estado.tipoFiltro === "todos" ? " selected" : ""}>Todos</option>
+            <option value="eco"${estado.tipoFiltro === "eco" ? " selected" : ""}>Eco</option>
+            <option value="convencional"${estado.tipoFiltro === "convencional" ? " selected" : ""}>Convencional</option>
+          </select>
+        </label>
+        <label>Presupuesto máx €/ha:
+          <input type="number" min="0" max="500" step="1" placeholder="—"
+                 value="${presupuestoVal}" data-rec="${rec.id}" data-campo="presupuestoMax">
+        </label>
+        <label>Plazo máx (días):
+          <input type="number" min="0" max="60" step="1" placeholder="—"
+                 value="${plazoVal}" data-rec="${rec.id}" data-campo="plazoMax">
+        </label>
+        <label>Ordenar:
+          <select data-rec="${rec.id}" data-campo="orden">
+            <option value="barato"${estado.orden === "barato" ? " selected" : ""}>Más barato</option>
+            <option value="eco"${estado.orden === "eco" ? " selected" : ""}>Más eco</option>
+            <option value="plazo"${estado.orden === "plazo" ? " selected" : ""}>Menor plazo</option>
+            <option value="eficaz"${estado.orden === "eficaz" ? " selected" : ""}>Más eficaz</option>
+          </select>
+        </label>
+      </div>`;
+
+      if (!lista.length) {
+        html += `<div class="productos-vacio">Ningún producto del catálogo cumple los filtros actuales.</div>`;
+      } else {
+        html += `<div class="productos-tabla-wrap"><table class="productos-tabla">
+          <thead><tr>
+            <th>Producto</th><th>Coste</th><th>Plazo</th><th>Eficacia</th><th></th>
+          </tr></thead><tbody>`;
+        lista.forEach(p => {
+          const claseFila = idElegido === p.id ? "elegido" : (idSugerido === p.id ? "sugerido" : "");
+          const badge = idElegido === p.id
+            ? `<span class="badge-elegido">Tu elección</span>`
+            : (idSugerido === p.id ? `<span class="badge-sugerido">Sugerido</span>` : "");
+          const tipoClase = p.tipo === "eco" ? "eco" : "convencional";
+          const plazoTxt = p.plazoSeguridad == null ? "—" : `${p.plazoSeguridad} d`;
+          const costeTxt = p.costeMin === p.costeMax ? `${p.costeMin} €/ha` : `${p.costeMin}-${p.costeMax} €/ha`;
+          const elegirTxt = idElegido === p.id ? "Elegido" : "Voy a usar este";
+          const elegirClase = idElegido === p.id ? "activo" : "";
+          html += `<tr class="${claseFila}" data-producto-id="${p.id}" data-rec="${rec.id}">
+            <td>
+              <span class="producto-nombre">${p.nombre}</span>
+              <span class="badge-tipo ${tipoClase}">${p.tipo === "eco" ? "eco" : "conv."}</span>
+              ${badge}
+            </td>
+            <td>${costeTxt}</td>
+            <td>${plazoTxt}</td>
+            <td class="eficacia ${p.eficacia}">${p.eficacia}</td>
+            <td><button type="button" class="btn-elegir-producto ${elegirClase}" data-rec="${rec.id}" data-producto-id="${p.id}">${elegirTxt}</button></td>
+          </tr>
+          <tr class="producto-detalle" id="pd-${rec.id}-${p.id}">
+            <td colspan="5">
+              <div class="pd-fila"><strong>Sustancia activa:</strong> ${p.sustanciaActiva}</div>
+              <div class="pd-fila"><strong>Dosis:</strong> ${p.dosis}</div>
+              ${p.modo ? `<div class="pd-fila"><strong>Modo:</strong> ${p.modo}</div>` : ""}
+              ${p.notas ? `<div class="pd-fila">${p.notas}</div>` : ""}
+            </td>
+          </tr>`;
+        });
+        html += `</tbody></table></div>`;
+        html += `<p class="productos-disclaimer">Lee siempre la etiqueta del producto antes de aplicar. Precios orientativos: pueden variar según cooperativa o distribuidor.</p>`;
+      }
+
+      panel.innerHTML = html;
+    }
+
+    // Inicializa estado y dispara sugerencia IA si procede
+    function inicializarBloqueProductos(rec) {
+      if (productosEstado[rec.id]) return; // ya inicializado
+      productosEstado[rec.id] = {
+        tipoFiltro: "todos",
+        presupuestoMax: null,
+        plazoMax: null,
+        orden: "barato",
+        idSugerido: null,
+        razonamientoIA: "",
+        idElegido: null,
+      };
+      renderProductosTabla(rec);
+      // Dispara sugerencia IA en background
+      const todos = filtrarProductosCatalogo(rec.productoCriterio, cfg);
+      if (todos.length > 1) cargarSugerenciaProducto(rec, todos);
     }
 
     // Hash sencillo de los candidatos (id+titulo+detalle) para evitar
@@ -2571,7 +2944,11 @@
         panel.className = "rec-detalle-panel";
 
         let html = `<p>${detalle}</p>`;
-        if (rec.prod?.eco && rec.prod?.conv) {
+        if (rec.productoCriterio) {
+          // El contenedor lo poblará renderProductosTabla() al abrir el panel
+          html += `<div class="productos-bloque" id="prod-bloque-${rec.id}"></div>`;
+        } else if (rec.prod?.eco && rec.prod?.conv) {
+          // Fallback (recomendaciones sin criterio de producto, p.ej. riego)
           html += `<div class="rec-producto">
             <div class="rec-producto-label">Opción ecológica</div>
             <strong>${rec.prod.eco.nombre}</strong>${rec.prod.eco.dosis ? ` &middot; ${rec.prod.eco.dosis}` : ""}
@@ -2593,6 +2970,7 @@
           if (!abierto) {
             panel.classList.add("visible");
             fila.setAttribute("aria-expanded", "true");
+            if (rec.productoCriterio) inicializarBloqueProductos(rec);
           }
         });
       });
@@ -3065,6 +3443,7 @@
       renderizarAlertas();
       renderRiegoRegistro();
       renderHistorialRiegos();
+      cargarCatalogoProductos();
       renderRecomendaciones();
       cargarDatos();
       cargarNDVI();
@@ -3105,6 +3484,65 @@
         if (!confirm(`¿Borrar el riego del ${fecha}?`)) return;
         removeRiego(fecha);
         refrescarTrasCambioRiego();
+      });
+
+      // Tabla comparativa de productos (filtros, orden, elegir, expandir)
+      const recoContainer = document.getElementById("recomendaciones-container");
+      function recPorId(recId) {
+        const recs = generarRecomendaciones();
+        return recs.find(r => r.id === recId) || null;
+      }
+
+      recoContainer.addEventListener("change", (e) => {
+        const target = e.target;
+        if (!target.dataset.rec || !target.dataset.campo) return;
+        const recId = target.dataset.rec;
+        const campo = target.dataset.campo;
+        const estado = productosEstado[recId];
+        if (!estado) return;
+        if (campo === "tipoFiltro" || campo === "orden") {
+          estado[campo] = target.value;
+        } else {
+          const val = target.value.trim();
+          estado[campo] = val === "" ? null : Number(val);
+        }
+        const rec = recPorId(recId);
+        if (rec) renderProductosTabla(rec);
+      });
+
+      recoContainer.addEventListener("click", (e) => {
+        // Botón "Voy a usar este"
+        const btnElegir = e.target.closest(".btn-elegir-producto");
+        if (btnElegir) {
+          e.stopPropagation();
+          const recId = btnElegir.dataset.rec;
+          const prodId = btnElegir.dataset.productoId;
+          const estado = productosEstado[recId];
+          if (!estado) return;
+          const rec = recPorId(recId);
+          if (!rec) return;
+          // Toggle elección
+          if (estado.idElegido === prodId) {
+            estado.idElegido = null;
+            const prefs = getPreferenciasProducto();
+            delete prefs[criterioKey(rec.productoCriterio)];
+            localStorage.setItem(PREF_PRODUCTOS_KEY, JSON.stringify(prefs));
+          } else {
+            estado.idElegido = prodId;
+            setPreferenciaProducto(criterioKey(rec.productoCriterio), prodId);
+          }
+          renderProductosTabla(rec);
+          return;
+        }
+
+        // Click en fila de producto → expandir/contraer detalle
+        const filaProd = e.target.closest("tr[data-producto-id]");
+        if (filaProd && !e.target.closest(".btn-elegir-producto")) {
+          const recId = filaProd.dataset.rec;
+          const prodId = filaProd.dataset.productoId;
+          const det = document.getElementById(`pd-${recId}-${prodId}`);
+          if (det) det.classList.toggle("visible");
+        }
       });
 
       // Filas de indicadores: clic abre/cierra panel de explicación
