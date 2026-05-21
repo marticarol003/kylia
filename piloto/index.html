@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#2b7a3a" />
+<meta name="robots" content="index,follow" />
+<title>Piloto Kylia 2026 — Para asesores ATRIA, técnicos y centros agrarios</title>
+<meta name="description" content="Piloto privado de la campaña 2026. Para asesores ATRIA, técnicos de cooperativa y centros de investigación. Acceso completo sin coste a cambio de feedback." />
+<link rel="canonical" href="https://kylia.app/piloto" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Piloto Kylia 2026" />
+<meta property="og:description" content="Para asesores, técnicos y centros de investigación: prueba Kylia en tus parcelas durante toda la campaña 2026 sin coste." />
+<meta property="og:image" content="https://kylia.app/assets/img/og-image.png" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%232b7a3a%22/><path d=%22M10 20 Q16 10 22 20 Z%22 fill=%22white%22/></svg>" />
+
+<style>
+:root {
+  --verde:#2b7a3a; --verde-700:#1f5a2b; --verde-900:#0f3617; --verde-50:#e8f3ea;
+  --slate-900:#0f172a; --slate-700:#334155; --slate-500:#64748b; --slate-300:#cbd5e1; --slate-200:#e2e8f0; --slate-50:#f8fafc;
+  --rojo:#9b3a3a;
+  --text:var(--slate-900); --muted:var(--slate-500); --subtle:var(--slate-700); --border:var(--slate-200);
+  --max:1180px; --radius:16px; --radius-sm:10px;
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+*,*::before,*::after { box-sizing:border-box; }
+html,body,h1,h2,h3,h4,p,ul,ol { margin:0; padding:0; }
+ul { list-style:none; }
+body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, system-ui, sans-serif;
+       color:var(--text); line-height:1.6; -webkit-font-smoothing:antialiased; }
+a { color:var(--verde); text-decoration:none; }
+a:hover { text-decoration:underline; }
+.wrap { max-width:var(--max); margin:0 auto; padding:0 24px; }
+
+.nav { position:sticky; top:0; z-index:50; background:rgba(255,255,255,0.92); backdrop-filter:saturate(180%) blur(10px); border-bottom:1px solid var(--border); }
+.nav-inner { display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:24px; }
+.brand { display:inline-flex; align-items:center; gap:8px; color:var(--verde-900); font-weight:800; letter-spacing:-0.02em; font-size:1.1rem; }
+.brand-dot { width:14px; height:14px; border-radius:50%; background:var(--verde); }
+.nav-links { display:flex; gap:24px; align-items:center; font-size:0.95rem; }
+.nav-links a { color:var(--subtle); }
+.nav-links a:hover { color:var(--text); text-decoration:none; }
+@media (max-width:760px) { .nav-links a:not(.btn) { display:none; } }
+
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:11px 20px; font-weight:600; border-radius:10px; border:1.5px solid transparent; transition:all 0.15s var(--ease); cursor:pointer; font-size:0.95rem; }
+.btn-primary { background:var(--verde); color:#fff; border-color:var(--verde); }
+.btn-primary:hover { background:var(--verde-700); border-color:var(--verde-700); text-decoration:none; }
+.btn-secondary { background:#fff; color:var(--verde-900); border-color:var(--border); }
+.btn-lg { padding:14px 26px; font-size:1.05rem; }
+
+/* Hero */
+.hero { padding:80px 0 56px; background:linear-gradient(180deg, #fff 0%, var(--verde-50) 100%); }
+.eyebrow { display:inline-block; background:#fff; border:1px solid var(--verde); color:var(--verde-700); padding:6px 14px; border-radius:999px; font-weight:700; font-size:0.78rem; letter-spacing:0.18em; text-transform:uppercase; }
+h1 { font-size:clamp(2rem, 5vw, 3rem); line-height:1.08; margin:20px 0 14px; color:var(--verde-900); letter-spacing:-0.02em; max-width:860px; }
+.lead { font-size:1.18rem; color:var(--subtle); max-width:680px; }
+.hero-cta { margin-top:28px; display:flex; gap:12px; flex-wrap:wrap; }
+.hero-meta { margin-top:24px; display:flex; gap:24px; flex-wrap:wrap; color:var(--muted); font-size:0.9rem; }
+.hero-meta span { display:inline-flex; align-items:center; gap:6px; }
+.hero-meta strong { color:var(--verde-900); }
+
+/* Bloques */
+section.block { padding:56px 0; }
+section.block.alt { background:var(--slate-50); }
+.section-title { text-align:center; max-width:680px; margin:0 auto 36px; }
+.section-title h2 { font-size:clamp(1.7rem,3.6vw,2.2rem); color:var(--verde-900); letter-spacing:-0.02em; }
+.section-title p { color:var(--subtle); margin-top:10px; }
+
+/* Para quién */
+.audiencias { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+@media (max-width:880px) { .audiencias { grid-template-columns:1fr; } }
+.audiencia { background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:26px; box-shadow:var(--shadow-md); }
+.audiencia .tag { display:inline-block; background:var(--verde-50); color:var(--verde-700); padding:4px 10px; border-radius:6px; font-size:0.74rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:10px; }
+.audiencia h3 { color:var(--verde-900); font-size:1.1rem; margin-bottom:8px; }
+.audiencia p { color:var(--subtle); font-size:0.94rem; }
+.audiencia ul { margin-top:12px; font-size:0.9rem; color:var(--subtle); }
+.audiencia li { margin-bottom:5px; }
+.audiencia li::before { content:"✓"; color:var(--verde); font-weight:700; margin-right:6px; }
+
+/* Trato */
+.trato { display:grid; grid-template-columns:1fr 1fr; gap:36px; }
+@media (max-width:880px) { .trato { grid-template-columns:1fr; } }
+.trato-card { background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:30px; }
+.trato-card h3 { color:var(--verde-900); font-size:1.15rem; margin-bottom:14px; }
+.trato-card ul li { padding:8px 0; border-bottom:1px solid var(--slate-50); color:var(--subtle); font-size:0.95rem; }
+.trato-card ul li:last-child { border-bottom:0; }
+.trato-card ul li strong { color:var(--text); }
+.trato-card.ofrecemos { border-color:var(--verde); }
+.trato-card.ofrecemos h3 { color:var(--verde); }
+
+/* App preview */
+.preview-grid { display:grid; grid-template-columns:1.1fr 0.9fr; gap:40px; align-items:center; }
+@media (max-width:880px) { .preview-grid { grid-template-columns:1fr; } }
+.preview-text h3 { font-size:1.4rem; color:var(--verde-900); margin-bottom:12px; }
+.preview-text p { color:var(--subtle); margin-bottom:14px; }
+.preview-text ul li { padding:8px 0; color:var(--subtle); font-size:0.96rem; border-bottom:1px solid var(--slate-50); }
+.preview-text ul li strong { color:var(--text); }
+
+.app-mock { background:#fff; border:1px solid var(--border); border-radius:18px; box-shadow:0 28px 60px -28px rgba(15,54,23,0.45); padding:22px; }
+.app-mock .mock-card { background:#dcfce7; border:1px solid #bbf7d0; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+.app-mock .mock-card.warn { background:#fef3c7; border-color:#fde68a; }
+.app-mock .mock-card.alarm { background:#fee2e2; border-color:#fecaca; }
+.app-mock .mock-card h4 { font-size:0.92rem; color:var(--text); margin-bottom:4px; }
+.app-mock .mock-card p { font-size:0.85rem; color:var(--subtle); }
+.app-mock .mock-ind { display:flex; justify-content:space-between; padding:10px 14px; background:var(--slate-50); border-radius:8px; margin-bottom:6px; font-size:0.86rem; }
+.app-mock .mock-ind .v { color:var(--verde); font-weight:700; }
+
+/* Caso real */
+.caso { background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:36px; box-shadow:var(--shadow-md); max-width:780px; margin:0 auto; }
+.caso .caso-head { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-bottom:20px; }
+.caso .caso-num { font-size:2.4rem; font-weight:800; color:var(--verde); line-height:1; letter-spacing:-0.02em; }
+.caso .caso-num-label { color:var(--subtle); font-size:0.86rem; margin-top:4px; }
+.caso .caso-stat { flex:1; min-width:140px; }
+.caso h3 { color:var(--verde-900); font-size:1.2rem; margin-bottom:14px; }
+.caso p { color:var(--subtle); margin-bottom:12px; }
+.caso .quote { border-left:3px solid var(--verde); padding-left:16px; margin-top:18px; font-style:italic; color:var(--text); }
+.caso .quote-author { font-style:normal; color:var(--muted); font-size:0.86rem; margin-top:6px; }
+
+/* Formulario */
+.form-card { background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:36px; max-width:640px; margin:0 auto; box-shadow:var(--shadow-md); }
+.form-card h2 { font-size:1.5rem; color:var(--verde-900); margin-bottom:8px; }
+.form-card > p { color:var(--subtle); margin-bottom:24px; }
+form.piloto-form { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+form.piloto-form .full { grid-column:1 / -1; }
+@media (max-width:560px) { form.piloto-form { grid-template-columns:1fr; } }
+form.piloto-form label { display:block; font-size:0.82rem; color:var(--subtle); margin-bottom:6px; font-weight:500; }
+form.piloto-form input, form.piloto-form select, form.piloto-form textarea {
+  width:100%; padding:11px 13px; border:1.5px solid var(--border); border-radius:10px;
+  font-size:0.95rem; font-family:inherit; background:#fff; color:var(--text);
+}
+form.piloto-form textarea { resize:vertical; min-height:80px; }
+form.piloto-form input:focus, form.piloto-form select:focus, form.piloto-form textarea:focus { outline:2px solid var(--verde); border-color:transparent; }
+form.piloto-form button {
+  grid-column:1 / -1; background:var(--verde); color:#fff; border:none; border-radius:10px;
+  padding:14px 28px; font-size:1rem; font-weight:700; font-family:inherit; cursor:pointer;
+  margin-top:6px;
+}
+form.piloto-form button:hover:not(:disabled) { background:var(--verde-700); }
+form.piloto-form button:disabled { opacity:0.6; cursor:default; }
+.form-status { margin-top:14px; font-size:0.92rem; min-height:22px; }
+.form-status.ok { color:var(--verde); }
+.form-status.err { color:var(--rojo); }
+.form-legal { font-size:0.78rem; color:var(--muted); margin-top:14px; line-height:1.5; }
+.form-consent { display:flex; gap:8px; align-items:flex-start; font-size:0.84rem; color:var(--subtle); margin-top:6px; }
+.form-consent input { width:16px !important; height:16px !important; flex-shrink:0; margin-top:3px; accent-color:var(--verde); padding:0 !important; }
+
+/* FAQ */
+.faq-list { max-width:760px; margin:0 auto; }
+.faq-item { background:#fff; border:1px solid var(--border); border-radius:12px; margin-bottom:10px; overflow:hidden; }
+.faq-item summary { padding:16px 50px 16px 18px; cursor:pointer; font-weight:600; color:var(--text); list-style:none; position:relative; }
+.faq-item summary::-webkit-details-marker { display:none; }
+.faq-item summary::after { content:"+"; position:absolute; right:18px; top:50%; transform:translateY(-50%); font-size:1.3rem; color:var(--muted); }
+.faq-item[open] summary::after { content:"−"; }
+.faq-item .body { padding:0 18px 18px; color:var(--subtle); font-size:0.95rem; }
+
+footer { background:var(--verde-900); color:#bcd6c2; padding:40px 0 28px; margin-top:48px; }
+footer .wrap { display:flex; flex-wrap:wrap; gap:24px; justify-content:space-between; }
+footer a { color:#fff; }
+footer .small { font-size:0.84rem; color:#7fa089; }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/"><span class="brand-dot"></span> Kylia</a>
+    <nav class="nav-links" aria-label="Principal">
+      <a href="/#producto">Producto</a>
+      <a href="/cooperativas">Cooperativas</a>
+      <a href="/precios">Precios</a>
+      <a href="/blog">Blog</a>
+      <a class="btn btn-primary" href="#formulario">Apuntarme</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">Piloto privado · campaña 2026</span>
+      <h1>Detecta el estrés hídrico antes de que tu ojo lo vea.</h1>
+      <p class="lead">Kylia cruza satélite Sentinel-2, meteorología y el calendario de cada parcela para decirte qué socio o explotación necesita una visita antes que las demás. Estamos buscando 5–10 asesores, técnicos y centros que prueben la herramienta durante toda la campaña 2026.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="#formulario">Quiero entrar al piloto →</a>
+        <a class="btn btn-secondary btn-lg" href="#como-funciona">Ver cómo funciona</a>
+      </div>
+      <div class="hero-meta">
+        <span>✓ <strong>Sin coste</strong> durante la campaña 2026</span>
+        <span>✓ <strong>Soporte directo</strong> conmigo, fundador</span>
+        <span>✓ <strong>30 min/mes</strong> de feedback bastan</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Para quién -->
+  <section class="block">
+    <div class="wrap">
+      <div class="section-title">
+        <h2>¿Para quién es este piloto?</h2>
+        <p>Buscamos perfiles que trabajen con varias explotaciones, no agricultores individuales sueltos.</p>
+      </div>
+      <div class="audiencias">
+        <div class="audiencia">
+          <span class="tag">Perfil 1</span>
+          <h3>Asesores ATRIA / agronómicos</h3>
+          <p>Asesoras a 20–60 explotaciones y vives saltando entre parcelas. Te ahorras la jornada de "ir a ver" para descubrir que no había nada.</p>
+          <ul>
+            <li>Una vista de todas tus parcelas asesoradas</li>
+            <li>Triaje semanal: a quién visitar primero</li>
+            <li>Datos en el móvil al llegar a la parcela</li>
+          </ul>
+        </div>
+        <div class="audiencia">
+          <span class="tag">Perfil 2</span>
+          <h3>Técnicos de cooperativa</h3>
+          <p>Eres el técnico de campo de una cooperativa pequeña/mediana. Quieres bajar la carga de visitas reactivas y dar valor anticipándote.</p>
+          <ul>
+            <li>Panel con todos los socios y su estado</li>
+            <li>Alertas tempranas por NDMI/NDVI</li>
+            <li>Histórico exportable para la asamblea</li>
+          </ul>
+        </div>
+        <div class="audiencia">
+          <span class="tag">Perfil 3</span>
+          <h3>Centros tecnológicos agrarios</h3>
+          <p>IRTA, INTIA, IFAPA, Cajamar, universidades… Buscas validar herramientas digitales en parcelas reales con métricas serias.</p>
+          <ul>
+            <li>Acceso completo a la app y a la API</li>
+            <li>Datos brutos exportables para análisis</li>
+            <li>Posibilidad de co-publicación de resultados</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Trato -->
+  <section class="block alt">
+    <div class="wrap">
+      <div class="section-title">
+        <h2>El trato del piloto</h2>
+        <p>Claro y por escrito. Sin sorpresas, sin pequeña letra.</p>
+      </div>
+      <div class="trato">
+        <div class="trato-card ofrecemos">
+          <h3>Lo que ofrecemos</h3>
+          <ul>
+            <li><strong>Acceso completo</strong> a la app durante toda la campaña 2026 (hasta dic 2026).</strong></li>
+            <li><strong>Sin coste:</strong> ni hectárea ni socios ni mensualidad.</li>
+            <li><strong>Carga inicial</strong> de tus parcelas o las de tus asesorados (te ayudo a configurarlas).</li>
+            <li><strong>Soporte directo conmigo por WhatsApp.</strong> Sin ticket, sin colas.</li>
+            <li><strong>Roadmap influido:</strong> tus peticiones razonables tienen prioridad sobre el backlog.</li>
+            <li><strong>Caso de uso publicable</strong> opcional, con tu nombre o anonimizado, como prefieras.</li>
+          </ul>
+        </div>
+        <div class="trato-card">
+          <h3>Lo que pedimos</h3>
+          <ul>
+            <li><strong>Probarla de verdad:</strong> al menos 3 parcelas reales activas durante 2 meses.</li>
+            <li><strong>30 min al mes</strong> en llamada para contarme qué falla y qué echas en falta.</li>
+            <li><strong>Permiso</strong> para usar los datos agregados anonimizados con fines de mejora del producto.</li>
+            <li><strong>Honestidad:</strong> si después del piloto no aporta valor, lo dices sin compromiso.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cómo funciona -->
+  <section class="block" id="como-funciona">
+    <div class="wrap">
+      <div class="section-title">
+        <h2>Cómo funciona la app</h2>
+        <p>Una pantalla, una acción al día. Sin tecnicismos visibles.</p>
+      </div>
+      <div class="preview-grid">
+        <div class="preview-text">
+          <h3>La acción del día, sin abrir hojas de cálculo</h3>
+          <p>Para cada parcela, la app calcula el balance hídrico real cruzando ET₀ acumulada (Open-Meteo) con el satélite Sentinel-2 y los riegos registrados.</p>
+          <ul>
+            <li><strong>Verde</strong> · Todo en orden — no requiere acción</li>
+            <li><strong>Naranja</strong> · Revisar el riego — el agua evaporada empieza a notarse</li>
+            <li><strong>Rojo</strong> · Regar hoy — riesgo de estrés hídrico real</li>
+          </ul>
+          <p style="margin-top:16px; font-size:0.92rem;">Cada estado es justificado por dato: cuántos mm se han evaporado desde el último riego, qué dice la previsión meteorológica, qué tendencia tiene el NDVI/NDMI.</p>
+        </div>
+        <div class="app-mock" aria-hidden="true">
+          <div class="mock-card alarm">
+            <h4>🚨 Regar hoy · Parcela 12 (lechuga)</h4>
+            <p>32 mm de ET₀ acumulada desde el último riego. Sin lluvia prevista 3 días.</p>
+          </div>
+          <div class="mock-card warn">
+            <h4>⚠ Revisar el riego · Parcela 7 (tomate)</h4>
+            <p>18 mm acumulados. Conviene comprobar el goteo.</p>
+          </div>
+          <div class="mock-card">
+            <h4>✓ Todo en orden · Parcela 3 (espinaca)</h4>
+            <p>Regada hace 2 días. Lluvia prevista mañana.</p>
+          </div>
+          <div class="mock-ind"><span>Vigor del cultivo (NDVI)</span><span class="v">0.68</span></div>
+          <div class="mock-ind"><span>Agua en la planta (NDMI)</span><span class="v">0.31</span></div>
+          <div class="mock-ind"><span>Humedad del suelo (Open-Meteo)</span><span class="v">24 %</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Caso de uso -->
+  <section class="block alt">
+    <div class="wrap">
+      <div class="section-title">
+        <h2>Un caso real, en producción</h2>
+        <p>La app no es una demo cerrada. Lleva meses corriendo en una parcela real con un agricultor real.</p>
+      </div>
+      <div class="caso">
+        <h3>Parcela hortícola en el delta del Llobregat (Cataluña)</h3>
+        <div class="caso-head">
+          <div class="caso-stat"><div class="caso-num">2 ha</div><div class="caso-num-label">Lechuga al aire libre</div></div>
+          <div class="caso-stat"><div class="caso-num">3 meses</div><div class="caso-num-label">App en uso continuado</div></div>
+          <div class="caso-stat"><div class="caso-num">100 %</div><div class="caso-num-label">Acciones diarias seguidas</div></div>
+        </div>
+        <p>La app cubre las decisiones de riego, las alertas de plaga (pulgón, mildiu) y el cuaderno de aplicaciones de fitosanitarios. Los registros se exportan a CSV para el cuaderno de explotación oficial.</p>
+        <p>El feedback continuado durante el desarrollo afinó los umbrales de ET₀ acumulada para hortícolas mediterráneas y simplificó el lenguaje de las recomendaciones — sin siglas, sin paternalismo.</p>
+        <div class="quote">"Antes miraba el cielo y el suelo. Ahora abro la app y sé si toca regar antes de salir al campo."</div>
+        <div class="quote-author">— Agricultor del piloto inicial. Identidad disponible bajo petición y bajo NDA.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Formulario -->
+  <section class="block" id="formulario">
+    <div class="wrap">
+      <div class="form-card">
+        <h2>Apuntarme al piloto</h2>
+        <p>Te respondemos en menos de 48 horas con un calendario para una llamada de 20 min de presentación.</p>
+        <form class="piloto-form" id="piloto-form">
+          <div>
+            <label for="pf-nombre">Nombre y apellidos *</label>
+            <input type="text" id="pf-nombre" name="nombre" required maxlength="120">
+          </div>
+          <div>
+            <label for="pf-email">Email *</label>
+            <input type="email" id="pf-email" name="email" required>
+          </div>
+          <div>
+            <label for="pf-perfil">Perfil *</label>
+            <select id="pf-perfil" name="perfil" required>
+              <option value="">— Elige —</option>
+              <option value="asesor-atria">Asesor ATRIA / agronómico</option>
+              <option value="tecnico-cooperativa">Técnico de cooperativa</option>
+              <option value="centro-investigacion">Centro de investigación / universidad</option>
+              <option value="agricultor-individual">Agricultor individual</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div>
+            <label for="pf-organizacion">Organización / cooperativa</label>
+            <input type="text" id="pf-organizacion" name="organizacion" maxlength="200">
+          </div>
+          <div>
+            <label for="pf-zona">Zona geográfica (provincia)</label>
+            <input type="text" id="pf-zona" name="zona" placeholder="Ej: Almería, Murcia, Lleida..." maxlength="100">
+          </div>
+          <div>
+            <label for="pf-explotaciones">Nº parcelas / explotaciones</label>
+            <input type="text" id="pf-explotaciones" name="explotaciones" placeholder="Aproximado" maxlength="50">
+          </div>
+          <div class="full">
+            <label for="pf-cultivos">Cultivos principales</label>
+            <input type="text" id="pf-cultivos" name="cultivos" placeholder="Ej: lechuga, tomate, brassica..." maxlength="200">
+          </div>
+          <div class="full">
+            <label for="pf-mensaje">¿Algo que quieras contarme? (opcional)</label>
+            <textarea id="pf-mensaje" name="mensaje" maxlength="800" placeholder="Qué problema concreto quieres resolver, qué echas en falta de las herramientas actuales..."></textarea>
+          </div>
+          <label class="form-consent full">
+            <input type="checkbox" id="pf-consent" required checked>
+            <span>Acepto que Kylia trate los datos enviados para gestionar mi solicitud de piloto. Puedo darme de baja cuando quiera escribiendo a <a href="mailto:hola@kylia.app">hola@kylia.app</a>. <a href="/legal/privacidad" target="_blank" rel="noopener">Política de privacidad</a>.</span>
+          </label>
+          <button type="submit" id="pf-submit">Enviar solicitud →</button>
+        </form>
+        <div class="form-status" id="pf-status" aria-live="polite"></div>
+        <p class="form-legal">Solo enviamos correo cuando hay algo concreto que comunicarte. Sin newsletters, sin spam, sin venta a terceros. Datos en Europa.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="block alt">
+    <div class="wrap">
+      <div class="section-title">
+        <h2>Lo que preguntan otros</h2>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>¿Realmente es gratis durante toda la campaña 2026?</summary>
+          <div class="body">Sí. Sin €/hectárea, sin €/socio, sin mensualidad. A cambio de feedback honesto. Si después del piloto la usas y te resulta útil, hablamos de plan. Si no, te marchas sin compromiso.</div>
+        </details>
+        <details class="faq-item">
+          <summary>¿Cuánto tiempo me lleva configurar mis parcelas?</summary>
+          <div class="body">Cada parcela: 1 minuto si se coge del SIGPAC tocando el contorno en el mapa. Las primeras 5-10 te las configuro yo en directo por videollamada, para que veas cómo es y me cuentes lo que falla.</div>
+        </details>
+        <details class="faq-item">
+          <summary>¿Mis datos se quedan dentro de Kylia o salen a terceros?</summary>
+          <div class="body">Los datos meteorológicos y de satélite vienen de Open-Meteo y Copernicus (servicios públicos). Los registros que tú introduces (riegos, aplicaciones) se guardan en tu navegador durante el piloto. No vendemos datos a nadie y los servidores están en Europa. Detalle completo en la <a href="/legal/privacidad" target="_blank" rel="noopener">política de privacidad</a>.</div>
+        </details>
+        <details class="faq-item">
+          <summary>¿Funciona con olivar, cereal, viña? ¿O solo hortícolas?</summary>
+          <div class="body">Las medidas de satélite y meteorología funcionan con cualquier cultivo. Las recomendaciones específicas (plagas concretas, dosis de fertilizante por grupo) están afinadas hoy para hortícolas mediterráneas. Si entras al piloto con olivar o cereal, ampliamos el catálogo contigo.</div>
+        </details>
+        <details class="faq-item">
+          <summary>¿Reemplaza al asesor agronómico?</summary>
+          <div class="body">No. Es una herramienta de apoyo. La decisión y la responsabilidad agronómica siguen siendo tuyas. Lo que sí hace: filtrar el ruido y ahorrarte revisiones rutinarias para que el tiempo del asesor se invierta donde realmente añade valor.</div>
+        </details>
+        <details class="faq-item">
+          <summary>¿Y si después del piloto decido no seguir?</summary>
+          <div class="body">Te ayudo a exportar tu cuaderno de explotación a CSV y desaparecemos sin cobrarte un euro. Sin penalización, sin permanencia.</div>
+        </details>
+        <details class="faq-item">
+          <summary>¿Quién está detrás del proyecto?</summary>
+          <div class="body">Martí Carol, fundador. Estudiante de ingeniería con un padre agricultor en Cataluña, construyendo Kylia para resolver problemas reales que ve en casa. El piloto lo atiendo yo personalmente: tendrás mi WhatsApp directo. <a href="mailto:hola@kylia.app">hola@kylia.app</a>.</div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="brand" style="color:#fff;"><span class="brand-dot"></span> Kylia</div>
+      <p class="small" style="margin-top:8px;">Tu parcela vista desde el satélite.</p>
+    </div>
+    <div>
+      <strong style="color:#fff;">Producto</strong>
+      <ul style="margin-top:8px;">
+        <li><a href="/#producto">App</a></li>
+        <li><a href="/cooperativas">Cooperativas</a></li>
+        <li><a href="/precios">Precios</a></li>
+      </ul>
+    </div>
+    <div>
+      <strong style="color:#fff;">Contacto</strong>
+      <ul style="margin-top:8px;">
+        <li><a href="mailto:hola@kylia.app">hola@kylia.app</a></li>
+        <li><a href="mailto:cooperativas@kylia.app">cooperativas@kylia.app</a></li>
+      </ul>
+    </div>
+    <div>
+      <strong style="color:#fff;">Legal</strong>
+      <ul style="margin-top:8px;">
+        <li><a href="/legal/privacidad">Privacidad</a></li>
+        <li><a href="/legal/terminos">Términos</a></li>
+        <li><a href="/legal/cookies">Cookies</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top:32px; border-top:1px solid #2b4d36; padding-top:16px;">
+    <p class="small">© 2026 Kylia. Hecho en Cataluña con datos europeos.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  const form    = document.getElementById("piloto-form");
+  const status  = document.getElementById("pf-status");
+  const btn     = document.getElementById("pf-submit");
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const data = {
+      nombre:         form.nombre.value.trim(),
+      email:          form.email.value.trim().toLowerCase(),
+      organizacion:   (form.organizacion.value.trim() || `piloto-${form.perfil.value}`),
+      perfil:         form.perfil.value,
+      zona:           form.zona.value.trim(),
+      explotaciones:  form.explotaciones.value.trim(),
+      cultivos:       form.cultivos.value.trim(),
+      mensaje:        form.mensaje.value.trim(),
+      origen:         "piloto",
+    };
+    if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      status.textContent = "Introduce un email válido.";
+      status.className = "form-status err";
+      return;
+    }
+    if (!data.nombre || !data.perfil) {
+      status.textContent = "Falta nombre o perfil.";
+      status.className = "form-status err";
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = "Enviando...";
+    status.className = "form-status";
+    try {
+      const res = await fetch("/api/waitlist", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("status " + res.status);
+      status.textContent = "Recibido. Te escribo en menos de 48 horas.";
+      status.className = "form-status ok";
+      form.reset();
+    } catch (err) {
+      status.textContent = "No se pudo enviar. Prueba escribiendo a hola@kylia.app.";
+      status.className = "form-status err";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
