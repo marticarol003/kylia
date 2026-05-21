@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#2b7a3a" />
 <meta name="robots" content="index,follow" />
 <title>Precios — Kylia · Desde 99 €/año, sin sensores</title>
-<meta name="description" content="Pricing transparente de Kylia. Free hasta 30 ha. Productor desde 99 €/año (escala con tu superficie). Cooperativa desde 2.900 €/año (paquete cerrado). Garantía 60 días." />
+<meta name="description" content="Pricing transparente de Kylia. Free hasta 5 ha. Productor desde 99 €/año (escala con tu superficie). Cooperativa desde 2.900 €/año (paquete cerrado). Garantía 60 días." />
 <link rel="canonical" href="https://kylia.app/precios" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Precios — Kylia" />
@@ -22,8 +22,8 @@
   "description": "SaaS de monitorización agronómica por satélite Sentinel-2 sobre parcelas SIGPAC. Sin sensores, sin €/ha lineal.",
   "brand": { "@type": "Brand", "name": "Kylia" },
   "offers": [
-    { "@type": "Offer", "name": "Free",                     "price": "0",     "priceCurrency": "EUR", "description": "Hasta 30 ha y 2 parcelas. Gratis para siempre." },
-    { "@type": "Offer", "name": "Productor",                "price": "99",    "priceCurrency": "EUR", "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1Y" }, "description": "Desde 99 €/año. Hasta 100 ha en el mínimo. Después €/ha decreciente." },
+    { "@type": "Offer", "name": "Free",                     "price": "0",     "priceCurrency": "EUR", "description": "Hasta 5 ha y 1 parcela. Gratis para siempre." },
+    { "@type": "Offer", "name": "Productor",                "price": "99",    "priceCurrency": "EUR", "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1Y" }, "description": "Desde 99 €/año. Hasta 30 ha en el mínimo. Después €/ha decreciente." },
     { "@type": "Offer", "name": "Cooperativa Esencial",     "price": "2900",  "priceCurrency": "EUR", "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1Y" }, "description": "Hasta 200 socios y 3.000 ha." },
     { "@type": "Offer", "name": "Cooperativa Profesional",  "price": "5900",  "priceCurrency": "EUR", "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1Y" }, "description": "Hasta 600 socios y 10.000 ha." },
     { "@type": "Offer", "name": "Cooperativa Avanzado",     "price": "11900", "priceCurrency": "EUR", "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1Y" }, "description": "Hasta 2.000 socios y 30.000 ha." },
@@ -254,9 +254,9 @@ footer .small { font-size:0.85rem; color:#7fa089; }
           <div class="tier-price-row">
             <div class="tier-price">0&nbsp;€<small>/siempre</small></div>
           </div>
-          <div class="tier-sub">Para empezar a probarlo en tu finca pequeña o huerto familiar.</div>
+          <div class="tier-sub">Para probarlo en huerto familiar o parcela pequeña antes de saltar al plan Productor.</div>
           <ul class="tier-list">
-            <li><strong>30 ha</strong> · 2 parcelas</li>
+            <li><strong>5 ha</strong> · 1 parcela</li>
             <li>NDVI + NDMI semanal</li>
             <li>1 alerta por email a la semana</li>
             <li>Histórico 30 días</li>
@@ -274,9 +274,9 @@ footer .small { font-size:0.85rem; color:#7fa089; }
           <div class="tier-perday">Equivale a 8,25 € al mes</div>
           <div class="tier-sub">Tu finca completa, sin importar el tamaño. Escala con tu superficie de forma decreciente.</div>
           <ul class="tier-list">
-            <li>Hasta <strong>100 ha</strong> incluidas en 99 €</li>
-            <li>Después: <strong>+0,40 €/ha</strong> hasta 500 ha</li>
-            <li>Después: <strong>+0,20 €/ha</strong> hasta 2.000 ha</li>
+            <li>Hasta <strong>30 ha</strong> incluidas en 99 €</li>
+            <li>Después: <strong>+0,80 €/ha</strong> hasta 500 ha</li>
+            <li>Después: <strong>+0,40 €/ha</strong> hasta 2.000 ha</li>
             <li>Alertas Telegram + email ilimitadas</li>
             <li>Histórico 5 años · exportación</li>
             <li>Soporte prioritario por email</li>
@@ -316,13 +316,13 @@ footer .small { font-size:0.85rem; color:#7fa089; }
         <div class="calc-input-row">
           <div class="calc-field">
             <label for="calc-ha">Tu superficie total</label>
-            <input id="calc-ha" type="number" min="0" step="1" value="100" inputmode="numeric"/>
+            <input id="calc-ha" type="number" min="0" step="1" value="50" inputmode="numeric"/>
           </div>
         </div>
         <div class="calc-result">
           <div class="label">Pagarías</div>
-          <div class="price"><span id="calc-price">99</span>&nbsp;€<small> / año</small></div>
-          <div class="breakdown" id="calc-breakdown">100 ha entran en el mínimo facturable de 99 €.</div>
+          <div class="price"><span id="calc-price">115</span>&nbsp;€<small> / año</small></div>
+          <div class="breakdown" id="calc-breakdown">50 ha · 99 € (mínimo) + 20 ha · 0,80 €/ha = 115 €/año.</div>
         </div>
       </div>
     </div>
@@ -351,7 +351,7 @@ footer .small { font-size:0.85rem; color:#7fa089; }
         </div>
       </div>
       <div class="roi-summary">
-        <p>Una finca de <strong>200 ha de olivar</strong> que evita perder un solo año en calidad recupera <strong>40.000-80.000 €</strong>. Kylia para esa finca cuesta <strong>139 €/año</strong>. La cuenta sale sola.</p>
+        <p>Una finca de <strong>200 ha de olivar</strong> que evita perder un solo año en calidad recupera <strong>40.000-80.000 €</strong>. Kylia para esa finca cuesta <strong>235 €/año</strong>. La cuenta sale sola.</p>
       </div>
     </div>
   </section>
@@ -375,7 +375,7 @@ footer .small { font-size:0.85rem; color:#7fa089; }
             <td>Coste anual (200 ha)</td>
             <td class="market">~10 h/semana técnico</td>
             <td class="market">600-1.200 €/año (€/ha lineal)</td>
-            <td class="kylia">139 €/año</td>
+            <td class="kylia">235 €/año</td>
           </tr>
           <tr>
             <td>Datos satelitales</td>
@@ -466,8 +466,8 @@ footer .small { font-size:0.85rem; color:#7fa089; }
     </details>
 
     <details>
-      <summary>¿Qué pasa si supero las 100 ha del precio mínimo?</summary>
-      <p>El sistema te avisa con dos semanas de antelación y te muestra exactamente qué pagarías con tu nueva superficie. Por ejemplo, 250 ha = 159 €/año. 500 ha = 259 €/año. La calculadora de arriba te lo dice al céntimo. No suspendemos servicio sin avisar.</p>
+      <summary>¿Qué pasa si supero las 30 ha del precio mínimo?</summary>
+      <p>El sistema te avisa con dos semanas de antelación y te muestra exactamente qué pagarías con tu nueva superficie. Por ejemplo, 100 ha = 155 €/año. 250 ha = 275 €/año. 500 ha = 475 €/año. La calculadora de arriba te lo dice al céntimo. No suspendemos servicio sin avisar.</p>
     </details>
 
     <details>
@@ -527,10 +527,10 @@ footer .small { font-size:0.85rem; color:#7fa089; }
 // ── Calculadora del plan Productor ──
 (function() {
   const MIN = 99;          // mínimo facturable
-  const T1 = 100;          // hasta 100 ha incluidas en mínimo
-  const T2 = 500;          // 100-500 ha a 0,40 €/ha
-  const T3 = 2000;         // 500-2000 ha a 0,20 €/ha
-  const R12 = 0.40, R23 = 0.20;
+  const T1 = 30;           // hasta 30 ha incluidas en mínimo
+  const T2 = 500;          // 30-500 ha a 0,80 €/ha
+  const T3 = 2000;         // 500-2000 ha a 0,40 €/ha
+  const R12 = 0.80, R23 = 0.40;
 
   const haEl = document.getElementById('calc-ha');
   const priceEl = document.getElementById('calc-price');
@@ -540,15 +540,15 @@ footer .small { font-size:0.85rem; color:#7fa089; }
   function calc(ha) {
     if (!ha || ha < 0) return { price: 0, breakdown: 'Introduce tus hectáreas para ver el precio.' };
     if (ha === 0) return { price: 0, breakdown: 'Sin superficie, sin coste.' };
-    if (ha <= 30) return { price: 0, breakdown: `Con ${ha} ha estás en el plan Free, gratis para siempre.` };
+    if (ha <= 5) return { price: 0, breakdown: `Con ${ha} ha estás en el plan Free, gratis para siempre.` };
     if (ha <= T1) return { price: MIN, breakdown: `${ha} ha entran en el mínimo facturable de ${MIN} €.` };
     if (ha <= T2) {
       const extra = (ha - T1) * R12;
-      return { price: Math.round(MIN + extra), breakdown: `${MIN} € (mínimo) + ${ha - T1} ha · 0,40 €/ha = ${Math.round(MIN + extra)} €/año.` };
+      return { price: Math.round(MIN + extra), breakdown: `${MIN} € (mínimo) + ${ha - T1} ha · 0,80 €/ha = ${Math.round(MIN + extra)} €/año.` };
     }
     if (ha <= T3) {
       const extra = (T2 - T1) * R12 + (ha - T2) * R23;
-      return { price: Math.round(MIN + extra), breakdown: `${MIN} € + 400 ha · 0,40 € + ${ha - T2} ha · 0,20 € = ${Math.round(MIN + extra)} €/año.` };
+      return { price: Math.round(MIN + extra), breakdown: `${MIN} € + 470 ha · 0,80 € + ${ha - T2} ha · 0,40 € = ${Math.round(MIN + extra)} €/año.` };
     }
     return { price: null, breakdown: `Más de 2.000 ha — pasa a plan Enterprise. Hablamos.` };
   }
