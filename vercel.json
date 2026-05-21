@@ -30,5 +30,8 @@
     { "source": "/coops",        "destination": "/cooperativas",             "permanent": true },
     { "source": "/app.html",     "destination": "/app",                      "permanent": true },
     { "source": "/og-image.png", "destination": "/assets/img/og-image.png",  "permanent": true }
+  ],
+  "crons": [
+    { "path": "/api/recordatorio-diario", "schedule": "0 6 * * *" }
   ]
 }

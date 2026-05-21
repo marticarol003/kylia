@@ -25,6 +25,19 @@
   <link rel="dns-prefetch" href="https://api.bigdatacloud.net">
 
   <title>Kylia · Tu parcela desde el satélite</title>
+
+  <!-- Telemetría sin cookies (Plausible). Solo trackea si está cargado el script.
+       Para activarla en producción, descomenta la línea de abajo y reemplaza el dominio.
+       Cookieless = no requiere banner. -->
+  <!-- <script defer data-domain="kylia.app" src="https://plausible.io/js/script.tagged-events.js"></script> -->
+  <script>
+    // Helper seguro: si Plausible no está cargado, no rompe.
+    window.kyliaTrack = function (event, props) {
+      try {
+        if (window.plausible) window.plausible(event, { props: props || {} });
+      } catch (_) { /* noop */ }
+    };
+  </script>
   <style>
     :root {
       --bg:         #f5f8f2;
@@ -1190,6 +1203,207 @@
       font-family: inherit; cursor: pointer;
     }
     .btn-modal-cancel:hover { background: var(--border); color: var(--text); }
+
+    /* ── Welcome banner (primer uso) ── */
+    .welcome-banner {
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+    .welcome-banner h3 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .welcome-banner p {
+      margin: 0;
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .welcome-banner .pasos {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    .welcome-banner .pasos li { margin-bottom: 2px; }
+
+    /* ── Gate: consentimiento RGPD ── */
+    .gate-consent {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      margin: 12px 0 4px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .gate-consent input[type="checkbox"] {
+      flex-shrink: 0;
+      width: 16px; height: 16px;
+      margin-top: 2px;
+      accent-color: var(--low);
+    }
+    .gate-consent a {
+      color: var(--low);
+      text-decoration: underline;
+    }
+
+    /* ── FAB soporte (Hablar conmigo / Reportar) ── */
+    .fab-soporte {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .fab-btn {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-size: 1.4rem;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+      display: flex; align-items: center; justify-content: center;
+      font-family: inherit;
+      transition: transform 0.12s ease;
+    }
+    .fab-btn:hover { transform: scale(1.06); }
+    .fab-btn:focus-visible { outline: 2px solid var(--low); outline-offset: 3px; }
+    .fab-btn-whatsapp {
+      background: #25d366;
+      color: #fff;
+    }
+    .fab-btn-feedback {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      width: 44px; height: 44px;
+      font-size: 1.1rem;
+    }
+    .fab-btn-feedback:hover { background: var(--bg); }
+
+    /* ── Modal feedback ── */
+    .modal-card textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: var(--bg);
+      color: var(--text);
+      resize: vertical;
+      min-height: 90px;
+    }
+    .modal-card textarea:focus {
+      outline: 2px solid var(--low);
+      border-color: transparent;
+    }
+    .modal-card .feedback-tipo {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .modal-card .feedback-tipo button {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 0.82rem;
+      font-family: inherit;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .modal-card .feedback-tipo button.activo {
+      background: var(--low-bg);
+      border-color: var(--low);
+      color: var(--low);
+    }
+
+    /* ── FAQ ── */
+    .faq-section {
+      margin-top: 18px;
+    }
+    .faq-section > h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .faq-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .faq-item summary {
+      padding: 12px 14px;
+      cursor: pointer;
+      font-size: 0.92rem;
+      font-weight: 500;
+      list-style: none;
+      position: relative;
+      padding-right: 36px;
+    }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::after {
+      content: "+";
+      position: absolute;
+      right: 14px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.2rem;
+      color: var(--muted);
+      font-weight: 400;
+    }
+    .faq-item[open] summary::after { content: "−"; }
+    .faq-item .faq-body {
+      padding: 0 14px 14px;
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* ── Footer app ── */
+    .app-footer {
+      margin: 24px 0 80px;
+      padding: 14px 4px 0;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+    }
+    .app-footer a {
+      color: var(--muted);
+      text-decoration: underline;
+    }
+    .app-footer a:hover { color: var(--text); }
+
+    /* ── Piloto badge ── */
+    .piloto-badge {
+      display: inline-block;
+      background: var(--low-bg);
+      color: var(--low);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body>
@@ -1207,6 +1421,10 @@
         <label for="gate-email">Email *</label>
         <input type="email" id="gate-email" placeholder="tunombre@ejemplo.com" autocomplete="email" required>
       </div>
+      <label class="gate-consent">
+        <input type="checkbox" id="gate-consent" checked>
+        <span>Acepto que Kylia guarde mi email para enviarme la información del piloto. Puedo darme de baja cuando quiera. <a href="/legal/privacidad" target="_blank" rel="noopener">Política de privacidad</a>.</span>
+      </label>
       <button id="gate-btn" type="button">Entrar →</button>
       <span id="gate-status" class="gate-status" aria-live="polite"></span>
       <p class="gate-legal">Sin spam · datos en Europa · puedes pedir eliminación en cualquier momento.</p>
@@ -1228,10 +1446,11 @@
       }
 
       document.getElementById("gate-btn").addEventListener("click", async function () {
-        const emailEl  = document.getElementById("gate-email");
-        const nombreEl = document.getElementById("gate-nombre");
-        const statusEl = document.getElementById("gate-status");
-        const btn      = document.getElementById("gate-btn");
+        const emailEl   = document.getElementById("gate-email");
+        const nombreEl  = document.getElementById("gate-nombre");
+        const consentEl = document.getElementById("gate-consent");
+        const statusEl  = document.getElementById("gate-status");
+        const btn       = document.getElementById("gate-btn");
 
         const email  = emailEl.value.trim();
         const nombre = nombreEl.value.trim();
@@ -1240,6 +1459,12 @@
           statusEl.textContent = "Introduce un email válido.";
           statusEl.className   = "gate-status error";
           emailEl.focus();
+          return;
+        }
+        if (!consentEl.checked) {
+          statusEl.textContent = "Necesitamos tu consentimiento para guardar el email.";
+          statusEl.className   = "gate-status error";
+          consentEl.focus();
           return;
         }
 
@@ -1251,11 +1476,13 @@
           await fetch("/api/waitlist", {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
-            body:    JSON.stringify({ email, nombre, organizacion: "app-visitor" }),
+            body:    JSON.stringify({ email, nombre, organizacion: "app-piloto" }),
           });
         } catch (_) { /* si falla la red, dejamos pasar igualmente */ }
 
         localStorage.setItem("kylia_user_email", email);
+        localStorage.setItem("kylia_user_consent", new Date().toISOString());
+        if (nombre) localStorage.setItem("kylia_user_nombre", nombre);
         gate.hidden = true;
       });
 
@@ -1276,6 +1503,17 @@
         <p class="sub" id="subtitle"> </p>
       </div>
       <button class="btn-config" id="btn-config" aria-label="Abrir configuración">&#9881;</button>
+    </div>
+
+    <!-- Banner de bienvenida primer uso (se inserta dinámicamente) -->
+    <div id="welcome-banner" class="welcome-banner" hidden>
+      <h3>👋 Bienvenido a Kylia <span class="piloto-badge">Piloto</span></h3>
+      <p>Configura tu parcela en menos de 1 minuto y empieza a recibir la acción del día:</p>
+      <ol class="pasos">
+        <li>Tu ubicación (GPS o ciudad)</li>
+        <li>Tu parcela en el mapa (toca el contorno SIGPAC)</li>
+        <li>Qué cultivas</li>
+      </ol>
     </div>
 
     <div class="config-panel" id="config-panel" aria-label="Configuración">
@@ -1408,7 +1646,92 @@
       <span id="weather-status" class="status" aria-live="polite">Cargando...</span>
     </section>
 
+    <!-- Preguntas frecuentes -->
+    <section class="faq-section" aria-label="Preguntas frecuentes">
+      <h2>Preguntas frecuentes</h2>
+
+      <details class="faq-item">
+        <summary>¿Cómo decide la app si tengo que regar?</summary>
+        <div class="faq-body">Calcula el agua evaporada (ET₀) desde tu último riego usando datos de Open-Meteo. Si supera 30 mm sin reponer, marca "Regar hoy" en rojo. A 15 mm sugiere revisar. Toca "¿Por qué?" en la acción del día para ver el desglose.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿De dónde salen los datos de mi parcela?</summary>
+        <div class="faq-body">El verdor (NDVI) y el agua en hojas (NDMI) vienen del satélite Sentinel-2 (Copernicus, Unión Europea). La meteorología y la humedad del suelo, de Open-Meteo. El contorno de tu parcela, del registro oficial SIGPAC.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Qué pasa si no riego cuando me lo dice?</summary>
+        <div class="faq-body">La app es una herramienta de apoyo, tú decides. Si el déficit supera los 30 mm sin lluvia, el cultivo entra en estrés hídrico y el verdor (NDVI) baja en la siguiente imagen de satélite. Si tienes humedad medible en suelo arcilloso, el margen es algo mayor.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Por qué la app me pide que registre los riegos y las aplicaciones?</summary>
+        <div class="faq-body">Los riegos ayudan a calcular el balance hídrico real (no estimado). Las aplicaciones de productos generan tu cuaderno de explotación exportable a CSV y avisan automáticamente del plazo de seguridad.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Funciona con cualquier cultivo?</summary>
+        <div class="faq-body">Durante el piloto, las recomendaciones específicas (plagas y fertilizantes) están afinadas para hortícolas: lechuga, espinaca, col/coliflor, tomate, pimiento, berenjena y calabacín. Las medidas de satélite y meteo funcionan para cualquier cultivo.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿La sugerencia de producto sustituye al asesor técnico?</summary>
+        <div class="faq-body">No. La app ofrece una comparativa basada en un catálogo curado con datos del registro MAPA, pero la decisión final y la responsabilidad del tratamiento son tuyas. Lee siempre la etiqueta del producto y, si tienes dudas, consulta con tu ATRIA o asesor.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Qué hago si veo algo raro o me equivoco al registrar?</summary>
+        <div class="faq-body">Toca el botón verde de WhatsApp (abajo a la derecha) y escríbeme. Estoy atendiendo personalmente a los pilotos. Cada riego y cada aplicación se pueden borrar individualmente desde su historial.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Mis datos se quedan en mi teléfono o se suben?</summary>
+        <div class="faq-body">Durante el piloto, los registros de riego y aplicaciones se guardan localmente en tu navegador. El email se guarda en nuestra lista para avisarte de novedades. Puedes pedir borrado en cualquier momento. <a href="/legal/privacidad" target="_blank" rel="noopener">Más detalle aquí</a>.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Cuánto cuesta?</summary>
+        <div class="faq-body">El piloto es gratuito. A cambio, te pedimos que nos cuentes lo que falla y qué echas en falta. Si la cooperativa o asesor termina contratando, tú sigues con acceso gratuito al plan personal durante toda la campaña 2026.</div>
+      </details>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div><a href="/legal/privacidad" target="_blank" rel="noopener">Privacidad</a> · <a href="/legal/terminos" target="_blank" rel="noopener">Términos</a> · <a href="/legal/cookies" target="_blank" rel="noopener">Cookies</a></div>
+      <div style="margin-top:6px">Datos en Europa · Sin venta a terceros · Borrado a petición en <a href="mailto:hola@kylia.app">hola@kylia.app</a></div>
+    </footer>
+
   </main>
+
+  <!-- FAB de soporte -->
+  <div class="fab-soporte" role="region" aria-label="Soporte del piloto">
+    <button class="fab-btn fab-btn-feedback" id="fab-feedback" type="button" aria-label="Reportar o sugerir" title="Reportar o sugerir">✎</button>
+    <a class="fab-btn fab-btn-whatsapp" id="fab-whatsapp" href="#" target="_blank" rel="noopener" aria-label="Hablar conmigo por WhatsApp" title="Hablar conmigo por WhatsApp">💬</a>
+  </div>
+
+  <!-- Modal: feedback -->
+  <div id="modal-feedback" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-feedback-titulo" hidden>
+    <div class="modal-card">
+      <h2 id="modal-feedback-titulo">Cuéntame qué tal</h2>
+      <div class="feedback-tipo" role="group" aria-label="Tipo de feedback">
+        <button type="button" data-tipo="problema">⚠️ Problema</button>
+        <button type="button" data-tipo="sugerencia">💡 Sugerencia</button>
+        <button type="button" data-tipo="duda">❓ Duda</button>
+        <button type="button" data-tipo="otro">📝 Otro</button>
+      </div>
+      <div class="config-field">
+        <label for="feedback-texto">¿Qué quieres contarme?</label>
+        <textarea id="feedback-texto" placeholder="Escribe aquí. Te leo personalmente."></textarea>
+      </div>
+      <p class="modal-hint">Se enviará junto con tu cultivo, ubicación y datos recientes para que pueda entender el contexto. Sin esto se pierde información útil.</p>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" id="modal-feedback-cancelar" type="button">Cancelar</button>
+        <button class="btn-save" id="modal-feedback-enviar" type="button">Enviar</button>
+      </div>
+      <span id="modal-feedback-status" class="config-feedback" aria-live="polite" style="display:block;margin-top:8px;"></span>
+    </div>
+  </div>
 
   <!-- Modal: registrar aplicación de producto -->
   <div id="modal-aplicacion" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-aplicacion-titulo" hidden>
@@ -3478,10 +3801,14 @@
       }
 
       async function guardarYActualizar(nuevoCfg) {
+        const eraPrimerUso = !localStorage.getItem(STORAGE_KEY);
         saveConfig(nuevoCfg);
         actualizarHeader();
         panel.classList.remove("visible");
+        const banner = document.getElementById("welcome-banner");
+        if (banner) banner.hidden = true;
         setFeedback("");
+        if (eraPrimerUso) window.kyliaTrack?.("onboarding-completado", { cultivos: (nuevoCfg.cultivos || []).join(",") });
         await cargarDatos();
         cargarNDVI(true);
         cargarHumedadSuelo();
@@ -3516,10 +3843,14 @@
       }
 
       if (!localStorage.getItem(STORAGE_KEY)) {
+        // Primer uso: mostrar banner de bienvenida + abrir panel de configuración
+        const banner = document.getElementById("welcome-banner");
+        if (banner) banner.hidden = false;
         panel.classList.add("visible");
         inicializarCultivos();
         initMapaParcela();
         forzarRedibujoMapa();
+        window.kyliaTrack?.("onboarding-iniciado");
       }
 
       btnConfig.addEventListener("click", () => {
@@ -3961,6 +4292,139 @@
           panel.classList.toggle("visible", !abierto);
           row.setAttribute("aria-expanded", String(!abierto));
         });
+      });
+
+      // ─── Soporte WhatsApp ─────────────────────────────────────────────────
+      // Número del fundador para soporte directo durante el piloto
+      const WHATSAPP_NUMERO = "34634891471";
+      const fabWa = document.getElementById("fab-whatsapp");
+      if (fabWa) {
+        const nombreUsr = (localStorage.getItem("kylia_user_nombre") || "").trim();
+        const saludo = nombreUsr
+          ? `Hola, soy ${nombreUsr}. Estoy probando Kylia y...`
+          : "Hola, estoy probando Kylia y...";
+        fabWa.href = `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(saludo)}`;
+        fabWa.addEventListener("click", () => window.kyliaTrack?.("soporte-whatsapp"));
+      }
+
+      // ─── Feedback in-app ──────────────────────────────────────────────────
+      const fabFb        = document.getElementById("fab-feedback");
+      const modalFb      = document.getElementById("modal-feedback");
+      const fbTextoEl    = document.getElementById("feedback-texto");
+      const fbStatusEl   = document.getElementById("modal-feedback-status");
+      const fbEnviarBtn  = document.getElementById("modal-feedback-enviar");
+      const fbCancelBtn  = document.getElementById("modal-feedback-cancelar");
+      const fbTipoCont   = modalFb?.querySelector(".feedback-tipo");
+      let fbTipoSel = "sugerencia";
+
+      function setFbTipo(tipo) {
+        fbTipoSel = tipo;
+        if (!fbTipoCont) return;
+        fbTipoCont.querySelectorAll("button").forEach(b => {
+          b.classList.toggle("activo", b.dataset.tipo === tipo);
+        });
+      }
+      function abrirModalFeedback() {
+        if (!modalFb) return;
+        setFbTipo("sugerencia");
+        fbTextoEl.value = "";
+        fbStatusEl.textContent = "";
+        fbStatusEl.className = "config-feedback";
+        modalFb.hidden = false;
+        requestAnimationFrame(() => fbTextoEl.focus());
+        window.kyliaTrack?.("feedback-abierto");
+      }
+      function cerrarModalFeedback() {
+        if (modalFb) modalFb.hidden = true;
+      }
+
+      fabFb?.addEventListener("click", abrirModalFeedback);
+      fbCancelBtn?.addEventListener("click", cerrarModalFeedback);
+      modalFb?.addEventListener("click", (e) => {
+        if (e.target.id === "modal-feedback") cerrarModalFeedback();
+      });
+      fbTipoCont?.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-tipo]");
+        if (btn) setFbTipo(btn.dataset.tipo);
+      });
+      fbEnviarBtn?.addEventListener("click", async () => {
+        const texto = (fbTextoEl.value || "").trim();
+        if (texto.length < 4) {
+          fbStatusEl.textContent = "Escribe un poco más para que te pueda entender.";
+          fbStatusEl.className = "config-feedback error";
+          fbTextoEl.focus();
+          return;
+        }
+        fbEnviarBtn.disabled = true;
+        fbStatusEl.textContent = "Enviando...";
+        fbStatusEl.className = "config-feedback";
+
+        const payload = {
+          tipo:    fbTipoSel,
+          texto,
+          email:   localStorage.getItem("kylia_user_email") || null,
+          nombre:  localStorage.getItem("kylia_user_nombre") || null,
+          contexto: {
+            cultivos: cfg?.cultivos || [],
+            ciudad:   cfg?.ciudad   || null,
+            lat:      cfg?.lat      || null,
+            lon:      cfg?.lon      || null,
+            tieneParcela: !!cfg?.parcela,
+            ndvi:     ultimoNDVI?.ndvi ?? null,
+            ndviFecha: ultimoNDVI?.fecha ?? null,
+            ndmi:     ultimoNDMI?.ndmi ?? null,
+            sueloHoy: ultimoSuelo?.hoy?.[0] ?? null,
+            et0Acumulada: (function () {
+              if (!ultimoET0) return null;
+              const ref = ultimoRiego || ultimoNDMI?.fecha;
+              if (!ref) return null;
+              return Number(ultimoET0.filter(({ date }) => date >= ref).reduce((s, { et0 }) => s + (et0 || 0), 0).toFixed(1));
+            })(),
+            ultimoRiego: ultimoRiego || null,
+            numAplicaciones: (typeof aplicaciones !== "undefined" && Array.isArray(aplicaciones)) ? aplicaciones.length : 0,
+          },
+          ua:       navigator.userAgent,
+          url:      location.href,
+          fecha:    new Date().toISOString(),
+        };
+
+        try {
+          const res = await fetch("/api/feedback", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify(payload),
+          });
+          if (!res.ok) throw new Error("status " + res.status);
+          fbStatusEl.textContent = "¡Gracias! Te leo y te respondo.";
+          fbStatusEl.className = "config-feedback";
+          window.kyliaTrack?.("feedback-enviado", { tipo: fbTipoSel });
+          setTimeout(cerrarModalFeedback, 1400);
+        } catch (err) {
+          fbStatusEl.textContent = "No se pudo enviar. Prueba por WhatsApp.";
+          fbStatusEl.className = "config-feedback error";
+        } finally {
+          fbEnviarBtn.disabled = false;
+        }
+      });
+
+      // ESC cierra también el modal de feedback
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modalFb && !modalFb.hidden) cerrarModalFeedback();
+      });
+
+      // ─── Telemetría: eventos básicos ──────────────────────────────────────
+      // Cargar app
+      window.kyliaTrack?.("app-cargada", {
+        primerUso: !localStorage.getItem(STORAGE_KEY) ? "si" : "no",
+      });
+      // Trackear interacciones clave (delegación)
+      document.addEventListener("click", (e) => {
+        if (e.target.closest("#btn-registrar-riego")) window.kyliaTrack?.("registra-riego");
+        if (e.target.closest("#btn-aplicacion-nueva")) window.kyliaTrack?.("aplicacion-nueva");
+        if (e.target.closest(".btn-aplicar-producto")) window.kyliaTrack?.("aplicacion-desde-tabla");
+        if (e.target.closest(".btn-elegir-producto"))  window.kyliaTrack?.("producto-elegido");
+        if (e.target.closest("#btn-aplicaciones-csv")) window.kyliaTrack?.("descarga-csv");
+        if (e.target.closest("#btn-config"))           window.kyliaTrack?.("abre-config");
       });
     });
   </script>
