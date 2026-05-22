@@ -812,54 +812,100 @@
       color: var(--muted);
       margin-bottom: 12px;
     }
-    .rec-lista { display: flex; flex-direction: column; gap: 6px; }
+    .rec-lista { display: flex; flex-direction: column; gap: 8px; }
     .rec-fila {
       display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 11px 12px;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 14px;
       background: var(--bg);
-      border-radius: 10px;
+      border-radius: 12px;
       border: 1px solid var(--border);
+      border-left: 4px solid var(--border);
       cursor: pointer;
-      transition: background 0.12s;
+      transition: background 0.12s, border-left-color 0.12s, box-shadow 0.12s;
     }
+    .rec-fila:hover  { background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
     .rec-fila:active { background: var(--border); }
-    .rec-cat {
-      font-size: 0.63rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      padding: 3px 8px;
-      border-radius: 8px;
-      white-space: nowrap;
-      flex-shrink: 0;
-      margin-top: 2px;
+    .rec-fila.urgencia-alta  { border-left-color: var(--high); }
+    .rec-fila.urgencia-media { border-left-color: var(--medium); }
+    .rec-fila.urgencia-baja  { border-left-color: var(--low); }
+    .rec-fila.urgencia-info  {
+      border-left-color: #cbd5e1;
+      background: color-mix(in srgb, var(--bg) 60%, #ffffff);
     }
-    .rec-cat.riego       { background: #dbeafe; color: #1d4ed8; }
-    .rec-cat.tratamiento { background: var(--high-bg); color: var(--high); }
-    .rec-cat.nutricion   { background: #d1fae5; color: #065f46; }
+    .rec-fila[aria-expanded="true"] {
+      background: var(--card);
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+      border-bottom-color: transparent;
+    }
+    .rec-icono {
+      font-size: 1.5rem;
+      line-height: 1;
+      flex-shrink: 0;
+      width: 30px;
+      text-align: center;
+    }
+    .rec-cuerpo {
+      flex: 1;
+      min-width: 0;
+    }
+    .rec-cat {
+      display: inline-block;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .rec-cat.protegido { color: #047857; }
+    .rec-cat .rec-cat-tag {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 6px;
+      margin-right: 6px;
+    }
+    .rec-cat.riego       .rec-cat-tag { background: #dbeafe; color: #1d4ed8; }
+    .rec-cat.tratamiento .rec-cat-tag { background: var(--high-bg); color: var(--high); }
+    .rec-cat.nutricion   .rec-cat-tag { background: #d1fae5; color: #065f46; }
+    .rec-cat.protegido   .rec-cat-tag { background: #ecfdf5; color: #047857; }
     .rec-titulo {
-      font-size: 0.88rem;
-      font-weight: 500;
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 600;
       color: var(--text);
       line-height: 1.35;
-      flex: 1;
+      margin-top: 3px;
     }
+    .rec-fila.urgencia-info .rec-titulo { color: var(--muted); font-weight: 500; }
+    .rec-chevron {
+      flex-shrink: 0;
+      font-size: 1rem;
+      color: var(--muted);
+      transition: transform 0.18s ease;
+      margin-left: 4px;
+    }
+    .rec-fila[aria-expanded="true"] .rec-chevron { transform: rotate(180deg); }
     .rec-detalle-panel {
       display: none;
       margin-top: -2px;
-      padding: 10px 12px 12px;
+      padding: 12px 14px 14px;
       background: var(--card);
       border: 1px solid var(--border);
+      border-left: 4px solid var(--border);
       border-top: none;
-      border-radius: 0 0 10px 10px;
-      font-size: 0.82rem;
-      color: var(--muted);
+      border-radius: 0 0 12px 12px;
+      font-size: 0.85rem;
+      color: var(--text);
       line-height: 1.55;
     }
+    .rec-detalle-panel.urgencia-alta  { border-left-color: var(--high); }
+    .rec-detalle-panel.urgencia-media { border-left-color: var(--medium); }
+    .rec-detalle-panel.urgencia-baja  { border-left-color: var(--low); }
+    .rec-detalle-panel.urgencia-info  { border-left-color: #cbd5e1; }
     .rec-detalle-panel.visible { display: block; }
-    .rec-detalle-panel p { margin: 0 0 10px; }
+    .rec-detalle-panel p { margin: 0 0 10px; color: var(--text); }
     .rec-producto {
       margin-top: 6px;
       padding: 9px 10px;
@@ -887,27 +933,28 @@
 
     /* ── Bloque análisis IA ── */
     .ia-bloque {
-      background: color-mix(in srgb, var(--border) 30%, transparent);
-      border-radius: 10px;
-      padding: 12px 14px;
-      margin-bottom: 12px;
-      font-size: 0.875rem;
-      line-height: 1.6;
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%);
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      font-size: 0.92rem;
+      line-height: 1.55;
       color: var(--text);
     }
     .ia-label {
-      font-size: 0.63rem;
+      font-size: 0.66rem;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--muted);
-      margin-bottom: 5px;
+      letter-spacing: 0.08em;
+      color: #047857;
+      margin-bottom: 6px;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
     }
-    .ia-texto { font-style: italic; }
-    .ia-cargando { color: var(--muted); font-size: 0.82rem; font-style: italic; }
+    .ia-texto { font-style: normal; margin: 0; }
+    .ia-cargando { color: #047857; font-size: 0.85rem; margin: 0; }
 
     /* ── Tabla comparativa de productos ── */
     .productos-bloque { margin-top: 12px; }
@@ -1155,6 +1202,16 @@
     }
     .historial-aplicaciones .apl-plazo.libre {
       background: var(--low-bg); color: var(--low);
+    }
+    .historial-aplicaciones .apl-efecto {
+      display: inline-block;
+      font-weight: 600; font-size: 0.74rem;
+      padding: 3px 8px; border-radius: 999px;
+      margin-top: 4px; margin-left: 6px;
+      background: #e0f2fe; color: #075985;
+    }
+    .historial-aplicaciones .apl-efecto.fert {
+      background: #d1fae5; color: #065f46;
     }
     .historial-aplicaciones .apl-borrar {
       background: none; border: none; cursor: pointer;
@@ -2494,6 +2551,90 @@
       });
     }
 
+    // ─── Ventanas de efecto de tratamientos y fertilizantes ──────────────────
+    // Días mínimos de "espera de respuesta" tras un abonado antes de volver a
+    // recomendar nutrición: la planta tarda en responder visiblemente en el
+    // NDVI captado por satélite (5-15 días).
+    const ESPERA_RESPUESTA_NDVI_DIAS = 14;
+
+    // Para una aplicación, calcula hasta cuándo sigue activa (protección de
+    // tratamiento o efecto de fertilizante). Requiere catálogo cargado.
+    function calcularEfectoAplicacion(aplicacion) {
+      if (!aplicacion?.productoId) return null;
+      const catalogo = (typeof CATALOGO !== "undefined" && CATALOGO) ? CATALOGO : null;
+      if (!catalogo) return null;
+      const tratamiento = (catalogo.tratamientos || []).find(p => p.id === aplicacion.productoId);
+      if (tratamiento) {
+        const dias = tratamiento.duracionProteccion;
+        if (!dias || dias <= 0) return null;
+        const fin = new Date(aplicacion.date);
+        fin.setDate(fin.getDate() + dias);
+        return { tipo: "tratamiento", producto: tratamiento, dias, fechaFin: fin };
+      }
+      const fertilizante = (catalogo.fertilizantes || []).find(p => p.id === aplicacion.productoId);
+      if (fertilizante) {
+        const efecto = fertilizante.duracionEfecto || 0;
+        const ventana = Math.max(efecto, ESPERA_RESPUESTA_NDVI_DIAS);
+        if (ventana <= 0) return null;
+        const fin = new Date(aplicacion.date);
+        fin.setDate(fin.getDate() + ventana);
+        return { tipo: "fertilizante", producto: fertilizante, dias: ventana, fechaFin: fin };
+      }
+      return null;
+    }
+
+    // Busca una aplicación reciente del catálogo cuyo efecto aún cubra el
+    // criterio dado y, por tanto, justifique silenciar la recomendación.
+    // criterio: { tipo: "plaga", clave: "pulgon" } | { tipo: "fertilizante", clave: "hojas"|"fruto"|"brassica" }
+    // Devuelve { aplicacion, producto, diasRestantes, fechaFin } o null.
+    function aplicacionReciente(criterio) {
+      if (!criterio) return null;
+      const hoy = new Date();
+      for (let i = aplicaciones.length - 1; i >= 0; i--) {
+        const a = aplicaciones[i];
+        const efecto = calcularEfectoAplicacion(a);
+        if (!efecto) continue;
+        if (efecto.fechaFin <= hoy) continue;
+        if (criterio.tipo === "plaga") {
+          if (efecto.tipo !== "tratamiento") continue;
+          if (!(efecto.producto.plagas || []).includes(criterio.clave)) continue;
+        } else if (criterio.tipo === "fertilizante") {
+          if (efecto.tipo !== "fertilizante") continue;
+          // Cualquier fertilizante reciente silencia la recomendación de nutrición:
+          // compost/estiércol son universales, npk-hoja cubre hojas+brassica,
+          // npk-fruto cubre fruto. Si se aplicó algo, la planta tiene que asentarlo.
+        } else {
+          continue;
+        }
+        return {
+          aplicacion: a,
+          producto: efecto.producto,
+          diasRestantes: Math.max(1, Math.ceil((efecto.fechaFin - hoy) / 86400000)),
+          fechaFin: efecto.fechaFin.toISOString().slice(0, 10),
+        };
+      }
+      return null;
+    }
+
+    // Devuelve aplicaciones cuyo efecto aún está activo, para mostrar badge en
+    // el historial. Distinto de aplicacionesConPlazoActivo (que mira cosecha).
+    function aplicacionesConEfectoActivo() {
+      const hoy = new Date();
+      const out = [];
+      aplicaciones.forEach(a => {
+        const efecto = calcularEfectoAplicacion(a);
+        if (!efecto || efecto.fechaFin <= hoy) return;
+        out.push({
+          date: a.date,
+          productoNombre: a.productoNombre,
+          tipoEfecto: efecto.tipo,
+          diasRestantes: Math.max(1, Math.ceil((efecto.fechaFin - hoy) / 86400000)),
+          fechaFin: efecto.fechaFin.toISOString().slice(0, 10),
+        });
+      });
+      return out;
+    }
+
     // Centroide geométrico de la parcela actual (lat, lon). Si no hay parcela
     // seleccionada, cae al lat/lon del pueblo/configuración.
     // Esto es importante para Open-Meteo: si no usamos el centroide, toda la
@@ -2931,6 +3072,18 @@
             badge = `<span class="apl-plazo libre">Ya puedes recolectar</span>`;
           }
         }
+        // Badge de efecto/protección residual (en paralelo al plazo de cosecha)
+        let efectoBadge = "";
+        const efecto = calcularEfectoAplicacion(a);
+        if (efecto && efecto.fechaFin > new Date()) {
+          const diasEf = Math.max(1, Math.ceil((efecto.fechaFin - new Date()) / 86400000));
+          const finIso = efecto.fechaFin.toISOString().slice(0, 10);
+          const claseExtra = efecto.tipo === "fertilizante" ? " fert" : "";
+          const texto = efecto.tipo === "fertilizante"
+            ? `Efecto activo hasta ${formatearFechaCorta(finIso)} · ${diasEf} día${diasEf !== 1 ? "s" : ""}`
+            : `Protege hasta ${formatearFechaCorta(finIso)} · ${diasEf} día${diasEf !== 1 ? "s" : ""}`;
+          efectoBadge = `<span class="apl-efecto${claseExtra}">${texto}</span>`;
+        }
         const sustancia = a.sustanciaActiva ? ` · ${a.sustanciaActiva}` : "";
         const cultivo   = a.cultivo ? ` · ${a.cultivo}` : "";
         const dosis     = a.dosis ? ` · ${a.dosis}` : "";
@@ -2945,6 +3098,7 @@
           + `<button class="apl-borrar" data-date="${a.date}" data-nombre="${a.productoNombre.replace(/"/g, "&quot;")}" aria-label="Borrar aplicación">✕</button>`
           + `</div>`
           + badge
+          + efectoBadge
           + notas;
         lista.appendChild(li);
       });
@@ -3039,7 +3193,8 @@
         }
       }
 
-      // 2. TRATAMIENTO — riesgo de hoy y aviso preventivo de los próximos días
+      // 2. TRATAMIENTO — solo si la ventana de riesgo justifica intervenir y
+      // no hay un tratamiento reciente cuya protección siga activa.
       if (ultimoMeteo && cfg.cultivos?.length) {
         const alertasActivas = new Set();
         cfg.cultivos.forEach(cId => {
@@ -3049,25 +3204,61 @@
         alertasActivas.forEach(alertaId => {
           const alerta = ALERTAS[alertaId];
           if (!alerta) return;
-          const nivelHoy = alerta.calcFn(ultimoMeteo).nivel;
-          const diaAlto  = ultimoPrevision.find(d => alerta.calcFn(d).nivel === "ALTO");
-          const prod     = PRODUCTOS_PLAGA[alertaId];
+          const prod = PRODUCTOS_PLAGA[alertaId];
           if (!prod) return;
 
-          if (nivelHoy === "ALTO") {
+          const nivelHoy = alerta.calcFn(ultimoMeteo).nivel;
+          // Niveles de los próximos 3 días
+          const nivelesProx = ultimoPrevision.map(d => ({
+            dia: d,
+            nivel: alerta.calcFn(d).nivel,
+          }));
+          const diasAltos = (nivelHoy === "ALTO" ? 1 : 0)
+            + nivelesProx.filter(n => n.nivel === "ALTO").length;
+          const proximoDiaAlto = nivelesProx.find(n => n.nivel === "ALTO")?.dia;
+
+          // Si ya hay protección activa de una aplicación reciente, no insistir
+          const proteccion = aplicacionReciente({ tipo: "plaga", clave: alertaId });
+          if (proteccion) {
+            // Solo emitimos un aviso suave si la ventana actual o próxima es ALTA,
+            // para que el agricultor sepa que la protección ya cubre el riesgo.
+            if (nivelHoy === "ALTO" || proximoDiaAlto) {
+              recs.push({
+                id: `trat_${alertaId}`, categoria: "TRATAMIENTO", catClass: "tratamiento",
+                titulo: `Protección activa frente al ${prod.titulo.toLowerCase()} — quedan ${proteccion.diasRestantes} días`,
+                detalle: `Aplicaste ${proteccion.aplicacion.productoNombre} el ${proteccion.aplicacion.date}. Sigue protegiendo el cultivo hasta el ${proteccion.fechaFin}. Si ves síntomas claros antes de esa fecha, revisa y consulta — no hace falta volver a tratar todavía.`,
+                prod, prioridad: 6,
+                productoCriterio: { tipo: "plaga", clave: alertaId },
+                yaProtegido: true,
+              });
+            }
+            return;
+          }
+
+          if (nivelHoy === "ALTO" && diasAltos >= 2) {
+            // Hoy ALTO y mañana también: ventana real, merece tratar
             recs.push({
               id: `trat_${alertaId}`, categoria: "TRATAMIENTO", catClass: "tratamiento",
               titulo: `Riesgo alto de ${prod.titulo.toLowerCase()} — actúa antes de que se extienda`,
-              detalle: `Las condiciones de hoy son ideales para el ${prod.titulo.toLowerCase()}. Actuar ahora de forma preventiva es mucho más eficaz que hacerlo cuando la plaga ya está establecida.`,
+              detalle: `Las condiciones de hoy y las próximas son ideales para el ${prod.titulo.toLowerCase()}. La ventana favorable dura varios días, así que actuar ahora de forma preventiva es mucho más eficaz que esperar.`,
               prod, prioridad: 2,
               productoCriterio: { tipo: "plaga", clave: alertaId },
             });
-          } else if (diaAlto) {
-            // Riesgo alto previsto pero no hoy → aviso preventivo
+          } else if (nivelHoy === "ALTO" && diasAltos === 1) {
+            // Hoy ALTO pero mañana baja: ventana puntual, mejor vigilar
+            recs.push({
+              id: `trat_vig_${alertaId}`, categoria: "TRATAMIENTO", catClass: "tratamiento",
+              titulo: `Vigila ${prod.titulo.toLowerCase()} hoy — riesgo puntual`,
+              detalle: `Las condiciones de hoy favorecen el ${prod.titulo.toLowerCase()}, pero mañana cambian. Revisa el cultivo en busca de síntomas; sólo aplica producto si ves daños activos. Tratar por una ventana de un día suele ser un gasto innecesario.`,
+              prod, prioridad: 4,
+              productoCriterio: { tipo: "plaga", clave: alertaId },
+            });
+          } else if (proximoDiaAlto && diasAltos >= 2) {
+            // Próximos días con ALTO sostenido → preventivo
             recs.push({
               id: `trat_prev_${alertaId}`, categoria: "TRATAMIENTO", catClass: "tratamiento",
-              titulo: `Prepárate: riesgo de ${prod.titulo.toLowerCase()} el ${diaAlto.nombreDia}`,
-              detalle: `Hoy el riesgo es bajo, pero el ${diaAlto.nombreDia} las condiciones serán favorables para el ${prod.titulo.toLowerCase()}. Prepara el producto con antelación para poder actuar en el momento justo.`,
+              titulo: `Prepárate: riesgo de ${prod.titulo.toLowerCase()} a partir del ${proximoDiaAlto.nombreDia}`,
+              detalle: `Hoy el riesgo es bajo, pero las condiciones serán favorables al ${prod.titulo.toLowerCase()} durante varios días seguidos a partir del ${proximoDiaAlto.nombreDia}. Prepara el producto con antelación para actuar en el momento justo.`,
               prod, prioridad: 4,
               productoCriterio: { tipo: "plaga", clave: alertaId },
             });
@@ -3075,7 +3266,9 @@
         });
       }
 
-      // 3. NUTRICIÓN — ajustada a la lluvia prevista
+      // 3. NUTRICIÓN — ajustada a la lluvia prevista, silenciada si hay un
+      // abonado reciente (la planta tarda 10-14 días en responder visiblemente
+      // en el NDVI, así que insistir antes lleva a sobrefertilizar).
       if (ultimoNDVI && enTemp && cfg.cultivos?.length) {
         const { ndvi } = ultimoNDVI;
         const sueloSaturado = ultimoSuelo?.hoy[0] != null && ultimoSuelo.hoy[0] > 0.38;
@@ -3083,30 +3276,43 @@
           const grupo = grupoFertilizante(cfg.cultivos);
           if (grupo) {
             const fert = FERTILIZANTES_CULTIVO[grupo];
-            let titulo, detalle, prioridad;
+            const abonadoReciente = aplicacionReciente({ tipo: "fertilizante", clave: grupo });
 
-            if (lluviaExcesiva) {
-              titulo   = "Espera para abonar — lluvia intensa prevista";
-              detalle  = `Se prevé lluvia intensa en los próximos días. Abonar ahora podría hacer que los nutrientes se lixivien antes de llegar a las raíces. Abona después de que pase la lluvia.`;
-              prioridad = 5;
-            } else if (lluviaInminente) {
-              const diaRain = ultimoPrevision.find(d => (d.lluvia ?? 0) >= 4);
-              titulo   = `Abona hoy antes de la lluvia del ${diaRain.nombreDia} — ahorra el riego`;
-              detalle  = `${fert.porQue} Si abonas en cobertera hoy, la lluvia del ${diaRain.nombreDia} disolverá y llevará el nutriente a las raíces sin necesidad de riego adicional — máximo aprovechamiento con mínimo gasto.`;
-              prioridad = 3;
+            if (abonadoReciente) {
+              // El usuario abonó hace poco: no insistir. Mostrar mensaje de "espera".
+              recs.push({
+                id: "nutricion_espera", categoria: "NUTRICIÓN", catClass: "nutricion",
+                titulo: `Abonado reciente — espera a que la planta responda`,
+                detalle: `Aplicaste ${abonadoReciente.aplicacion.productoNombre} el ${abonadoReciente.aplicacion.date}. La planta tarda entre 7 y 14 días en mostrar la respuesta en el satélite, así que aunque el NDVI siga bajo no es momento de volver a abonar. Vuelve a evaluar a partir del ${abonadoReciente.fechaFin}.`,
+                prod: null, prioridad: 6,
+                productoCriterio: { tipo: "fertilizante", clave: grupo },
+                yaProtegido: true,
+              });
             } else {
-              titulo   = "Abona el cultivo esta semana";
-              detalle  = fert.porQue;
-              prioridad = 5;
-            }
+              let titulo, detalle, prioridad;
+              if (lluviaExcesiva) {
+                titulo   = "Espera para abonar — lluvia intensa prevista";
+                detalle  = `Se prevé lluvia intensa en los próximos días. Abonar ahora podría hacer que los nutrientes se lixivien antes de llegar a las raíces. Abona después de que pase la lluvia.`;
+                prioridad = 5;
+              } else if (lluviaInminente) {
+                const diaRain = ultimoPrevision.find(d => (d.lluvia ?? 0) >= 4);
+                titulo   = `Abona hoy antes de la lluvia del ${diaRain.nombreDia} — ahorra el riego`;
+                detalle  = `${fert.porQue} Si abonas en cobertera hoy, la lluvia del ${diaRain.nombreDia} disolverá y llevará el nutriente a las raíces sin necesidad de riego adicional — máximo aprovechamiento con mínimo gasto.`;
+                prioridad = 3;
+              } else {
+                titulo   = "Abona el cultivo esta semana";
+                detalle  = fert.porQue;
+                prioridad = 5;
+              }
 
-            recs.push({
-              id: "nutricion", categoria: "NUTRICIÓN", catClass: "nutricion",
-              titulo, detalle,
-              prod: { titulo: fert.titulo, eco: fert.eco, conv: fert.conv },
-              prioridad,
-              productoCriterio: { tipo: "fertilizante", clave: grupo },
-            });
+              recs.push({
+                id: "nutricion", categoria: "NUTRICIÓN", catClass: "nutricion",
+                titulo, detalle,
+                prod: { titulo: fert.titulo, eco: fert.eco, conv: fert.conv },
+                prioridad,
+                productoCriterio: { tipo: "fertilizante", clave: grupo },
+              });
+            }
           }
         }
       }
@@ -3535,26 +3741,47 @@
       section.appendChild(lista);
       container.appendChild(section);
 
+      const ICONOS_REC = {
+        riego:       "💧",  // 💧
+        tratamiento: "🛡️", // 🛡️
+        nutricion:   "🌱",  // 🌱
+      };
+      const urgenciaClase = (rec) => {
+        if (rec.yaProtegido) return "urgencia-info";
+        if (rec.prioridad <= 2) return "urgencia-alta";
+        if (rec.prioridad === 3) return "urgencia-media";
+        if (rec.prioridad <= 5) return "urgencia-baja";
+        return "urgencia-info";
+      };
+
       recs.forEach(rec => {
         // Si la IA reescribió este id, usamos sus textos; si no, los de las reglas
         const reescrito = recomendacionesIA?.[rec.id];
         const titulo  = reescrito?.titulo  || rec.titulo;
         const detalle = reescrito?.detalle || rec.detalle;
+        const urgencia = urgenciaClase(rec);
+        const icono = ICONOS_REC[rec.catClass] || "•";
+        const catLabel = rec.yaProtegido ? `✓ ${rec.categoria}` : rec.categoria;
+        const catClassFinal = rec.yaProtegido ? `protegido` : rec.catClass;
 
         const fila = document.createElement("div");
-        fila.className = "rec-fila";
+        fila.className = `rec-fila ${urgencia}`;
         fila.setAttribute("role", "button");
         fila.setAttribute("aria-expanded", "false");
         fila.innerHTML =
-          `<span class="rec-cat ${rec.catClass}">${rec.categoria}</span>`
-          + `<span class="rec-titulo">${titulo}</span>`;
+          `<span class="rec-icono" aria-hidden="true">${icono}</span>`
+          + `<div class="rec-cuerpo">`
+          +   `<span class="rec-cat ${catClassFinal}"><span class="rec-cat-tag">${catLabel}</span></span>`
+          +   `<span class="rec-titulo">${titulo}</span>`
+          + `</div>`
+          + `<span class="rec-chevron" aria-hidden="true">▾</span>`;
         lista.appendChild(fila);
 
         const panel = document.createElement("div");
-        panel.className = "rec-detalle-panel";
+        panel.className = `rec-detalle-panel ${urgencia}`;
 
         let html = `<p>${detalle}</p>`;
-        if (rec.productoCriterio) {
+        if (rec.productoCriterio && !rec.yaProtegido) {
           // El contenedor lo poblará renderProductosTabla() al abrir el panel
           html += `<div class="productos-bloque" id="prod-bloque-${rec.id}"></div>`;
         } else if (rec.prod?.eco && rec.prod?.conv) {
@@ -3580,7 +3807,7 @@
           if (!abierto) {
             panel.classList.add("visible");
             fila.setAttribute("aria-expanded", "true");
-            if (rec.productoCriterio) inicializarBloqueProductos(rec);
+            if (rec.productoCriterio && !rec.yaProtegido) inicializarBloqueProductos(rec);
           }
         });
       });
@@ -4128,7 +4355,12 @@
       renderRiegoRegistro();
       renderHistorialRiegos();
       renderHistorialAplicaciones();
-      cargarCatalogoProductos();
+      cargarCatalogoProductos().then(() => {
+        // Catálogo cargado: refresca el historial (badge "efecto activo") y las
+        // recomendaciones (que ahora pueden silenciar tratamientos/nutrición ya cubiertos)
+        renderHistorialAplicaciones();
+        renderRecomendaciones();
+      });
       renderRecomendaciones();
       cargarDatos();
       cargarNDVI();

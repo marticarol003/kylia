@@ -1,11 +1,15 @@
 {
-  "version": "1.0.0",
-  "lastReviewed": "2026-05-20",
+  "version": "1.1.0",
+  "lastReviewed": "2026-05-22",
   "fuenteDatos": "Registro de productos fitosanitarios MAPA + fichas técnicas fabricantes 2025-2026.",
   "escalaEficacia": {
     "alta":  "Resultados consistentes en condiciones típicas del cultivo.",
     "media": "Funciona con aplicación correcta; puede necesitar repetición o condiciones favorables.",
     "baja":  "Acción parcial o sólo en casos leves; útil como complemento."
+  },
+  "campos": {
+    "duracionProteccion": "Días de protección/eficacia residual sobre el cultivo (no confundir con plazoSeguridad, que regula la cosecha).",
+    "duracionEfecto": "Días durante los que el fertilizante sigue aportando nutrientes a la planta."
   },
   "tratamientos": [
     {
@@ -21,6 +25,7 @@
       "costeMax": 12,
       "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga", "espinaca", "brassica"],
       "plagas": ["pulgon", "mosca_blanca"],
+      "duracionProteccion": 5,
       "notas": "Acción por contacto, sin residualidad. Repetir cada 7-10 días si la población es alta."
     },
     {
@@ -36,6 +41,7 @@
       "costeMax": 14,
       "cultivos": ["tomate", "pimiento", "berenjena", "calabacin"],
       "plagas": ["pulgon", "mosca_blanca", "arana_roja"],
+      "duracionProteccion": 7,
       "notas": "Asfixia los insectos por contacto. Mejor a primera hora de la mañana."
     },
     {
@@ -51,6 +57,7 @@
       "costeMax": 18,
       "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga", "brassica"],
       "plagas": ["pulgon", "mosca_blanca", "oruga_col", "arana_roja"],
+      "duracionProteccion": 7,
       "notas": "Repelente y disruptor del crecimiento del insecto. Acción más lenta que un convencional."
     },
     {
@@ -66,6 +73,7 @@
       "costeMax": 22,
       "cultivos": ["brassica", "tomate", "pimiento", "lechuga"],
       "plagas": ["oruga_col"],
+      "duracionProteccion": 5,
       "notas": "Específico para orugas, inofensivo para fauna útil. Pierde efecto con UV; mejor al atardecer."
     },
     {
@@ -81,6 +89,7 @@
       "costeMax": 28,
       "cultivos": ["tomate", "pimiento", "lechuga", "brassica"],
       "plagas": ["oruga_col"],
+      "duracionProteccion": 10,
       "notas": "Origen bacteriano, autorizado en producción ecológica. Tóxico para abejas; aplicar a última hora."
     },
     {
@@ -96,6 +105,7 @@
       "costeMax": 10,
       "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga"],
       "plagas": ["arana_roja"],
+      "duracionProteccion": 7,
       "notas": "Acción preventiva y curativa contra oídio y eficaz contra araña roja en bajas poblaciones."
     },
     {
@@ -111,6 +121,7 @@
       "costeMax": 15,
       "cultivos": ["tomate", "pimiento", "lechuga"],
       "plagas": ["mildiu"],
+      "duracionProteccion": 10,
       "notas": "Autorizado en ecológico con límite anual de 4 kg Cu/ha. Reduce eficacia tras lluvia fuerte."
     },
     {
@@ -126,6 +137,7 @@
       "costeMax": 15,
       "cultivos": ["tomate", "pimiento", "berenjena", "lechuga", "brassica"],
       "plagas": ["pulgon", "mosca_blanca"],
+      "duracionProteccion": 14,
       "notas": "Sistémico, persiste 10-14 días. Restricciones en floración para proteger polinizadores."
     },
     {
@@ -141,6 +153,7 @@
       "costeMax": 12,
       "cultivos": ["tomate", "pimiento", "brassica"],
       "plagas": ["pulgon", "oruga_col", "mosca_blanca"],
+      "duracionProteccion": 10,
       "notas": "Piretroide de amplio espectro. Muy tóxico para abejas: NO aplicar en floración."
     },
     {
@@ -156,6 +169,7 @@
       "costeMax": 18,
       "cultivos": ["tomate", "pimiento", "lechuga"],
       "plagas": ["mildiu"],
+      "duracionProteccion": 10,
       "notas": "Multisitio, bajo riesgo de resistencias. Aplicar antes de la lluvia para cubrir el follaje."
     },
     {
@@ -171,6 +185,7 @@
       "costeMax": 20,
       "cultivos": ["tomate", "pimiento", "berenjena", "lechuga"],
       "plagas": ["arana_roja"],
+      "duracionProteccion": 12,
       "notas": "Translaminar (penetra la hoja). Muy eficaz contra ácaros y minadores."
     }
   ],
@@ -188,6 +203,7 @@
       "costeMax": 40,
       "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga", "espinaca", "brassica"],
       "tipoFertilizante": "fondo",
+      "duracionEfecto": 90,
       "notas": "Mejora estructura del suelo y aporta nutrición lenta. Cero plazos legales: aplicable cualquier momento."
     },
     {
@@ -203,6 +219,7 @@
       "costeMax": 120,
       "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga", "espinaca", "brassica"],
       "tipoFertilizante": "fondo",
+      "duracionEfecto": 120,
       "notas": "Aporta NPK natural y mejora la actividad biológica del suelo. Efecto a medio-largo plazo."
     },
     {
@@ -218,6 +235,7 @@
       "costeMax": 110,
       "cultivos": ["lechuga", "espinaca", "brassica"],
       "tipoFertilizante": "hojas",
+      "duracionEfecto": 25,
       "notas": "Equilibrio para hortícolas de hoja con más nitrógeno para el desarrollo foliar."
     },
     {
@@ -233,6 +251,7 @@
       "costeMax": 90,
       "cultivos": ["tomate", "pimiento", "berenjena", "calabacin"],
       "tipoFertilizante": "fruto",
+      "duracionEfecto": 25,
       "notas": "Mayor proporción de potasa para mejorar la calidad y conservación del fruto."
     },
     {
@@ -248,6 +267,7 @@
       "costeMax": 40,
       "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga", "espinaca", "brassica"],
       "tipoFertilizante": "bioestimulante",
+      "duracionEfecto": 10,
       "notas": "Bioestimulante. Mejora la recuperación tras estrés hídrico o térmico. Compatible con producción ecológica."
     }
   ]
