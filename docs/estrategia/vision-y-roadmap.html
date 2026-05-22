@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Kylia · Visión estratégica y hoja de ruta</title>
+<style>
+  @page {
+    size: A4;
+    margin: 22mm 18mm 22mm 18mm;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #1f2a1f;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    background: #fff;
+  }
+  .cover {
+    page-break-after: always;
+    height: 252mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 30mm 0 0 0;
+  }
+  .cover-top {
+    border-top: 4px solid #15803d;
+    padding-top: 18mm;
+  }
+  .cover-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 9pt;
+    color: #5a685a;
+    font-weight: 600;
+    margin-bottom: 14mm;
+  }
+  .cover h1 {
+    font-size: 36pt;
+    line-height: 1.05;
+    margin: 0 0 8mm 0;
+    font-weight: 700;
+    letter-spacing: -0.5pt;
+  }
+  .cover h2 {
+    font-size: 17pt;
+    line-height: 1.3;
+    margin: 0;
+    font-weight: 400;
+    color: #2c3a2c;
+    max-width: 130mm;
+  }
+  .cover-bottom {
+    font-size: 9.5pt;
+    color: #5a685a;
+  }
+  .cover-bottom .author { font-weight: 600; color: #1f2a1f; }
+
+  h1.section {
+    font-size: 18pt;
+    margin: 0 0 6mm 0;
+    padding-bottom: 4mm;
+    border-bottom: 2px solid #15803d;
+    color: #15803d;
+    page-break-after: avoid;
+    font-weight: 700;
+  }
+  h2 {
+    font-size: 12.5pt;
+    margin: 8mm 0 3mm 0;
+    color: #1f2a1f;
+    page-break-after: avoid;
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 11pt;
+    margin: 6mm 0 2mm 0;
+    color: #2c3a2c;
+    page-break-after: avoid;
+    font-weight: 600;
+  }
+  p {
+    margin: 0 0 3mm 0;
+    text-align: justify;
+  }
+  strong { color: #15803d; }
+  em { color: #2c3a2c; }
+  .section-wrap { page-break-before: always; }
+  .section-wrap.no-break { page-break-before: avoid; }
+
+  ul, ol { margin: 0 0 4mm 5mm; padding-left: 0; }
+  li { margin-bottom: 1.5mm; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4mm 0 5mm 0;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #15803d;
+    color: #fff;
+    text-align: left;
+    padding: 2.5mm 3mm;
+    font-weight: 600;
+    font-size: 9.5pt;
+  }
+  td {
+    border-bottom: 1px solid #dfe7d9;
+    padding: 2.5mm 3mm;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f7faf4; }
+
+  .callout {
+    background: #f0fdf4;
+    border-left: 4px solid #15803d;
+    padding: 4mm 5mm;
+    margin: 4mm 0 5mm 0;
+    font-size: 10pt;
+    line-height: 1.5;
+    page-break-inside: avoid;
+    border-radius: 0 4px 4px 0;
+  }
+  .callout-amber {
+    background: #fef9e7;
+    border-left-color: #b45309;
+  }
+  .callout-red {
+    background: #fef2f2;
+    border-left-color: #b91c1c;
+  }
+  .callout .label {
+    text-transform: uppercase;
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #15803d;
+    display: block;
+    margin-bottom: 1.5mm;
+  }
+  .callout-amber .label { color: #b45309; }
+  .callout-red .label { color: #b91c1c; }
+
+  .layers {
+    border: 1px solid #15803d;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 4mm 0 6mm 0;
+    page-break-inside: avoid;
+  }
+  .layer {
+    padding: 3mm 5mm;
+    border-bottom: 1px solid #d9e5d4;
+    background: #f0fdf4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10pt;
+  }
+  .layer:last-child { border-bottom: none; }
+  .layer.modelo {
+    background: #fff7ed;
+    border-bottom: none;
+  }
+  .layer-name { font-weight: 600; color: #15803d; }
+  .layer.modelo .layer-name { color: #b45309; }
+  .layer-tag {
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    color: #fff;
+    background: #15803d;
+    padding: 1mm 2.5mm;
+    border-radius: 3px;
+  }
+  .layer.modelo .layer-tag {
+    background: #b45309;
+  }
+
+  .ejemplo {
+    background: #fff;
+    border: 1px solid #dfe7d9;
+    border-radius: 6px;
+    padding: 4mm 5mm;
+    margin: 3mm 0 4mm 0;
+    page-break-inside: avoid;
+  }
+  .ejemplo .ejemplo-titulo {
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: #5a685a;
+    margin-bottom: 2mm;
+  }
+  .ejemplo.generalista { border-color: #fcd34d; background: #fefce8; }
+  .ejemplo.generalista .ejemplo-titulo { color: #92400e; }
+  .ejemplo.kylia { border-color: #86efac; background: #f0fdf4; }
+  .ejemplo.kylia .ejemplo-titulo { color: #15803d; }
+
+  .fase {
+    border-left: 3px solid #15803d;
+    padding: 1mm 0 1mm 5mm;
+    margin: 0 0 5mm 0;
+    page-break-inside: avoid;
+  }
+  .fase-cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 1.5mm;
+  }
+  .fase-nombre {
+    font-weight: 700;
+    font-size: 11pt;
+    color: #15803d;
+  }
+  .fase-plazo {
+    font-size: 9pt;
+    color: #5a685a;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .fase ul { margin-bottom: 0; }
+
+  .footnote {
+    font-size: 8.5pt;
+    color: #5a685a;
+    margin-top: 5mm;
+    padding-top: 3mm;
+    border-top: 1px solid #dfe7d9;
+  }
+
+  .resumen-key {
+    background: #1f2a1f;
+    color: #f0fdf4;
+    padding: 5mm 6mm;
+    border-radius: 4px;
+    margin: 4mm 0;
+    font-size: 10.5pt;
+    line-height: 1.6;
+    page-break-inside: avoid;
+  }
+  .resumen-key strong { color: #86efac; }
+
+  .toc {
+    margin: 6mm 0 10mm 0;
+  }
+  .toc ol { list-style: none; padding-left: 0; counter-reset: toc; }
+  .toc ol li {
+    counter-increment: toc;
+    padding: 1.5mm 0;
+    border-bottom: 1px dotted #c9d4c2;
+    font-size: 10.5pt;
+  }
+  .toc ol li::before {
+    content: counter(toc) ". ";
+    color: #15803d;
+    font-weight: 700;
+    margin-right: 2mm;
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── COVER ─── -->
+<section class="cover">
+  <div class="cover-top">
+    <div class="cover-eyebrow">Documento estratégico · v1 · Mayo 2026</div>
+    <h1>Kylia</h1>
+    <h2>Infraestructura vertical de inteligencia agronómica para el agricultor pequeño hispanohablante.</h2>
+  </div>
+  <div class="cover-bottom">
+    <div class="author">Martí Carol</div>
+    <div>Visión, diferenciación frente a IAs generalistas y hoja de ruta a 5 años.</div>
+  </div>
+</section>
+
+<!-- ─── TOC ─── -->
+<section class="section-wrap">
+  <h1 class="section">Contenido</h1>
+  <div class="toc">
+    <ol>
+      <li>Resumen ejecutivo</li>
+      <li>El problema y la oportunidad</li>
+      <li>Diferenciación frente a IAs generalistas (Claude, GPT, Gemini)</li>
+      <li>Diferenciación frente a competencia sectorial</li>
+      <li>Visión a largo plazo: foundation model vertical agronómico</li>
+      <li>Hoja de ruta por fases</li>
+      <li>El moat real: dataset propietario y feedback loop</li>
+      <li>Riesgos honestos y mitigaciones</li>
+      <li>Próximos pasos operativos</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ─── 1. RESUMEN EJECUTIVO ─── -->
+<section class="section-wrap">
+  <h1 class="section">1. Resumen ejecutivo</h1>
+
+  <p>Kylia no es una app de agricultura. Es la <strong>infraestructura vertical de inteligencia agronómica</strong> para el agricultor pequeño hispanohablante, construida sobre foundation models pero con todas las capas verticales que un modelo generalista no puede aportar.</p>
+
+  <p>La visión a 3-5 años: construir el <strong>primer foundation model vertical para agronomía en castellano</strong>, entrenado sobre un dataset propietario que sólo puede generarse estando en el campo con agricultores reales. Esto representa una oportunidad de transformación comparable a la de Bloomberg en finanzas o Stripe en pagos: convertirse en la <em>capa de inteligencia</em> del sector, donde el modelo generalista (Claude, GPT, Gemini) es <em>un componente intercambiable</em>, no el producto.</p>
+
+  <div class="resumen-key">
+    El cuello de botella de la agricultura hoy <strong>no es la productividad ni el acceso a datos</strong>: es el <strong>acceso a la decisión agronómica experta</strong>. 500 millones de pequeños agricultores en el mundo producen un tercio de los alimentos sin asesoría cualificada. Los foundation models hacen viable, por primera vez, escalar el consejo agronómico experto a coste marginal cero. Quien construya la pila vertical para esa nueva categoría definirá la próxima generación de agricultura digital.
+  </div>
+
+  <h2>Tres tesis fundamentales</h2>
+  <ol>
+    <li><strong>El modelo no es el producto.</strong> Los foundation models genéricos seguirán mejorando, pero estructuralmente no acceden al contexto operativo, la regulación, el catálogo verificado ni el feedback de outcomes reales. Kylia es la pila vertical que sí.</li>
+    <li><strong>El moat se construye estando en el campo.</strong> El dataset privilegiado que entrena el futuro modelo de Kylia se genera cada vez que un agricultor interactúa con la app y reporta el resultado. Ningún Big Tech puede replicarlo sin replicar el piloto.</li>
+    <li><strong>La ventana es ahora.</strong> Los foundation models existen desde 2023. La especialización vertical aún no está construida en agronomía. Quedan 3-10 años de oportunidad antes de consolidación.</li>
+  </ol>
+</section>
+
+<!-- ─── 2. PROBLEMA Y OPORTUNIDAD ─── -->
+<section class="section-wrap">
+  <h1 class="section">2. El problema y la oportunidad</h1>
+
+  <h2>2.1 Las revoluciones agrícolas han eliminado restricciones físicas, no incrementado lo existente</h2>
+
+  <table>
+    <thead>
+      <tr><th>Año</th><th>Revolución</th><th>Cuello de botella eliminado</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>~10 000 a.C.</td><td>Sedentarización + domesticación</td><td>Movilidad y acceso constante a alimento</td></tr>
+      <tr><td>1909</td><td>Haber-Bosch (síntesis de amoniaco)</td><td>Nitrógeno disponible para el cultivo</td></tr>
+      <tr><td>1950-1970</td><td>Revolución verde</td><td>Genética + química + riego industrial</td></tr>
+      <tr><td>1990s</td><td>Biotecnología (transgénicos)</td><td>Resistencia codificada en la semilla</td></tr>
+      <tr><td>2000s+</td><td>Agricultura de precisión (GPS, sensores)</td><td>Resolución espacial de la decisión</td></tr>
+    </tbody>
+  </table>
+
+  <p>Cada revolución eliminó una restricción que limitaba al sistema entero. Las revoluciones no nacen de mejorar lo que ya hay, sino de <strong>quitar el cuello de botella</strong>.</p>
+
+  <h2>2.2 El cuello de botella del 2026 es el acceso a la decisión agronómica experta</h2>
+
+  <ul>
+    <li>Cerca de <strong>500 millones</strong> de pequeños agricultores en el mundo producen un tercio de los alimentos sin acceso a agrónomo cualificado.</li>
+    <li>En España hay aproximadamente <strong>200 000 explotaciones hortícolas pequeñas</strong> (&lt;10 ha) que los players profesionales (Auravant, VisualNACert, xarvio, EOSDA, GeoCampo Pro) ignoran sistemáticamente por unit economics.</li>
+    <li>El conocimiento agronómico de calidad está atrapado en papers no leídos, agrónomos jubilados, servicios de extensión sin escala y consejos de cuñado.</li>
+    <li>Los foundation models hacen viable, por primera vez, <strong>escalar el consejo experto a coste marginal cero</strong>.</li>
+  </ul>
+
+  <div class="callout">
+    <span class="label">La ventana histórica</span>
+    Los pilares técnicos (foundation models, satélite gratis, cómputo barato, smartphones generalizados) están todos disponibles desde 2023-2024. La especialización vertical aún no está construida. Quedan <strong>3-10 años</strong> antes de que los grandes players de software o agroquímica intenten ocupar este espacio. Kylia tiene una ventaja temprana real si construye dataset y red de usuarios <em>ahora</em>.
+  </div>
+
+  <h2>2.3 Tamaño y forma del mercado</h2>
+
+  <p>El mercado relevante en primera fase es el agricultor hortícola pequeño hispanohablante:</p>
+  <ul>
+    <li><strong>España:</strong> ~200 000 explotaciones hortícolas &lt;10 ha. Concentradas en Murcia, Valencia, Almería, Cataluña, Galicia, periferia urbana.</li>
+    <li><strong>Hispanoamérica:</strong> expansión natural en años 3-5. Estimación de 5-15 M de explotaciones hortícolas pequeñas en LATAM con problemas equivalentes.</li>
+    <li><strong>Modelo de negocio:</strong> tramo Free hasta 5 ha (captación), Productor de pago para explotaciones más grandes, API y servicios B2B para cooperativas y aseguradoras en fase de madurez.</li>
+  </ul>
+</section>
+
+<!-- ─── 3. DIFERENCIACIÓN VS IAS GENERALISTAS ─── -->
+<section class="section-wrap">
+  <h1 class="section">3. Diferenciación frente a IAs generalistas</h1>
+
+  <p>Esta es la pregunta crítica que cualquier evaluador hará: <em>«¿Qué impide que use Claude directamente?»</em>. La respuesta no está en el modelo. Está en las <strong>capas verticales que un modelo generalista no puede tener</strong>.</p>
+
+  <h2>3.1 Lo que Claude, GPT y Gemini sí pueden hacer hoy</h2>
+
+  <ul>
+    <li>Conversar fluido en castellano sobre conceptos agronómicos básicos.</li>
+    <li>Explicar literatura técnica disponible en internet abierto.</li>
+    <li>Razonar sobre escenarios hipotéticos genéricos.</li>
+    <li>Reconocer hojas dañadas con visión genérica.</li>
+    <li>Sintetizar y traducir entre dominios.</li>
+  </ul>
+
+  <p>Si una IA generalista se parara aquí, ya sería <em>mejor que muchos foros</em>. Pero a un agricultor real le faltan diez cosas críticas que el modelo generalista <strong>no puede aportar por construcción</strong>.</p>
+
+  <h2>3.2 Los diez gaps estructurales del modelo generalista</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:24%">Gap</th>
+        <th style="width:38%">Qué falla en una IA generalista</th>
+        <th style="width:38%">Cómo lo resuelve Kylia</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1. Contexto operativo</td>
+        <td>No conoce el NDVI de tu parcela, ni el balance hídrico, ni la previsión local de los próximos días.</td>
+        <td>Integra Sentinel-2, Open-Meteo, SIGPAC y ET₀ en tiempo real para tu lat/lon exacta.</td>
+      </tr>
+      <tr>
+        <td>2. Memoria del usuario</td>
+        <td>Empieza de cero cada conversación; no recuerda tus aplicaciones, tus riegos, tu calendario fenológico.</td>
+        <td>Histórico persistente: riegos con cantidad, aplicaciones con plazo y duración de protección, observaciones.</td>
+      </tr>
+      <tr>
+        <td>3. Catálogo verificado</td>
+        <td>Puede recomendar productos no autorizados en España o dosis fuera de etiqueta. Alucina referencias.</td>
+        <td>Catálogo curado contra registro MAPA con dosis, plazo, eficacia y validador anti-alucinación post-LLM.</td>
+      </tr>
+      <tr>
+        <td>4. Feedback loop con resultados</td>
+        <td>Nunca sabe si su consejo funcionó. No mejora con la práctica del usuario.</td>
+        <td>Cada recomendación genera punto de validación (ejecutó / no ejecutó / resultado a N días). Dataset propio.</td>
+      </tr>
+      <tr>
+        <td>5. Contexto local</td>
+        <td>No sabe que en Murcia en mayo el calendario de lechuga es X, ni qué productos hay en tu cooperativa.</td>
+        <td>Conocimiento operativo de las zonas hortícolas españolas, integrado con cooperativas y calendario regional.</td>
+      </tr>
+      <tr>
+        <td>6. Alineación regulatoria</td>
+        <td>PAC, cuaderno de explotación, plazos de seguridad, productos autorizados por cultivo y autonomía: todo está en PDFs viejos del BOE.</td>
+        <td>Capa regulatoria integrada. Generación automática de cuaderno y avisos de cumplimiento.</td>
+      </tr>
+      <tr>
+        <td>7. Simulación física</td>
+        <td>Describe el presente. No puede simular «qué pasa si riego X y luego 5 días sin nada».</td>
+        <td>Simulador de balance hídrico y nutricional (AquaCrop-lite + modelos físicos) ejecutable como tool.</td>
+      </tr>
+      <tr>
+        <td>8. Accountability</td>
+        <td>Si recomienda mal, no responde nadie. Sin disclaimers verificados ni trazabilidad legal.</td>
+        <td>Trazabilidad de cada recomendación, disclaimers regulatorios, validadores duros antes de mostrar.</td>
+      </tr>
+      <tr>
+        <td>9. Red local de observaciones</td>
+        <td>Sus usuarios son anónimos y aislados. No agrega lo que está pasando en tu zona en tiempo real.</td>
+        <td>Red de agricultores que reportan focos de plagas, eventos climáticos y resultados. Efecto red geográfico.</td>
+      </tr>
+      <tr>
+        <td>10. Visión específica vertical</td>
+        <td>Reconocen «hoja amarilla» pero no distinguen mildiu temprano de deficiencia de Mg en pimiento murciano.</td>
+        <td>Modelo de visión fine-tuneado sobre fotos verificadas de plagas y enfermedades hortícolas españolas.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <span class="label">Punto clave</span>
+    Ninguno de estos diez gaps se cierra solo con un modelo generalista más grande. Todos requieren <strong>infraestructura vertical, dataset propio y presencia en el sector</strong>. Esto es lo que define el moat real.
+  </div>
+
+  <h2>3.3 La pila vertical de Kylia</h2>
+
+  <p>El modelo generalista es <strong>una capa de diez</strong> en el producto. Las otras nueve son lo que verdaderamente diferencia:</p>
+
+  <div class="layers">
+    <div class="layer"><span class="layer-name">Interfaz nativa (WhatsApp + app + voz + foto)</span><span class="layer-tag">Kylia</span></div>
+    <div class="layer"><span class="layer-name">Agente con tools, memoria y razonamiento multi-paso</span><span class="layer-tag">Kylia</span></div>
+    <div class="layer"><span class="layer-name">Validador anti-alucinación contra catálogo MAPA</span><span class="layer-tag">Kylia</span></div>
+    <div class="layer"><span class="layer-name">Simulador físico de cultivo (AquaCrop-lite, fenología)</span><span class="layer-tag">Kylia</span></div>
+    <div class="layer"><span class="layer-name">Datos en vivo (Sentinel-2, Open-Meteo, SIGPAC)</span><span class="layer-tag">Kylia</span></div>
+    <div class="layer"><span class="layer-name">Dataset propio (interacciones, fotos, outcomes)</span><span class="layer-tag">Kylia</span></div>
+    <div class="layer"><span class="layer-name">Contexto local (calendario, cooperativas, zonas)</span><span class="layer-tag">Kylia</span></div>
+    <div class="layer"><span class="layer-name">Capa regulatoria (PAC, cuaderno, plazos)</span><span class="layer-tag">Kylia</span></div>
+    <div class="layer"><span class="layer-name">Red de observaciones de agricultores cercanos</span><span class="layer-tag">Kylia</span></div>
+    <div class="layer modelo"><span class="layer-name">Modelo fundacional (Claude / Llama / propio)</span><span class="layer-tag">Componente</span></div>
+  </div>
+
+  <p>En el año 3-5, la capa inferior (modelo) deja de ser un componente externo y se vuelve <strong>un modelo fine-tuneado propio</strong>, entrenado sobre el dataset acumulado. En ese momento se cierra el círculo y la pila completa es defendible verticalmente.</p>
+
+  <h2>3.4 Ejemplo concreto: misma pregunta, dos respuestas</h2>
+
+  <p>Considera la pregunta de un agricultor real, en castellano llano:</p>
+
+  <div class="callout">
+    <strong>«Mis tomateras tienen las hojas bajeras con manchas amarillas, ¿qué hago?»</strong>
+  </div>
+
+  <div class="ejemplo generalista">
+    <div class="ejemplo-titulo">Respuesta de una IA generalista (Claude / GPT / Gemini, 2026)</div>
+    <p>«Las manchas amarillas en hojas bajeras de tomate suelen indicar deficiencia de nitrógeno o magnesio, aunque también podrían deberse a alternaria u otras enfermedades fúngicas. Recomendaría aplicar un fertilizante NPK equilibrado y un fungicida preventivo, como mancozeb o clorotalonil. Asegúrate de podar las hojas afectadas y mejorar la ventilación entre plantas.»</p>
+    <p style="margin-top:3mm; font-size:9pt; color:#92400e;"><strong>Problemas:</strong> consejo divulgativo sin contexto, sin diagnóstico real, recomienda clorotalonil (<strong>prohibido en la UE desde 2020</strong>), sin dosis ni autorización por cultivo, sin información de tu cooperativa ni de tu histórico.</p>
+  </div>
+
+  <div class="ejemplo kylia">
+    <div class="ejemplo-titulo">Respuesta del agente Kylia (con tools sobre tu parcela)</div>
+    <p>«He cruzado los datos de tu parcela:</p>
+    <ul style="margin-top:0; margin-bottom:2mm;">
+      <li>NDVI 0,48 captado hace 4 días (moderada).</li>
+      <li>Aplicaste foliar de calcio el 12 de mayo, no preventivo de hongos en las últimas 3 semanas.</li>
+      <li>Tres últimos días con humedad nocturna &gt;85 % y 23-26 ℃ — condiciones ideales para mildiu.</li>
+      <li>Dos agricultores en un radio de 8 km han reportado focos de mildiu esta semana.</li>
+    </ul>
+    <p>Diagnóstico probable: <strong>inicio de mildiu</strong>, no deficiencia nutricional. La señal espacial coincide con tu zona.</p>
+    <p><strong>Acción:</strong> aplica oxicloruro de cobre 2,5 kg/ha hoy antes de las 19 h. Plazo de seguridad 15 días, autorizado en tomate al aire libre (MAPA). Tu cooperativa en Mazarrón lo tiene a 11-13 €/kg.</p>
+    <p>¿Quieres que registre la aplicación cuando la hagas?»</p>
+  </div>
+
+  <p>La diferencia no está en la fluidez del castellano ni en el conocimiento agronómico de fondo (ambos modelos lo tienen). La diferencia está en las <strong>diez capas verticales</strong> que sólo Kylia puede operar.</p>
+</section>
+
+<!-- ─── 4. DIFERENCIACIÓN SECTORIAL ─── -->
+<section class="section-wrap">
+  <h1 class="section">4. Diferenciación frente a competencia sectorial</h1>
+
+  <p>Los players actuales en agro-tech (Auravant, VisualNACert, xarvio, EOSDA, GeoCampo Pro) usan los mismos datos públicos que Kylia: Sentinel-2, Open-Meteo, registros oficiales. La diferenciación frente a ellos no es técnica sino <strong>estratégica</strong>.</p>
+
+  <h2>4.1 Posicionamiento de mercado</h2>
+
+  <table>
+    <thead>
+      <tr><th>Player</th><th>Cliente típico</th><th>Producto</th><th>ARPU anual</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Auravant</td><td>Agrónomo, técnico, AT</td><td>Dashboard pro multifunción</td><td>2-10 k €</td></tr>
+      <tr><td>VisualNACert</td><td>Cooperativas, técnicos</td><td>Cuaderno digital pro</td><td>1-5 k €</td></tr>
+      <tr><td>xarvio (BASF)</td><td>Agricultor profesional</td><td>Recom. centradas en herbicidas</td><td>0,5-3 k €</td></tr>
+      <tr><td>EOSDA</td><td>Grandes explotaciones</td><td>Satélite + analytics</td><td>1-50 k €</td></tr>
+      <tr><td>GeoCampo Pro</td><td>Gestión profesional</td><td>Suite gestión integrada SIGPAC</td><td>0,5-2 k €</td></tr>
+      <tr><td><strong>Kylia</strong></td><td><strong>Hortícola pequeño &lt;10 ha</strong></td><td><strong>Agrónomo IA en castellano llano</strong></td><td><strong>0-180 €</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h2>4.2 Innovator&apos;s dilemma de los incumbentes</h2>
+
+  <p>Los players listados <strong>no pueden bajar a este segmento sin canibalizar su producto B2B</strong>:</p>
+  <ul>
+    <li>Su ARPU exige una estructura comercial pesada (cuentas profesionales, asesores, formación).</li>
+    <li>Su UX es densa, técnica y exige formación: incompatible con el agricultor pequeño.</li>
+    <li>Una versión consumer-grade les confunde su narrativa profesional ante sus clientes que pagan caro.</li>
+  </ul>
+
+  <p>Históricamente, este es el patrón Christensen: los incumbentes están optimizados para el segmento alto y no pueden atender el bajo. Su organización se lo prohíbe estructuralmente.</p>
+
+  <h2>4.3 Ventaja de Kylia frente al sector</h2>
+
+  <ol>
+    <li><strong>Wedge que los incumbentes no quieren</strong> (200 000 explotaciones ignoradas en España).</li>
+    <li><strong>Conocimiento vertical hortícola</strong> con catálogo MAPA curado y plagas específicas.</li>
+    <li><strong>Velocidad de iteración con usuarios reales</strong>: del feedback de un piloto al cambio en producto en días, no en trimestres.</li>
+    <li><strong>Proximidad cultural y de idioma</strong>: soporte directo en WhatsApp, en castellano natural.</li>
+    <li><strong>Apuesta tecnológica diferencial</strong>: foundation model vertical en lugar de dashboard generalista.</li>
+  </ol>
+</section>
+
+<!-- ─── 5. VISIÓN LARGO PLAZO ─── -->
+<section class="section-wrap">
+  <h1 class="section">5. Visión a largo plazo: foundation model vertical agronómico</h1>
+
+  <p>A 3-5 años, Kylia construye el <strong>primer foundation model vertical para agronomía en castellano</strong>: un modelo demostrablemente superior a GPT o Claude en consultas hortícolas españolas.</p>
+
+  <h2>5.1 Qué entrena ese modelo</h2>
+  <ul>
+    <li><strong>Corpus público:</strong> CSIC, INIA, IRTA, IFAPA, MAPA, RUE, BOE; manuales de cooperativas; calendarios fenológicos; etiquetas verificadas de productos.</li>
+    <li><strong>Imagen vertical:</strong> dataset propietario de fotos georreferenciadas de plagas y enfermedades hortícolas, etiquetadas durante el piloto y la fase de captación.</li>
+    <li><strong>Interacciones del usuario:</strong> cada conversación, cada recomendación, cada validación de outcome → ejemplo de entrenamiento.</li>
+    <li><strong>Datos sintéticos:</strong> escenarios generados por el simulador físico, usados para enseñar al modelo razonamiento causal en agronomía.</li>
+  </ul>
+
+  <h2>5.2 Por qué nadie más lo va a construir</h2>
+  <ul>
+    <li><strong>Anthropic / OpenAI / Google</strong> son horizontales, no van a especializarse en agronomía castellana.</li>
+    <li><strong>Auravant / VisualNACert</strong> no tienen incentivo ni cultura ML para emprender este camino.</li>
+    <li><strong>Bayer / Syngenta</strong> tienen conflicto de interés: un agrónomo IA honesto recomienda menos producto químico.</li>
+    <li><strong>Universidades</strong> no construyen producto.</li>
+  </ul>
+
+  <p>Hay una ventana de 18-36 meses para construir el dataset y la red de usuarios antes de que alguien con más recursos despierte. Para Kylia es la oportunidad estructural.</p>
+
+  <h2>5.3 Qué hace este modelo posible que el actual no</h2>
+  <ul>
+    <li>Conversación al nivel de agrónomo experto, en castellano natural, con confianza calibrada.</li>
+    <li>Diagnóstico de plagas y enfermedades con fotos del móvil, fine-tuneado para variedades españolas.</li>
+    <li>Razonamiento multi-paso con simulación causal del cultivo.</li>
+    <li>Predicción de rendimiento, fecha de cosecha y precio de venta integrados.</li>
+    <li>API consumida por cooperativas, aseguradoras y administraciones públicas.</li>
+  </ul>
+</section>
+
+<!-- ─── 6. ROADMAP ─── -->
+<section class="section-wrap">
+  <h1 class="section">6. Hoja de ruta por fases</h1>
+
+  <p>La construcción de Kylia se planifica en seis fases evolutivas. Cada una construye sobre la anterior y deja capacidad técnica y operativa instalada.</p>
+
+  <div class="fase">
+    <div class="fase-cabecera">
+      <span class="fase-nombre">Fase 0 · Piloto inicial</span>
+      <span class="fase-plazo">Q2 2026 · Activa</span>
+    </div>
+    <ul>
+      <li>3-5 agricultores hortícolas en activo usando la app real.</li>
+      <li>Validación de recomendaciones de riego, tratamiento y nutrición con feedback in-app.</li>
+      <li>Soporte personal por WhatsApp; iteración rápida sobre fricciones.</li>
+      <li>Telemetría de uso (qué se expande, qué se ignora).</li>
+      <li><strong>Resultado esperado:</strong> 4-8 semanas de uso real, dataset inicial de outcomes para futura fase ML.</li>
+    </ul>
+  </div>
+
+  <div class="fase">
+    <div class="fase-cabecera">
+      <span class="fase-nombre">Fase 1 · Agente conversacional con tools</span>
+      <span class="fase-plazo">Q3 2026 · 6-8 semanas</span>
+    </div>
+    <ul>
+      <li>Endpoint /api/agent con Claude + tools (NDVI, meteo, balance hídrico, histórico, catálogo).</li>
+      <li>Caja de chat dentro de la app debajo de Recomendaciones.</li>
+      <li>Validador post-LLM contra catálogo MAPA: cero alucinación tolerada en productos y dosis.</li>
+      <li>Memoria estructurada por usuario (perfil, histórico, calendario).</li>
+      <li><strong>Resultado esperado:</strong> primer producto cualitativamente distinto del de los competidores.</li>
+    </ul>
+  </div>
+
+  <div class="fase">
+    <div class="fase-cabecera">
+      <span class="fase-nombre">Fase 2 · Simulador físico + planificación</span>
+      <span class="fase-plazo">Q4 2026 · 8-12 semanas</span>
+    </div>
+    <ul>
+      <li>Integración de AquaCrop-lite (FAO) como microservicio.</li>
+      <li>Tools simular_escenario y comparar_escenarios para razonamiento causal.</li>
+      <li>Plan del día generado de forma proactiva por cron diario.</li>
+      <li>Consideración de Kc por cultivo y fase fenológica.</li>
+      <li><strong>Resultado esperado:</strong> Kylia pasa de describir a predecir.</li>
+    </ul>
+  </div>
+
+  <div class="fase">
+    <div class="fase-cabecera">
+      <span class="fase-nombre">Fase 3 · WhatsApp + smartphone-as-sensor</span>
+      <span class="fase-plazo">Q1-Q2 2027</span>
+    </div>
+    <ul>
+      <li>Integración WhatsApp Cloud API: el agente vive donde vive el agricultor.</li>
+      <li>Mensajes de voz (Whisper) y fotos (modelo de visión).</li>
+      <li>Captación sistemática de fotos georreferenciadas para entrenar el modelo de visión vertical.</li>
+      <li>Primer fine-tuning de un modelo de visión sobre dataset propietario.</li>
+      <li><strong>Resultado esperado:</strong> el smartphone se vuelve instrumento agronómico de precisión.</li>
+    </ul>
+  </div>
+
+  <div class="fase">
+    <div class="fase-cabecera">
+      <span class="fase-nombre">Fase 4 · Foundation model vertical agronómico</span>
+      <span class="fase-plazo">2027-2028</span>
+    </div>
+    <ul>
+      <li>Fine-tuning de modelo abierto (Llama, Mistral o equivalente) sobre el corpus agronómico hispano.</li>
+      <li>Integración de dataset propio de interacciones y outcomes (mínimo 50 000 ejemplos validados).</li>
+      <li>Benchmark interno y externo contra Claude/GPT en consultas hortícolas españolas.</li>
+      <li>Sustitución progresiva del modelo externo por el propio en la capa fundacional.</li>
+      <li><strong>Resultado esperado:</strong> Kylia opera con modelo propio, mejor que generalistas en su dominio.</li>
+    </ul>
+  </div>
+
+  <div class="fase">
+    <div class="fase-cabecera">
+      <span class="fase-nombre">Fase 5 · Expansión hispanoamericana y API B2B</span>
+      <span class="fase-plazo">2028-2030</span>
+    </div>
+    <ul>
+      <li>Replicación geográfica: Argentina, Chile, México, Perú; adaptación regulatoria y de catálogo.</li>
+      <li>API B2B consumida por cooperativas, aseguradoras agrarias, administraciones públicas.</li>
+      <li>Integraciones con la cadena de valor (compra de inputs, venta de cosecha, seguros paramétricos).</li>
+      <li><strong>Resultado esperado:</strong> Kylia se convierte en la <em>capa de inteligencia agronómica</em> del mundo hispanohablante.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ─── 7. MOAT ─── -->
+<section class="section-wrap">
+  <h1 class="section">7. El moat real: dataset propietario y feedback loop</h1>
+
+  <p>El moat estructural de Kylia no está en el código, ni en el modelo, ni en el catálogo curado. Está en algo que ningún competidor puede comprar ni copiar:</p>
+
+  <div class="resumen-key">
+    <strong>El dataset de interacciones reales con outcomes validados</strong> entre Kylia y cada agricultor, capturado durante años de operación en el campo.
+  </div>
+
+  <h2>7.1 Cómo se construye el dataset día a día</h2>
+  <ul>
+    <li>Cada recomendación emitida queda registrada con su contexto completo (datos satélite, meteo, histórico, fecha).</li>
+    <li>El agricultor confirma si la ejecutó (botón explícito o registro automático).</li>
+    <li>A los 7, 14 y 30 días se mide el outcome: NDVI, observación visual, rendimiento, satisfacción.</li>
+    <li>Cada conversación de WhatsApp se anonimiza y se incorpora al corpus de entrenamiento.</li>
+    <li>Las fotos contribuidas por usuarios alimentan el modelo de visión.</li>
+  </ul>
+
+  <h2>7.2 Por qué este dataset no se puede replicar</h2>
+  <ul>
+    <li><strong>Está fuera de internet.</strong> No es contenido público, es comportamiento agronómico vivido.</li>
+    <li><strong>Requiere presencia.</strong> Sólo se genera con agricultores reales usando un producto real. No se puede comprar ni licenciar.</li>
+    <li><strong>Compunde.</strong> Cada año el dataset crece y el modelo mejora; el incumbente que llega tarde ya empieza por detrás.</li>
+    <li><strong>Es defensible legalmente.</strong> Política de uso y consentimiento del usuario dan a Kylia derechos exclusivos sobre el dataset agregado.</li>
+  </ul>
+
+  <h2>7.3 La analogía operativa</h2>
+  <ul>
+    <li><strong>Bloomberg vs Wikipedia + ChatGPT:</strong> ambos pueden responder preguntas financieras genéricas. Pero Bloomberg cobra 25 000 €/año por terminal porque tiene datos en vivo, instrumentos validados, herramientas especializadas y una red de profesionales que se fían.</li>
+    <li><strong>Stripe vs «hazlo con AWS + LLM»:</strong> técnicamente cualquiera puede montar un Stripe con AWS y APIs públicas. Nadie lo hace porque la pila vertical especializada (compliance, fraude, integraciones, soporte) es años de operación, no semanas de código.</li>
+  </ul>
+
+  <p>Kylia ocupa el mismo espacio en agronomía: el modelo es commodity, la <strong>pila vertical y el dataset son el producto</strong>.</p>
+</section>
+
+<!-- ─── 8. RIESGOS ─── -->
+<section class="section-wrap">
+  <h1 class="section">8. Riesgos honestos y mitigaciones</h1>
+
+  <div class="callout callout-amber">
+    <span class="label">Riesgo 1 · Entrada de Big Tech</span>
+    OpenAI, Google o Anthropic podrían lanzar una versión vertical agro. <strong>Mitigación:</strong> ventaja temporal de 18-36 meses, dataset privado y relación con usuarios. La capa fundacional es intercambiable; las otras nueve no.
+  </div>
+
+  <div class="callout callout-amber">
+    <span class="label">Riesgo 2 · Velocidad de captación del dataset</span>
+    Si el piloto no escala, el dataset no se forma a tiempo. <strong>Mitigación:</strong> empezar con corpus público y datos sintéticos antes de tener dataset propio. Captación obsesiva desde el día 1.
+  </div>
+
+  <div class="callout callout-amber">
+    <span class="label">Riesgo 3 · Costes de LLM a escala</span>
+    A 1 000 usuarios activos, el coste de inferencia puede ser significativo. <strong>Mitigación:</strong> caching agresivo, arquitectura híbrida (modelo pequeño para queries triviales, grande para razonamiento serio), eventual sustitución por modelo propio.
+  </div>
+
+  <div class="callout callout-amber">
+    <span class="label">Riesgo 4 · Alucinación con productos y dosis</span>
+    Una recomendación errónea de fitosanitario implica responsabilidad legal y cosechas perdidas. <strong>Mitigación:</strong> validador post-LLM contra catálogo MAPA bloqueante. Cualquier mención fuera de catálogo se reescribe o se bloquea antes de mostrar al usuario.
+  </div>
+
+  <div class="callout callout-red">
+    <span class="label">Riesgo 5 · Disciplina estratégica</span>
+    La tentación de diversificar prematuramente (hardware, marketplace, seguros) puede destruir foco. <strong>Mitigación:</strong> tesis única — pila vertical agronómica con foundation model. Todo lo demás se monetiza como API encima, no como negocios paralelos.
+  </div>
+
+  <div class="callout callout-amber">
+    <span class="label">Riesgo 6 · Tiempo y soledad</span>
+    La construcción real requiere 3-5 años. Founder solo difícilmente sostiene esto sin co-fundador técnico ML. <strong>Mitigación:</strong> identificar y reclutar perfil técnico ML en año 1-2; aliarse con CSIC/IRTA para credibilidad académica.
+  </div>
+</section>
+
+<!-- ─── 9. PRÓXIMOS PASOS ─── -->
+<section class="section-wrap">
+  <h1 class="section">9. Próximos pasos operativos</h1>
+
+  <h2>9.1 Inmediatos (próximas 4 semanas)</h2>
+  <ol>
+    <li><strong>Arrancar el piloto</strong> con 3-5 horticultores en activo y empezar a recopilar feedback estructurado.</li>
+    <li><strong>Diseñar el registro de outcomes</strong>: cada recomendación debe poder ser confirmada y validada con su resultado a 7, 14 y 30 días. Esto convierte el piloto en una <em>máquina de captación de dataset</em>.</li>
+    <li><strong>Prototipo del agente (Fase 1)</strong>: endpoint /api/agent con Claude + 6 tools iniciales y validador anti-alucinación.</li>
+    <li><strong>Conversaciones exploratorias</strong> con 2-3 fondos de venture con tesis en agro-tech o vertical AI, sin compromiso de cierre.</li>
+  </ol>
+
+  <h2>9.2 Trimestre Q3 2026</h2>
+  <ol>
+    <li>Despliegue del agente en el piloto, medición de uso y satisfacción.</li>
+    <li>Primer borrador de simulador físico (Fase 2).</li>
+    <li>Alianza inicial con IRTA o CSIC para validación científica.</li>
+    <li>Captación de 30-50 agricultores activos en zona piloto concentrada (Murcia o equivalente).</li>
+  </ol>
+
+  <h2>9.3 Año 2027</h2>
+  <ol>
+    <li>WhatsApp como canal principal (Fase 3).</li>
+    <li>Captación sistemática de fotos para dataset de visión.</li>
+    <li>Primer fine-tuning sobre dataset propio.</li>
+    <li>Levantamiento de Serie Seed con tesis &laquo;foundation model vertical agronómico hispano&raquo;.</li>
+  </ol>
+
+  <div class="footnote">
+    Documento estratégico interno · Kylia · v1, mayo 2026 · Martí Carol.<br>
+    Este documento describe la intención estratégica de Kylia y la hoja de ruta para construir, sobre un piloto operativo actual, la infraestructura vertical de inteligencia agronómica para el mundo hispanohablante. Las estimaciones de mercado, los plazos y las decisiones técnicas son orientativos y se actualizarán con cada hito del piloto.
+  </div>
+</section>
+
+</body>
+</html>

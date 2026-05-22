@@ -4,22 +4,30 @@ Este directorio agrupa toda la documentación interna del proyecto, organizada p
 
 ## Estructura
 
+### `estrategia/` — Visión y diferenciación
+- **`vision-y-roadmap.html`** — documento estratégico vivo: tesis, diferenciación frente a IAs generalistas y competencia sectorial, hoja de ruta a 5 años.
+- **`Kylia-vision-y-roadmap.pdf`** — snapshot imprimible, generado con `scripts/build_estrategia_pdf.mjs`.
+
 ### `tecnico/` — Cómo está construido Kylia
 - **`arquitectura.md`** — diagrama Mermaid del sistema, decisiones de stack (Vercel + Supabase + Copernicus), costes mensuales estimados, plan de disaster recovery.
+- **`estado-y-roadmap.md`** — estado funcional actual y siguientes pasos técnicos.
+- **`fase-2-integracion-mapa.md`** — diseño de la integración con el dump oficial MAPA (Fase 2, pendiente de implementación).
 - **`dossier-tecnico.pdf`** — versión imprimible para enseñar a un CTO o a un partner técnico.
 
 ### `negocio/` — Estrategia y captación de capital
 - **`go-to-market.md`** — plan de lanzamiento, segmentos prioritarios, canales y métricas de éxito.
+- **`Presentacion_Kylia.pdf`** — presentación corta de Kylia.
 - **`dossier-inversores.pdf`** — pitch deck en PDF para enviar a fondos / business angels.
 
-### `marketing/` — Comunicación y captación de leads
-- **`social-media.md`** — estrategia de redes sin cara del fundador, tono y formatos.
-- **`telegram-leads.md`** — guion del canal de Telegram, tipos de mensaje y flujo de captación.
-- **`emails/`** — plantillas transaccionales y de newsletter (variables tipo `{{nombre}}`, `{{ndmi}}`).
-- **`contenido/`** — calendario editorial semana a semana, con sub-carpetas `imagenes/` que contienen los SVG fuente y los PNG ya rasterizados listos para publicar.
+### `marketing/` — Captación directa y outreach
+- **`emails/`** — plantillas de bienvenida y de outreach a perfiles piloto (asesor ATRIA, centro de investigación, cooperativa).
+- **`guion-llamada-piloto.md`** — guion para llamadas de captación de piloto.
+- **`lista-pilotos-targets.md`** — lista de contactos objetivo para el piloto.
+
+### `legal-fuente/` — Fuentes de los textos legales
+Los `.md` aquí se compilan a HTML con `scripts/build_legal.py` y se publican en `/legal/*` en la landing.
 
 ## Convenciones
 
 - Los `.md` son el documento vivo; los `.pdf` son snapshots imprimibles.
-- Las imágenes de redes se generan en SVG (1080×1080 cuadrado, 1080×1350 vertical, 1200×400 banner) y se rasterizan a PNG con `cairosvg`.
 - Los marcadores `[REVISAR]` en cualquier doc indican secciones que requieren validación humana antes de publicar.
