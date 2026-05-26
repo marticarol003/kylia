@@ -26,17 +26,109 @@
 
   <title>Kylia · Tu parcela desde el satélite</title>
 
-  <!-- Telemetría sin cookies (Plausible). Solo trackea si está cargado el script.
-       Para activarla en producción, descomenta la línea de abajo y reemplaza el dominio.
-       Cookieless = no requiere banner. -->
-  <!-- <script defer data-domain="kylia.app" src="https://plausible.io/js/script.tagged-events.js"></script> -->
+  <!-- Sincronización con backend Kylia (Supabase via /api/*).
+       Define modo (piloto / demo), genera kylia_user_id, captura UTMs y expone
+       window.kyliaSync.* para que el resto del script registre acciones,
+       observaciones, mediciones y eventos en silencio. -->
   <script>
-    // Helper seguro: si Plausible no está cargado, no rompe.
-    window.kyliaTrack = function (event, props) {
+    (function () {
+      // ─ UUID v4 ─────────────────────────────────────────────────────
+      function uuid() {
+        if (crypto?.randomUUID) return crypto.randomUUID();
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+        });
+      }
+
+      // ─ Identidad persistente del piloto ────────────────────────────
+      let userId = localStorage.getItem("kylia_user_id");
+      if (!userId) {
+        userId = uuid();
+        localStorage.setItem("kylia_user_id", userId);
+      }
+
+      // ─ Captura UTMs / slug por persona ─────────────────────────────
       try {
-        if (window.plausible) window.plausible(event, { props: props || {} });
+        const params = new URLSearchParams(location.search);
+        const u  = params.get("u");
+        const us = params.get("utm_source");
+        const um = params.get("utm_medium");
+        const uc = params.get("utm_campaign");
+        if (u || us || um || uc) {
+          const origen = [u, us, um, uc].filter(Boolean).join("|");
+          localStorage.setItem("kylia_origen", origen);
+        }
+        if (params.get("demo") === "1") localStorage.setItem("kylia_modo", "demo");
+        if (params.get("modo") === "piloto") localStorage.setItem("kylia_modo", "piloto");
       } catch (_) { /* noop */ }
-    };
+
+      // ─ Decisión de modo ────────────────────────────────────────────
+      // demo:    usuarios antiguos (ya tienen riegos/aplicaciones), o ?demo=1, o kylia_modo=demo
+      // piloto:  por defecto para nuevos visitantes (modo silencioso, sin recomendaciones visibles)
+      function detectarModo() {
+        const forzado = localStorage.getItem("kylia_modo");
+        if (forzado === "demo" || forzado === "piloto") return forzado;
+        const teniaDatos =
+          localStorage.getItem("kylia_config") ||
+          localStorage.getItem("kylia_riegos") ||
+          localStorage.getItem("kylia_aplicaciones") ||
+          localStorage.getItem("kylia_ultimo_riego");
+        return teniaDatos ? "demo" : "piloto";
+      }
+      const modo = detectarModo();
+      document.documentElement.dataset.modoKylia = modo;
+
+      // ─ POST silencioso con reintento ligero ────────────────────────
+      function post(path, data) {
+        try {
+          return fetch(path, {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify(data),
+            keepalive: true,
+          }).catch(() => null);
+        } catch (_) { return Promise.resolve(null); }
+      }
+
+      window.kyliaSync = {
+        userId,
+        modo,
+        get esPiloto() { return document.documentElement.dataset.modoKylia === "piloto"; },
+        get esDemo()   { return document.documentElement.dataset.modoKylia === "demo"; },
+        cambiarModo(nuevo) {
+          if (nuevo !== "demo" && nuevo !== "piloto") return;
+          localStorage.setItem("kylia_modo", nuevo);
+          document.documentElement.dataset.modoKylia = nuevo;
+        },
+        registroUsuario(payload) {
+          return post("/api/registro-usuario", { id: userId, ...payload });
+        },
+        accion(payload) {
+          return post("/api/acciones", { usuario_id: userId, ...payload });
+        },
+        observacion(payload) {
+          return post("/api/observaciones", { usuario_id: userId, ...payload });
+        },
+        jornada(payload) {
+          return post("/api/jornadas", { usuario_id: userId, ...payload });
+        },
+        medicion(payload) {
+          return post("/api/mediciones", { usuario_id: userId, ...payload });
+        },
+        recomendacionesLog(recomendaciones, contexto) {
+          return post("/api/recomendaciones-log", { usuario_id: userId, recomendaciones, contexto });
+        },
+        evento(nombre, props) {
+          return post("/api/eventos", { usuario_id: userId, nombre, props: props || {}, url: location.href });
+        },
+      };
+
+      // ─ kyliaTrack: ahora va al backend propio (antes Plausible) ────
+      window.kyliaTrack = function (event, props) {
+        try { window.kyliaSync.evento(event, props); } catch (_) { /* noop */ }
+      };
+    })();
   </script>
   <style>
     :root {
@@ -1461,6 +1553,124 @@
       margin-left: 8px;
       vertical-align: middle;
     }
+
+    /* ── Modo piloto: oculta cards que dan recomendaciones ───────────
+       El cálculo sigue ejecutándose para enviarlo al backend, pero el
+       agricultor no ve nada. Modo demo (?demo=1 o usuarios veteranos)
+       muestra todo. */
+    html[data-modo-kylia="piloto"] #card-hoy,
+    html[data-modo-kylia="piloto"] #recomendaciones-container,
+    html[data-modo-kylia="piloto"] #alertas-container { display: none !important; }
+
+    /* ── Banner "Cerrar jornada" ───────────────────────────────────── */
+    .jornada-banner {
+      background: linear-gradient(135deg, #1f5a2b 0%, #2b7a3a 100%);
+      color: #fff;
+      padding: 16px 18px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 4px 12px rgba(15, 87, 35, 0.18);
+      cursor: pointer;
+      border: none;
+      width: 100%;
+      text-align: left;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .jornada-banner:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(15, 87, 35, 0.24); }
+    .jornada-banner:disabled { opacity: 0.55; cursor: default; transform: none; }
+    .jornada-banner-icon { font-size: 1.6rem; line-height: 1; flex-shrink: 0; }
+    .jornada-banner-body { flex: 1; }
+    .jornada-banner-titulo { font-weight: 700; font-size: 1rem; line-height: 1.2; }
+    .jornada-banner-sub { font-size: 0.84rem; opacity: 0.92; margin-top: 2px; }
+
+    /* ── Modal genérico para wizard ─────────────────────────────────── */
+    .modal-jornada-card { max-width: 480px; }
+    .jornada-paso { padding: 6px 2px; }
+    .jornada-paso h3 { margin: 0 0 6px; font-size: 1.1rem; color: var(--text); }
+    .jornada-paso p.sub { color: var(--muted); font-size: 0.9rem; margin: 0 0 14px; }
+    .jornada-opciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .jornada-opciones.full { grid-template-columns: 1fr; }
+    .jornada-opcion {
+      padding: 14px 12px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.12s ease;
+      text-align: left;
+    }
+    .jornada-opcion:hover { border-color: var(--low); background: var(--low-bg); }
+    .jornada-opcion.activo { border-color: var(--low); background: var(--low-bg); color: var(--low); }
+    .jornada-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .jornada-chip {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: 0.86rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .jornada-chip.activo { border-color: var(--low); background: var(--low-bg); color: var(--low); font-weight: 600; }
+    .jornada-progreso {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .jornada-progreso-paso {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      transition: background 0.18s ease;
+    }
+    .jornada-progreso-paso.activo,
+    .jornada-progreso-paso.completado { background: var(--low); }
+    .jornada-nav { display: flex; gap: 10px; justify-content: space-between; margin-top: 14px; }
+    .jornada-nav button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    .jornada-nav button.primario { background: var(--low); color: #fff; border-color: var(--low); }
+    .jornada-nav button.primario:disabled { opacity: 0.45; cursor: default; }
+
+    .jornada-input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      font-size: 0.95rem;
+      font-family: inherit;
+    }
+    .jornada-input:focus { outline: 2px solid var(--low); border-color: transparent; }
+    textarea.jornada-input { resize: vertical; min-height: 70px; }
+
+    /* Severidad 1-5 */
+    .severidad-row { display: flex; gap: 6px; margin: 6px 0 12px; }
+    .severidad-row button {
+      flex: 1;
+      padding: 10px 4px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .severidad-row button.activo { background: var(--medium-bg); border-color: var(--medium); color: var(--medium); }
+    .severidad-leyenda { font-size: 0.78rem; color: var(--muted); margin-top: -4px; margin-bottom: 12px; display: flex; justify-content: space-between; }
   </style>
 </head>
 <body>
@@ -1540,6 +1750,8 @@
         localStorage.setItem("kylia_user_email", email);
         localStorage.setItem("kylia_user_consent", new Date().toISOString());
         if (nombre) localStorage.setItem("kylia_user_nombre", nombre);
+        // Alta inicial del piloto en Supabase (silencioso, idempotente)
+        try { window.kyliaSync?.registroUsuario({ email, nombre, origen: localStorage.getItem("kylia_origen") }); } catch (_) {}
         gate.hidden = true;
       });
 
@@ -1600,6 +1812,15 @@
         <span class="config-feedback" id="config-feedback" aria-live="polite"></span>
       </div>
     </div>
+
+    <!-- Banner "Cerrar jornada" — visible en ambos modos -->
+    <button type="button" class="jornada-banner" id="jornada-banner" hidden>
+      <span class="jornada-banner-icon" aria-hidden="true">📝</span>
+      <span class="jornada-banner-body">
+        <span class="jornada-banner-titulo" id="jornada-banner-titulo">¿Cómo ha ido tu jornada?</span>
+        <span class="jornada-banner-sub"    id="jornada-banner-sub">Cuéntamelo en 30 segundos.</span>
+      </span>
+    </button>
 
     <!-- Acción del día -->
     <section class="card card-hoy" id="card-hoy" aria-label="Acción del día">
@@ -1765,6 +1986,111 @@
   <div class="fab-soporte" role="region" aria-label="Soporte del piloto">
     <button class="fab-btn fab-btn-feedback" id="fab-feedback" type="button" aria-label="Reportar o sugerir" title="Reportar o sugerir">✎</button>
     <a class="fab-btn fab-btn-whatsapp" id="fab-whatsapp" href="#" target="_blank" rel="noopener" aria-label="Hablar conmigo por WhatsApp" title="Hablar conmigo por WhatsApp">💬</a>
+  </div>
+
+  <!-- Modal: Cerrar jornada (wizard 4 pasos) -->
+  <div id="modal-jornada" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-jornada-titulo" hidden>
+    <div class="modal-card modal-jornada-card">
+      <h2 id="modal-jornada-titulo">Diario de la jornada</h2>
+      <div class="jornada-progreso" aria-hidden="true">
+        <div class="jornada-progreso-paso" data-step="1"></div>
+        <div class="jornada-progreso-paso" data-step="2"></div>
+        <div class="jornada-progreso-paso" data-step="3"></div>
+        <div class="jornada-progreso-paso" data-step="4"></div>
+      </div>
+
+      <!-- Paso 1: riego -->
+      <div class="jornada-paso" id="j-paso-1">
+        <h3>¿Has regado hoy?</h3>
+        <p class="sub">Si sí, indica la cantidad aproximada.</p>
+        <div class="jornada-opciones">
+          <button type="button" class="jornada-opcion" data-jriego="no">No, hoy no</button>
+          <button type="button" class="jornada-opcion" data-jriego="si">Sí, he regado</button>
+        </div>
+        <div id="j-riego-cantidad" hidden>
+          <label for="j-riego-litros" class="sub">¿Cuántos L/m² aproximadamente?</label>
+          <input type="number" id="j-riego-litros" class="jornada-input" min="0" step="0.5" inputmode="decimal" placeholder="Ej: 4">
+        </div>
+      </div>
+
+      <!-- Paso 2: aplicación -->
+      <div class="jornada-paso" id="j-paso-2" hidden>
+        <h3>¿Has aplicado algún tratamiento?</h3>
+        <p class="sub">Insecticida, fungicida, abono, biostimulante…</p>
+        <div class="jornada-opciones">
+          <button type="button" class="jornada-opcion" data-japl="no">No, hoy no</button>
+          <button type="button" class="jornada-opcion" data-japl="si">Sí, he aplicado</button>
+        </div>
+        <div id="j-apl-detalle" hidden>
+          <label class="sub" for="j-apl-producto">Producto</label>
+          <input type="text" id="j-apl-producto" class="jornada-input" placeholder="Ej: Jabón potásico" maxlength="120">
+          <label class="sub" for="j-apl-dosis" style="margin-top:8px;display:block">Dosis</label>
+          <input type="text" id="j-apl-dosis" class="jornada-input" placeholder="Ej: 1 L/ha" maxlength="60">
+          <label class="sub" style="margin-top:10px;display:block">¿Por qué lo has aplicado?</label>
+          <div class="jornada-chips" id="j-apl-motivo" role="group" aria-label="Motivo">
+            <button type="button" class="jornada-chip" data-mot="preventivo">Preventivo</button>
+            <button type="button" class="jornada-chip" data-mot="sintoma">Vi algo en el cultivo</button>
+            <button type="button" class="jornada-chip" data-mot="asesor">Lo indicó un asesor</button>
+            <button type="button" class="jornada-chip" data-mot="costumbre">Por costumbre del cultivo</button>
+            <button type="button" class="jornada-chip" data-mot="otro">Otro</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Paso 3: observación -->
+      <div class="jornada-paso" id="j-paso-3" hidden>
+        <h3>¿Has visto algo en el cultivo?</h3>
+        <p class="sub">Plaga, enfermedad, estrés, hojas amarillas, lo que sea.</p>
+        <div class="jornada-opciones">
+          <button type="button" class="jornada-opcion" data-jobs="no">No, todo bien</button>
+          <button type="button" class="jornada-opcion" data-jobs="si">Sí, he visto algo</button>
+        </div>
+        <div id="j-obs-detalle" hidden>
+          <label class="sub">¿De qué tipo?</label>
+          <div class="jornada-chips" id="j-obs-tipo" role="group" aria-label="Tipo de observación">
+            <button type="button" class="jornada-chip" data-tipo="plaga">Plaga</button>
+            <button type="button" class="jornada-chip" data-tipo="enfermedad">Enfermedad</button>
+            <button type="button" class="jornada-chip" data-tipo="estres">Estrés</button>
+            <button type="button" class="jornada-chip" data-tipo="otro">Otro</button>
+          </div>
+          <label class="sub" for="j-obs-desc" style="margin-top:6px;display:block">Describe brevemente</label>
+          <input type="text" id="j-obs-desc" class="jornada-input" placeholder="Ej: pulgón en hojas jóvenes" maxlength="200">
+          <label class="sub" style="margin-top:8px;display:block">¿Cuán grave parece? (1 = leve · 5 = grave)</label>
+          <div class="severidad-row" id="j-obs-severidad" role="group" aria-label="Severidad">
+            <button type="button" data-sev="1">1</button>
+            <button type="button" data-sev="2">2</button>
+            <button type="button" data-sev="3">3</button>
+            <button type="button" data-sev="4">4</button>
+            <button type="button" data-sev="5">5</button>
+          </div>
+          <div class="severidad-leyenda"><span>Leve</span><span>Grave</span></div>
+        </div>
+      </div>
+
+      <!-- Paso 4: decisión + comentario -->
+      <div class="jornada-paso" id="j-paso-4" hidden>
+        <h3>¿En qué te has basado hoy para decidir?</h3>
+        <p class="sub">Puedes seleccionar varias.</p>
+        <div class="jornada-chips" id="j-fuente" role="group" aria-label="Fuente de decisión">
+          <button type="button" class="jornada-chip" data-fuente="experiencia">Mi experiencia</button>
+          <button type="button" class="jornada-chip" data-fuente="meteo">La meteo / lluvia</button>
+          <button type="button" class="jornada-chip" data-fuente="asesor">Un asesor o técnico</button>
+          <button type="button" class="jornada-chip" data-fuente="vecino">Lo que hace mi vecino</button>
+          <button type="button" class="jornada-chip" data-fuente="rutina">La rutina del cultivo</button>
+          <button type="button" class="jornada-chip" data-fuente="otro">Otro</button>
+        </div>
+        <label class="sub" for="j-comentario" style="margin-top:6px;display:block">Comentario libre (opcional)</label>
+        <textarea id="j-comentario" class="jornada-input" placeholder="Una frase breve si quieres añadir algo." maxlength="500"></textarea>
+      </div>
+
+      <div class="jornada-nav">
+        <button type="button" id="j-cancelar">Cerrar</button>
+        <button type="button" id="j-atras" hidden>← Atrás</button>
+        <button type="button" id="j-siguiente" class="primario">Siguiente →</button>
+        <button type="button" id="j-finalizar" class="primario" hidden>Guardar diario</button>
+      </div>
+      <span id="modal-jornada-status" class="config-feedback" aria-live="polite" style="display:block;margin-top:8px;"></span>
+    </div>
   </div>
 
   <!-- Modal: feedback -->
@@ -2495,6 +2821,15 @@
       const arr = riegos.filter(r => r.date !== date);
       arr.push({ date, litros: litros != null && !Number.isNaN(litros) ? +litros : null });
       saveRiegos(arr);
+      // Sincronizar en background con Supabase
+      try {
+        window.kyliaSync?.accion({
+          tipo:          "riego",
+          fecha_local:   date,
+          cantidad_l_m2: litros != null && !Number.isNaN(litros) ? +litros : null,
+          jornada_id:    window._kyliaJornadaActual?.id || null,
+        });
+      } catch (_) {}
     }
     function removeRiego(date) {
       saveRiegos(riegos.filter(r => r.date !== date));
@@ -2524,6 +2859,23 @@
       const arr = aplicaciones.slice();
       arr.push(entrada);
       saveAplicaciones(arr);
+      // Sincronizar en background con Supabase
+      try {
+        window.kyliaSync?.accion({
+          tipo:                 "aplicacion",
+          fecha_local:          entrada.date,
+          producto_id:          entrada.productoId,
+          producto_nombre:      entrada.productoNombre,
+          sustancia_activa:     entrada.sustanciaActiva,
+          dosis:                entrada.dosis,
+          cultivo:              entrada.cultivo,
+          plazo_seguridad_dias: entrada.plazoSeguridad,
+          fue_otro:             !!entrada.fueOtro,
+          motivo:               entrada.motivo || null,
+          notas:                entrada.notas || null,
+          jornada_id:           window._kyliaJornadaActual?.id || null,
+        });
+      } catch (_) {}
     }
     function removeAplicacion(date, productoNombre) {
       saveAplicaciones(
@@ -2750,6 +3102,19 @@
       ultimoNDMI = entrada.ndmi != null
         ? { ndmi: entrada.ndmi, stdev: entrada.ndmiStdev, fecha: entrada.imagenFecha || entrada.date }
         : null;
+      // Sincronizar medición Sentinel-2 (NDVI + NDMI) con Supabase
+      try {
+        const fechaMed = (entrada.imagenFecha || entrada.date || "").slice(0, 10);
+        if (fechaMed) {
+          window.kyliaSync?.medicion({
+            fecha:      fechaMed,
+            ndvi:       entrada.ndvi ?? null,
+            ndmi:       entrada.ndmi ?? null,
+            ndmi_stdev: entrada.ndmiStdev ?? null,
+            fuente:     "sentinel-2",
+          });
+        }
+      } catch (_) {}
       renderIndicadores();
       renderHoy();
       renderRiegoRegistro();
@@ -2809,6 +3174,17 @@
           hoy:   [media(idxAhora), d[idxAhora] ?? null, e[idxAhora] ?? null],
           hace7: [media(idxHace7), d[idxHace7] ?? null, e[idxHace7] ?? null],
         };
+        // Sincronizar humedad de suelo (capas) con Supabase
+        try {
+          const hoyIso = new Date().toISOString().slice(0, 10);
+          window.kyliaSync?.medicion({
+            fecha:        hoyIso,
+            suelo_0_7:    ultimoSuelo.hoy[0] ?? null,
+            suelo_7_28:   ultimoSuelo.hoy[1] ?? null,
+            suelo_28_100: ultimoSuelo.hoy[2] ?? null,
+            fuente:       "open-meteo",
+          });
+        } catch (_) {}
         renderSuelo();
         renderIndicadores();
         renderHoy();
@@ -3693,12 +4069,63 @@
       }
     }
 
+    // Persiste lo que Kylia "habría recomendado" (shadow log) en Supabase.
+    // Una vez al día por usuario — dedupe por hash de contenido + fecha.
+    function enviarRecomendacionesAlLog(recs) {
+      if (!Array.isArray(recs) || !window.kyliaSync) return;
+      try {
+        const hoy = new Date().toISOString().slice(0, 10);
+        const hashRecs = (recs.map(r => `${r.id}|${r.titulo}|${r.prioridad}`).join("·")) + "@" + hoy;
+        if (sessionStorage.getItem("kylia_rec_hash") === hashRecs) return;
+        sessionStorage.setItem("kylia_rec_hash", hashRecs);
+
+        const contexto = {
+          ndvi:           ultimoNDVI?.ndvi ?? null,
+          ndvi_estado:    ultimoNDVI?.estado ?? null,
+          ndvi_fecha:     ultimoNDVI?.fecha ?? null,
+          ndmi:           ultimoNDMI?.ndmi ?? null,
+          suelo_hoy:      ultimoSuelo?.hoy ?? null,
+          temp_max:       ultimoMeteo?.tempMax ?? null,
+          hum_max:        ultimoMeteo?.humMax ?? null,
+          lluvia_3d:      ultimoPrevision?.reduce((s, d) => s + (d.lluvia ?? 0), 0) ?? null,
+          ultimo_riego:   ultimoRiego || null,
+          cultivos:       cfg?.cultivos || [],
+          modo:           window.kyliaSync.modo,
+        };
+
+        const payload = recs.map(r => {
+          // Tipo según la clase de la rec
+          const tipo = r.catClass === "tratamiento" ? "tratamiento"
+                     : r.catClass === "nutricion"   ? "nutricion"
+                     : "riego";
+          // Cantidad L/m² si aparece en el título "Riega X L/m²"
+          const m = (r.titulo || "").match(/(\d+(?:[.,]\d+)?)\s*L\/m/);
+          const cantidad_l_m2 = m ? Number(m[1].replace(",", ".")) : null;
+          const nivel = r.prioridad <= 2 ? "alta" : r.prioridad === 3 ? "media" : "baja";
+          return {
+            tipo,
+            texto:           [r.titulo, r.detalle].filter(Boolean).join(". "),
+            cantidad_l_m2,
+            producto_id:     r.prod?.id || null,
+            producto_nombre: r.prod?.nombre || null,
+            dosis:           r.prod?.dosis || null,
+            nivel,
+            contexto,
+          };
+        });
+
+        window.kyliaSync.recomendacionesLog(payload, contexto);
+      } catch (_) { /* noop */ }
+    }
+
     function renderRecomendaciones() {
       const container = document.getElementById("recomendaciones-container");
       if (!container) return;
       if (!ultimoET0 && !ultimoNDVI && !ultimoMeteo) return;
 
       const recs = generarRecomendaciones();
+      // Persistir el "shadow log" en Supabase: una vez al día por usuario
+      enviarRecomendacionesAlLog(recs);
       // Dispara reescritura IA en background (la primera llamada renderiza
       // con textos de reglas; la segunda, con los reescritos por Gemini)
       cargarRecomendacionesIA(recs);
@@ -4036,6 +4463,19 @@
         if (banner) banner.hidden = true;
         setFeedback("");
         if (eraPrimerUso) window.kyliaTrack?.("onboarding-completado", { cultivos: (nuevoCfg.cultivos || []).join(",") });
+        // Sincronizar perfil del piloto con Supabase (silencioso)
+        try {
+          window.kyliaSync?.registroUsuario({
+            email:    localStorage.getItem("kylia_user_email") || null,
+            nombre:   nuevoCfg.nombre,
+            ciudad:   nuevoCfg.ciudad,
+            lat:      nuevoCfg.lat,
+            lon:      nuevoCfg.lon,
+            cultivos: nuevoCfg.cultivos,
+            parcela:  nuevoCfg.parcela,
+            origen:   localStorage.getItem("kylia_origen"),
+          });
+        } catch (_) {}
         await cargarDatos();
         cargarNDVI(true);
         cargarHumedadSuelo();
@@ -4648,6 +5088,8 @@
       // Cargar app
       window.kyliaTrack?.("app-cargada", {
         primerUso: !localStorage.getItem(STORAGE_KEY) ? "si" : "no",
+        modo:      window.kyliaSync?.modo || "?",
+        origen:    localStorage.getItem("kylia_origen") || null,
       });
       // Trackear interacciones clave (delegación)
       document.addEventListener("click", (e) => {
@@ -4658,6 +5100,254 @@
         if (e.target.closest("#btn-aplicaciones-csv")) window.kyliaTrack?.("descarga-csv");
         if (e.target.closest("#btn-config"))           window.kyliaTrack?.("abre-config");
       });
+
+      // ─── Wizard "Cerrar jornada" ─────────────────────────────────────────
+      (function inicializarWizardJornada() {
+        const STORAGE_DIARIO = "kylia_diario_completado"; // "YYYY-MM-DD" del día ya cerrado
+        const banner   = document.getElementById("jornada-banner");
+        const bTitulo  = document.getElementById("jornada-banner-titulo");
+        const bSub     = document.getElementById("jornada-banner-sub");
+        const modal    = document.getElementById("modal-jornada");
+        const status   = document.getElementById("modal-jornada-status");
+        const btnNext  = document.getElementById("j-siguiente");
+        const btnBack  = document.getElementById("j-atras");
+        const btnFin   = document.getElementById("j-finalizar");
+        const btnCanc  = document.getElementById("j-cancelar");
+        if (!banner || !modal) return;
+
+        const hoyIso = () => new Date().toISOString().slice(0, 10);
+
+        let paso = 1;
+        let estado = {
+          riego:        null,  // 'si' | 'no'
+          riegoLitros:  null,
+          apl:          null,  // 'si' | 'no'
+          aplProducto:  "",
+          aplDosis:     "",
+          aplMotivo:    null,
+          obs:          null,  // 'si' | 'no'
+          obsTipo:      null,
+          obsDesc:      "",
+          obsSeveridad: null,
+          fuente:       new Set(),
+          comentario:   "",
+        };
+
+        function refrescarBanner() {
+          const diarioHoy = localStorage.getItem(STORAGE_DIARIO);
+          if (diarioHoy === hoyIso()) {
+            bTitulo.textContent = "Diario de hoy guardado ✓";
+            bSub.textContent    = "Gracias. Vuelve mañana cuando termines tu jornada.";
+            banner.disabled = true;
+          } else {
+            bTitulo.textContent = "¿Cómo ha ido tu jornada?";
+            bSub.textContent    = "Cuéntamelo en 30 segundos.";
+            banner.disabled = false;
+          }
+          banner.hidden = false;
+        }
+
+        function setProgreso() {
+          modal.querySelectorAll(".jornada-progreso-paso").forEach(el => {
+            const n = +el.dataset.step;
+            el.classList.toggle("completado", n < paso);
+            el.classList.toggle("activo",     n === paso);
+          });
+        }
+        function mostrarPaso() {
+          modal.querySelectorAll(".jornada-paso").forEach((p, idx) => {
+            p.hidden = (idx + 1) !== paso;
+          });
+          btnBack.hidden = paso === 1;
+          btnNext.hidden = paso === 4;
+          btnFin.hidden  = paso !== 4;
+          setProgreso();
+          status.textContent = "";
+        }
+        function abrir() {
+          paso = 1;
+          // Reset estado
+          estado = {
+            riego: null, riegoLitros: null,
+            apl: null, aplProducto: "", aplDosis: "", aplMotivo: null,
+            obs: null, obsTipo: null, obsDesc: "", obsSeveridad: null,
+            fuente: new Set(), comentario: "",
+          };
+          // Reset UI
+          modal.querySelectorAll(".jornada-opcion").forEach(b => b.classList.remove("activo"));
+          modal.querySelectorAll(".jornada-chip").forEach(b => b.classList.remove("activo"));
+          modal.querySelectorAll(".severidad-row button").forEach(b => b.classList.remove("activo"));
+          ["j-riego-litros", "j-apl-producto", "j-apl-dosis", "j-obs-desc", "j-comentario"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = "";
+          });
+          ["j-riego-cantidad", "j-apl-detalle", "j-obs-detalle"].forEach(id => {
+            document.getElementById(id).hidden = true;
+          });
+          mostrarPaso();
+          modal.hidden = false;
+          window.kyliaTrack?.("diario-abierto");
+        }
+        function cerrar() { modal.hidden = true; }
+
+        // Selección riego
+        modal.querySelectorAll("[data-jriego]").forEach(b => b.addEventListener("click", () => {
+          modal.querySelectorAll("[data-jriego]").forEach(x => x.classList.remove("activo"));
+          b.classList.add("activo");
+          estado.riego = b.dataset.jriego;
+          document.getElementById("j-riego-cantidad").hidden = (estado.riego !== "si");
+        }));
+        // Selección aplicación
+        modal.querySelectorAll("[data-japl]").forEach(b => b.addEventListener("click", () => {
+          modal.querySelectorAll("[data-japl]").forEach(x => x.classList.remove("activo"));
+          b.classList.add("activo");
+          estado.apl = b.dataset.japl;
+          document.getElementById("j-apl-detalle").hidden = (estado.apl !== "si");
+        }));
+        // Motivo aplicación
+        modal.querySelectorAll("#j-apl-motivo .jornada-chip").forEach(b => b.addEventListener("click", () => {
+          modal.querySelectorAll("#j-apl-motivo .jornada-chip").forEach(x => x.classList.remove("activo"));
+          b.classList.add("activo");
+          estado.aplMotivo = b.dataset.mot;
+        }));
+        // Observación
+        modal.querySelectorAll("[data-jobs]").forEach(b => b.addEventListener("click", () => {
+          modal.querySelectorAll("[data-jobs]").forEach(x => x.classList.remove("activo"));
+          b.classList.add("activo");
+          estado.obs = b.dataset.jobs;
+          document.getElementById("j-obs-detalle").hidden = (estado.obs !== "si");
+        }));
+        modal.querySelectorAll("#j-obs-tipo .jornada-chip").forEach(b => b.addEventListener("click", () => {
+          modal.querySelectorAll("#j-obs-tipo .jornada-chip").forEach(x => x.classList.remove("activo"));
+          b.classList.add("activo");
+          estado.obsTipo = b.dataset.tipo;
+        }));
+        modal.querySelectorAll("#j-obs-severidad button").forEach(b => b.addEventListener("click", () => {
+          modal.querySelectorAll("#j-obs-severidad button").forEach(x => x.classList.remove("activo"));
+          b.classList.add("activo");
+          estado.obsSeveridad = +b.dataset.sev;
+        }));
+        // Fuente decisión (multi)
+        modal.querySelectorAll("#j-fuente .jornada-chip").forEach(b => b.addEventListener("click", () => {
+          const f = b.dataset.fuente;
+          if (estado.fuente.has(f)) { estado.fuente.delete(f); b.classList.remove("activo"); }
+          else                       { estado.fuente.add(f);     b.classList.add("activo"); }
+        }));
+
+        function validarPaso() {
+          if (paso === 1) {
+            if (estado.riego == null) return "Marca si has regado hoy o no.";
+            if (estado.riego === "si") {
+              const v = parseFloat(document.getElementById("j-riego-litros").value);
+              if (Number.isFinite(v) && v >= 0) estado.riegoLitros = v;
+            }
+          }
+          if (paso === 2) {
+            if (estado.apl == null) return "Marca si has aplicado algo o no.";
+            if (estado.apl === "si") {
+              estado.aplProducto = document.getElementById("j-apl-producto").value.trim();
+              estado.aplDosis    = document.getElementById("j-apl-dosis").value.trim();
+              if (!estado.aplProducto) return "Indica al menos el nombre del producto.";
+            }
+          }
+          if (paso === 3) {
+            if (estado.obs == null) return "Marca si has observado algo o no.";
+            if (estado.obs === "si") {
+              estado.obsDesc = document.getElementById("j-obs-desc").value.trim();
+              if (!estado.obsTipo) return "Selecciona el tipo.";
+            }
+          }
+          return null;
+        }
+        btnNext.addEventListener("click", () => {
+          const err = validarPaso();
+          if (err) { status.textContent = err; status.className = "config-feedback error"; return; }
+          paso = Math.min(4, paso + 1);
+          mostrarPaso();
+        });
+        btnBack.addEventListener("click", () => { paso = Math.max(1, paso - 1); mostrarPaso(); });
+        btnCanc.addEventListener("click", cerrar);
+        modal.addEventListener("click", (e) => { if (e.target.id === "modal-jornada") cerrar(); });
+
+        btnFin.addEventListener("click", async () => {
+          estado.comentario = document.getElementById("j-comentario").value.trim();
+          btnFin.disabled = true;
+          status.textContent = "Guardando...";
+          status.className = "config-feedback";
+          const fecha = hoyIso();
+          try {
+            // 1) Crear/actualizar jornada y obtener id
+            const respJ = await fetch("/api/jornadas", {
+              method:  "POST",
+              headers: { "Content-Type": "application/json" },
+              body:    JSON.stringify({
+                usuario_id:      window.kyliaSync?.userId,
+                fecha,
+                fuente_decision: Array.from(estado.fuente),
+                comentario:      estado.comentario,
+              }),
+            });
+            const dataJ = await respJ.json().catch(() => ({}));
+            const jornadaId = dataJ?.jornada?.id || null;
+            window._kyliaJornadaActual = { id: jornadaId, fecha };
+
+            // 2) Riego: añadir a localStorage (que dispara /api/acciones)
+            if (estado.riego === "si") {
+              addRiego(fecha, estado.riegoLitros);
+              refrescarTrasCambioRiego?.();
+            }
+            // 3) Aplicación: añadir a localStorage
+            if (estado.apl === "si") {
+              addAplicacion({
+                date:            fecha,
+                productoId:      null,
+                productoNombre:  estado.aplProducto,
+                sustanciaActiva: null,
+                tipo:            "fitosanitario",
+                dosis:           estado.aplDosis,
+                cultivo:         (cfg?.cultivos || [])[0] || null,
+                plazoSeguridad:  null,
+                notas:           null,
+                fueOtro:         true,
+                motivo:          estado.aplMotivo,
+              });
+              renderHistorialAplicaciones?.();
+            }
+            // 4) Observación: POST directo a /api/observaciones
+            if (estado.obs === "si") {
+              window.kyliaSync?.observacion({
+                jornada_id:  jornadaId,
+                fecha_local: fecha,
+                tipo:        estado.obsTipo,
+                descripcion: estado.obsDesc,
+                severidad:   estado.obsSeveridad,
+                cultivo:     (cfg?.cultivos || [])[0] || null,
+              });
+            }
+
+            localStorage.setItem(STORAGE_DIARIO, fecha);
+            window.kyliaTrack?.("diario-guardado", {
+              rego:  estado.riego === "si" ? "si" : "no",
+              aplic: estado.apl   === "si" ? "si" : "no",
+              obs:   estado.obs   === "si" ? "si" : "no",
+            });
+            status.textContent = "Gracias, hasta mañana 🌱";
+            status.className = "config-feedback";
+            setTimeout(() => { cerrar(); refrescarBanner(); }, 900);
+          } catch (err) {
+            status.textContent = "No se pudo guardar. Reintenta en un momento.";
+            status.className = "config-feedback error";
+          } finally {
+            btnFin.disabled = false;
+          }
+        });
+
+        banner.addEventListener("click", () => { if (!banner.disabled) abrir(); });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && !modal.hidden) cerrar();
+        });
+        refrescarBanner();
+      })();
     });
   </script>
 </body>
