@@ -24,6 +24,9 @@ const HANDLERS = {
   "eventos":             handleEventos,
 };
 
+const METODOS_RIEGO = new Set(["goteo", "aspersion", "surco", "manguera"]);
+const FRANJAS       = new Set(["manana", "mediodia", "tarde", "noche"]);
+
 module.exports = async (req, res) => {
   if (!preludio(req, res, "POST")) return;
   const body = parseBody(req);
@@ -55,6 +58,7 @@ async function handleRegistroUsuario(req, res, body) {
                     : [],
     parcela:      body.parcela && typeof body.parcela === "object" ? body.parcela : null,
     tarifa_agua:  numOrNull(body.tarifa_agua),
+    metodo_riego: METODOS_RIEGO.has(body.metodo_riego) ? body.metodo_riego : null,
     origen:       clean(body.origen,       120)                 || null,
     preferencias: body.preferencias && typeof body.preferencias === "object" ? body.preferencias : {},
     ua:           clean(req.headers["user-agent"], 400)         || null,
@@ -90,6 +94,8 @@ async function handleAcciones(req, res, body) {
     fecha_local:          dateOrNull(body.fecha_local),
     tipo,
     cantidad_l_m2:        numOrNull(body.cantidad_l_m2),
+    franja_horaria:       FRANJAS.has(body.franja_horaria) ? body.franja_horaria : null,
+    duracion_min:         intOrNull(body.duracion_min),
     producto_id:          clean(body.producto_id,      80),
     producto_nombre:      clean(body.producto_nombre, 160),
     sustancia_activa:     clean(body.sustancia_activa,160),

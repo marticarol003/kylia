@@ -27,6 +27,7 @@ create table usuarios (
   cultivos      text[]      default '{}',
   parcela       jsonb,
   tarifa_agua   numeric,
+  metodo_riego  text,                                  -- 'goteo','aspersion','surco','manguera'
   origen        text,
   preferencias  jsonb       default '{}'::jsonb,
   ua            text,
@@ -69,6 +70,8 @@ create table acciones (
   fecha_local          date,
   tipo                 text,
   cantidad_l_m2        numeric,
+  franja_horaria       text,                            -- 'manana','mediodia','tarde','noche'
+  duracion_min         int,                             -- duración del riego en minutos (opcional)
   producto_id          text,
   producto_nombre      text,
   sustancia_activa     text,

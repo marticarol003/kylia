@@ -1814,6 +1814,15 @@
         <label>Mis cultivos</label>
         <div class="cultivos-grid" id="cultivos-grid"></div>
       </div>
+      <div class="config-field">
+        <label>Método de riego habitual</label>
+        <div class="cultivos-grid" id="metodo-riego-grid">
+          <button type="button" class="btn-cultivo" data-metodo="goteo">Goteo</button>
+          <button type="button" class="btn-cultivo" data-metodo="aspersion">Aspersión</button>
+          <button type="button" class="btn-cultivo" data-metodo="surco">Surco</button>
+          <button type="button" class="btn-cultivo" data-metodo="manguera">Manguera</button>
+        </div>
+      </div>
       <div class="config-actions">
         <button class="btn-save" id="btn-save-config">Guardar</button>
         <span class="config-feedback" id="config-feedback" aria-live="polite"></span>
@@ -2017,6 +2026,15 @@
         <div id="j-riego-cantidad" hidden>
           <label for="j-riego-litros" class="sub">¿Cuántos L/m² aproximadamente?</label>
           <input type="number" id="j-riego-litros" class="jornada-input" min="0" step="0.5" inputmode="decimal" placeholder="Ej: 4">
+          <label class="sub" style="margin-top:10px;display:block">¿Cuándo lo has hecho?</label>
+          <div class="jornada-chips" id="j-riego-franja" role="group" aria-label="Franja horaria">
+            <button type="button" class="jornada-chip" data-franja="manana">Mañana</button>
+            <button type="button" class="jornada-chip" data-franja="mediodia">Mediodía</button>
+            <button type="button" class="jornada-chip" data-franja="tarde">Tarde</button>
+            <button type="button" class="jornada-chip" data-franja="noche">Noche</button>
+          </div>
+          <label class="sub" for="j-riego-duracion" style="margin-top:8px;display:block">Duración aproximada (minutos, opcional)</label>
+          <input type="number" id="j-riego-duracion" class="jornada-input" min="0" step="5" inputmode="numeric" placeholder="Ej: 45">
         </div>
       </div>
 
@@ -2040,6 +2058,13 @@
             <button type="button" class="jornada-chip" data-mot="asesor">Lo indicó un asesor</button>
             <button type="button" class="jornada-chip" data-mot="costumbre">Por costumbre del cultivo</button>
             <button type="button" class="jornada-chip" data-mot="otro">Otro</button>
+          </div>
+          <label class="sub" style="margin-top:10px;display:block">¿Cuándo lo has hecho?</label>
+          <div class="jornada-chips" id="j-apl-franja" role="group" aria-label="Franja horaria">
+            <button type="button" class="jornada-chip" data-franja="manana">Mañana</button>
+            <button type="button" class="jornada-chip" data-franja="mediodia">Mediodía</button>
+            <button type="button" class="jornada-chip" data-franja="tarde">Tarde</button>
+            <button type="button" class="jornada-chip" data-franja="noche">Noche</button>
           </div>
         </div>
       </div>
@@ -2150,6 +2175,15 @@
         <p class="modal-hint">Días sin recolectar tras la aplicación. Cero si no aplica.</p>
       </div>
       <div class="config-field">
+        <label>¿Cuándo lo has hecho?</label>
+        <div class="jornada-chips" id="modal-apl-franja" role="group" aria-label="Franja horaria">
+          <button type="button" class="jornada-chip" data-franja="manana">Mañana</button>
+          <button type="button" class="jornada-chip" data-franja="mediodia">Mediodía</button>
+          <button type="button" class="jornada-chip" data-franja="tarde">Tarde</button>
+          <button type="button" class="jornada-chip" data-franja="noche">Noche</button>
+        </div>
+      </div>
+      <div class="config-field">
         <label for="modal-apl-notas">Notas (opcional)</label>
         <input type="text" id="modal-apl-notas" placeholder="Ej: foco localizado en fila norte">
       </div>
@@ -2173,6 +2207,19 @@
         <input type="number" id="modal-riego-litros" min="0" max="100" step="1" inputmode="numeric" placeholder="Ej: 5">
         <p class="modal-hint" id="modal-riego-sugerido"></p>
       </div>
+      <div class="config-field">
+        <label>¿Cuándo lo has hecho?</label>
+        <div class="jornada-chips" id="modal-riego-franja" role="group" aria-label="Franja horaria">
+          <button type="button" class="jornada-chip" data-franja="manana">Mañana</button>
+          <button type="button" class="jornada-chip" data-franja="mediodia">Mediodía</button>
+          <button type="button" class="jornada-chip" data-franja="tarde">Tarde</button>
+          <button type="button" class="jornada-chip" data-franja="noche">Noche</button>
+        </div>
+      </div>
+      <div class="config-field">
+        <label for="modal-riego-duracion">Duración (minutos, opcional)</label>
+        <input type="number" id="modal-riego-duracion" min="0" step="5" inputmode="numeric" placeholder="Ej: 45">
+      </div>
       <div class="modal-actions">
         <button class="btn-modal-cancel" id="modal-riego-cancelar" type="button">Cancelar</button>
         <button class="btn-save" id="modal-riego-guardar" type="button">Guardar</button>
@@ -2186,12 +2233,13 @@
     const STORAGE_KEY = "kylia_config";
 
     const DEFAULTS = {
-      nombre:   "Agricultor",
-      ciudad:   "Barcelona",
-      lat:      41.3828,
-      lon:      2.1771,
-      cultivos: ["lechuga"],
-      parcela:  null,
+      nombre:      "Agricultor",
+      ciudad:      "Barcelona",
+      lat:         41.3828,
+      lon:         2.1771,
+      cultivos:    ["lechuga"],
+      parcela:     null,
+      metodoRiego: null,
     };
 
     const NDVI_HISTORY_DAYS = 56; // 8 semanas
@@ -2824,17 +2872,22 @@
       localStorage.setItem(RIEGOS_KEY, JSON.stringify(riegos));
       ultimoRiego = riegos.length ? riegos[riegos.length - 1].date : null;
     }
-    function addRiego(date, litros) {
+    function addRiego(date, litros, opciones = {}) {
+      const franja   = opciones.franja || null;
+      const duracion = opciones.duracion != null && !Number.isNaN(opciones.duracion) ? +opciones.duracion : null;
+      const litrosN  = litros != null && !Number.isNaN(litros) ? +litros : null;
       const arr = riegos.filter(r => r.date !== date);
-      arr.push({ date, litros: litros != null && !Number.isNaN(litros) ? +litros : null });
+      arr.push({ date, litros: litrosN, franja, duracion });
       saveRiegos(arr);
       // Sincronizar en background con Supabase
       try {
         window.kyliaSync?.accion({
-          tipo:          "riego",
-          fecha_local:   date,
-          cantidad_l_m2: litros != null && !Number.isNaN(litros) ? +litros : null,
-          jornada_id:    window._kyliaJornadaActual?.id || null,
+          tipo:           "riego",
+          fecha_local:    date,
+          cantidad_l_m2:  litrosN,
+          franja_horaria: franja,
+          duracion_min:   duracion,
+          jornada_id:     window._kyliaJornadaActual?.id || null,
         });
       } catch (_) {}
     }
@@ -2879,6 +2932,7 @@
           plazo_seguridad_dias: entrada.plazoSeguridad,
           fue_otro:             !!entrada.fueOtro,
           motivo:               entrada.motivo || null,
+          franja_horaria:       entrada.franja || null,
           notas:                entrada.notas || null,
           jornada_id:           window._kyliaJornadaActual?.id || null,
         });
@@ -4473,14 +4527,15 @@
         // Sincronizar perfil del piloto con Supabase (silencioso)
         try {
           window.kyliaSync?.registroUsuario({
-            email:    localStorage.getItem("kylia_user_email") || null,
-            nombre:   nuevoCfg.nombre,
-            ciudad:   nuevoCfg.ciudad,
-            lat:      nuevoCfg.lat,
-            lon:      nuevoCfg.lon,
-            cultivos: nuevoCfg.cultivos,
-            parcela:  nuevoCfg.parcela,
-            origen:   localStorage.getItem("kylia_origen"),
+            email:        localStorage.getItem("kylia_user_email") || null,
+            nombre:       nuevoCfg.nombre,
+            ciudad:       nuevoCfg.ciudad,
+            lat:          nuevoCfg.lat,
+            lon:          nuevoCfg.lon,
+            cultivos:     nuevoCfg.cultivos,
+            parcela:      nuevoCfg.parcela,
+            metodo_riego: nuevoCfg.metodoRiego || null,
+            origen:       localStorage.getItem("kylia_origen"),
           });
         } catch (_) {}
         await cargarDatos();
@@ -4514,7 +4569,26 @@
         inputCiudad.value = "";
         setFeedback(cfg.ciudad ? `Ubicación actual: ${cfg.ciudad}` : "");
         inicializarCultivos();
+        inicializarMetodoRiego();
       }
+
+      function inicializarMetodoRiego() {
+        document.querySelectorAll("#metodo-riego-grid .btn-cultivo").forEach(btn => {
+          btn.classList.toggle("activo", btn.dataset.metodo === cfg.metodoRiego);
+        });
+      }
+      function obtenerMetodoRiegoSeleccionado() {
+        const el = document.querySelector("#metodo-riego-grid .btn-cultivo.activo");
+        return el ? el.dataset.metodo : null;
+      }
+      // Single-select del grid de método de riego
+      document.querySelectorAll("#metodo-riego-grid .btn-cultivo").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const yaActivo = btn.classList.contains("activo");
+          document.querySelectorAll("#metodo-riego-grid .btn-cultivo").forEach(x => x.classList.remove("activo"));
+          if (!yaActivo) btn.classList.add("activo");
+        });
+      });
 
       if (!localStorage.getItem(STORAGE_KEY)) {
         // Primer uso: mostrar banner de bienvenida + abrir panel de configuración
@@ -4522,6 +4596,7 @@
         if (banner) banner.hidden = false;
         panel.classList.add("visible");
         inicializarCultivos();
+        inicializarMetodoRiego();
         initMapaParcela();
         forzarRedibujoMapa();
         window.kyliaTrack?.("onboarding-iniciado");
@@ -4540,9 +4615,10 @@
         const nombre = inputNombre.value.trim() || DEFAULTS.nombre;
         const ciudad = inputCiudad.value.trim();
         const cultivosSeleccionados = obtenerCultivosSeleccionados();
+        const metodoRiego = obtenerMetodoRiegoSeleccionado();
 
         if (!ciudad) {
-          await guardarYActualizar({ ...cfg, nombre, cultivos: cultivosSeleccionados });
+          await guardarYActualizar({ ...cfg, nombre, cultivos: cultivosSeleccionados, metodoRiego });
           return;
         }
 
@@ -4559,7 +4635,7 @@
           }
 
           const lugar = data.results[0];
-          await guardarYActualizar({ ...cfg, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados, parcela: null });
+          await guardarYActualizar({ ...cfg, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados, parcela: null, metodoRiego });
         } catch (_) {
           setFeedback("Error de conexión. Inténtalo de nuevo.", true);
         } finally {
@@ -4575,6 +4651,7 @@
 
         const nombre = inputNombre.value.trim() || DEFAULTS.nombre;
         const cultivosSeleccionados = obtenerCultivosSeleccionados();
+        const metodoRiego = obtenerMetodoRiegoSeleccionado();
 
         btnGps.disabled = true;
         setFeedback("Obteniendo ubicación GPS...");
@@ -4589,9 +4666,9 @@
               const data = await res.json();
               const ciudad = data.city || data.locality || data.principalSubdivision || "Ubicación GPS";
 
-              await guardarYActualizar({ ...cfg, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados, parcela: null });
+              await guardarYActualizar({ ...cfg, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados, parcela: null, metodoRiego });
             } catch (_) {
-              await guardarYActualizar({ ...cfg, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados, parcela: null });
+              await guardarYActualizar({ ...cfg, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados, parcela: null, metodoRiego });
             } finally {
               btnGps.disabled = false;
             }
@@ -4659,6 +4736,8 @@
       sugerEl.textContent = sugerido != null
         ? `Sugerido por la app: ${sugerido} L/m² (compensa lo evaporado).`
         : "Si lo prefieres, puedes dejarlo vacío.";
+      document.getElementById("modal-riego-duracion").value = "";
+      modal.querySelectorAll("#modal-riego-franja .jornada-chip").forEach(b => b.classList.remove("activo"));
       modal.hidden = false;
       requestAnimationFrame(() => litrosEl.focus());
     }
@@ -4666,10 +4745,15 @@
       document.getElementById("modal-riego").hidden = true;
     }
     function guardarModalRiego() {
-      const fecha  = document.getElementById("modal-riego-fecha").value;
-      const litros = document.getElementById("modal-riego-litros").value;
+      const fecha    = document.getElementById("modal-riego-fecha").value;
+      const litros   = document.getElementById("modal-riego-litros").value;
+      const duracion = document.getElementById("modal-riego-duracion").value;
+      const franjaEl = document.querySelector("#modal-riego-franja .jornada-chip.activo");
       if (!fecha) return;
-      addRiego(fecha, litros === "" ? null : Number(litros));
+      addRiego(fecha, litros === "" ? null : Number(litros), {
+        franja:   franjaEl ? franjaEl.dataset.franja : null,
+        duracion: duracion === "" ? null : Number(duracion),
+      });
       cerrarModalRiego();
       refrescarTrasCambioRiego();
     }
@@ -4690,6 +4774,7 @@
       document.getElementById("modal-apl-dosis").value = prefill.dosis || "";
       document.getElementById("modal-apl-plazo").value = prefill.plazoSeguridad ?? "";
       document.getElementById("modal-apl-notas").value = "";
+      document.querySelectorAll("#modal-apl-franja .jornada-chip").forEach(b => b.classList.remove("activo"));
 
       const hint = document.getElementById("modal-apl-sustancia");
       hint.textContent = prefill.sustanciaActiva ? `Sustancia activa: ${prefill.sustanciaActiva}` : "Si el producto no está en el catálogo, escríbelo libremente.";
@@ -4722,6 +4807,7 @@
 
       if (!fecha || !producto) return;
 
+      const franjaEl = document.querySelector("#modal-apl-franja .jornada-chip.activo");
       const entrada = {
         date: fecha,
         productoId: productoEl.dataset.productoId || null,
@@ -4733,6 +4819,7 @@
         plazoSeguridad: plazo === "" ? 0 : Number(plazo),
         notas: notas || null,
         fueOtro: !productoEl.dataset.productoId,
+        franja: franjaEl ? franjaEl.dataset.franja : null,
       };
       addAplicacion(entrada);
       cerrarModalAplicacion();
@@ -4836,12 +4923,24 @@
       document.getElementById("modal-riego").addEventListener("click", (e) => {
         if (e.target.id === "modal-riego") cerrarModalRiego();
       });
+      document.querySelectorAll("#modal-riego-franja .jornada-chip").forEach(b => {
+        b.addEventListener("click", () => {
+          document.querySelectorAll("#modal-riego-franja .jornada-chip").forEach(x => x.classList.remove("activo"));
+          b.classList.add("activo");
+        });
+      });
 
       // Modal de aplicación
       document.getElementById("modal-apl-cancelar").addEventListener("click", cerrarModalAplicacion);
       document.getElementById("modal-apl-guardar").addEventListener("click", guardarModalAplicacion);
       document.getElementById("modal-aplicacion").addEventListener("click", (e) => {
         if (e.target.id === "modal-aplicacion") cerrarModalAplicacion();
+      });
+      document.querySelectorAll("#modal-apl-franja .jornada-chip").forEach(b => {
+        b.addEventListener("click", () => {
+          document.querySelectorAll("#modal-apl-franja .jornada-chip").forEach(x => x.classList.remove("activo"));
+          b.classList.add("activo");
+        });
       });
 
       document.addEventListener("keydown", (e) => {
@@ -5175,8 +5274,8 @@
           paso = 1;
           // Reset estado
           estado = {
-            riego: null, riegoLitros: null,
-            apl: null, aplProducto: "", aplDosis: "", aplMotivo: null,
+            riego: null, riegoLitros: null, riegoFranja: null, riegoDuracion: null,
+            apl: null, aplProducto: "", aplDosis: "", aplMotivo: null, aplFranja: null,
             obs: null, obsTipo: null, obsDesc: "", obsSeveridad: null,
             fuente: new Set(), comentario: "",
           };
@@ -5184,7 +5283,7 @@
           modal.querySelectorAll(".jornada-opcion").forEach(b => b.classList.remove("activo"));
           modal.querySelectorAll(".jornada-chip").forEach(b => b.classList.remove("activo"));
           modal.querySelectorAll(".severidad-row button").forEach(b => b.classList.remove("activo"));
-          ["j-riego-litros", "j-apl-producto", "j-apl-dosis", "j-obs-desc", "j-comentario"].forEach(id => {
+          ["j-riego-litros", "j-riego-duracion", "j-apl-producto", "j-apl-dosis", "j-obs-desc", "j-comentario"].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = "";
           });
@@ -5217,6 +5316,18 @@
           b.classList.add("activo");
           estado.aplMotivo = b.dataset.mot;
         }));
+        // Franja horaria del riego
+        modal.querySelectorAll("#j-riego-franja .jornada-chip").forEach(b => b.addEventListener("click", () => {
+          modal.querySelectorAll("#j-riego-franja .jornada-chip").forEach(x => x.classList.remove("activo"));
+          b.classList.add("activo");
+          estado.riegoFranja = b.dataset.franja;
+        }));
+        // Franja horaria de la aplicación
+        modal.querySelectorAll("#j-apl-franja .jornada-chip").forEach(b => b.addEventListener("click", () => {
+          modal.querySelectorAll("#j-apl-franja .jornada-chip").forEach(x => x.classList.remove("activo"));
+          b.classList.add("activo");
+          estado.aplFranja = b.dataset.franja;
+        }));
         // Observación
         modal.querySelectorAll("[data-jobs]").forEach(b => b.addEventListener("click", () => {
           modal.querySelectorAll("[data-jobs]").forEach(x => x.classList.remove("activo"));
@@ -5247,6 +5358,8 @@
             if (estado.riego === "si") {
               const v = parseFloat(document.getElementById("j-riego-litros").value);
               if (Number.isFinite(v) && v >= 0) estado.riegoLitros = v;
+              const d = parseInt(document.getElementById("j-riego-duracion").value, 10);
+              if (Number.isFinite(d) && d >= 0) estado.riegoDuracion = d;
             }
           }
           if (paso === 2) {
@@ -5301,7 +5414,10 @@
 
             // 2) Riego: añadir a localStorage (que dispara /api/log acciones)
             if (estado.riego === "si") {
-              addRiego(fecha, estado.riegoLitros);
+              addRiego(fecha, estado.riegoLitros, {
+                franja:   estado.riegoFranja,
+                duracion: estado.riegoDuracion,
+              });
               refrescarTrasCambioRiego?.();
             }
             // 3) Aplicación: añadir a localStorage
@@ -5318,6 +5434,7 @@
                 notas:           null,
                 fueOtro:         true,
                 motivo:          estado.aplMotivo,
+                franja:          estado.aplFranja,
               });
               renderHistorialAplicaciones?.();
             }
