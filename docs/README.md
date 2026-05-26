@@ -7,6 +7,7 @@ Este directorio agrupa toda la documentación interna del proyecto, organizada p
 ### `estrategia/` — Visión y diferenciación
 - **`vision-y-roadmap.html`** — documento estratégico vivo: tesis, diferenciación frente a IAs generalistas y competencia sectorial, hoja de ruta a 5 años.
 - **`Kylia-vision-y-roadmap.pdf`** — snapshot imprimible, generado con `scripts/build_estrategia_pdf.mjs`.
+- **`anexo-2026-diferenciacion-y-escalado.md`** — anexo operativo: cliente arquetípico (Marc), reencuadre del eje competitivo (3 capas), agente IA como motor del producto, escenarios futuros y opcionalidad estratégica, path realista a enterprise.
 
 ### `tecnico/` — Cómo está construido Kylia
 - **`arquitectura.md`** — diagrama Mermaid del sistema, decisiones de stack (Vercel + Supabase + Copernicus), costes mensuales estimados, plan de disaster recovery.
