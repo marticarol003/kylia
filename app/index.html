@@ -102,25 +102,25 @@
           document.documentElement.dataset.modoKylia = nuevo;
         },
         registroUsuario(payload) {
-          return post("/api/registro-usuario", { id: userId, ...payload });
+          return post("/api/log", { recurso: "registro-usuario", id: userId, ...payload });
         },
         accion(payload) {
-          return post("/api/acciones", { usuario_id: userId, ...payload });
+          return post("/api/log", { recurso: "acciones", usuario_id: userId, ...payload });
         },
         observacion(payload) {
-          return post("/api/observaciones", { usuario_id: userId, ...payload });
+          return post("/api/log", { recurso: "observaciones", usuario_id: userId, ...payload });
         },
         jornada(payload) {
-          return post("/api/jornadas", { usuario_id: userId, ...payload });
+          return post("/api/log", { recurso: "jornadas", usuario_id: userId, ...payload });
         },
         medicion(payload) {
-          return post("/api/mediciones", { usuario_id: userId, ...payload });
+          return post("/api/log", { recurso: "mediciones", usuario_id: userId, ...payload });
         },
         recomendacionesLog(recomendaciones, contexto) {
-          return post("/api/recomendaciones-log", { usuario_id: userId, recomendaciones, contexto });
+          return post("/api/log", { recurso: "recomendaciones-log", usuario_id: userId, recomendaciones, contexto });
         },
         evento(nombre, props) {
-          return post("/api/eventos", { usuario_id: userId, nombre, props: props || {}, url: location.href });
+          return post("/api/log", { recurso: "eventos", usuario_id: userId, nombre, props: props || {}, url: location.href });
         },
       };
 
@@ -5277,10 +5277,11 @@
           const fecha = hoyIso();
           try {
             // 1) Crear/actualizar jornada y obtener id
-            const respJ = await fetch("/api/jornadas", {
+            const respJ = await fetch("/api/log", {
               method:  "POST",
               headers: { "Content-Type": "application/json" },
               body:    JSON.stringify({
+                recurso:         "jornadas",
                 usuario_id:      window.kyliaSync?.userId,
                 fecha,
                 fuente_decision: Array.from(estado.fuente),
@@ -5291,7 +5292,7 @@
             const jornadaId = dataJ?.jornada?.id || null;
             window._kyliaJornadaActual = { id: jornadaId, fecha };
 
-            // 2) Riego: añadir a localStorage (que dispara /api/acciones)
+            // 2) Riego: añadir a localStorage (que dispara /api/log acciones)
             if (estado.riego === "si") {
               addRiego(fecha, estado.riegoLitros);
               refrescarTrasCambioRiego?.();
@@ -5313,7 +5314,7 @@
               });
               renderHistorialAplicaciones?.();
             }
-            // 4) Observación: POST directo a /api/observaciones
+            // 4) Observación: POST a /api/log observaciones (vía kyliaSync)
             if (estado.obs === "si") {
               window.kyliaSync?.observacion({
                 jornada_id:  jornadaId,
