@@ -1554,13 +1554,20 @@
       vertical-align: middle;
     }
 
-    /* ── Modo piloto: oculta cards que dan recomendaciones ───────────
-       El cálculo sigue ejecutándose para enviarlo al backend, pero el
-       agricultor no ve nada. Modo demo (?demo=1 o usuarios veteranos)
-       muestra todo. */
+    /* ── Modo piloto: pantalla mínima de observación silenciosa ──────
+       El piloto solo ve el banner "Cerrar jornada". El cálculo sigue
+       ejecutándose en background (Sentinel + recomendaciones) para
+       comparar lo que Kylia HABRÍA recomendado con lo que hizo el
+       agricultor. Modo demo (?demo=1 o usuarios veteranos) muestra todo. */
+    html[data-modo-kylia="piloto"] #welcome-banner,
     html[data-modo-kylia="piloto"] #card-hoy,
+    html[data-modo-kylia="piloto"] #card-parcela,
+    html[data-modo-kylia="piloto"] #card-historial-riegos,
+    html[data-modo-kylia="piloto"] #card-historial-aplicaciones,
     html[data-modo-kylia="piloto"] #recomendaciones-container,
-    html[data-modo-kylia="piloto"] #alertas-container { display: none !important; }
+    html[data-modo-kylia="piloto"] #alertas-container,
+    html[data-modo-kylia="piloto"] section.card[aria-label="Condiciones meteorológicas"],
+    html[data-modo-kylia="piloto"] .faq-section { display: none !important; }
 
     /* ── Banner "Cerrar jornada" ───────────────────────────────────── */
     .jornada-banner {
