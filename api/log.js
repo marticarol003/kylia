@@ -26,6 +26,7 @@ const HANDLERS = {
 
 const METODOS_RIEGO = new Set(["goteo", "aspersion", "surco", "manguera"]);
 const FRANJAS       = new Set(["manana", "mediodia", "tarde", "noche"]);
+const MANEJOS       = new Set(["convencional", "ecologico"]);
 
 module.exports = async (req, res) => {
   if (!preludio(req, res, "POST")) return;
@@ -53,13 +54,15 @@ async function handleRegistroUsuario(req, res, body) {
     lat:          numOrNull(body.lat),
     lon:          numOrNull(body.lon),
     ciudad:       clean(body.ciudad,       160)                 || null,
-    cultivos:     Array.isArray(body.cultivos)
-                    ? body.cultivos.map(c => String(c).slice(0, 60)).slice(0, 20)
-                    : [],
-    parcela:      body.parcela && typeof body.parcela === "object" ? body.parcela : null,
-    tarifa_agua:  numOrNull(body.tarifa_agua),
-    metodo_riego: METODOS_RIEGO.has(body.metodo_riego) ? body.metodo_riego : null,
-    origen:       clean(body.origen,       120)                 || null,
+    cultivos:             Array.isArray(body.cultivos)
+                            ? body.cultivos.map(c => String(c).slice(0, 60)).slice(0, 20)
+                            : [],
+    cultivos_secundarios: clean(body.cultivos_secundarios, 200),
+    parcela:              body.parcela && typeof body.parcela === "object" ? body.parcela : null,
+    tarifa_agua:          numOrNull(body.tarifa_agua),
+    metodo_riego:         METODOS_RIEGO.has(body.metodo_riego) ? body.metodo_riego : null,
+    manejo:               MANEJOS.has(body.manejo) ? body.manejo : null,
+    origen:               clean(body.origen,       120)                 || null,
     preferencias: body.preferencias && typeof body.preferencias === "object" ? body.preferencias : {},
     ua:           clean(req.headers["user-agent"], 400)         || null,
   };

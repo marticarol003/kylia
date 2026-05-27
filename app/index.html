@@ -894,6 +894,12 @@
       margin-top: 4px;
       margin-bottom: 0;
     }
+    .config-hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin: 4px 0 6px 0;
+      line-height: 1.4;
+    }
 
     /* ── Recomendaciones ── */
     .rec-section-header {
@@ -1807,12 +1813,25 @@
       <div class="config-field">
         <label>Parcela agrícola</label>
         <p class="parcela-info" id="parcela-info">Toca tu campo en el mapa para cargar el contorno oficial de SIGPAC.</p>
+        <p class="config-hint">Si tienes varias parcelas, elige la más representativa. Por ahora Kylia monitoriza una sola por usuario.</p>
         <div id="mapa-parcela"></div>
         <button class="btn-confirmar-parcela" id="btn-confirmar-parcela" type="button">&#10003; Confirmar parcela</button>
       </div>
       <div class="config-field">
-        <label>Mis cultivos</label>
+        <label>Tipo de manejo</label>
+        <div class="cultivos-grid" id="manejo-grid">
+          <button type="button" class="btn-cultivo" data-manejo="convencional">Convencional</button>
+          <button type="button" class="btn-cultivo" data-manejo="ecologico">Ecológico</button>
+        </div>
+      </div>
+      <div class="config-field">
+        <label>Cultivo principal</label>
+        <p class="config-hint">El que más superficie ocupa. Las recomendaciones se calculan sobre este.</p>
         <div class="cultivos-grid" id="cultivos-grid"></div>
+      </div>
+      <div class="config-field">
+        <label for="input-cultivos-secundarios">Otros cultivos en la parcela (opcional)</label>
+        <input type="text" id="input-cultivos-secundarios" placeholder="Ej: rúcula y rabanito" maxlength="120" autocomplete="off">
       </div>
       <div class="config-field">
         <label>Método de riego habitual</label>
@@ -2233,13 +2252,15 @@
     const STORAGE_KEY = "kylia_config";
 
     const DEFAULTS = {
-      nombre:      "Agricultor",
-      ciudad:      "Barcelona",
-      lat:         41.3828,
-      lon:         2.1771,
-      cultivos:    ["lechuga"],
-      parcela:     null,
-      metodoRiego: null,
+      nombre:              "Agricultor",
+      ciudad:              "Barcelona",
+      lat:                 41.3828,
+      lon:                 2.1771,
+      cultivos:            ["lechuga"],
+      cultivosSecundarios: "",
+      parcela:             null,
+      metodoRiego:         null,
+      manejo:              null,
     };
 
     const NDVI_HISTORY_DAYS = 56; // 8 semanas
@@ -4512,7 +4533,18 @@
       const inputCiudad = document.getElementById("input-ciudad");
 
       function obtenerCultivosSeleccionados() {
-        return [...document.querySelectorAll(".btn-cultivo.activo")].map((b) => b.dataset.id);
+        // Cultivo único: devolvemos array de 1 elemento (manteniendo compatibilidad
+        // con el resto del código que asume array) o vacío si no hay selección.
+        const el = document.querySelector("#cultivos-grid .btn-cultivo.activo");
+        return el ? [el.dataset.id] : [];
+      }
+      function obtenerCultivosSecundarios() {
+        const el = document.getElementById("input-cultivos-secundarios");
+        return el ? el.value.trim() : "";
+      }
+      function obtenerManejoSeleccionado() {
+        const el = document.querySelector("#manejo-grid .btn-cultivo.activo");
+        return el ? el.dataset.manejo : null;
       }
 
       async function guardarYActualizar(nuevoCfg) {
@@ -4527,15 +4559,17 @@
         // Sincronizar perfil del piloto con Supabase (silencioso)
         try {
           window.kyliaSync?.registroUsuario({
-            email:        localStorage.getItem("kylia_user_email") || null,
-            nombre:       nuevoCfg.nombre,
-            ciudad:       nuevoCfg.ciudad,
-            lat:          nuevoCfg.lat,
-            lon:          nuevoCfg.lon,
-            cultivos:     nuevoCfg.cultivos,
-            parcela:      nuevoCfg.parcela,
-            metodo_riego: nuevoCfg.metodoRiego || null,
-            origen:       localStorage.getItem("kylia_origen"),
+            email:                localStorage.getItem("kylia_user_email") || null,
+            nombre:               nuevoCfg.nombre,
+            ciudad:               nuevoCfg.ciudad,
+            lat:                  nuevoCfg.lat,
+            lon:                  nuevoCfg.lon,
+            cultivos:             nuevoCfg.cultivos,
+            cultivos_secundarios: nuevoCfg.cultivosSecundarios || null,
+            parcela:              nuevoCfg.parcela,
+            metodo_riego:         nuevoCfg.metodoRiego || null,
+            manejo:               nuevoCfg.manejo || null,
+            origen:               localStorage.getItem("kylia_origen"),
           });
         } catch (_) {}
         await cargarDatos();
@@ -4552,23 +4586,45 @@
       function inicializarCultivos() {
         const grid = document.getElementById("cultivos-grid");
         grid.innerHTML = "";
+        const seleccionado = (cfg.cultivos || [])[0] || null;
         CULTIVOS.forEach((cultivo) => {
           const btn = document.createElement("button");
-          const activo = cfg.cultivos.includes(cultivo.id);
+          const activo = cultivo.id === seleccionado;
           btn.className = "btn-cultivo" + (activo ? " activo" : "");
           btn.textContent = cultivo.nombre;
           btn.dataset.id = cultivo.id;
           btn.type = "button";
-          btn.addEventListener("click", () => btn.classList.toggle("activo"));
+          // Single-select: al pulsar, deselecciona los demás
+          btn.addEventListener("click", () => {
+            const yaActivo = btn.classList.contains("activo");
+            grid.querySelectorAll(".btn-cultivo").forEach(x => x.classList.remove("activo"));
+            if (!yaActivo) btn.classList.add("activo");
+          });
           grid.appendChild(btn);
         });
       }
+
+      function inicializarManejo() {
+        document.querySelectorAll("#manejo-grid .btn-cultivo").forEach(btn => {
+          btn.classList.toggle("activo", btn.dataset.manejo === cfg.manejo);
+        });
+      }
+      // Single-select del grid de manejo (eco/convencional)
+      document.querySelectorAll("#manejo-grid .btn-cultivo").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const yaActivo = btn.classList.contains("activo");
+          document.querySelectorAll("#manejo-grid .btn-cultivo").forEach(x => x.classList.remove("activo"));
+          if (!yaActivo) btn.classList.add("activo");
+        });
+      });
 
       function mostrarConfigActual() {
         inputNombre.value = cfg.nombre !== DEFAULTS.nombre ? cfg.nombre : "";
         inputCiudad.value = "";
         setFeedback(cfg.ciudad ? `Ubicación actual: ${cfg.ciudad}` : "");
+        document.getElementById("input-cultivos-secundarios").value = cfg.cultivosSecundarios || "";
         inicializarCultivos();
+        inicializarManejo();
         inicializarMetodoRiego();
       }
 
@@ -4596,6 +4652,7 @@
         if (banner) banner.hidden = false;
         panel.classList.add("visible");
         inicializarCultivos();
+        inicializarManejo();
         inicializarMetodoRiego();
         initMapaParcela();
         forzarRedibujoMapa();
@@ -4615,10 +4672,12 @@
         const nombre = inputNombre.value.trim() || DEFAULTS.nombre;
         const ciudad = inputCiudad.value.trim();
         const cultivosSeleccionados = obtenerCultivosSeleccionados();
+        const cultivosSecundarios = obtenerCultivosSecundarios();
         const metodoRiego = obtenerMetodoRiegoSeleccionado();
+        const manejo = obtenerManejoSeleccionado();
 
         if (!ciudad) {
-          await guardarYActualizar({ ...cfg, nombre, cultivos: cultivosSeleccionados, metodoRiego });
+          await guardarYActualizar({ ...cfg, nombre, cultivos: cultivosSeleccionados, cultivosSecundarios, metodoRiego, manejo });
           return;
         }
 
@@ -4635,7 +4694,7 @@
           }
 
           const lugar = data.results[0];
-          await guardarYActualizar({ ...cfg, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados, parcela: null, metodoRiego });
+          await guardarYActualizar({ ...cfg, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
         } catch (_) {
           setFeedback("Error de conexión. Inténtalo de nuevo.", true);
         } finally {
@@ -4651,7 +4710,9 @@
 
         const nombre = inputNombre.value.trim() || DEFAULTS.nombre;
         const cultivosSeleccionados = obtenerCultivosSeleccionados();
+        const cultivosSecundarios = obtenerCultivosSecundarios();
         const metodoRiego = obtenerMetodoRiegoSeleccionado();
+        const manejo = obtenerManejoSeleccionado();
 
         btnGps.disabled = true;
         setFeedback("Obteniendo ubicación GPS...");
@@ -4666,9 +4727,9 @@
               const data = await res.json();
               const ciudad = data.city || data.locality || data.principalSubdivision || "Ubicación GPS";
 
-              await guardarYActualizar({ ...cfg, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados, parcela: null, metodoRiego });
+              await guardarYActualizar({ ...cfg, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
             } catch (_) {
-              await guardarYActualizar({ ...cfg, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados, parcela: null, metodoRiego });
+              await guardarYActualizar({ ...cfg, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
             } finally {
               btnGps.disabled = false;
             }

@@ -24,14 +24,16 @@ create table usuarios (
   lat           numeric,
   lon           numeric,
   ciudad        text,
-  cultivos      text[]      default '{}',
-  parcela       jsonb,
-  tarifa_agua   numeric,
-  metodo_riego  text,                                  -- 'goteo','aspersion','surco','manguera'
-  origen        text,
-  preferencias  jsonb       default '{}'::jsonb,
-  ua            text,
-  fecha_alta    timestamptz default now()
+  cultivos              text[]      default '{}',
+  cultivos_secundarios  text,                                  -- texto libre opcional
+  parcela               jsonb,
+  tarifa_agua           numeric,
+  metodo_riego          text,                                  -- 'goteo','aspersion','surco','manguera'
+  manejo                text,                                  -- 'convencional','ecologico'
+  origen                text,
+  preferencias          jsonb       default '{}'::jsonb,
+  ua                    text,
+  fecha_alta            timestamptz default now()
 );
 
 -- 2) Lo que Kylia habría recomendado (nunca visible al agricultor)
