@@ -5472,6 +5472,20 @@
           if (e.key === "Escape" && !modal.hidden) cerrar();
         });
         refrescarBanner();
+
+        // Si el usuario llega desde el email recordatorio (?diario=1),
+        // abrir el wizard automáticamente y limpiar la query de la URL
+        // para que un refresh no lo abra de nuevo.
+        try {
+          const params = new URLSearchParams(location.search);
+          if (params.get("diario") === "1") {
+            const yaCerrado = localStorage.getItem(STORAGE_DIARIO) === hoyIso();
+            params.delete("diario");
+            const limpia = location.pathname + (params.toString() ? "?" + params.toString() : "") + location.hash;
+            history.replaceState(null, "", limpia);
+            if (!yaCerrado) setTimeout(abrir, 250);
+          }
+        } catch (_) { /* noop */ }
       })();
     });
   </script>
