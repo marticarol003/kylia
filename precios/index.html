@@ -5,597 +5,186 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#2b7a3a" />
 <meta name="robots" content="index,follow" />
-<title>Precios — Kylia · Desde 99 €/año, sin sensores</title>
-<meta name="description" content="Pricing transparente de Kylia. Free hasta 5 ha. Productor desde 99 €/año (escala con tu superficie). Cooperativa desde 2.900 €/año (paquete cerrado). Garantía 60 días." />
+<title>Precios — Kylia · Gratis durante el piloto 2026</title>
+<meta name="description" content="Kylia está en fase de piloto: gratis para los primeros agricultores. El modelo de precios para 2027 se está validando junto con ellos. Plazas limitadas, cierre en diciembre." />
 <link rel="canonical" href="https://kylia.app/precios" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="Precios — Kylia" />
-<meta property="og:description" content="Desde 99 €/año. Tu superficie decide tu precio. Garantía 60 días." />
+<meta property="og:description" content="Gratis durante el piloto 2026. Plazas limitadas." />
 <meta property="og:image" content="https://kylia.app/assets/img/og-image.png" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%232b7a3a%22/><path d=%22M10 20 Q16 10 22 20 Z%22 fill=%22white%22/></svg>" />
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "Product",
-  "name": "Kylia",
-  "description": "SaaS de monitorización agronómica por satélite Sentinel-2 sobre parcelas SIGPAC. Sin sensores, sin €/ha lineal.",
-  "brand": { "@type": "Brand", "name": "Kylia" },
-  "offers": [
-    { "@type": "Offer", "name": "Free",                     "price": "0",     "priceCurrency": "EUR", "description": "Hasta 5 ha y 1 parcela. Gratis para siempre." },
-    { "@type": "Offer", "name": "Productor",                "price": "99",    "priceCurrency": "EUR", "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1Y" }, "description": "Desde 99 €/año. Hasta 30 ha en el mínimo. Después €/ha decreciente." },
-    { "@type": "Offer", "name": "Cooperativa Esencial",     "price": "2900",  "priceCurrency": "EUR", "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1Y" }, "description": "Hasta 200 socios y 3.000 ha." },
-    { "@type": "Offer", "name": "Cooperativa Profesional",  "price": "5900",  "priceCurrency": "EUR", "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1Y" }, "description": "Hasta 600 socios y 10.000 ha." },
-    { "@type": "Offer", "name": "Cooperativa Avanzado",     "price": "11900", "priceCurrency": "EUR", "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1Y" }, "description": "Hasta 2.000 socios y 30.000 ha." },
-    { "@type": "Offer", "name": "Enterprise",               "price": "30000", "priceCurrency": "EUR", "priceSpecification": { "@type": "UnitPriceSpecification", "billingDuration": "P1Y" }, "description": "Aseguradoras, banca rural y administración pública." }
-  ]
-}
-</script>
 
 <style>
 :root {
   --verde:#2b7a3a; --verde-700:#1f5a2b; --verde-900:#0f3617; --verde-50:#e8f3ea;
-  --slate-900:#0f172a; --slate-700:#334155; --slate-500:#64748b; --slate-300:#cbd5e1; --slate-200:#e2e8f0; --slate-50:#f8fafc;
-  --rojo:#9b3a3a; --amber:#b45309; --amber-bg:#fef3c7;
+  --slate-900:#0f172a; --slate-700:#334155; --slate-500:#64748b; --slate-200:#e2e8f0; --slate-50:#f8fafc;
   --text:var(--slate-900); --muted:var(--slate-500); --subtle:var(--slate-700); --border:var(--slate-200);
-  --max:1180px; --radius:16px; --radius-sm:10px;
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --max:780px; --radius:16px;
   --shadow-lg: 0 14px 36px -16px rgba(43,122,58,0.4);
-  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 *,*::before,*::after { box-sizing:border-box; }
-html,body,h1,h2,h3,h4,p,ul { margin:0; padding:0; }
+html,body,h1,h2,h3,p,ul,li { margin:0; padding:0; }
 ul { list-style:none; }
-body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, system-ui, sans-serif;
-       color:var(--text); line-height:1.6; -webkit-font-smoothing:antialiased; }
-a { color:var(--verde); text-decoration:none; }
-a:hover { text-decoration:underline; }
-.wrap { max-width:var(--max); margin:0 auto; padding:0 24px; }
-
-/* ── Promo bar ── */
-.promo-bar { background:var(--verde-900); color:#fff; padding:10px 0; text-align:center; font-size:0.92rem; }
-.promo-bar strong { color:#a8d894; }
-.promo-bar .pulse { display:inline-block; width:8px; height:8px; border-radius:50%; background:#a8d894; margin-right:8px; vertical-align:middle; animation:pulse 1.6s var(--ease) infinite; }
-@keyframes pulse { 0%,100%{opacity:.4;} 50%{opacity:1;} }
-
-/* ── Nav ── */
-.nav { position:sticky; top:0; z-index:50; background:rgba(255,255,255,0.92);
-       backdrop-filter:saturate(180%) blur(10px); border-bottom:1px solid var(--border); }
-.nav-inner { display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:24px; position:relative; }
-.brand { display:inline-flex; align-items:center; gap:8px; color:var(--verde-900); font-weight:800; letter-spacing:-0.02em; font-size:1.1rem; }
-.brand-dot { width:14px; height:14px; border-radius:50%; background:var(--verde); }
-.nav-links { display:flex; gap:24px; align-items:center; font-size:0.95rem; }
-.nav-links a { color:var(--subtle); }
-.nav-links a:hover { color:var(--text); text-decoration:none; }
-.nav-toggle { display:none; background:transparent; border:1px solid var(--border); width:40px; height:40px;
-              border-radius:10px; padding:0; color:var(--text); align-items:center; justify-content:center; cursor:pointer; }
-.nav-toggle svg { width:20px; height:20px; pointer-events:none; }
-@media (max-width:760px) {
-  .nav-links { display:none; }
-  .nav-links.open {
-    display:flex; flex-direction:column; align-items:stretch;
-    position:absolute; top:100%; left:-24px; right:-24px;
-    background:#fff; border-bottom:1px solid var(--border);
-    padding:16px 24px; gap:4px;
-    box-shadow:0 8px 24px -8px rgba(15,23,42,0.12); z-index:60;
-  }
-  .nav-links.open a { padding:12px 8px; border-bottom:1px solid var(--slate-50); color:var(--text); font-size:1rem; }
-  .nav-links.open a:last-child { border-bottom:0; }
-  .nav-links.open .btn { margin-top:8px; text-align:center; justify-content:center; border-radius:999px; }
-  .nav-toggle { display:inline-flex; }
+body {
+  font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, system-ui, sans-serif;
+  color:var(--text); line-height:1.6; -webkit-font-smoothing:antialiased; background:var(--slate-50);
 }
-.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 18px;
-       font-weight:600; border-radius:10px; border:1.5px solid transparent; transition:all 0.15s var(--ease); cursor:pointer; font-size:0.95rem; }
-.btn-primary { background:var(--verde); color:#fff; border-color:var(--verde); }
-.btn-primary:hover { background:var(--verde-700); border-color:var(--verde-700); text-decoration:none; }
-.btn-secondary { background:#fff; color:var(--verde-900); border-color:var(--border); }
-.btn-secondary:hover { border-color:var(--verde); text-decoration:none; }
+a { color:var(--verde-700); text-decoration:none; }
+a:hover { text-decoration:underline; }
+.wrap { max-width:var(--max); margin:0 auto; padding:0 22px; }
 
-/* ── Hero ── */
-.hero { padding:80px 0 40px; text-align:center; background:linear-gradient(180deg, #fff 0%, var(--verde-50) 100%); }
-.eyebrow { display:inline-block; background:#fff; border:1px solid var(--verde); color:var(--verde-700);
-           padding:6px 14px; border-radius:999px; font-weight:700; font-size:0.78rem; letter-spacing:0.18em; text-transform:uppercase; }
-.hero h1 { font-size:clamp(2.2rem, 5vw, 3.4rem); line-height:1.05; margin:24px 0 16px; color:var(--verde-900); letter-spacing:-0.02em; }
-.hero p.lead { font-size:1.18rem; max-width:680px; margin:0 auto; color:var(--subtle); }
-.hero p.anchor { font-size:0.96rem; max-width:680px; margin:18px auto 0; color:var(--rojo); font-weight:600; }
+header.site {
+  border-bottom:1px solid var(--border); background:#fff;
+}
+header.site .row {
+  display:flex; align-items:center; justify-content:space-between; padding:16px 0;
+}
+header.site .brand { font-weight:800; color:var(--verde-900); font-size:1.05rem; }
+header.site nav { display:flex; gap:18px; align-items:center; font-size:0.95rem; }
+header.site nav a { color:var(--subtle); }
 
-/* ── Tarjetas ── */
-.tiers { padding:48px 0 64px; }
-.tiers-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:22px; align-items:stretch; }
-@media (max-width:980px) { .tiers-grid { grid-template-columns:1fr; max-width:420px; margin:0 auto; } }
-.card { background:#fff; border:1.5px solid var(--border); border-radius:var(--radius); padding:30px 26px; display:flex; flex-direction:column; gap:14px; box-shadow:var(--shadow-md); }
-.card.featured { border-color:var(--verde); box-shadow:var(--shadow-lg); position:relative; transform:translateY(-6px); }
-.card.featured::before { content:"⭐ MÁS POPULAR"; position:absolute; top:-14px; left:50%; transform:translateX(-50%);
-                          background:var(--verde); color:#fff; padding:6px 14px; border-radius:999px; font-size:0.72rem; font-weight:800; letter-spacing:0.12em; white-space:nowrap; }
-.tier-name { font-size:1.18rem; font-weight:800; letter-spacing:-0.01em; color:var(--verde-900); }
-.tier-price-row { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
-.tier-price { font-size:2.4rem; font-weight:800; color:var(--verde-900); line-height:1; }
-.tier-price small { font-size:0.95rem; font-weight:600; color:var(--muted); margin-left:4px; }
-.tier-strike { color:var(--muted); text-decoration:line-through; font-size:1rem; font-weight:600; }
-.tier-perday { color:var(--verde); font-weight:600; font-size:0.86rem; margin-top:2px; }
-.tier-sub { color:var(--muted); font-size:0.92rem; line-height:1.4; }
-.tier-list { display:flex; flex-direction:column; gap:9px; margin-top:8px; }
-.tier-list li { display:flex; gap:8px; font-size:0.94rem; color:var(--subtle); }
-.tier-list li::before { content:"✓"; color:var(--verde); font-weight:800; flex:0 0 auto; }
-.card .btn { margin-top:auto; width:100%; }
-.coop-table { font-size:0.86rem; margin-top:8px; border-top:1px solid var(--border); padding-top:14px; }
-.coop-table div { display:flex; justify-content:space-between; padding:5px 0; }
-.coop-table strong { color:var(--verde-900); font-weight:700; }
+main { padding:64px 0 80px; }
 
-/* ── Calculadora Productor ── */
-.calc { padding:48px 0; background:var(--verde-50); }
-.calc-box { background:#fff; max-width:720px; margin:0 auto; border-radius:var(--radius); padding:36px 32px; box-shadow:var(--shadow-md); border:1.5px solid var(--verde); }
-.calc h2 { color:var(--verde-900); font-size:1.6rem; margin-bottom:8px; letter-spacing:-0.01em; }
-.calc p.calc-sub { color:var(--subtle); margin-bottom:24px; font-size:1rem; }
-.calc-input-row { display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; }
-.calc-field { flex:1; min-width:200px; }
-.calc-field label { display:block; font-size:0.86rem; color:var(--verde-900); font-weight:700; margin-bottom:6px; letter-spacing:0.04em; text-transform:uppercase; }
-.calc-field input { width:100%; padding:12px 14px; font-size:1.1rem; border:1.5px solid var(--border); border-radius:10px; font-family:inherit; transition:border .15s; }
-.calc-field input:focus { outline:none; border-color:var(--verde); }
-.calc-result { background:var(--verde-900); color:#fff; border-radius:12px; padding:22px 24px; margin-top:24px; }
-.calc-result .label { color:#a8d894; font-size:0.78rem; letter-spacing:0.18em; font-weight:700; text-transform:uppercase; }
-.calc-result .price { font-size:2.4rem; font-weight:800; margin-top:4px; }
-.calc-result .price small { font-size:1rem; font-weight:600; opacity:0.8; }
-.calc-result .breakdown { font-size:0.88rem; color:#cce4d2; margin-top:8px; }
+.eyebrow {
+  text-transform:uppercase; letter-spacing:0.08em; font-size:0.78rem; font-weight:700;
+  color:var(--verde-700); margin-bottom:12px;
+}
+h1 {
+  font-size:2.4rem; line-height:1.1; color:var(--verde-900); margin-bottom:18px; letter-spacing:-0.02em;
+}
+.lead { font-size:1.1rem; color:var(--subtle); margin-bottom:36px; }
 
-/* ── ROI bloque ── */
-.roi { padding:64px 0; }
-.roi h2 { color:var(--verde-900); text-align:center; font-size:clamp(1.6rem, 3.5vw, 2.2rem); margin-bottom:16px; letter-spacing:-0.02em; }
-.roi-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:18px; max-width:1080px; margin:32px auto 0; }
-@media (max-width:880px) { .roi-grid { grid-template-columns:1fr; } }
-.roi-card { background:#fff; border:1.5px solid var(--border); border-radius:var(--radius); padding:24px 22px; }
-.roi-card .num { font-size:2rem; font-weight:800; color:var(--verde); letter-spacing:-0.02em; }
-.roi-card .num.alert { color:var(--rojo); }
-.roi-card .lab { font-size:0.96rem; color:var(--subtle); margin-top:6px; }
-.roi-card .src { font-size:0.78rem; color:var(--muted); margin-top:10px; font-style:italic; }
-.roi-summary { background:var(--verde-900); color:#fff; border-radius:var(--radius); padding:28px 28px; margin-top:28px; max-width:980px; margin-left:auto; margin-right:auto; }
-.roi-summary p { font-size:1.05rem; color:#e8f3ea; }
-.roi-summary strong { color:#fff; }
+.card {
+  background:#fff; border:1px solid var(--border); border-radius:var(--radius);
+  padding:32px 28px; box-shadow:var(--shadow-lg); margin-top:24px;
+}
+.card h2 {
+  font-size:1.25rem; color:var(--verde-900); margin-bottom:6px;
+}
+.card .price-tag {
+  font-size:2rem; font-weight:700; color:var(--verde); margin:14px 0 4px 0;
+}
+.card .price-sub {
+  font-size:0.92rem; color:var(--muted); margin-bottom:22px;
+}
+.card ul { display:flex; flex-direction:column; gap:10px; margin:18px 0 26px; }
+.card li {
+  padding-left:24px; position:relative; color:var(--subtle); font-size:0.98rem;
+}
+.card li::before {
+  content:""; position:absolute; left:2px; top:9px; width:14px; height:8px;
+  border-left:2.5px solid var(--verde); border-bottom:2.5px solid var(--verde);
+  transform: rotate(-45deg);
+}
+.btn {
+  display:inline-block; padding:13px 26px; border-radius:10px;
+  font-weight:600; font-size:1rem; transition:transform 0.12s ease, box-shadow 0.12s ease;
+}
+.btn-primary {
+  background:var(--verde-700); color:#fff;
+}
+.btn-primary:hover { background:var(--verde-900); text-decoration:none; transform:translateY(-1px); }
+.note { font-size:0.85rem; color:var(--muted); margin-top:16px; }
 
-/* ── Tabla comparativa ── */
-.compare { padding:48px 0 64px; background:var(--slate-50); }
-.compare h2 { text-align:center; font-size:clamp(1.6rem,3.5vw,2.2rem); margin-bottom:8px; color:var(--verde-900); letter-spacing:-0.02em; }
-.compare p.sub { text-align:center; color:var(--muted); margin-bottom:32px; max-width:640px; margin-left:auto; margin-right:auto; }
-.compare-table { width:100%; max-width:980px; margin:0 auto; border-collapse:collapse; background:#fff; border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow-md); }
-.compare-table th, .compare-table td { padding:14px 18px; border-bottom:1px solid var(--border); text-align:center; font-size:0.95rem; }
-.compare-table th { background:var(--verde-900); color:#fff; font-weight:700; }
-.compare-table td:first-child, .compare-table th:first-child { text-align:left; }
-.compare-table tbody tr:last-child td { border-bottom:0; }
-.compare-table .market { color:var(--rojo); font-weight:600; }
-.compare-table .kylia  { color:var(--verde); font-weight:700; background:var(--verde-50); }
-.compare-table .yes { color:var(--verde); font-weight:800; }
-.compare-table .no { color:var(--muted); }
-.compare-table tbody tr:nth-child(even):not(.head-row) td:not(.kylia) { background:var(--slate-50); }
-
-/* ── Garantía ── */
-.guarantee { padding:48px 0; }
-.guarantee-box { max-width:780px; margin:0 auto; background:linear-gradient(135deg, var(--verde-50), #fff); border:2px solid var(--verde); border-radius:var(--radius); padding:32px 36px; display:flex; gap:28px; align-items:center; flex-wrap:wrap; }
-.guarantee-icon { width:64px; height:64px; border-radius:50%; background:var(--verde); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.8rem; font-weight:800; flex:0 0 auto; }
-.guarantee-text h3 { color:var(--verde-900); font-size:1.3rem; margin-bottom:6px; }
-.guarantee-text p { color:var(--subtle); }
-
-/* ── Por qué confiar ── */
-.testimonials { padding:48px 0 64px; background:var(--verde-50); }
-.testimonials h2 { text-align:center; color:var(--verde-900); font-size:clamp(1.6rem,3.5vw,2.2rem); margin-bottom:32px; letter-spacing:-0.02em; }
-.testi-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:20px; max-width:1080px; margin:0 auto; }
-@media (max-width:880px) { .testi-grid { grid-template-columns:1fr; } }
-.testi { background:#fff; border-radius:var(--radius); padding:28px 24px; box-shadow:var(--shadow-md); display:flex; flex-direction:column; gap:16px; }
-.testi blockquote { font-size:1rem; color:var(--subtle); line-height:1.6; flex:1; }
-.testi blockquote::before { content:”\201C”; color:var(--verde); font-size:2rem; font-weight:800; line-height:0; vertical-align:-12px; margin-right:4px; }
-.testi .author { font-size:0.86rem; color:var(--muted); border-top:1px solid var(--slate-200); padding-top:14px; }
-.testi .author strong { color:var(--verde-900); display:block; margin-bottom:2px; }
-
-/* ── FAQ ── */
-.faq { padding:64px 24px; max-width:780px; margin:0 auto; }
-.faq h2 { font-size:clamp(1.6rem,3.5vw,2.2rem); text-align:center; margin-bottom:32px; color:var(--verde-900); letter-spacing:-0.02em; }
-.faq details { background:#fff; border:1px solid var(--border); border-radius:var(--radius-sm); padding:18px 22px; margin-bottom:12px; }
-.faq summary { font-weight:700; cursor:pointer; color:var(--verde-900); list-style:none; }
-.faq summary::-webkit-details-marker { display:none; }
-.faq summary::after { content:"＋"; float:right; color:var(--verde); font-weight:700; }
+.faq {
+  margin-top:48px; padding-top:36px; border-top:1px solid var(--border);
+}
+.faq h3 { font-size:1.1rem; color:var(--verde-900); margin-bottom:16px; }
+.faq details {
+  border-bottom:1px solid var(--border); padding:14px 0;
+}
+.faq summary {
+  cursor:pointer; font-weight:600; color:var(--text);
+  list-style:none; padding-right:24px; position:relative;
+}
+.faq summary::after {
+  content:"+"; position:absolute; right:0; top:-2px; color:var(--verde); font-size:1.4rem;
+  transition:transform 0.2s ease;
+}
 .faq details[open] summary::after { content:"−"; }
-.faq details[open] { box-shadow:var(--shadow-md); }
-.faq p { margin-top:12px; color:var(--subtle); }
+.faq p {
+  margin-top:10px; color:var(--subtle); font-size:0.96rem;
+}
 
-/* ── Enterprise franja ── */
-.enterprise-strip { padding:36px 0; background:var(--verde-900); color:#fff; }
-.enterprise-strip .wrap { display:flex; gap:24px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
-.enterprise-strip h3 { font-size:1.24rem; color:#fff; }
-.enterprise-strip p { color:#bcd6c2; max-width:560px; margin-top:4px; font-size:0.95rem; }
-.enterprise-strip .btn { background:#fff; color:var(--verde-900); border-color:#fff; }
-.enterprise-strip .btn:hover { background:#a8d894; border-color:#a8d894; color:var(--verde-900); }
+footer.site {
+  border-top:1px solid var(--border); background:#fff; padding:28px 0; margin-top:40px;
+  font-size:0.88rem; color:var(--muted);
+}
+footer.site .row { display:flex; justify-content:space-between; align-items:center; gap:18px; flex-wrap:wrap; }
+footer.site a { color:var(--subtle); margin-right:14px; }
 
-/* ── Footer ── */
-footer { background:var(--verde-900); color:#bcd6c2; padding:48px 0 32px; }
-footer .wrap { display:flex; flex-wrap:wrap; gap:32px; justify-content:space-between; }
-footer a { color:#fff; }
-footer .small { font-size:0.85rem; color:#7fa089; }
+@media (max-width:580px) {
+  main { padding:40px 0 60px; }
+  h1 { font-size:1.9rem; }
+  .card { padding:24px 20px; }
+  .card .price-tag { font-size:1.6rem; }
+  header.site nav { gap:12px; font-size:0.88rem; }
+}
 </style>
 </head>
 <body>
 
-<div class="promo-bar">
-  <span class="pulse"></span>
-  Precios de lanzamiento — <strong>99 €/año</strong> (precio estándar <s>149 €</s>). Garantía de devolución 60 días.
-</div>
-
-<header class="nav">
-  <div class="wrap nav-inner">
-    <a class="brand" href="/"><span class="brand-dot"></span> Kylia</a>
-    <button type="button" class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-label="Abrir menú">
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    </button>
-    <nav class="nav-links" id="nav-links" aria-label="Principal">
-      <a href="/#producto">Producto</a>
-      <a href="/precios" aria-current="page">Precios</a>
+<header class="site">
+  <div class="wrap row">
+    <a class="brand" href="/">🌱 Kylia</a>
+    <nav>
       <a href="/cooperativas">Cooperativas</a>
       <a href="/piloto">Piloto 2026</a>
-      <a href="/blog">Blog</a>
-      <a class="btn btn-primary" href="/app">Probar gratis</a>
+      <a href="/app">Abrir Kylia →</a>
     </nav>
   </div>
 </header>
 
 <main>
-  <section class="hero">
-    <div class="wrap">
-      <span class="eyebrow">Pricing transparente</span>
-      <h1>Desde 99 €/año.<br/>Tu superficie decide tu precio.</h1>
-      <p class="lead">Sin sensores, sin Excel, sin €/ha lineal que castiga al que crece. Anual, sencillo, garantía de devolución 60 días.</p>
-      <p class="anchor">El olivar español pierde de media <strong>200-400 €/ha al año</strong> por estrés hídrico no detectado a tiempo. Kylia desde <strong>99 €/año</strong>.</p>
+  <div class="wrap">
+    <div class="eyebrow">Piloto 2026</div>
+    <h1>Gratis durante el piloto.</h1>
+    <p class="lead">
+      Kylia está en fase de pruebas con los primeros agricultores reales. Durante 2026 el acceso es gratuito a cambio de feedback. El modelo de precios para 2027 lo decidiremos junto a los pilotos: nadie mejor que ellos para saber qué vale.
+    </p>
+
+    <article class="card">
+      <h2>Plan Productor</h2>
+      <div class="price-tag">Gratis</div>
+      <div class="price-sub">Durante todo el piloto 2026 · Plazas limitadas, cierre en diciembre</div>
+      <ul>
+        <li>Recomendaciones diarias de riego, tratamiento y nutrición</li>
+        <li>Cuaderno de aplicaciones con plazo de seguridad</li>
+        <li>Catálogo MAPA con sugerencia de producto</li>
+        <li>Soporte directo del fundador por WhatsApp</li>
+      </ul>
+      <a class="btn btn-primary" href="/piloto">Apuntarme al piloto →</a>
+      <p class="note">El piloto incluye apoyo personal del fundador, prioridad en nuevas funcionalidades y la posibilidad de influir en el roadmap del producto.</p>
+    </article>
+
+    <div class="faq">
+      <h3>Preguntas habituales</h3>
+      <details>
+        <summary>¿Y después del piloto, en 2027?</summary>
+        <p>El precio definitivo lo estamos validando con los pilotos. Habrá un plan asequible para agricultores pequeños y medianos (no más caro que la competencia y bastante más útil). Quienes participen en el piloto tendrán condición preferente.</p>
+      </details>
+      <details>
+        <summary>¿Tengo que comprometerme a algo?</summary>
+        <p>Solo a usar Kylia con frecuencia y a contarnos cómo va tu jornada (el diario diario, 30 segundos). Sin contratos, sin penalizaciones, sin tarjeta. Puedes salir cuando quieras.</p>
+      </details>
+      <details>
+        <summary>¿Por qué hay plazas limitadas?</summary>
+        <p>Para garantizar atención personal y poder hablar contigo cuando algo no funcione. Si entras al piloto, tienes WhatsApp directo con el fundador.</p>
+      </details>
+      <details>
+        <summary>¿Esto vale para mi cultivo?</summary>
+        <p>Kylia está optimizada para hortícolas hispanos (lechuga, espinaca, col/coliflor, tomate, pimiento, berenjena, calabacín). Las medidas de satélite y meteo funcionan para cualquier cultivo, pero las recomendaciones específicas de plagas y nutrición son por ahora hortícolas.</p>
+      </details>
     </div>
-  </section>
-
-  <section class="tiers">
-    <div class="wrap">
-      <div class="tiers-grid">
-
-        <article class="card">
-          <div class="tier-name">Free</div>
-          <div class="tier-price-row">
-            <div class="tier-price">0&nbsp;€<small>/siempre</small></div>
-          </div>
-          <div class="tier-sub">Para probarlo en huerto familiar o parcela pequeña antes de saltar al plan Productor.</div>
-          <ul class="tier-list">
-            <li><strong>5 ha</strong> · 1 parcela</li>
-            <li>NDVI + NDMI semanal</li>
-            <li>1 alerta por email a la semana</li>
-            <li>Histórico 30 días</li>
-            <li>Sin tarjeta · sin caducidad</li>
-          </ul>
-          <a class="btn btn-secondary" href="/app">Empezar gratis</a>
-        </article>
-
-        <article class="card featured">
-          <div class="tier-name">Productor</div>
-          <div class="tier-price-row">
-            <div class="tier-price">99&nbsp;€<small>/año</small></div>
-            <div class="tier-strike">149 €</div>
-          </div>
-          <div class="tier-perday">Equivale a 8,25 € al mes</div>
-          <div class="tier-sub">Tu finca completa, sin importar el tamaño. Escala con tu superficie de forma decreciente.</div>
-          <ul class="tier-list">
-            <li>Hasta <strong>30 ha</strong> incluidas en 99 €</li>
-            <li>Después: <strong>+0,80 €/ha</strong> hasta 500 ha</li>
-            <li>Después: <strong>+0,40 €/ha</strong> hasta 2.000 ha</li>
-            <li>Alertas Telegram + email ilimitadas</li>
-            <li>Histórico 5 años · exportación</li>
-            <li>Soporte prioritario por email</li>
-          </ul>
-          <a class="btn btn-primary" href="#calc">Calcular mi precio</a>
-        </article>
-
-        <article class="card" id="cooperativa">
-          <div class="tier-name">Cooperativa</div>
-          <div class="tier-price-row">
-            <div class="tier-price">2.900&nbsp;€<small>/año desde</small></div>
-          </div>
-          <div class="tier-sub">Para ATRIA, ADV y cooperativas de servicios. Paquete cerrado, sin sorpresas por hectárea.</div>
-          <div class="coop-table">
-            <div><span>Esencial · 200 socios · 3.000 ha</span><strong>2.900 €</strong></div>
-            <div><span>Profesional · 600 socios · 10.000 ha</span><strong>5.900 €</strong></div>
-            <div><span>Avanzado · 2.000 socios · 30.000 ha</span><strong>11.900 €</strong></div>
-          </div>
-          <ul class="tier-list" style="margin-top:14px;">
-            <li>Dashboard del técnico con triaje semanal</li>
-            <li>Formación al equipo · soporte priority</li>
-            <li>Reuniones trimestrales de revisión</li>
-          </ul>
-          <a class="btn btn-secondary" href="/cooperativas">Ver detalle Cooperativas →</a>
-        </article>
-
-      </div>
-    </div>
-  </section>
-
-  <!-- ── CALCULADORA PRODUCTOR ── -->
-  <section class="calc" id="calc">
-    <div class="wrap">
-      <div class="calc-box">
-        <h2>¿Cuánto pagarías por tu finca?</h2>
-        <p class="calc-sub">Mete tus hectáreas y te decimos al céntimo lo que costaría el plan Productor. Sin trampas, sin contactar a ventas.</p>
-        <div class="calc-input-row">
-          <div class="calc-field">
-            <label for="calc-ha">Tu superficie total</label>
-            <input id="calc-ha" type="number" min="0" step="1" value="50" inputmode="numeric"/>
-          </div>
-        </div>
-        <div class="calc-result">
-          <div class="label">Pagarías</div>
-          <div class="price"><span id="calc-price">115</span>&nbsp;€<small> / año</small></div>
-          <div class="breakdown" id="calc-breakdown">50 ha · 99 € (mínimo) + 20 ha · 0,80 €/ha = 115 €/año.</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── ROI ── -->
-  <section class="roi">
-    <div class="wrap">
-      <h2>El cálculo que hace tu técnico (o tú) cada noche</h2>
-      <p style="text-align:center; color:var(--subtle); max-width:680px; margin:0 auto;">Esto es lo que te puedes ahorrar con detección temprana. Compáralo con lo que cuesta Kylia.</p>
-      <div class="roi-grid">
-        <div class="roi-card">
-          <div class="num alert">200-400 €/ha</div>
-          <div class="lab">Pérdida de calidad en aceituna por estrés hídrico no detectado a tiempo.</div>
-          <div class="src">Cooperativas olivareras Andalucía 2024-2025.</div>
-        </div>
-        <div class="roi-card">
-          <div class="num alert">10 h/semana</div>
-          <div class="lab">Tiempo del técnico de cooperativa buscando información parcela por parcela.</div>
-          <div class="src">Estimación en cooperativa media, ~412 socios.</div>
-        </div>
-        <div class="roi-card">
-          <div class="num alert">7-12 días</div>
-          <div class="lab">Adelanto medio en la detección del estrés hídrico que da Sentinel-2 vs sensor en suelo.</div>
-          <div class="src">Validación interna sobre olivar Jaén, abr 2026.</div>
-        </div>
-      </div>
-      <div class="roi-summary">
-        <p>Una finca de <strong>200 ha de olivar</strong> que evita perder un solo año en calidad recupera <strong>40.000-80.000 €</strong>. Kylia para esa finca cuesta <strong>235 €/año</strong>. La cuenta sale sola.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── COMPARATIVA ── -->
-  <section class="compare">
-    <div class="wrap">
-      <h2>Kylia frente a lo que ya conoces</h2>
-      <p class="sub">No estamos compitiendo con un Excel, estamos ahorrándote 10 horas a la semana del técnico que ya tienes.</p>
-      <table class="compare-table">
-        <thead>
-          <tr>
-            <th>&nbsp;</th>
-            <th>Excel + sensor</th>
-            <th>xarvio / FieldView</th>
-            <th>Kylia</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Coste anual (200 ha)</td>
-            <td class="market">~10 h/semana técnico</td>
-            <td class="market">600-1.200 €/año (€/ha lineal)</td>
-            <td class="kylia">235 €/año</td>
-          </tr>
-          <tr>
-            <td>Datos satelitales</td>
-            <td class="no">No</td>
-            <td class="yes">Sí</td>
-            <td class="kylia yes">Sí</td>
-          </tr>
-          <tr>
-            <td>Sin sensores físicos</td>
-            <td class="yes">Sí</td>
-            <td class="no">Necesita Drive</td>
-            <td class="kylia yes">Sí</td>
-          </tr>
-          <tr>
-            <td>Tarifa predecible</td>
-            <td class="no">—</td>
-            <td class="no">No, €/ha lineal</td>
-            <td class="kylia yes">Sí, escala decreciente</td>
-          </tr>
-          <tr>
-            <td>Plan dedicado a cooperativas</td>
-            <td class="no">No</td>
-            <td class="no">Negocio individual</td>
-            <td class="kylia yes">Sí, 3 paquetes</td>
-          </tr>
-          <tr>
-            <td>Garantía de devolución</td>
-            <td class="no">—</td>
-            <td class="no">No</td>
-            <td class="kylia yes">60 días</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- ── GARANTÍA ── -->
-  <section class="guarantee">
-    <div class="wrap">
-      <div class="guarantee-box">
-        <div class="guarantee-icon">✓</div>
-        <div class="guarantee-text">
-          <h3>Garantía de devolución 60 días, sin preguntas</h3>
-          <p>Si en 60 días Kylia no te ha ahorrado al menos 100 € en decisiones agronómicas, te devolvemos el dinero. Sin formularios, sin justificaciones, sin negociación.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── POR QUÉ CONFIAR ── -->
-  <section class="testimonials">
-    <div class="wrap">
-      <h2>¿Por qué confiar en Kylia sin testimonios todavía?</h2>
-      <div class="testi-grid">
-        <div class="testi">
-          <blockquote>Los datos de Sentinel-2 llevan en abierto desde 2015. El problema nunca fue el satélite — fue que nadie te lo traduce a "regar el martes". Eso es lo que construimos.</blockquote>
-          <div class="author"><strong>Martí Carol</strong> — Fundador e Ingeniero</div>
-        </div>
-        <div class="testi">
-          <blockquote>Somos muy nuevos. Todavía no tenemos clientes de pago. Preferimos decirlo así, con claridad, que inventarnos puntuaciones de Google o logos de clientes ficticios.</blockquote>
-          <div class="author"><strong>Construcción abierta</strong> — Mayo 2026</div>
-        </div>
-        <div class="testi">
-          <blockquote>Por eso la garantía de devolución de 60 días está ahí. Si en dos meses Kylia no te ha ahorrado al menos 100 €, te devolvemos el importe completo. Sin formularios, sin negociación.</blockquote>
-          <div class="author"><strong>Garantía real</strong> — No trial, devolución íntegra</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── FAQ ── -->
-  <section class="faq">
-    <h2>Preguntas frecuentes</h2>
-
-    <details>
-      <summary>¿Por qué 99 €/año y no 19 €/mes como otros SaaS?</summary>
-      <p>Porque el agricultor cobra cuando vende cosecha (anual), no mensualmente. Pagar 99 € en otoño junto al resto de inputs encaja con tu cabeza; pagar 19 € cada mes te pone en alerta cada 30 días. Y a ti te da caja por adelantado y churn más bajo.</p>
-    </details>
-
-    <details>
-      <summary>¿Cómo de fiables son los datos del satélite Sentinel-2?</summary>
-      <p>Sentinel-2 es el satélite oficial del programa Copernicus de la Comisión Europea. Pasa cada 5 días sobre cualquier parcela en España con resolución de 10 m por píxel. Es el mismo satélite que usan el Ministerio de Agricultura, las pólizas de seguro agrario y todas las plataformas profesionales del sector. Lo que cambia es lo que cada empresa hace con esos datos.</p>
-    </details>
-
-    <details>
-      <summary>¿Necesito instalar algo en el campo?</summary>
-      <p>No. Kylia funciona solo con tu referencia SIGPAC. No hay sensores, no hay batería que cambiar, no hay pasarela GSM, no hay router. Si tu parcela está en el SIGPAC, Kylia la monitoriza.</p>
-    </details>
-
-    <details>
-      <summary>¿Qué pasa si supero las 30 ha del precio mínimo?</summary>
-      <p>El sistema te avisa con dos semanas de antelación y te muestra exactamente qué pagarías con tu nueva superficie. Por ejemplo, 100 ha = 155 €/año. 250 ha = 275 €/año. 500 ha = 475 €/año. La calculadora de arriba te lo dice al céntimo. No suspendemos servicio sin avisar.</p>
-    </details>
-
-    <details>
-      <summary>¿Funciona en olivar denso, viña, almendro y cereal?</summary>
-      <p>Sí. NDVI y NDMI son índices universales — funcionan sobre cualquier cobertura vegetal. Kylia tiene perfiles agronómicos para olivar, viña, almendro y cereal de invierno; otros cultivos los podemos calibrar a petición.</p>
-    </details>
-
-    <details>
-      <summary>¿Puedo cancelar cuando quiera?</summary>
-      <p>Sí. Tienes los <strong>60 días de garantía</strong> con devolución íntegra. Pasados los 60 días puedes cancelar la renovación en cualquier momento; Kylia funciona hasta el final del periodo ya pagado y luego se queda en plan Free.</p>
-    </details>
-
-    <details>
-      <summary>¿Tienen IVA los precios?</summary>
-      <p>Los precios mostrados son sin IVA. La factura aplica el IVA español al 21 % (o el régimen intracomunitario B2B con NIF-IVA válido cuando proceda).</p>
-    </details>
-  </section>
-
-  <!-- ── ENTERPRISE FRANJA ── -->
-  <section class="enterprise-strip">
-    <div class="wrap">
-      <div>
-        <h3>¿Aseguradora, banca rural o más de 30.000 ha?</h3>
-        <p>Tenemos plan Enterprise desde 30.000 €/año con SLA garantizado, DPA firmado, API privada y account manager dedicado.</p>
-      </div>
-      <a class="btn" href="mailto:enterprise@kylia.app">Hablar con ventas</a>
-    </div>
-  </section>
+  </div>
 </main>
 
-<footer>
-  <div class="wrap">
-    <div>
-      <div class="brand" style="color:#fff;"><span class="brand-dot"></span> Kylia</div>
-      <p class="small" style="margin-top:12px; max-width:320px;">Monitorización por satélite Sentinel-2 sobre parcelas SIGPAC. Sin sensores. Sin €/ha lineal.</p>
-    </div>
-    <div>
-      <div style="font-weight:700; color:#fff; margin-bottom:8px;">Producto</div>
-      <p><a href="/">Inicio</a></p>
-      <p><a href="/precios">Precios</a></p>
-      <p><a href="/cooperativas">Cooperativas</a></p>
-      <p><a href="/blog">Blog</a></p>
-      <p><a href="/app">Probar gratis</a></p>
-    </div>
-    <div>
-      <div style="font-weight:700; color:#fff; margin-bottom:8px;">Legal</div>
-      <p><a href="/legal/">Documentos legales</a></p>
-      <p><a href="/legal/terminos">Términos</a></p>
-      <p><a href="/legal/privacidad">Privacidad</a></p>
-      <p><a href="/legal/cookies">Cookies</a></p>
-    </div>
-    <div class="small" style="flex-basis:100%;">© 2026 Kylia · Construido sobre Copernicus, SIGPAC, DWD ICON</div>
+<footer class="site">
+  <div class="wrap row">
+    <div>© 2026 Kylia · <a href="/legal/privacidad">Privacidad</a> · <a href="/legal/terminos">Términos</a> · <a href="/legal/cookies">Cookies</a></div>
+    <div><a href="mailto:hola@kylia.app">hola@kylia.app</a></div>
   </div>
 </footer>
 
-<script>
-// ── Calculadora del plan Productor ──
-(function() {
-  const MIN = 99;          // mínimo facturable
-  const T1 = 30;           // hasta 30 ha incluidas en mínimo
-  const T2 = 500;          // 30-500 ha a 0,80 €/ha
-  const T3 = 2000;         // 500-2000 ha a 0,40 €/ha
-  const R12 = 0.80, R23 = 0.40;
-
-  const haEl = document.getElementById('calc-ha');
-  const priceEl = document.getElementById('calc-price');
-  const breakEl = document.getElementById('calc-breakdown');
-  if (!haEl) return;
-
-  function calc(ha) {
-    if (!ha || ha < 0) return { price: 0, breakdown: 'Introduce tus hectáreas para ver el precio.' };
-    if (ha === 0) return { price: 0, breakdown: 'Sin superficie, sin coste.' };
-    if (ha <= 5) return { price: 0, breakdown: `Con ${ha} ha estás en el plan Free, gratis para siempre.` };
-    if (ha <= T1) return { price: MIN, breakdown: `${ha} ha entran en el mínimo facturable de ${MIN} €.` };
-    if (ha <= T2) {
-      const extra = (ha - T1) * R12;
-      return { price: Math.round(MIN + extra), breakdown: `${MIN} € (mínimo) + ${ha - T1} ha · 0,80 €/ha = ${Math.round(MIN + extra)} €/año.` };
-    }
-    if (ha <= T3) {
-      const extra = (T2 - T1) * R12 + (ha - T2) * R23;
-      return { price: Math.round(MIN + extra), breakdown: `${MIN} € + 470 ha · 0,80 € + ${ha - T2} ha · 0,40 € = ${Math.round(MIN + extra)} €/año.` };
-    }
-    return { price: null, breakdown: `Más de 2.000 ha — pasa a plan Enterprise. Hablamos.` };
-  }
-
-  function update() {
-    const ha = parseFloat(haEl.value);
-    const r = calc(ha);
-    if (r.price === null) {
-      priceEl.textContent = '—';
-    } else {
-      priceEl.textContent = r.price.toLocaleString('es-ES');
-    }
-    breakEl.textContent = r.breakdown;
-  }
-
-  haEl.addEventListener('input', update);
-  update();
-})();
-
-// ── Contador de plazas (visualmente) ──
-// El contador real lo conectaríamos a Stripe/Supabase. Por ahora muestra un valor estable
-// que se actualizará desde el backend cuando esté el sistema de waitlist contable.
-(function () {
-  const el = document.getElementById('promo-count');
-  if (!el) return;
-  // Lectura desde localStorage para mantener consistencia entre páginas
-  const stored = localStorage.getItem('kylia_promo_remaining');
-  if (stored) el.textContent = stored;
-})();
-</script>
-
-<script>
-(function(){
-  const t = document.getElementById("nav-toggle");
-  const n = document.getElementById("nav-links");
-  if(!t||!n) return;
-  t.addEventListener("click",()=>{
-    const o = n.classList.toggle("open");
-    t.setAttribute("aria-expanded", o?"true":"false");
-    t.setAttribute("aria-label", o?"Cerrar menú":"Abrir menú");
-  });
-  n.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>{
-    n.classList.remove("open");
-    t.setAttribute("aria-expanded","false");
-    t.setAttribute("aria-label","Abrir menú");
-  }));
-})();
-</script>
 </body>
 </html>
