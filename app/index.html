@@ -1560,20 +1560,34 @@
       vertical-align: middle;
     }
 
-    /* ── Modo piloto: pantalla mínima de observación silenciosa ──────
-       El piloto solo ve el banner "Cerrar jornada". El cálculo sigue
-       ejecutándose en background (Sentinel + recomendaciones) para
-       comparar lo que Kylia HABRÍA recomendado con lo que hizo el
-       agricultor. Modo demo (?demo=1 o usuarios veteranos) muestra todo. */
+    /* ── Modo piloto: observación silenciosa con cuaderno operativo ──
+       El piloto ve el banner del diario + su cuaderno de aplicaciones
+       y riegos (beneficio operativo: ya tiene el cuaderno PAC hecho).
+       Las recomendaciones, alertas y análisis se calculan en
+       background pero NO se muestran — para no influir en sus
+       decisiones. Modo demo (?demo=1 o usuarios veteranos) muestra todo. */
     html[data-modo-kylia="piloto"] #welcome-banner,
     html[data-modo-kylia="piloto"] #card-hoy,
     html[data-modo-kylia="piloto"] #card-parcela,
-    html[data-modo-kylia="piloto"] #card-historial-riegos,
-    html[data-modo-kylia="piloto"] #card-historial-aplicaciones,
     html[data-modo-kylia="piloto"] #recomendaciones-container,
     html[data-modo-kylia="piloto"] #alertas-container,
     html[data-modo-kylia="piloto"] section.card[aria-label="Condiciones meteorológicas"],
     html[data-modo-kylia="piloto"] .faq-section { display: none !important; }
+
+    /* Aviso explicativo del modo piloto (solo visible en este modo) */
+    .piloto-aviso { display: none; }
+    html[data-modo-kylia="piloto"] .piloto-aviso {
+      display: block;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      font-size: 0.88rem;
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .piloto-aviso strong { color: var(--low); }
 
     /* ── Banner "Cerrar jornada" ───────────────────────────────────── */
     .jornada-banner {
@@ -1846,6 +1860,12 @@
         <button class="btn-save" id="btn-save-config">Guardar</button>
         <span class="config-feedback" id="config-feedback" aria-live="polite"></span>
       </div>
+    </div>
+
+    <!-- Aviso modo piloto silencioso (solo visible en modo piloto) -->
+    <div class="piloto-aviso" aria-label="Información sobre el modo piloto">
+      <strong>Estás en el piloto silencioso de Kylia.</strong> Tu único compromiso es contestar las 4 preguntas del diario al cerrar la jornada. Las recomendaciones de la app se calculan en segundo plano pero no se muestran — así tus decisiones no quedan influenciadas por la herramienta y el dataset es limpio. <br/>
+      Al finalizar los 2 meses te enseñaré lo que Kylia habría recomendado durante todo el piloto, podrás comparar con tus decisiones y decidir si quieres seguir con la app completa.
     </div>
 
     <!-- Banner "Cerrar jornada" — visible en ambos modos -->
