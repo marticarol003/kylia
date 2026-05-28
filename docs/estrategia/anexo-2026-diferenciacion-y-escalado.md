@@ -2,6 +2,8 @@
 
 **Mayo 2026 · Martí Carol**
 
+*Proyecto desarrollado en colaboración con la UPC. Participante en Santander X Explorer.*
+
 Este anexo complementa `vision-y-roadmap.html` con seis cuestiones que se trabajaron en sesión específica:
 
 1. Cliente arquetípico para los primeros 12-18 meses.
