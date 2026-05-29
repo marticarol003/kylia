@@ -32,7 +32,6 @@
     { "source": "/og-image.png", "destination": "/assets/img/og-image.png",  "permanent": true }
   ],
   "crons": [
-    { "path": "/api/recordatorio-diario", "schedule": "0 6 * * *" },
     { "path": "/api/recordatorio-wizard", "schedule": "0 17 * * *" }
   ]
 }
