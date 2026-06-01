@@ -106,6 +106,17 @@ section.block.alt { background:var(--slate-50); }
 .app-mock .mock-ind { display:flex; justify-content:space-between; padding:10px 14px; background:var(--slate-50); border-radius:8px; margin-bottom:6px; font-size:0.86rem; }
 .app-mock .mock-ind .v { color:var(--verde); font-weight:700; }
 
+/* Reveal · qué medirá el informe final */
+.reveal-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:880px) { .reveal-grid { grid-template-columns:1fr; } }
+.reveal-card { background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:26px; box-shadow:var(--shadow-md); }
+.reveal-card .reveal-icon { width:44px; height:44px; border-radius:12px; background:var(--verde-50); color:var(--verde-700); display:flex; align-items:center; justify-content:center; margin-bottom:14px; }
+.reveal-card .reveal-icon svg { width:22px; height:22px; }
+.reveal-card h3 { color:var(--verde-900); font-size:1.08rem; margin-bottom:8px; }
+.reveal-card p { color:var(--subtle); font-size:0.94rem; }
+.reveal-note { text-align:center; margin:32px auto 0; font-size:0.9rem; color:var(--muted); max-width:680px; line-height:1.6; }
+.reveal-note strong { color:var(--text); }
+
 /* Caso real */
 .caso { background:#fff; border:1px solid var(--border); border-radius:var(--radius); padding:36px; box-shadow:var(--shadow-md); max-width:780px; margin:0 auto; }
 .caso .caso-head { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-bottom:20px; }
@@ -307,8 +318,51 @@ footer .small { font-size:0.84rem; color:#7fa089; }
     </div>
   </section>
 
-  <!-- Caso de uso -->
+  <!-- Qué mide el reveal -->
   <section class="block alt">
+    <div class="wrap">
+      <div class="section-title">
+        <h2>Qué medirá el informe final</h2>
+        <p>El reveal no es un PDF genérico. Es un análisis día a día de cuatro dimensiones concretas — lo que el piloto sirve para medir.</p>
+      </div>
+      <div class="reveal-grid">
+        <div class="reveal-card">
+          <div class="reveal-icon">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <h3>Horas en decidir cada semana</h3>
+          <p>Sumamos el tiempo declarado en "en qué te basaste" para estimar las horas semanales que has dedicado a decidir cuándo regar y qué aplicar. Hipótesis a contrastar: Kylia las baja a minutos.</p>
+        </div>
+        <div class="reveal-card">
+          <div class="reveal-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M5 10c0-3 3-6 7-7 4 1 7 4 7 7 0 5-4 9-7 9s-7-4-7-9z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3>Agua aplicada vs recomendada</h3>
+          <p>Tu litros/m² declarados contra los litros que la app habría sugerido cada día. Comparativa por semana y total al cierre. Si has regado de más, te enseñamos cuánto.</p>
+        </div>
+        <div class="reveal-card">
+          <div class="reveal-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 7v6c0 5 3 9 8 11 5-2 8-6 8-11V7l-8-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h3>Tratamientos potencialmente evitables</h3>
+          <p>Para cada aplicación que has registrado, contrastamos si Kylia veía la presión de plaga o si era preventivo. No te diremos si acertaste — solo cuántos podrías haber retrasado o saltado.</p>
+        </div>
+        <div class="reveal-card">
+          <div class="reveal-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 110 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <h3>Coste económico de la divergencia</h3>
+          <p>Traducimos los desvíos (agua, tratamientos, posibles intervenciones tardías) a euros con precios públicos por hectárea. No es contabilidad fina — es la magnitud del problema, para que decidas si Kylia te compensa.</p>
+        </div>
+      </div>
+      <p class="reveal-note">
+        Es la primera campaña en la que mediremos esto sistemáticamente. Los números del reveal serán <strong>los tuyos</strong>, no medias del sector. Por eso el dataset honesto del piloto silencioso es indispensable.
+      </p>
+    </div>
+  </section>
+
+  <!-- Caso de uso -->
+  <section class="block">
     <div class="wrap">
       <div class="section-title">
         <h2>Un caso real, en producción</h2>
@@ -330,7 +384,7 @@ footer .small { font-size:0.84rem; color:#7fa089; }
   </section>
 
   <!-- Formulario -->
-  <section class="block" id="formulario">
+  <section class="block alt" id="formulario">
     <div class="wrap">
       <div class="form-card">
         <h2>Apuntarme al piloto</h2>
@@ -388,7 +442,7 @@ footer .small { font-size:0.84rem; color:#7fa089; }
   </section>
 
   <!-- FAQ -->
-  <section class="block alt">
+  <section class="block">
     <div class="wrap">
       <div class="section-title">
         <h2>Lo que preguntan otros</h2>
