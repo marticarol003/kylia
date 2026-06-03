@@ -27,6 +27,7 @@ const HANDLERS = {
 const METODOS_RIEGO = new Set(["goteo", "aspersion", "surco", "manguera"]);
 const FRANJAS       = new Set(["manana", "mediodia", "tarde", "noche"]);
 const MANEJOS       = new Set(["convencional", "ecologico"]);
+const SUELOS        = new Set(["arenoso", "franco", "arcilloso"]);
 
 module.exports = async (req, res) => {
   if (!preludio(req, res, "POST")) return;
@@ -62,6 +63,8 @@ async function handleRegistroUsuario(req, res, body) {
     tarifa_agua:          numOrNull(body.tarifa_agua),
     metodo_riego:         METODOS_RIEGO.has(body.metodo_riego) ? body.metodo_riego : null,
     manejo:               MANEJOS.has(body.manejo) ? body.manejo : null,
+    suelo:                SUELOS.has(body.suelo) ? body.suelo : null,
+    fecha_plantacion:     dateOrNull(body.fecha_plantacion),
     origen:               clean(body.origen,       120)                 || null,
     preferencias: body.preferencias && typeof body.preferencias === "object" ? body.preferencias : {},
     ua:           clean(req.headers["user-agent"], 400)         || null,
