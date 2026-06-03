@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b1f13">
+  <meta name="theme-color" content="#013A27">
   <meta name="description" content="Kylia — tu parcela vista desde el satélite. Vigor, humedad y la siguiente acción de riego, en un vistazo.">
   <meta name="robots" content="noindex,follow">
 
@@ -14,7 +14,7 @@
   <meta property="og:image" content="https://kylia.app/assets/img/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
 
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%230b1f13%22/><path d=%22M10 20 Q16 10 22 20 Z%22 fill=%22white%22/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23013A27%22/><g fill=%22%23ffffff%22><path d=%22M0 0C2 -2.2 2 -5 0 -7.2C-2 -5 -2 -2.2 0 0Z%22 transform=%22translate(16 16) rotate(45)%22/><path d=%22M0 0C2 -2.2 2 -5 0 -7.2C-2 -5 -2 -2.2 0 0Z%22 transform=%22translate(16 16) rotate(225)%22/><circle cx=%2216%22 cy=%2216%22 r=%223.3%22/></g></svg>">
   <link rel="apple-touch-icon" href="/assets/img/og-image.png">
 
   <link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
@@ -501,9 +501,9 @@
     .ndvi-chart { width: 100%; height: 70px; display: block; }
     .ndvi-chart .grid     { stroke: var(--border); stroke-width: 0.5; }
     .ndvi-chart .area     { fill: rgba(43, 122, 58, 0.18); }
-    .ndvi-chart .line     { fill: none; stroke: #2b7a3a; stroke-width: 1.6; }
-    .ndvi-chart .dot      { fill: #2b7a3a; }
-    .ndvi-chart .dot.last { fill: #fff; stroke: #2b7a3a; stroke-width: 2; }
+    .ndvi-chart .line     { fill: none; stroke: #013A27; stroke-width: 1.6; }
+    .ndvi-chart .dot      { fill: #013A27; }
+    .ndvi-chart .dot.last { fill: #fff; stroke: #013A27; stroke-width: 2; }
     .ndvi-chart .axis     { font-size: 9px; fill: var(--muted); }
     .ndvi-chart .tip      { font-size: 10px; fill: var(--text); font-weight: 600; }
     .ndvi-historial-vacio { font-size: 0.78rem; color: var(--muted); font-style: italic; }
@@ -1591,7 +1591,7 @@
 
     /* ── Banner "Cerrar jornada" ───────────────────────────────────── */
     .jornada-banner {
-      background: linear-gradient(135deg, #1f5a2b 0%, #2b7a3a 100%);
+      background: linear-gradient(135deg, #002518 0%, #013A27 100%);
       color: #fff;
       padding: 16px 18px;
       border-radius: 12px;
@@ -1704,7 +1704,7 @@
   <!-- Gate de identificación — se oculta si ya hay email en localStorage -->
   <div id="gate" class="gate-overlay" role="dialog" aria-modal="true" aria-labelledby="gate-title" aria-describedby="gate-desc" hidden>
     <div class="gate-card">
-      <div class="gate-logo" aria-hidden="true">🌱 Kylia</div>
+      <div class="gate-logo" aria-hidden="true"><svg class="brand-logo" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="flex:0 0 auto"><path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(45)"/><path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(225)"/><circle cx="12" cy="12" r="2.4"/></svg> Kylia</div>
       <h2 id="gate-title">Introduce tu email para entrar</h2>
       <p id="gate-desc">Es un piloto privado. Solo te pedimos un email para avisarte de novedades y no perdernos.</p>
       <div class="gate-field">

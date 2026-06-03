@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1200px; height:630px; }
+  body {
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    color:#fff;
+    background:
+      radial-gradient(120% 140% at 88% 8%, #0A4A33 0%, #022a1c 42%, #001710 100%);
+    position:relative; overflow:hidden;
+  }
+  .wrap { position:absolute; inset:0; padding:64px 72px; display:flex; }
+  .left { width:680px; display:flex; flex-direction:column; }
+
+  /* marca */
+  .brand { display:flex; align-items:center; gap:14px; }
+  .brand svg { width:40px; height:40px; }
+  .brand .name { font-size:34px; font-weight:600; letter-spacing:-0.01em; }
+
+  .pill {
+    margin-top:34px; align-self:flex-start;
+    background:rgba(134,216,156,.12);
+    color:#bfe9cb; font-weight:700; font-size:19px; letter-spacing:.01em;
+    padding:11px 22px; border-radius:999px;
+    border:1px solid rgba(134,216,156,.18);
+  }
+
+  h1 {
+    margin-top:30px; font-size:70px; line-height:1.04;
+    font-weight:800; letter-spacing:-0.02em;
+  }
+  h1 .accent { color:#86d89c; }
+
+  .sub { margin-top:auto; }
+  .sub .big { font-size:27px; font-weight:700; color:#eaf4ee; line-height:1.32; }
+  .sub .src { margin-top:12px; font-size:18px; font-weight:600; color:#8fb39d; letter-spacing:.01em; }
+
+  /* tarjeta parcela */
+  .card {
+    position:absolute; top:120px; right:64px;
+    width:330px; height:420px;
+    background:rgba(255,255,255,.035);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:24px;
+    box-shadow:0 30px 70px -20px rgba(0,0,0,.55);
+    padding:22px;
+  }
+  .field { position:relative; width:100%; height:300px; }
+  .plot { position:absolute; border-radius:9px; }
+  .chip {
+    position:absolute; left:18px; right:18px; bottom:18px;
+    background:#fff; color:#013A27;
+    border-radius:13px; padding:12px 16px;
+    display:flex; align-items:center; gap:11px;
+    box-shadow:0 10px 24px -8px rgba(0,0,0,.4);
+  }
+  .chip .dot { width:13px; height:13px; border-radius:50%; background:#2e9e5a; flex:0 0 auto; }
+  .chip .t1 { font-size:14px; font-weight:600; color:#4d6b5b; }
+  .chip .t2 { font-size:17px; font-weight:800; letter-spacing:-0.01em; }
+
+  .url { position:absolute; right:72px; bottom:48px; font-size:22px; font-weight:700; color:#86d89c; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="left">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" fill="#86d89c">
+          <path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(45)"/>
+          <path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(225)"/>
+          <circle cx="12" cy="12" r="2.4"/>
+        </svg>
+        <span class="name">Kylia</span>
+      </div>
+
+      <span class="pill">Agricultura de precisión por satélite</span>
+
+      <h1>Tu parcela SIGPAC,<br>vigilada desde el<br><span class="accent">espacio.</span></h1>
+
+      <div class="sub">
+        <div class="big">Sin sensores. Sin coste por hectárea.<br>Para agricultores, cooperativas e inversores.</div>
+        <div class="src">Copernicus · Sentinel-2 · SIGPAC · Open-Meteo</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <div class="plot" style="left:0;    top:0;   width:150px; height:120px; background:#7cc472;"></div>
+      <div class="plot" style="left:160px;top:6;   width:160px; height:104px; background:#4ca06a;"></div>
+      <div class="plot" style="left:0;    top:130px;width:150px; height:96px;  background:#ccd96b;"></div>
+      <div class="plot" style="left:160px;top:120px;width:160px; height:118px; background:#2e9e5a; border:3px solid #fff;"></div>
+      <div class="plot" style="left:0;    top:236px;width:150px; height:64px;  background:#6bbf78;"></div>
+      <div class="plot" style="left:160px;top:248px;width:160px; height:52px;  background:#3f9460;"></div>
+    </div>
+    <div class="chip">
+      <span class="dot"></span>
+      <span><span class="t1">Parcela seleccionada</span><br><span class="t2">NDVI 0.72 · bueno</span></span>
+    </div>
+  </div>
+
+  <div class="url">kylia.app</div>
+</body>
+</html>
