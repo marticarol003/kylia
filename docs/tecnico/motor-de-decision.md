@@ -267,7 +267,7 @@ parte → riego reducido; horario tarde-noche / mañana según Tªmáx.
 #### f) Validación del motor (Nivel 2 del plan)
 Comparar Dr y ETc diarios de Kylia contra `pyfao56` con las mismas entradas →
 reportar RMSE en mm. Opcional: contrastar contra sensor de humedad de suelo en
-el campo de validación. *(Pendiente: validación formal contra `pyfao56`.)*
+el campo de validación. **Protocolo detallado en §3.4** *(pendiente de ejecutar).*
 
 ### 3.3 Evidencia de mejora: motor anterior vs FAO-56
 
@@ -300,6 +300,67 @@ suelo + fecha de plantación; tras recargar, el motor aplica el Kc real (tomate 
 por RAW; sin excepciones JS. Probes confirmados: el suelo cambia RAW
 (arenoso 10,8 / franco 20,3 / arcilloso 21,6 mm) y la edad cambia Kc
 (0,70 a 8 d / 0,95 a 80 d / 1,0 sin fecha = degradación elegante).
+
+### 3.4 Protocolo de validación contra `pyfao56` (Nivel 2) — *pendiente de ejecutar*
+
+La comparación de §3.3 demuestra que el motor nuevo se comporta **distinto y mejor
+fundado** que el viejo, pero lo hace contra el propio motor viejo de Kylia. Para
+cerrar el Nivel 2 del plan de validación hace falta contrastar el motor FAO-56 de
+Kylia contra una **implementación de referencia independiente del estándar**:
+[`pyfao56`](https://github.com/kthorp/pyfao56) (Thorp, USDA-ARS), que implementa el
+balance hídrico de suelo de Allen et al. (1998). Si Kylia y `pyfao56` divergen poco
+con las mismas entradas, el motor de Kylia *es* FAO-56, no solo "se inspira" en él.
+
+> **Estado:** no ejecutado todavía. Esta sección es la especificación del ensayo,
+> no su resultado. Hasta correrlo, §8 mantiene el riego como "validable", no
+> "validado contra estándar externo".
+
+#### a) Entradas idénticas a ambos motores
+Para un cultivo y periodo dados, alimentar Kylia y `pyfao56` con **exactamente** los
+mismos datos exógenos día a día:
+- **ET₀** diaria (Open-Meteo `et0_fao_evapotranspiration`).
+- **Lluvia** diaria (`precipitation_sum`).
+- **Cultivo** + **fecha de plantación** → misma curva Kc y mismas longitudes de fase
+  (`FAO_KC`); cargar en `pyfao56` el mismo `.par` (Kc_ini/med/fin, L_ini/des/med/fin).
+- **Suelo**: mismos `θ_FC − θ_WP` (o `θ_FC`, `θ_WP` del análisis real) y `Zr`.
+- **Riegos** netos aplicados (L/m² × eficiencia del sistema) en las mismas fechas.
+- `p` (fracción de agotamiento) idéntico.
+
+#### b) Salidas a comparar (serie diaria)
+- **ETc,i** (mm/día) — demanda del cultivo.
+- **Dr,i** (mm) — agotamiento de la zona radicular (la variable que dispara el riego).
+- **Eventos de riego** que cada motor habría disparado (día y cantidad neta).
+
+#### c) Métrica
+Sobre la serie diaria emparejada:
+```
+RMSE(X) = √( (1/n) · Σ (X_kylia,i − X_pyfao56,i)² )      X ∈ {ETc, Dr}
+```
+Reportar también **MBE** (sesgo medio, para detectar si Kylia corre seco o húmedo
+de forma sistemática) y la **concordancia de eventos de riego** (% de días en que
+ambos motores coinciden en "regar / no regar", y diferencia media en mm cuando ambos
+riegan).
+
+#### d) Criterio de aceptación (propuesto)
+| Métrica | Umbral objetivo | Lectura si se supera |
+|---|---|---|
+| RMSE(ETc) | ≤ 0,3 mm/día | Discrepancia en la curva Kc o en la interpolación de fase |
+| RMSE(Dr) | ≤ 5 mm (< ¼ de un RAW típico) | Discrepancia en lluvia efectiva, TAW/RAW o redondeos del balance |
+| MBE(Dr) | \|·\| ≤ 2 mm | Sesgo sistemático → revisar `p`, `Zr` o eficiencia de riego |
+| Concordancia eventos | ≥ 90% de días | Revisar el umbral de disparo (Dr ≥ RAW) |
+
+Cualquier desvío por encima del umbral se **diagnostica hasta el día y la variable**
+que lo causa (no se "ajusta a ojo"): el objetivo del ensayo es localizar dónde
+Kylia se aparta del estándar, no maquillar el RMSE.
+
+#### e) Montaje
+Harness en Python: `pip install pyfao56`; un script que (1) lea el mismo clima y
+parámetros que usa el frontend, (2) reconstruya el `Model` de `pyfao56` con esos
+`.par`/`.wth`/`.irr`, (3) exporte la serie diaria de Kylia (replicando
+`calcularBalanceHidrico()` en Python o volcando el `Dr` calculado por el frontend),
+(4) empareje por fecha y calcule las métricas de (c). Resultado → tabla nueva en esta
+§3.4 con los RMSE reales y el veredicto. Opcional (Nivel 2 reforzado): contrastar `Dr`
+contra el **sensor de humedad de suelo** del campo de validación.
 
 ---
 
