@@ -146,7 +146,7 @@ Clasificación (`clasificarHumedadSuelo`):
 Es el modelo estrella del piloto (alimenta el número de ahorro de agua). Aquí se
 documenta **cómo decide hoy** y **cómo decidirá tras la reescritura FAO-56**.
 
-### 3.1 Cómo decide HOY (heurística ET₀ cruda) — A SUSTITUIR
+### 3.1 Motor anterior (heurística ET₀ cruda) — SUSTITUIDO el 2026-06-03
 
 `calcularBalanceHidrico()` suma la **ET₀ de referencia** (Open-Meteo
 `et0_fao_evapotranspiration`) desde el último riego registrado, ajusta por un
@@ -170,11 +170,12 @@ recién plantada (Kc ≈ 0.7) **sobreestima ~30%**. Además el umbral 30/15 mm e
 fijo: ignora que un suelo arenoso retiene mucha menos agua disponible que uno
 arcilloso y debería disparar antes.
 
-### 3.2 Cómo decidirá (FAO-56 — DISEÑO OBJETIVO)
+### 3.2 Motor actual (FAO-56) — implementado y en producción (2026-06-03)
 
 Implementación del **balance hídrico de suelo FAO-56** (Allen et al., 1998),
 método del coeficiente único de cultivo (single Kc). Referencia de cálculo:
-`pyfao56`.
+`pyfao56`. **Desplegado en `main` (commit `e5a75ce`)** — sustituye a la heurística
+de §3.1.
 
 #### a) Demanda real del cultivo
 ```
@@ -266,7 +267,39 @@ parte → riego reducido; horario tarde-noche / mañana según Tªmáx.
 #### f) Validación del motor (Nivel 2 del plan)
 Comparar Dr y ETc diarios de Kylia contra `pyfao56` con las mismas entradas →
 reportar RMSE en mm. Opcional: contrastar contra sensor de humedad de suelo en
-el campo de validación.
+el campo de validación. *(Pendiente: validación formal contra `pyfao56`.)*
+
+### 3.3 Evidencia de mejora: motor anterior vs FAO-56
+
+Comparación de **ambos motores decidiendo sobre el mismo clima real** (Open-Meteo,
+Barcelona, 14 días, ET₀ media 5,3 mm/día, sin lluvia en el periodo). Mismo riego
+de partida en cada caso. "Mejor" = más cerca de la demanda real del cultivo según
+el estándar FAO-56.
+
+| Escenario | Motor anterior (ET₀ cruda) | Motor FAO-56 | Consecuencia del anterior |
+|---|---|---|---|
+| Tomate en producción (80 d), franco, regó hace 6 d | Regar **32 L/m²** | Regar **41 L/m²** (Kc 1,15) | Se queda **9 L/m² corto** → estrés hídrico |
+| Lechuga joven (12 d), franco, regó hace 6 d | Regar **32 L/m²** | Regar **25 L/m²** (Kc 0,70) | Aplica **7 L/m² de más** → agua/dinero desperdiciados |
+| Tomate (80 d), mismo caso, suelo **arenoso** | Regar 32 L/m² (ciego al suelo) | déficit/umbral **24/10,8 mm** | Ignora que el arenoso retiene la mitad → riega tarde |
+| Tomate en producción (80 d), franco, regó hace **4 d** | "**Revisar**" (no urgente) | "**Regar (urgente)**" | **No detecta** que ya toca regar → estrés |
+
+Lecturas clave:
+- El motor anterior asumía Kc = 1 (todos los cultivos como el césped de
+  referencia): **subestima** en cultivos de Kc alto (tomate en producción) y
+  **sobreestima** en Kc bajo (plántula).
+- Era **ciego al suelo** (umbral fijo 30/15 mm): un arenoso debería disparar
+  mucho antes que un arcilloso.
+- **No restaba la lluvia** (no se ve en esta tabla por ausencia de lluvia, pero en
+  semana lluviosa recomendaría regar cuando la lluvia ya cubrió el déficit).
+- Caso más grave: el 4º, donde el anterior **no dispara** el riego que el cultivo
+  ya necesita.
+
+**Verificación end-to-end (2026-06-03, navegador headless):** onboarding persiste
+suelo + fecha de plantación; tras recargar, el motor aplica el Kc real (tomate a
+80 d → Kc 0,88 en fase de desarrollo, no el fallback 1,0); la `card-hoy` renderiza
+por RAW; sin excepciones JS. Probes confirmados: el suelo cambia RAW
+(arenoso 10,8 / franco 20,3 / arcilloso 21,6 mm) y la edad cambia Kc
+(0,70 a 8 d / 0,95 a 80 d / 1,0 sin fecha = degradación elegante).
 
 ---
 
