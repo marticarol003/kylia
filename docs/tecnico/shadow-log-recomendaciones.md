@@ -114,10 +114,34 @@ Qué resuelve respecto a la lista anterior:
 - ✅ **Dedupe en servidor** (`yaCongelado`), no en `sessionStorage`.
 - ✅ **`contexto` con el balance FAO-56** en cada fila.
 
-Pendiente para que sea **inalterable de verdad** ante un evaluador:
-- **Append-only a nivel de BD**: revocar update/delete sobre `recomendaciones_log` (políticas
-  RLS o permisos), para que ni siquiera el servicio pueda reescribir la historia.
-- **Filtro de pilotos**: hoy procesa todo usuario con lat/lon; antes de `LIVE` conviene
-  marcar quién es piloto silencioso (flag en `usuarios`/`preferencias`).
-- **Unificar el motor**: que el frontend importe `api/_motor-riego.js` en lugar de su copia
-  inline (eliminar el riesgo de que deriven).
+Estado de los guardarraíles:
+- ✅ **Append-only a nivel de BD**: `db/diario-b-produccion.sql` instala un trigger que bloquea
+  UPDATE/DELETE en `recomendaciones_log` (para cualquier rol, incluida la service_role).
+- ✅ **Filtro de pilotos**: el cron solo procesa usuarios con `piloto_sombra=true` (columna nueva
+  del mismo SQL). Seguro por defecto: sin pilotos marcados, congela cero.
+- ⏳ **Unificar el motor**: el frontend (`app/index.html`) aún usa su copia inline del balance,
+  no importa `api/_motor-riego.js`. Hoy son **gemelos verificados**; aplazado a propósito (es un
+  refactor del app monolítico, arriesgado sin test end-to-end). Deuda técnica conocida.
+
+---
+
+## 6. Runbook de activación (dry-run → producción)
+
+El cron ya está desplegado en **dry-run** (calcula y loguea, no escribe). Para activarlo:
+
+1. **Limpia datos de prueba** si cargaste `db/seed-demo-piloto.sql` (antes del paso 2, que
+   sella la tabla):
+   `delete from recomendaciones_log where usuario_id = '7c1e9a04-2b6f-4d8a-9f10-3a5e7c0b1d22';`
+2. **Ejecuta `db/diario-b-produccion.sql`** en el SQL Editor de Supabase (flag `piloto_sombra`
+   + trigger append-only).
+3. **Marca los pilotos** reales:
+   `update usuarios set piloto_sombra = true where email = '…';`
+   Verifica que cada uno tiene `lat/lon`, `cultivos`, `suelo` y `fecha_plantacion`.
+4. **Prueba en seco** sin escribir: `GET /api/diario-b?dry=1` → revisa que devuelve las
+   decisiones esperadas de esos pilotos.
+5. **Activa la escritura**: en Vercel, `DIARIO_B_LIVE=1` (y `DIARIO_B_TOKEN=<secreto>` para
+   proteger el endpoint). El cron de las 06:00 UTC empezará a congelar.
+6. **Comprueba** al día siguiente que hay una fila por piloto en `recomendaciones_log` con
+   `contexto.fuente = "diario-b"` y `fecha` = ese día.
+
+Revertir: `DIARIO_B_LIVE` fuera (vuelve a dry-run) y/o `drop trigger trg_reclog_append_only …`.

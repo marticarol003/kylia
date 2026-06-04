@@ -84,12 +84,14 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok: true, persisted: false, reason: "supabase_not_configured" });
   }
 
-  // Pilotos con coordenadas (la decisión de riego corre sobre clima, no satélite).
+  // Pilotos silenciosos marcados (piloto_sombra=true) con coordenadas. La decisión
+  // de riego corre sobre clima, no satélite. Requiere db/diario-b-produccion.sql.
   let pilotos = [];
   try {
     pilotos = await supabaseSelect(
       "usuarios",
-      "select=id,ciudad,lat,lon,cultivos,suelo,metodo_riego,fecha_plantacion,tarifa_agua&lat=not.is.null&lon=not.is.null"
+      "select=id,ciudad,lat,lon,cultivos,suelo,metodo_riego,fecha_plantacion,tarifa_agua"
+      + "&piloto_sombra=eq.true&lat=not.is.null&lon=not.is.null"
     );
   } catch (err) {
     return res.status(500).json({ ok: false, error: `no se pudieron leer pilotos: ${err.message}` });
