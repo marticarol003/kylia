@@ -595,7 +595,7 @@
   .compare-callout strong { color: var(--verde-700); }
 
   .compare {
-    width: 100%; border-collapse: separate; border-spacing: 0;
+    width: 100%; min-width: 720px; border-collapse: separate; border-spacing: 0;
     background: #fff;
     border: 1px solid var(--border);
     border-radius: var(--radius); overflow: hidden;
@@ -613,10 +613,22 @@
     color: var(--text); font-size: .84rem;
     letter-spacing: .02em;
   }
+  /* Primera columna fija: al deslizar en móvil no se pierde la fila */
+  .compare tr > :first-child {
+    position: sticky; left: 0; z-index: 1;
+    background: var(--bg-alt);
+    box-shadow: 1px 0 0 var(--border);
+  }
   .compare th.highlight { background: var(--verde); color: #fff; }
   .compare td.yes { color: var(--verde); font-weight: 600; }
   .compare td.no  { color: var(--rojo); font-weight: 600; }
-  .compare-wrap { overflow-x: auto; }
+  .compare-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .compare-hint {
+    display: none;
+    font-size: .82rem; color: var(--subtle); font-weight: 600;
+    margin: 0 0 8px; text-align: right;
+  }
+  @media (max-width: 760px) { .compare-hint { display: block; } }
 
   /* ═══════════════════════════════════════════════════════
      Pricing
@@ -1132,6 +1144,7 @@
       <p>Las plataformas premium como xarvio o FieldView exigen formación técnica y, además, hardware en campo. Kylia es <strong>100% software</strong> y está pensada para el agricultor, no para el técnico.</p>
     </div>
 
+    <p class="compare-hint" aria-hidden="true">Desliza para comparar las 4 →</p>
     <div class="compare-wrap reveal">
       <table class="compare">
         <thead>
