@@ -362,6 +362,27 @@ parámetros que usa el frontend, (2) reconstruya el `Model` de `pyfao56` con eso
 §3.4 con los RMSE reales y el veredicto. Opcional (Nivel 2 reforzado): contrastar `Dr`
 contra el **sensor de humedad de suelo** del campo de validación.
 
+### 3.5 Presentación de la cantidad: tiempo vs litros (decisión de diseño, pendiente)
+
+El motor decide en **mm (= L/m²)** — es físico, no se toca. Pero la **unidad que se le
+muestra al agricultor** debería adaptarse a su sistema, porque un agricultor con goteo o
+manguera no mide litros: **abre la llave X minutos**.
+
+```
+minutos = lámina bruta (mm) ÷ caudal del sistema (mm/hora) × 60
+```
+
+- **goteo / aspersión / manguera → minutos.** Requiere un dato nuevo por piloto: el
+  **caudal/pluviometría del sistema** (mm/h), que se obtiene una vez (caudal del gotero ×
+  goteros/m²; prueba de pluviómetro; o "llena un cubo de 10 L y cronométralo").
+- **regadera → nº de regaderas / litros** (no es tiempo, es volumen contado): litros =
+  mm × área. Es el caso del experimento de las lechugas del campo del padre.
+
+El esquema ya está medio preparado: `acciones.duracion_min` existe para el lado de lo que
+**registra** el agricultor; falta llevar la unidad de tiempo también al lado de la
+**recomendación** (y capturar el caudal en onboarding). Internamente, el balance y el
+`cantidad_l_m2` del shadow log siguen en mm — el tiempo es solo capa de presentación.
+
 ---
 
 ## 4. Decisión: TRATAMIENTO (riesgo de plaga/enfermedad)

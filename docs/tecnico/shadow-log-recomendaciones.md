@@ -91,22 +91,33 @@ Supabase con la `service_role` (servidor, nunca el navegador).
 
 ---
 
-## 5. Lo que falta para que el log sea fiable (honesto)
+## 5. El Diario B: congelado en servidor (cron `/api/diario-b`)
 
-El esquema, el handler y el envío desde el frontend **ya existen y funcionan**. Lo que
-falta es lo que convierte esto en un registro de fiar para el reveal:
+El camino del §1 solo escribe **cuando el agricultor abre la app** → en sombra silenciosa
+deja huecos. Para cerrarlos existe el cron **`/api/diario-b.js`** (Vercel, diario ~06:00 UTC,
+"primera hora con la previsión del día"). Por cada piloto con coordenadas:
+1. baja el clima del día (ET₀ + lluvia, Open-Meteo);
+2. lee sus **riegos reales** de `acciones`;
+3. reconstruye el balance FAO-56 con el **mismo motor que la app** (`api/_motor-riego.js`,
+   importado también por… *pendiente: que el frontend consuma este módulo en vez de su copia
+   inline — hoy son código gemelo verificado, no el mismo fichero*);
+4. **congela** la decisión de hoy en `recomendaciones_log` con `fecha` = la fecha de la
+   decisión (no `now()`) y `contexto` con el balance (`et0, lluvia, kc, Dr, RAW, TAW`).
 
-1. **Congelado en servidor, cada día, sin retrovisor.** Hoy el log depende de que el
-   agricultor abra la app → en sombra silenciosa eso deja huecos. Falta un **cron diario**
-   (el "Diario B") que, por cada piloto, baje el clima, calcule la decisión de *ese* día y
-   la inserte — independientemente de la app.
-2. **`fecha` = fecha de la decisión, no `now()` del insert.** La columna usa
-   `default now()` (`db/schema.sql:43`); para un registro sellado conviene guardar la fecha
-   de la decisión explícita y tratar la tabla como **append-only** (sin updates ni deletes).
-3. **Dedupe robusto en servidor** (índice único por `usuario_id, fecha, tipo`), no en
-   `sessionStorage`.
-4. **`contexto` con el balance FAO-56** en toda fila (ver nota de §2), para poder explicar
-   y auditar cada decisión.
+**Seguridad:** corre en **DRY-RUN por defecto** (calcula y loguea, no escribe). Solo
+persiste con `DIARIO_B_LIVE=1` en entorno. Test manual: `GET /api/diario-b?dry=1`. Dedupe
+diario por servidor (`yaCongelado`: ¿hay fila de riego para ese usuario hoy?).
 
-Mientras (1)-(4) no estén, el shadow log es un buen borrador, pero **no es el registro
-inalterable** que hace creíble el reveal ante un evaluador.
+Qué resuelve respecto a la lista anterior:
+- ✅ **Congelado diario sin retrovisor** (cron, ET₀ observada + previsión de hoy).
+- ✅ **`fecha` = fecha de la decisión** (explícita, no el insert).
+- ✅ **Dedupe en servidor** (`yaCongelado`), no en `sessionStorage`.
+- ✅ **`contexto` con el balance FAO-56** en cada fila.
+
+Pendiente para que sea **inalterable de verdad** ante un evaluador:
+- **Append-only a nivel de BD**: revocar update/delete sobre `recomendaciones_log` (políticas
+  RLS o permisos), para que ni siquiera el servicio pueda reescribir la historia.
+- **Filtro de pilotos**: hoy procesa todo usuario con lat/lon; antes de `LIVE` conviene
+  marcar quién es piloto silencioso (flag en `usuarios`/`preferencias`).
+- **Unificar el motor**: que el frontend importe `api/_motor-riego.js` en lugar de su copia
+  inline (eliminar el riesgo de que deriven).
