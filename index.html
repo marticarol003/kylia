@@ -280,7 +280,7 @@
   .hero {
     background: var(--bg-dark);
     color: #fff;
-    padding: 108px 0 96px;
+    padding: 90px 0 78px;
     position: relative;
     overflow: hidden;
   }
@@ -421,7 +421,7 @@
   /* ═══════════════════════════════════════════════════════
      Section base
      ═══════════════════════════════════════════════════════ */
-  section { padding: 96px 0; }
+  section { padding: 74px 0; }
   section.alt { background: var(--bg-alt); }
   section.dark {
     background: var(--bg-dark);
@@ -431,7 +431,11 @@
   section.dark .section-lead { color: #8ea898; }
   section.dark .eyebrow { background: rgba(255,255,255,.07); color: #a8d894; }
 
-  .section-header { max-width: 780px; margin-bottom: 56px; }
+  .section-header { max-width: 780px; margin-bottom: 44px; }
+  @media (max-width: 760px) {
+    section { padding: 50px 0; }
+    .section-header { margin-bottom: 30px; }
+  }
   .section-title {
     font-size: clamp(1.8rem, 3.2vw, 2.6rem);
     font-weight: 700; letter-spacing: -.018em;
@@ -1007,16 +1011,8 @@
       <span class="eyebrow">El problema</span>
       <h2 class="section-title" id="h-problema">Sigues decidiendo cuándo regar igual que hace treinta años.</h2>
       <p class="section-lead">
-        Los datos del satélite son <strong>gratis desde 2015</strong>. Pero un píxel no te dice cuándo regar. Para llegar a esa decisión hay que cruzar Sentinel-2 con la previsión del tiempo, la evapotranspiración de tu zona, la humedad de tu suelo y el cultivo que tienes plantado. Hacerlo a mano son cinco horas a la semana de trabajo técnico. <strong>Kylia lo hace en cinco segundos.</strong>
+        Los datos del satélite son <strong>gratis desde 2015</strong>, pero un píxel no te dice cuándo regar: hay que cruzarlo con la previsión, la evapotranspiración de tu zona, la humedad del suelo y tu cultivo. A mano son cinco horas a la semana; <strong>Kylia lo hace en cinco segundos.</strong>
       </p>
-    </div>
-
-    <div class="problem-scene reveal">
-      <div class="scene-quote">
-        <span class="scene-tag">Una cooperativa olivarera · campaña 2026</span>
-        <p>El técnico tiene <strong>412 socios</strong> y un Excel con todas las parcelas. Cuando suena el teléfono, abre tres pestañas distintas y reconstruye la situación durante 20 minutos. Hace eso unas <strong>30 veces a la semana</strong>.</p>
-        <p>Son <strong>10 horas semanales</strong> buscando información que ya existe. <strong>11.000 €/año</strong> tirados solo en localizar lo que el satélite ya está mirando cada 5 días.</p>
-      </div>
     </div>
 
     <div class="problem-grid">
@@ -1139,13 +1135,6 @@
       <span class="eyebrow">Lo importante</span>
       <h2 class="section-title" id="h-compare">Cuatro cosas que diferencian a Kylia.</h2>
       <p class="section-lead">Lo justo para que decidas. Sin rodeos ni palabras grandes.</p>
-    </div>
-
-    <div class="compare-callout reveal">
-      <div class="compare-callout-icon" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3L2 20h20L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v5M12 17v1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </div>
-      <p>Las plataformas premium como xarvio o FieldView exigen formación técnica y, además, hardware en campo. Kylia es <strong>100% software</strong> y está pensada para el agricultor, no para el técnico.</p>
     </div>
 
     <p class="compare-hint" aria-hidden="true">Desliza para comparar las 4 →</p>
