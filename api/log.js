@@ -24,7 +24,7 @@ const HANDLERS = {
   "eventos":             handleEventos,
 };
 
-const METODOS_RIEGO = new Set(["goteo", "aspersion", "surco", "manguera"]);
+const METODOS_RIEGO = new Set(["goteo", "aspersion", "surco", "manguera", "regadera"]);
 const FRANJAS       = new Set(["manana", "mediodia", "tarde", "noche"]);
 const MANEJOS       = new Set(["convencional", "ecologico"]);
 const SUELOS        = new Set(["arenoso", "franco", "arcilloso"]);
@@ -65,6 +65,9 @@ async function handleRegistroUsuario(req, res, body) {
     manejo:               MANEJOS.has(body.manejo) ? body.manejo : null,
     suelo:                SUELOS.has(body.suelo) ? body.suelo : null,
     fecha_plantacion:     dateOrNull(body.fecha_plantacion),
+    caudal:               numOrNull(body.caudal),
+    area_m2:              numOrNull(body.area_m2),
+    capacidad_regadera:   numOrNull(body.capacidad_regadera),
     origen:               clean(body.origen,       120)                 || null,
     preferencias: body.preferencias && typeof body.preferencias === "object" ? body.preferencias : {},
     ua:           clean(req.headers["user-agent"], 400)         || null,

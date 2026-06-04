@@ -1857,6 +1857,25 @@
           <button type="button" class="btn-cultivo" data-metodo="aspersion">Aspersión</button>
           <button type="button" class="btn-cultivo" data-metodo="surco">Surco</button>
           <button type="button" class="btn-cultivo" data-metodo="manguera">Manguera</button>
+          <button type="button" class="btn-cultivo" data-metodo="regadera">Regadera</button>
+        </div>
+      </div>
+      <div class="config-field">
+        <label>Ajuste de la cantidad <span style="font-weight:400;color:var(--subtle)">(opcional)</span></label>
+        <p class="config-hint">Para darte el riego en <strong>minutos</strong> (goteo, aspersión, manguera) o en <strong>regaderas</strong>, en vez de litros por m². Si lo dejas vacío, lo estimamos.</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div>
+            <label for="input-caudal" class="sub">Caudal (L/m² por hora)</label>
+            <input type="number" id="input-caudal" min="0" step="0.5" inputmode="decimal" placeholder="Ej: 4">
+          </div>
+          <div>
+            <label for="input-area" class="sub">Superficie (m²)</label>
+            <input type="number" id="input-area" min="0" step="1" inputmode="numeric" placeholder="Ej: 500">
+          </div>
+          <div>
+            <label for="input-capacidad-regadera" class="sub">Regadera (L)</label>
+            <input type="number" id="input-capacidad-regadera" min="0" step="1" inputmode="numeric" placeholder="Ej: 10">
+          </div>
         </div>
       </div>
       <div class="config-field">
@@ -2300,6 +2319,9 @@
       manejo:              null,
       suelo:               null,  // arenoso | franco | arcilloso (FAO-56 TAW/RAW)
       fechaPlantacion:     null,  // YYYY-MM-DD — fase fenológica → Kc
+      caudal:              null,  // L/m²·h del sistema → riego en minutos
+      areaParcela:         null,  // m² → regaderas / litros totales
+      capacidadRegadera:   null,  // L por regadera
     };
 
     const NDVI_HISTORY_DAYS = 56; // 8 semanas
@@ -2879,8 +2901,28 @@
     const SUELO_AWC_DEFAULT = 0.15;   // franco si no se conoce
     const ZR_M          = 0.30;       // profundidad radicular efectiva (m), hortícola
     const P_AGOTAMIENTO = 0.45;       // fracción de agotamiento sin estrés, FAO-56 Tabla 22
-    const EFIC_RIEGO    = { goteo: 0.90, aspersion: 0.75, manguera: 0.70, surco: 0.60 };
+    const EFIC_RIEGO    = { goteo: 0.90, aspersion: 0.75, manguera: 0.70, surco: 0.60, regadera: 0.85 };
     const EFIC_DEFAULT  = 0.85;
+    const CAUDAL_DEFAULT_MMH = { goteo: 4, aspersion: 10, manguera: 20 }; // L/m²·h por defecto
+
+    // Presenta la lámina bruta (L/m² = mm) en la unidad del sistema del agricultor.
+    // (Gemelo de presentarRiego en api/_motor-riego.js — ver deuda "unificar motor".)
+    function fmtRiego(litrosBrutoMm) {
+      const mm = Math.max(0, Number(litrosBrutoMm) || 0);
+      const m  = cfg.metodoRiego;
+      if (m === "regadera") {
+        const a = Number(cfg.areaParcela), cap = Number(cfg.capacidadRegadera);
+        if (a > 0 && cap > 0) {
+          const litros = mm * a, n = litros / cap;
+          const nT = n >= 10 ? Math.round(n) : Math.round(n * 10) / 10;
+          return `${nT} regadera${nT === 1 ? "" : "s"} (${Math.round(litros)} L)`;
+        }
+        return `${Math.round(mm)} L/m²`;
+      }
+      const caudal = Number(cfg.caudal) || CAUDAL_DEFAULT_MMH[m];
+      if (caudal > 0) return `${Math.round((mm / caudal) * 60)} min`;
+      return `${Math.round(mm)} L/m²`;
+    }
 
     // Kc del día según los días transcurridos desde la plantación (interpolación
     // lineal por fases: inicial → desarrollo → media → final).
@@ -3724,16 +3766,16 @@
                 id: "riego", categoria: "RIEGO", catClass: "riego",
                 titulo: `No riegues — la lluvia prevista (${lluviaPrevista.toFixed(0)} mm) ya lo cubre`,
                 detalle: `${deficit} Se prevén ${lluviaPrevista.toFixed(0)} mm de lluvia en los próximos días, suficiente para reponer la pérdida. Regar ahora desperdiciaría agua y energía.`,
-                prod: null, prioridad: 3,
+                prod: null, prioridad: 3, cantidadLm2: 0,
               });
             } else if (!urgente && diaLluvia) {
               // Algo de lluvia pero no cubre todo → riego reducido
               const restante = Math.max(5, Math.ceil(Math.max(0, Dr - lluviaPrevista) / efic));
               recs.push({
                 id: "riego", categoria: "RIEGO", catClass: "riego",
-                titulo: `Riega solo ${restante} L/m² — el ${diaLluvia.nombreDia} llueve`,
-                detalle: `${deficit} Se prevén ${lluviaPrevista.toFixed(0)} mm de lluvia el ${diaLluvia.nombreDia}. Riega ahora solo ${restante} litros/m² — la lluvia completará el resto. Así usas el mínimo de agua necesario.`,
-                prod: null, prioridad: 3,
+                titulo: `Riega solo ${fmtRiego(restante)} — el ${diaLluvia.nombreDia} llueve`,
+                detalle: `${deficit} Se prevén ${lluviaPrevista.toFixed(0)} mm de lluvia el ${diaLluvia.nombreDia}. Riega ahora solo ${fmtRiego(restante)} (${restante} L/m²) — la lluvia completará el resto. Así usas el mínimo de agua necesario.`,
+                prod: null, prioridad: 3, cantidadLm2: restante,
               });
             } else {
               // Sin lluvia suficiente o urgente → regar normalmente
@@ -3742,9 +3784,9 @@
                 : "esta tarde-noche (entre las 18h y las 21h)";
               recs.push({
                 id: "riego", categoria: "RIEGO", catClass: "riego",
-                titulo: urgente ? `Riega hoy: aplica ${litros} L/m²` : `Riega ${litros} L/m² ${horario}`,
-                detalle: `${deficit} Aplica ${litros} litros por metro cuadrado ${horario}. Regar a esa hora evita que el sol evapore el agua antes de llegar a las raíces — el riego es 2-3 veces más eficiente que al mediodía.`,
-                prod: null, prioridad: urgente ? 1 : 3,
+                titulo: urgente ? `Riega hoy: ${fmtRiego(litros)}` : `Riega ${fmtRiego(litros)} ${horario}`,
+                detalle: `${deficit} Aplica ${fmtRiego(litros)} (${litros} L/m²) ${horario}. Regar a esa hora evita que el sol evapore el agua antes de llegar a las raíces — el riego es 2-3 veces más eficiente que al mediodía.`,
+                prod: null, prioridad: urgente ? 1 : 3, cantidadLm2: litros,
               });
             }
         }
@@ -4279,9 +4321,13 @@
           const tipo = r.catClass === "tratamiento" ? "tratamiento"
                      : r.catClass === "nutricion"   ? "nutricion"
                      : "riego";
-          // Cantidad L/m² si aparece en el título "Riega X L/m²"
-          const m = (r.titulo || "").match(/(\d+(?:[.,]\d+)?)\s*L\/m/);
-          const cantidad_l_m2 = m ? Number(m[1].replace(",", ".")) : null;
+          // Cantidad en L/m² (mm). Explícita en la rec (r.cantidadLm2); si no,
+          // se intenta extraer del título como fallback legacy.
+          let cantidad_l_m2 = (typeof r.cantidadLm2 === "number") ? r.cantidadLm2 : null;
+          if (cantidad_l_m2 == null) {
+            const m = (r.titulo || "").match(/(\d+(?:[.,]\d+)?)\s*L\/m/);
+            cantidad_l_m2 = m ? Number(m[1].replace(",", ".")) : null;
+          }
           const nivel = r.prioridad <= 2 ? "alta" : r.prioridad === 3 ? "media" : "baja";
           return {
             tipo,
@@ -4644,10 +4690,18 @@
         // Campos FAO-56 del panel (si no se seleccionan, se conserva lo previo).
         const sueloSel   = document.querySelector("#suelo-grid .btn-cultivo.activo");
         const fechaPlant = document.getElementById("input-fecha-plantacion");
+        const numCfg = (id, prev) => {
+          const el = document.getElementById(id);
+          const v  = el ? parseFloat(el.value) : NaN;
+          return (Number.isFinite(v) && v > 0) ? v : (prev ?? null);
+        };
         nuevoCfg = {
           ...nuevoCfg,
-          suelo:           sueloSel ? sueloSel.dataset.suelo : (nuevoCfg.suelo ?? null),
-          fechaPlantacion: (fechaPlant && fechaPlant.value) ? fechaPlant.value : (nuevoCfg.fechaPlantacion ?? null),
+          suelo:             sueloSel ? sueloSel.dataset.suelo : (nuevoCfg.suelo ?? null),
+          fechaPlantacion:   (fechaPlant && fechaPlant.value) ? fechaPlant.value : (nuevoCfg.fechaPlantacion ?? null),
+          caudal:            numCfg("input-caudal",              nuevoCfg.caudal),
+          areaParcela:       numCfg("input-area",                nuevoCfg.areaParcela),
+          capacidadRegadera: numCfg("input-capacidad-regadera",  nuevoCfg.capacidadRegadera),
         };
         const eraPrimerUso = !localStorage.getItem(STORAGE_KEY);
         saveConfig(nuevoCfg);
@@ -4672,6 +4726,9 @@
             manejo:               nuevoCfg.manejo || null,
             suelo:                nuevoCfg.suelo || null,
             fecha_plantacion:     nuevoCfg.fechaPlantacion || null,
+            caudal:               nuevoCfg.caudal ?? null,
+            area_m2:              nuevoCfg.areaParcela ?? null,
+            capacidad_regadera:   nuevoCfg.capacidadRegadera ?? null,
             origen:               localStorage.getItem("kylia_origen"),
           });
         } catch (_) {}
@@ -4756,6 +4813,10 @@
         });
         const fp = document.getElementById("input-fecha-plantacion");
         if (fp) fp.value = cfg.fechaPlantacion || "";
+        const setNum = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v != null ? v : ""); };
+        setNum("input-caudal",              cfg.caudal);
+        setNum("input-area",                cfg.areaParcela);
+        setNum("input-capacidad-regadera",  cfg.capacidadRegadera);
       }
       // Single-select del grid de tipo de suelo
       document.querySelectorAll("#suelo-grid .btn-cultivo").forEach(btn => {

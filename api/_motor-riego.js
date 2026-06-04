@@ -22,8 +22,13 @@ const SUELO_AWC = { arenoso: 0.08, franco: 0.15, arcilloso: 0.16 }; // θFC−θ
 const SUELO_AWC_DEFAULT = 0.15;   // franco
 const ZR_M          = 0.30;       // profundidad radicular efectiva (m)
 const P_AGOTAMIENTO = 0.45;       // fracción de agotamiento sin estrés, FAO-56 Tabla 22
-const EFIC_RIEGO    = { goteo: 0.90, aspersion: 0.75, manguera: 0.70, surco: 0.60 };
+const EFIC_RIEGO    = { goteo: 0.90, aspersion: 0.75, manguera: 0.70, surco: 0.60, regadera: 0.85 };
 const EFIC_DEFAULT  = 0.85;
+
+// Pluviometría/caudal por defecto del sistema (mm/hora = L/m² por hora), para
+// convertir la lámina a minutos cuando el agricultor no declara el suyo.
+// Orientativos; cada piloto puede afinar el suyo en onboarding.
+const CAUDAL_DEFAULT_MMH = { goteo: 4, aspersion: 10, manguera: 20 };
 
 // Kc del día por interpolación lineal entre fases (inicial→desarrollo→media→final).
 function kcDelDia(cultivoId, diasDesdePlantacion) {
@@ -115,7 +120,38 @@ function decisionRiego(bal) {
            texto: `Todo en orden · déficit ${r0(Dr)} mm < umbral ${r0(raw)}` };
 }
 
+// Convierte la lámina BRUTA (mm = L/m²) a la unidad del sistema del agricultor.
+//   regadera → nº de regaderas (= mm × área ÷ capacidad) + litros totales
+//   goteo/aspersión/manguera → minutos (= mm ÷ caudal mm/h × 60)
+//   surco / sin datos → L/m² (no hay modelo de caudal fiable)
+// Siempre devuelve también `mm` para trazabilidad (todo el motor habla en mm).
+function presentarRiego(mmBruto, opts = {}) {
+  const { metodoRiego, caudalMmh, areaM2, capacidadRegaderaL } = opts;
+  const mm = Math.max(0, Number(mmBruto) || 0);
+  const r0 = (x) => Math.round(x);
+  const r1 = (x) => Math.round(x * 10) / 10;
+
+  if (metodoRiego === "regadera") {
+    if (areaM2 > 0 && capacidadRegaderaL > 0) {
+      const litros = mm * areaM2;                       // L para todo el bancal
+      const n = litros / capacidadRegaderaL;
+      const nTxt = n >= 10 ? r0(n) : r1(n);
+      return { unidad: "regaderas", valor: nTxt, mm: r1(mm),
+               litrosTotales: r0(litros),
+               texto: `${nTxt} regadera${nTxt === 1 ? "" : "s"} (${r0(litros)} L)` };
+    }
+    return { unidad: "l_m2", valor: r0(mm), mm: r1(mm), texto: `${r0(mm)} L/m²` };
+  }
+
+  const caudal = Number(caudalMmh) || CAUDAL_DEFAULT_MMH[metodoRiego];
+  if (caudal > 0) {
+    const min = (mm / caudal) * 60;
+    return { unidad: "min", valor: r0(min), mm: r1(mm), texto: `${r0(min)} min` };
+  }
+  return { unidad: "l_m2", valor: r0(mm), mm: r1(mm), texto: `${r0(mm)} L/m²` };
+}
+
 module.exports = {
-  FAO_KC, SUELO_AWC, ZR_M, P_AGOTAMIENTO, EFIC_RIEGO, EFIC_DEFAULT,
-  kcDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego,
+  FAO_KC, SUELO_AWC, ZR_M, P_AGOTAMIENTO, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
+  kcDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego,
 };

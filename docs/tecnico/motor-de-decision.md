@@ -362,7 +362,7 @@ parámetros que usa el frontend, (2) reconstruya el `Model` de `pyfao56` con eso
 §3.4 con los RMSE reales y el veredicto. Opcional (Nivel 2 reforzado): contrastar `Dr`
 contra el **sensor de humedad de suelo** del campo de validación.
 
-### 3.5 Presentación de la cantidad: tiempo vs litros (decisión de diseño, pendiente)
+### 3.5 Presentación de la cantidad: tiempo vs litros — IMPLEMENTADO (2026-06-04)
 
 El motor decide en **mm (= L/m²)** — es físico, no se toca. Pero la **unidad que se le
 muestra al agricultor** debería adaptarse a su sistema, porque un agricultor con goteo o
@@ -378,10 +378,15 @@ minutos = lámina bruta (mm) ÷ caudal del sistema (mm/hora) × 60
 - **regadera → nº de regaderas / litros** (no es tiempo, es volumen contado): litros =
   mm × área. Es el caso del experimento de las lechugas del campo del padre.
 
-El esquema ya está medio preparado: `acciones.duracion_min` existe para el lado de lo que
-**registra** el agricultor; falta llevar la unidad de tiempo también al lado de la
-**recomendación** (y capturar el caudal en onboarding). Internamente, el balance y el
-`cantidad_l_m2` del shadow log siguen en mm — el tiempo es solo capa de presentación.
+**Implementación (2026-06-04):** `presentarRiego()` en `api/_motor-riego.js` (y su gemelo
+inline `fmtRiego()` en `app/index.html`) convierte la lámina bruta a la unidad del sistema.
+Onboarding capta `caudal`, `area_m2` y `capacidad_regadera` (+ método `regadera`), persistidos
+en `usuarios` (`db/onboarding-riego-unidades.sql`) vía `api/log.js`. La recomendación de riego
+muestra **minutos** (goteo/aspersión/manguera, con `CAUDAL_DEFAULT_MMH` si no se declara caudal),
+**regaderas + litros** (regadera) o **L/m²** (surco/sin datos), siempre con los mm en el detalle.
+El `cantidad_l_m2` del shadow log se desacopló del título (campo explícito `cantidadLm2`), así que
+sigue guardando los mm aunque el texto muestre minutos. Internamente el balance sigue en mm — el
+tiempo/regaderas es solo capa de presentación.
 
 ---
 
