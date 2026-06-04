@@ -13,6 +13,9 @@ Este directorio agrupa toda la documentación interna del proyecto, organizada p
 - **`arquitectura.md`** — diagrama Mermaid del sistema, decisiones de stack (Vercel + Supabase + Copernicus), costes mensuales estimados, plan de disaster recovery.
 - **`estado-y-roadmap.md`** — estado funcional actual y siguientes pasos técnicos.
 - **`fase-2-integracion-mapa.md`** — diseño de la integración con el dump oficial MAPA (Fase 2, pendiente de implementación).
+- **`motor-de-decision.md`** — referencia del motor agronómico: datos, cálculos FAO-56 del riego, estado de validación honesto por modelo.
+- **`shadow-log-recomendaciones.md`** — cómo una recomendación pasa a ser texto en Supabase (registro silencioso) + el cron Diario B.
+- **`runbook-piloto-silencioso.md`** — pasos operativos para activar los pilotos silenciosos y montar el campo del padre, dejándolo todo registrado.
 - **`dossier-tecnico.pdf`** — versión imprimible para enseñar a un CTO o a un partner técnico.
 
 ### `negocio/` — Estrategia y captación de capital
