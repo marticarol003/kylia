@@ -133,9 +133,10 @@ module.exports = async (req, res) => {
   const vista = (req.query?.vista || "hoy").toString();
 
   try {
-    const usuarios = await supabaseSelect("usuarios",
-      `id=eq.${usuarioId}&select=id,ciudad,cultivos,lat,lon,suelo,metodo_riego,`
-      + `fecha_plantacion,area_m2,capacidad_regadera,tarifa_agua`);
+    // select=* a propósito: tras un ALTER reciente, el caché de esquema de
+    // PostgREST puede no conocer aún las columnas nuevas y un select explícito
+    // falla. Con * traemos lo que haya; el motor cae a defaults si algo falta.
+    const usuarios = await supabaseSelect("usuarios", `id=eq.${usuarioId}&select=*`);
     const u = (usuarios || [])[0];
     if (!u) return res.status(404).json({ ok: false, error: "usuario no encontrado (¿ejecutaste el alta?)" });
 
