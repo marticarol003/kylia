@@ -11,7 +11,10 @@
 // y loguean por consola, pero NO lanzan — así los endpoints siguen respondiendo
 // 200 y el frontend no rompe (ej. cuando todavía no se han configurado).
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "";
+// Sin barra(s) final(es): si SUPABASE_URL viene como "https://x.supabase.co/",
+// el "/rest/v1/..." produciría "//rest/v1/..." (doble barra) y PostgREST lo
+// rechaza con PGRST125 "Invalid path". Normalizar aquí lo arregla para todos.
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/+$/, "");
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || "";
 
 function isConfigured() {
