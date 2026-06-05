@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Campo del padre · Kylia</title>
+<meta name="theme-color" content="#013A27" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --verde:#013A27; --verde-700:#002518; --verde-900:#001710; --verde-50:#E7F1EC;
+    --slate-900:#0f172a; --slate-700:#334155; --slate-500:#64748b; --slate-200:#e2e8f0; --slate-50:#f8fafc;
+    --ambar:#b45309; --ambar-50:#fef3c7; --rojo:#9b3a3a; --rojo-50:#f7ebeb;
+    --radius:18px; --shadow:0 8px 24px -8px rgba(15,23,42,0.18);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color:var(--slate-900); line-height:1.55; background:var(--slate-50);
+    -webkit-font-smoothing:antialiased; padding:18px;
+  }
+  .app { max-width:520px; margin:0 auto; }
+  .brand { display:flex; align-items:center; gap:8px; font-weight:800; color:var(--verde-900);
+           letter-spacing:-0.02em; font-size:1.05rem; margin:6px 2px 18px; }
+  .brand .dot { width:11px; height:11px; border-radius:50%; background:var(--verde); }
+  h1 { font-size:1.5rem; color:var(--verde-900); letter-spacing:-0.02em; }
+  .sub { color:var(--slate-500); font-size:0.92rem; margin-top:2px; }
+
+  .card { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:26px 24px; margin-top:18px; }
+
+  /* Tarjeta de estado de hoy, coloreada por nivel */
+  .estado { text-align:center; padding:34px 24px; border-radius:var(--radius); margin-top:18px; }
+  .estado.baja  { background:var(--verde-50); }
+  .estado.media { background:var(--ambar-50); }
+  .estado.alta  { background:var(--rojo-50); }
+  .estado .tag { display:inline-block; font-size:0.74rem; font-weight:700; letter-spacing:0.16em;
+                 text-transform:uppercase; padding:5px 13px; border-radius:999px; }
+  .estado.baja  .tag { background:var(--verde); color:#fff; }
+  .estado.media .tag { background:var(--ambar); color:#fff; }
+  .estado.alta  .tag { background:var(--rojo); color:#fff; }
+  .estado .titular { font-size:2rem; font-weight:800; letter-spacing:-0.02em; margin:14px 0 6px; }
+  .estado.baja  .titular { color:var(--verde-900); }
+  .estado.media .titular { color:var(--ambar); }
+  .estado.alta  .titular { color:var(--rojo); }
+  .estado .porque { color:var(--slate-700); font-size:0.96rem; max-width:340px; margin:0 auto; }
+
+  .chips { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px; }
+  .chip { background:rgba(255,255,255,0.7); border:1px solid var(--slate-200); border-radius:999px;
+          padding:6px 13px; font-size:0.82rem; color:var(--slate-700); font-weight:600; }
+
+  .label { font-size:0.74rem; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+           color:var(--slate-500); margin-bottom:10px; }
+  .next { display:flex; align-items:baseline; gap:8px; }
+  .next .big { font-size:1.35rem; font-weight:800; color:var(--verde-900); }
+  .hist { list-style:none; }
+  .hist li { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--slate-200);
+             font-size:0.92rem; }
+  .hist li:last-child { border-bottom:0; }
+  .hist .f { color:var(--slate-500); }
+  .hist .v { font-weight:700; color:var(--verde-900); }
+
+  .foot { text-align:center; color:var(--slate-500); font-size:0.78rem; margin:22px 2px 8px; line-height:1.5; }
+  .msg { text-align:center; color:var(--slate-500); padding:40px 20px; }
+  .msg code { background:var(--slate-200); padding:2px 6px; border-radius:6px; font-size:0.85em; }
+  .skel { animation:pulse 1.3s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="brand"><span class="dot"></span> Kylia</div>
+    <div id="root">
+      <div class="msg skel">Calculando el riego de hoy…</div>
+    </div>
+    <p class="foot">
+      Cálculo FAO-56 con el clima de Sant Boi en vivo (Open-Meteo). Solo lectura.<br>
+      El campo del padre es laboratorio abierto: aquí Kylia habla.
+    </p>
+  </div>
+
+<script>
+  // Campo del padre por defecto; se puede ver otro con ?id=<uuid>
+  const ID = new URLSearchParams(location.search).get("id")
+    || "9aaa1b25-6fad-4213-9eda-e135af71b2c3";
+
+  const NIVEL = {
+    baja:  { tag:"Hoy",      titular:"No toca regar" },
+    media: { tag:"Atención", titular:"Vigila el riego" },
+    alta:  { tag:"Hoy toca", titular:"Riega" },
+  };
+  const fmtFecha = iso => {
+    const [y,m,d] = iso.split("-");
+    return `${d}/${m}`;
+  };
+
+  function pintar(data) {
+    const root = document.getElementById("root");
+    if (!data.ok) {
+      const txt = data.error && /no encontrado/.test(data.error)
+        ? `Este campo aún no está dado de alta. Ejecuta <code>db/alta-campo-padre.sql</code> en Supabase.`
+        : `No se pudo cargar: ${data.error || data.reason || "error"}.`;
+      root.innerHTML = `<div class="msg">${txt}</div>`;
+      return;
+    }
+    const h = data.hoy, u = data.usuario, n = NIVEL[h.nivel] || NIVEL.baja;
+    const titular = h.nivel === "alta" && h.presentacion
+      ? `Riega ~${h.presentacion.texto}` : n.titular;
+
+    let html = `
+      <h1>Campo del padre</h1>
+      <div class="sub">${u.ciudad || ""}${u.cultivo ? " · " + u.cultivo : ""} · ${h.fecha.split("-").reverse().slice(0,2).join("/")}</div>
+
+      <div class="estado ${h.nivel}">
+        <span class="tag">${n.tag}</span>
+        <div class="titular">${titular}</div>
+        <div class="porque">Déficit de agua en el suelo: <b>${h.deficit_mm} mm</b>
+          de un umbral de <b>${h.umbral_mm} mm</b> para regar.</div>
+        <div class="chips">
+          <span class="chip">💧 Lluvia hoy ${h.lluvia} mm</span>
+          <span class="chip">☀️ Evaporación ${h.et0} mm</span>
+        </div>
+      </div>`;
+
+    html += `<div class="card"><div class="label">Próximo riego previsto</div>`;
+    if (data.proximo) {
+      const cubos = data.proximo.presentacion?.texto || "—";
+      html += `<div class="next"><span class="big">${fmtFecha(data.proximo.fecha)}</span>
+               <span>· aprox. ${cubos}</span></div>`;
+    } else {
+      html += `<div class="next"><span>Sin riego previsto en los próximos 7 días — el suelo tiene reserva suficiente.</span></div>`;
+    }
+    html += `</div>`;
+
+    if (data.riegos_recientes && data.riegos_recientes.length) {
+      html += `<div class="card"><div class="label">Riegos registrados</div><ul class="hist">`;
+      for (const r of data.riegos_recientes) {
+        const v = r.cubos != null ? `${r.cubos} cubo${r.cubos === 1 ? "" : "s"}` : `${r.l_m2} L/m²`;
+        html += `<li><span class="f">${fmtFecha(r.fecha)}</span><span class="v">${v}</span></li>`;
+      }
+      html += `</ul></div>`;
+    }
+    root.innerHTML = html;
+  }
+
+  fetch(`/api/riego-hoy?usuario_id=${encodeURIComponent(ID)}`)
+    .then(r => r.json())
+    .then(pintar)
+    .catch(e => {
+      document.getElementById("root").innerHTML =
+        `<div class="msg">No se pudo conectar con el servidor.<br><small>${e.message}</small></div>`;
+    });
+</script>
+</body>
+</html>
