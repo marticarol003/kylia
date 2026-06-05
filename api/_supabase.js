@@ -86,7 +86,8 @@ async function supabaseSelect(table, query = "") {
   const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Supabase select ${table} ${res.status}: ${text.slice(0, 400)}`);
+    const path = url.replace(SUPABASE_URL, "");   // sin dominio/clave, solo el path+query
+    throw new Error(`Supabase select ${table} ${res.status} [${path}]: ${text.slice(0, 300)}`);
   }
   return await res.json();
 }
