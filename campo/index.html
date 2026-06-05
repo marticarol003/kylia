@@ -30,7 +30,6 @@
 
   .card { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:26px 24px; margin-top:18px; }
 
-  /* Tarjeta de estado de hoy, coloreada por nivel */
   .estado { text-align:center; padding:34px 24px; border-radius:var(--radius); margin-top:18px; }
   .estado.baja  { background:var(--verde-50); }
   .estado.media { background:var(--ambar-50); }
@@ -61,38 +60,134 @@
   .hist .f { color:var(--slate-500); }
   .hist .v { font-weight:700; color:var(--verde-900); }
 
+  /* Cuaderno de campo (registro) */
+  .tabs { display:flex; gap:6px; margin-bottom:16px; }
+  .tab { flex:1; padding:9px 6px; border:1.5px solid var(--slate-200); background:#fff; border-radius:10px;
+         font-family:inherit; font-weight:700; font-size:0.86rem; color:var(--slate-500); cursor:pointer; }
+  .tab.on { background:var(--verde); border-color:var(--verde); color:#fff; }
+  .pane { display:none; }
+  .pane.on { display:block; }
+  .field { margin-bottom:12px; }
+  .field label { display:block; font-size:0.82rem; font-weight:600; color:var(--slate-700); margin-bottom:5px; }
+  .field input, .field select {
+    width:100%; padding:11px 12px; border:1.5px solid var(--slate-200); border-radius:10px;
+    font-family:inherit; font-size:1rem; color:var(--slate-900); background:#fff;
+  }
+  .field input:focus, .field select:focus { outline:none; border-color:var(--verde); }
+  .hint { font-size:0.8rem; color:var(--slate-500); margin-top:5px; }
+  .btn { width:100%; padding:13px; background:var(--verde); color:#fff; border:0; border-radius:10px;
+         font-family:inherit; font-weight:700; font-size:1rem; cursor:pointer; margin-top:4px; }
+  .btn:disabled { opacity:0.5; }
+  .row2 { display:flex; gap:10px; }
+  .row2 > * { flex:1; }
+
   .foot { text-align:center; color:var(--slate-500); font-size:0.78rem; margin:22px 2px 8px; line-height:1.5; }
   .msg { text-align:center; color:var(--slate-500); padding:40px 20px; }
   .msg code { background:var(--slate-200); padding:2px 6px; border-radius:6px; font-size:0.85em; }
   .skel { animation:pulse 1.3s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(80px);
+           background:var(--verde-900); color:#fff; padding:12px 22px; border-radius:999px; font-weight:600;
+           font-size:0.92rem; box-shadow:var(--shadow); transition:transform 0.28s cubic-bezier(0.22,0.61,0.36,1);
+           z-index:99; }
+  #toast.show { transform:translateX(-50%) translateY(0); }
+  #toast.err { background:var(--rojo); }
 </style>
 </head>
 <body>
   <div class="app">
     <div class="brand"><span class="dot"></span> Kylia</div>
-    <div id="root">
-      <div class="msg skel">Calculando el riego de hoy…</div>
+    <div id="root"><div class="msg skel">Calculando el riego de hoy…</div></div>
+
+    <!-- Cuaderno de campo (oculto hasta que carga el usuario) -->
+    <div class="card" id="registro" style="display:none">
+      <div class="label">Registrar lo de hoy</div>
+      <div class="tabs">
+        <button class="tab on" data-pane="riego">💧 Riego</button>
+        <button class="tab" data-pane="trat">🧪 Tratamiento</button>
+        <button class="tab" data-pane="obs">👁️ Observación</button>
+      </div>
+
+      <div class="pane on" data-pane="riego">
+        <div class="row2">
+          <div class="field">
+            <label for="r-cubos">Cubos echados</label>
+            <input id="r-cubos" type="number" inputmode="decimal" step="0.5" min="0" placeholder="ej. 1.5" />
+          </div>
+          <div class="field">
+            <label for="r-franja">Momento</label>
+            <select id="r-franja">
+              <option value="">—</option>
+              <option value="manana">Mañana</option>
+              <option value="mediodia">Mediodía</option>
+              <option value="tarde">Tarde</option>
+              <option value="noche">Noche</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" id="r-hint"></div>
+        <button class="btn" data-send="riego">Registrar riego</button>
+      </div>
+
+      <div class="pane" data-pane="trat">
+        <div class="field"><label for="t-prod">Producto aplicado</label>
+          <input id="t-prod" type="text" maxlength="160" placeholder="ej. jabón potásico" /></div>
+        <div class="row2">
+          <div class="field"><label for="t-dosis">Dosis (opcional)</label>
+            <input id="t-dosis" type="text" maxlength="80" placeholder="ej. 20 ml/L" /></div>
+          <div class="field"><label for="t-franja">Momento</label>
+            <select id="t-franja"><option value="">—</option><option value="manana">Mañana</option>
+              <option value="mediodia">Mediodía</option><option value="tarde">Tarde</option>
+              <option value="noche">Noche</option></select></div>
+        </div>
+        <div class="field"><label for="t-notas">Notas (opcional)</label>
+          <input id="t-notas" type="text" maxlength="200" placeholder="ej. solo en 2 lechugas" /></div>
+        <button class="btn" data-send="trat">Registrar tratamiento</button>
+      </div>
+
+      <div class="pane" data-pane="obs">
+        <div class="row2">
+          <div class="field"><label for="o-tipo">Qué viste</label>
+            <select id="o-tipo"><option value="plaga">Plaga</option><option value="enfermedad">Enfermedad</option>
+              <option value="estres">Estrés (calor, falta de agua…)</option><option value="otro">Otro</option></select></div>
+          <div class="field"><label for="o-sev">Gravedad</label>
+            <select id="o-sev"><option value="">—</option><option value="1">1 · leve</option>
+              <option value="2">2</option><option value="3">3 · media</option><option value="4">4</option>
+              <option value="5">5 · grave</option></select></div>
+        </div>
+        <div class="field"><label for="o-desc">Descripción</label>
+          <input id="o-desc" type="text" maxlength="300" placeholder="ej. pulgón en el envés de 1 lechuga" /></div>
+        <button class="btn" data-send="obs">Registrar observación</button>
+      </div>
     </div>
+
     <p class="foot">
-      Cálculo FAO-56 con el clima de Sant Boi en vivo (Open-Meteo). Solo lectura.<br>
-      El campo del padre es laboratorio abierto: aquí Kylia habla.
+      Cálculo FAO-56 con el clima de Sant Boi en vivo (Open-Meteo).<br>
+      El campo del padre es laboratorio abierto: aquí Kylia habla y registramos lo real.
     </p>
   </div>
+  <div id="toast"></div>
 
 <script>
-  // Campo del padre por defecto; se puede ver otro con ?id=<uuid>
   const ID = new URLSearchParams(location.search).get("id")
     || "9aaa1b25-6fad-4213-9eda-e135af71b2c3";
+  let USUARIO = {};   // capacidad_regadera, area_m2, cultivo (del fetch)
 
   const NIVEL = {
     baja:  { tag:"Hoy",      titular:"No toca regar" },
     media: { tag:"Atención", titular:"Vigila el riego" },
     alta:  { tag:"Hoy toca", titular:"Riega" },
   };
-  const fmtFecha = iso => {
-    const [y,m,d] = iso.split("-");
-    return `${d}/${m}`;
+  const fmtFecha = iso => { const [,m,d] = iso.split("-"); return `${d}/${m}`; };
+  const hoyLocal = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  };
+  const toast = (txt, err) => {
+    const t = document.getElementById("toast");
+    t.textContent = txt; t.className = "show" + (err ? " err" : "");
+    setTimeout(() => { t.className = err ? "err" : ""; }, 2600);
   };
 
   function pintar(data) {
@@ -104,14 +199,13 @@
       root.innerHTML = `<div class="msg">${txt}</div>`;
       return;
     }
-    const h = data.hoy, u = data.usuario, n = NIVEL[h.nivel] || NIVEL.baja;
-    const titular = h.nivel === "alta" && h.presentacion
-      ? `Riega ~${h.presentacion.texto}` : n.titular;
+    USUARIO = data.usuario || {};
+    const h = data.hoy, u = USUARIO, n = NIVEL[h.nivel] || NIVEL.baja;
+    const titular = h.nivel === "alta" && h.presentacion ? `Riega ~${h.presentacion.texto}` : n.titular;
 
     let html = `
       <h1>Campo del padre</h1>
-      <div class="sub">${u.ciudad || ""}${u.cultivo ? " · " + u.cultivo : ""} · ${h.fecha.split("-").reverse().slice(0,2).join("/")}</div>
-
+      <div class="sub">${u.ciudad || ""}${u.cultivo ? " · " + u.cultivo : ""} · ${fmtFecha(h.fecha)}</div>
       <div class="estado ${h.nivel}">
         <span class="tag">${n.tag}</span>
         <div class="titular">${titular}</div>
@@ -121,13 +215,11 @@
           <span class="chip">💧 Lluvia hoy ${h.lluvia} mm</span>
           <span class="chip">☀️ Evaporación ${h.et0} mm</span>
         </div>
-      </div>`;
-
-    html += `<div class="card"><div class="label">Próximo riego previsto</div>`;
+      </div>
+      <div class="card"><div class="label">Próximo riego previsto</div>`;
     if (data.proximo) {
-      const cubos = data.proximo.presentacion?.texto || "—";
       html += `<div class="next"><span class="big">${fmtFecha(data.proximo.fecha)}</span>
-               <span>· aprox. ${cubos}</span></div>`;
+               <span>· aprox. ${data.proximo.presentacion?.texto || "—"}</span></div>`;
     } else {
       html += `<div class="next"><span>Sin riego previsto en los próximos 7 días — el suelo tiene reserva suficiente.</span></div>`;
     }
@@ -142,15 +234,74 @@
       html += `</ul></div>`;
     }
     root.innerHTML = html;
+
+    // Mostrar el cuaderno + pista de conversión cubos→litros
+    document.getElementById("registro").style.display = "";
+    const hint = document.getElementById("r-hint");
+    if (u.capacidad_regadera && u.area_m2) {
+      hint.textContent = `Cada cubo = ${u.capacidad_regadera} L sobre ${u.area_m2} m².`;
+    }
   }
 
-  fetch(`/api/campo?vista=hoy&usuario_id=${encodeURIComponent(ID)}`)
-    .then(r => r.json())
-    .then(pintar)
-    .catch(e => {
-      document.getElementById("root").innerHTML =
-        `<div class="msg">No se pudo conectar con el servidor.<br><small>${e.message}</small></div>`;
+  function cargar() {
+    fetch(`/api/campo?vista=hoy&usuario_id=${encodeURIComponent(ID)}`)
+      .then(r => r.json()).then(pintar)
+      .catch(e => { document.getElementById("root").innerHTML =
+        `<div class="msg">No se pudo conectar.<br><small>${e.message}</small></div>`; });
+  }
+
+  // ── Registro (POST /api/log) ──────────────────────────────────
+  async function enviar(recurso, fila) {
+    const body = { recurso, usuario_id: ID, fecha_local: hoyLocal(), cultivo: USUARIO.cultivo || null, ...fila };
+    const res = await fetch("/api/log", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || j.ok === false) throw new Error(j.error || "error al guardar");
+  }
+
+  const val = id => document.getElementById(id).value.trim();
+  const acciones = {
+    riego: async () => {
+      const cubos = parseFloat(val("r-cubos"));
+      if (!(cubos > 0)) { toast("Pon cuántos cubos", true); return; }
+      const fila = { tipo: "riego", franja_horaria: val("r-franja") || null,
+                     notas: `${cubos} cubo${cubos === 1 ? "" : "s"}` };
+      if (USUARIO.capacidad_regadera && USUARIO.area_m2)
+        fila.cantidad_l_m2 = Math.round((cubos * USUARIO.capacidad_regadera / USUARIO.area_m2) * 10) / 10;
+      await enviar("acciones", fila);
+      document.getElementById("r-cubos").value = "";
+    },
+    trat: async () => {
+      const prod = val("t-prod");
+      if (!prod) { toast("Pon el producto", true); return; }
+      await enviar("acciones", { tipo: "aplicacion", producto_nombre: prod,
+        dosis: val("t-dosis") || null, franja_horaria: val("t-franja") || null, notas: val("t-notas") || null });
+      ["t-prod","t-dosis","t-notas"].forEach(i => document.getElementById(i).value = "");
+    },
+    obs: async () => {
+      const desc = val("o-desc");
+      if (!desc) { toast("Describe lo que viste", true); return; }
+      await enviar("observaciones", { tipo: val("o-tipo"), descripcion: desc, severidad: val("o-sev") || null });
+      document.getElementById("o-desc").value = "";
+    },
+  };
+
+  // Pestañas
+  document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
+    const p = tab.dataset.pane;
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t === tab));
+    document.querySelectorAll(".pane").forEach(pane => pane.classList.toggle("on", pane.dataset.pane === p));
+  }));
+  // Botones de envío
+  document.querySelectorAll("[data-send]").forEach(btn => btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    try { await acciones[btn.dataset.send](); toast("✓ Registrado"); cargar(); }
+    catch (e) { toast(e.message || "No se pudo guardar", true); }
+    finally { btn.disabled = false; }
+  }));
+
+  cargar();
 </script>
 </body>
 </html>
