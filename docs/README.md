@@ -15,6 +15,7 @@ Este directorio agrupa toda la documentación interna del proyecto, organizada p
 - **`fase-2-integracion-mapa.md`** — diseño de la integración con el dump oficial MAPA (Fase 2, pendiente de implementación).
 - **`motor-de-decision.md`** — referencia del motor agronómico: datos, cálculos FAO-56 del riego, estado de validación honesto por modelo.
 - **`shadow-log-recomendaciones.md`** — cómo una recomendación pasa a ser texto en Supabase (registro silencioso) + el cron Diario B.
+- **`generador-reveal.md`** — el informe final del piloto: cruza lo que Kylia decidió vs lo que el agricultor hizo (4 dimensiones de /piloto), € solo en agua.
 - **`runbook-piloto-silencioso.md`** — pasos operativos para activar los pilotos silenciosos y montar el campo del padre, dejándolo todo registrado.
 - **`dossier-tecnico.pdf`** — versión imprimible para enseñar a un CTO o a un partner técnico.
 
