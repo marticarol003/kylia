@@ -144,7 +144,7 @@
     root.innerHTML = html;
   }
 
-  fetch(`/api/riego-hoy?usuario_id=${encodeURIComponent(ID)}`)
+  fetch(`/api/campo?vista=hoy&usuario_id=${encodeURIComponent(ID)}`)
     .then(r => r.json())
     .then(pintar)
     .catch(e => {

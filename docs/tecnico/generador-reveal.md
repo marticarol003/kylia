@@ -15,14 +15,16 @@
 | Qué | Dónde |
 |---|---|
 | Núcleo PURO (cálculo, sin red, testeable) | `api/_reveal.js` |
-| Endpoint (lee Supabase → núcleo → JSON) | `api/reveal.js` |
+| Endpoint (lee Supabase → núcleo → JSON) | `api/campo.js` (vista `reveal`) |
 | Test determinista | `scripts/test-reveal.mjs` (`node scripts/test-reveal.mjs`) |
 
 El núcleo recibe las filas ya leídas y devuelve el informe; el endpoint solo lee de
 Supabase y ensambla. Mismo patrón que `_motor-riego.js` ↔ `diario-b.js`.
 
-**Uso:** `GET /api/reveal?usuario_id=<uuid>` → `{ ok, informe }`. Añade `&dump=1` para
-ver las filas crudas. Si existe `REVEAL_TOKEN` en entorno, se exige (`?token=` o header).
+**Uso:** `GET /api/campo?vista=reveal&usuario_id=<uuid>` → `{ ok, informe }`. Añade
+`&dump=1` para ver las filas crudas. (El mismo router sirve `?vista=hoy`, el riego del
+día en cubos que consume `/campo`; se unificó en un endpoint por el límite de funciones
+del plan Vercel.)
 
 ---
 
