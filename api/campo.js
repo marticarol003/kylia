@@ -126,6 +126,15 @@ async function vistaReveal(req, res, u) {
 module.exports = async (req, res) => {
   if (!preludio(req, res, "GET")) return;
 
+  if (req.query?.debug === "1") {
+    const su = process.env.SUPABASE_URL || "";
+    return res.status(200).json({
+      supabase_url_preview: su.slice(0, 38), len: su.length,
+      ends_slash: su.endsWith("/"), has_rest: su.includes("/rest"),
+      has_key: Boolean(process.env.SUPABASE_SERVICE_KEY),
+    });
+  }
+
   const usuarioId = (req.query?.usuario_id || "").toString().trim();
   if (!ES_UUID.test(usuarioId)) return res.status(400).json({ error: "usuario_id inválido (UUID)" });
   if (!isConfigured()) return res.status(200).json({ ok: false, reason: "supabase_not_configured" });
