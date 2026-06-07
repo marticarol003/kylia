@@ -162,11 +162,22 @@ async function vistaComparativa(res, u) {
       `usuario_id=eq.${u.id}&tipo=eq.aplicacion&select=fecha_local,producto_nombre&order=fecha_local.asc`),
   ]);
 
-  // Solo días pasados/hoy (sin pronóstico): la comparativa es de lo ya ocurrido.
-  const idxHoy = serie.findIndex(s => s.date === hoy);
-  const dias   = serie.slice(0, (idxHoy >= 0 ? idxHoy : serie.length - 1) + 1);
+  // La comparación NO cuenta el riego de asentamiento del trasplante (riego de
+  // establecimiento, no una decisión de manejo). Arranca el día SIGUIENTE a la
+  // plantación, con el suelo a capacidad de campo (Dr=0: tras el asentamiento +
+  // lluvia el suelo quedó lleno). Así ambas ramas parten de 0 y solo divergen
+  // por las decisiones posteriores → el hueco = agua ahorrada siguiendo a Kylia.
+  const plant  = u.fecha_plantacion ? dia(u.fecha_plantacion) : null;
+  const inicio = plant
+    ? new Date(new Date(`${plant}T12:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10)
+    : null;
 
-  // 🟢 Kylia: contrafactual sobre el campo del padre.
+  // Solo días pasados/hoy (sin pronóstico) y desde el inicio de la comparación.
+  const idxHoy = serie.findIndex(s => s.date === hoy);
+  const hasta  = serie.slice(0, (idxHoy >= 0 ? idxHoy : serie.length - 1) + 1);
+  const dias   = inicio ? hasta.filter(d => d.date >= inicio) : hasta;
+
+  // 🟢 Kylia: contrafactual sobre el campo del padre (Dr arranca en 0 = suelo lleno tras el asentamiento).
   const kylia = simularKylia(dias, {
     suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
     metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
@@ -174,11 +185,12 @@ async function vistaComparativa(res, u) {
   const acumKylia = {};
   kylia.puntos.forEach(p => { acumKylia[p.date] = p.acum_l_m2; });
 
-  // 🟤 Padre: acumulado de lo realmente vertido por fecha.
+  // 🟤 Padre: acumulado de lo realmente vertido por fecha (sin el riego de asentamiento).
   const realPorDia = {};
   (riegos || []).forEach(r => {
-    if (r.fecha_local && r.cantidad_l_m2 != null)
-      realPorDia[dia(r.fecha_local)] = (realPorDia[dia(r.fecha_local)] || 0) + r.cantidad_l_m2;
+    const f = dia(r.fecha_local);
+    if (f && r.cantidad_l_m2 != null && (!inicio || f >= inicio))
+      realPorDia[f] = (realPorDia[f] || 0) + r.cantidad_l_m2;
   });
   let acumPadre = 0;
   const puntos = dias.map(d => {
@@ -195,8 +207,9 @@ async function vistaComparativa(res, u) {
     kylia_l_m2: r1(ultimo.kylia_l_m2),
     padre_l_m2: r1(ultimo.padre_l_m2),
     dif_l_m2:   r1(ultimo.padre_l_m2 - ultimo.kylia_l_m2),
-    dif_pct:    ultimo.kylia_l_m2 > 0
-                  ? Math.round(((ultimo.padre_l_m2 - ultimo.kylia_l_m2) / ultimo.kylia_l_m2) * 100)
+    // % de agua ahorrada siguiendo a Kylia, sobre lo que usa el padre (la base que se reduce).
+    ahorro_pct: ultimo.padre_l_m2 > 0
+                  ? Math.round(((ultimo.padre_l_m2 - ultimo.kylia_l_m2) / ultimo.padre_l_m2) * 100)
                   : null,
     kylia_litros: area ? Math.round(ultimo.kylia_l_m2 * area) : null,
     padre_litros: area ? Math.round(ultimo.padre_l_m2 * area) : null,
@@ -214,7 +227,7 @@ async function vistaComparativa(res, u) {
     ok: true, vista: "comparativa",
     campo: { ciudad: u.ciudad, cultivo: (u.cultivos || [])[0] || null,
              area_m2: area, metodo: u.metodo_riego, caudal_mmh: u.caudal },
-    desde: dias[0]?.date || null, hoy,
+    desde: dias[0]?.date || inicio || null, hoy, excluye_asentamiento: true,
     serie: puntos, totales, fertilizantes,
   });
 }

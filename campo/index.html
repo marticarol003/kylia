@@ -396,13 +396,16 @@
 
     let veredicto;
     if (t.dif_l_m2 > 0.5) {
-      veredicto = `Tu padre aplicó <b style="color:var(--marron)">${t.dif_l_m2} L/m² más</b>
-        que lo que habría recomendado Kylia${t.dif_pct != null ? ` (+${t.dif_pct}%)` : ""}.
-        ${c.area_m2 ? `En 500 m², ≈ <b>${Math.round(t.dif_l_m2 * c.area_m2).toLocaleString("es-ES")} L</b> de margen.` : ""}`;
+      const litros = c.area_m2 ? Math.round(t.dif_l_m2 * c.area_m2).toLocaleString("es-ES") : null;
+      veredicto = `Siguiendo a Kylia ahorrarías
+        <b style="color:var(--verde-900)">${t.dif_l_m2} L/m²${t.ahorro_pct != null ? ` (${t.ahorro_pct}%)` : ""}</b>
+        en este campo${litros ? ` · ≈ <b>${litros} L menos</b> en 500 m²` : ""}.`;
     } else if (t.dif_l_m2 < -0.5) {
-      veredicto = `Tu padre aplicó <b>${Math.abs(t.dif_l_m2)} L/m² menos</b> que Kylia — vigilar posible estrés hídrico.`;
+      veredicto = `Aquí Kylia habría regado <b>${Math.abs(t.dif_l_m2)} L/m² más</b> —
+        tu padre se está quedando corto (ojo al estrés hídrico). Ahorrar no es regar menos, es regar lo justo.`;
     } else {
-      veredicto = `De momento van <b>a la par</b> (${t.kylia_l_m2} vs ${t.padre_l_m2} L/m²).`;
+      veredicto = `De momento van <b>a la par</b> (${t.kylia_l_m2} vs ${t.padre_l_m2} L/m²) —
+        el ahorro se verá según avance la campaña.`;
     }
 
     let ferts = "";
@@ -442,10 +445,11 @@
       ${ferts}
 
       <p class="caveat">
-        Comparación <b>orientativa por m²</b>, no es un ensayo científico controlado: son dos parcelas de
-        escala distinta sobre el mismo clima. La línea de Kylia es la recomendación FAO-56 viva; la del padre,
-        lo que registró de verdad. El caudal del aspersor (${c.caudal_mmh || 10} mm/h) es <b>estimado</b> —
-        afínalo con el truco del vaso y la gráfica se recalcula.
+        Comparación sobre el <b>mismo campo</b> (los 500 m² de tu padre): misma lluvia, mismo suelo y cultivo.
+        🟤 lo que aplicó él &nbsp;vs&nbsp; 🟢 lo que Kylia le habría recomendado — solo cambia <b>quién decide</b>,
+        así el hueco es agua de la decisión, no del tamaño de la parcela. <b>No se cuenta el riego de asentamiento</b>
+        del trasplante (la comparación empieza al día siguiente). El caudal del aspersor (${c.caudal_mmh || 10} mm/h)
+        es estimado — afínalo con el truco del vaso y la gráfica se recalcula.
       </p>`;
   }
 
