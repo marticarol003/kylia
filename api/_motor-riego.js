@@ -43,6 +43,19 @@ function kcDelDia(cultivoId, diasDesdePlantacion) {
   return k.fin;
 }
 
+// Nombre de la fase fenológica del día (inicial→desarrollo→media→final), para
+// explicar en pantalla por qué el Kc es el que es. Misma partición que kcDelDia.
+function faseDelDia(cultivoId, dias) {
+  const k = FAO_KC[cultivoId];
+  if (!k || dias == null) return null;
+  const [Li, Ld, Lm] = k.L;
+  const d = Math.max(0, dias);
+  if (d < Li)           return "inicial";
+  if (d < Li + Ld)      return "desarrollo";
+  if (d < Li + Ld + Lm) return "media";
+  return "final";
+}
+
 // Agua total (TAW) y fácilmente disponible (RAW), en mm, según textura.
 function aguaSuelo(suelo) {
   const awc = SUELO_AWC[suelo] ?? SUELO_AWC_DEFAULT;
@@ -151,7 +164,36 @@ function presentarRiego(mmBruto, opts = {}) {
   return { unidad: "l_m2", valor: r0(mm), mm: r1(mm), texto: `${r0(mm)} L/m²` };
 }
 
+// Simula el manejo del riego "según Kylia" sobre una serie climática: cada día,
+// si el déficit acumulado alcanza el umbral RAW, riega la lámina BRUTA que
+// recomienda la regla (Dr/eficiencia) y repone el suelo; si no, no riega. Es la
+// rama contrafactual del campo del padre: "lo que habría hecho si hubiera
+// seguido a Kylia", para contrastarla con lo que aplicó de verdad.
+//   serie: [{date, et0, lluvia}]   opts: { suelo, cultivoId, metodoRiego, fechaPlantacion }
+// Devuelve { puntos:[{date, acum_l_m2}], total, taw, raw, efic } — todo BRUTO (L/m²),
+// para comparar manzanas con manzanas contra el agua realmente vertida (que también
+// es bruta: lo que sale del aspersor/regadera, antes de pérdidas).
+function simularKylia(serie, opts = {}) {
+  const { suelo, cultivoId = null, metodoRiego, fechaPlantacion = null } = opts;
+  const { taw, raw } = aguaSuelo(suelo);
+  const efic = EFIC_RIEGO[metodoRiego] ?? EFIC_DEFAULT;
+
+  const orden = [...(serie || [])].sort((a, b) => a.date.localeCompare(b.date));
+  let Dr = 0, acum = 0;
+  const puntos = [];
+  for (const dia of orden) {
+    // Decisión de la mañana: con el déficit que arrastra de ayer (misma regla que decisionRiego).
+    if (Dr >= raw) { acum += Dr / efic; Dr = 0; }   // riego bruto = Dr/efic → repone Dr neto
+    const kc  = kcDelDia(cultivoId, diasEntre(fechaPlantacion, new Date(`${dia.date}T12:00:00`)));
+    const etc = kc * (dia.et0 ?? 0);
+    const pe  = Math.max(0, dia.lluvia ?? 0);
+    Dr = Math.min(taw, Math.max(0, Dr + etc - pe));
+    puntos.push({ date: dia.date, acum_l_m2: Math.round(acum * 10) / 10 });
+  }
+  return { puntos, total: Math.round(acum * 10) / 10, taw, raw, efic };
+}
+
 module.exports = {
   FAO_KC, SUELO_AWC, ZR_M, P_AGOTAMIENTO, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
-  kcDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego,
+  kcDelDia, faseDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego, simularKylia,
 };
