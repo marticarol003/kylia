@@ -13,7 +13,7 @@
 // aquí solo se leen las filas y se ensambla.
 
 const { isConfigured, supabaseSelect, preludio } = require("./_supabase.js");
-const { balanceHidrico, decisionRiego, presentarRiego, simularKylia } = require("./_motor-riego.js");
+const { balanceHidrico, decisionRiego, presentarRiego, simularKylia, faseDelDia } = require("./_motor-riego.js");
 const { construirReveal } = require("./_reveal.js");
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
@@ -80,9 +80,27 @@ async function vistaHoy(res, u) {
       ? Math.round((r.litros * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
   }));
 
+  // Desglose del "porqué de hoy": de dónde sale la decisión (para la tarjeta explicativa).
+  const cultivoId = (u.cultivos || [])[0] || null;
+  const et0Hoy = Number(climaHoy.et0 ?? 0);
+  const desglose = {
+    suelo: u.suelo || "franco", cultivo: cultivoId,
+    dias_planta: diasDesde(u.fecha_plantacion),
+    fase: faseDelDia(cultivoId, diasDesde(u.fecha_plantacion)),
+    kc:  Number(balHoy.kcActual.toFixed(2)),
+    et0: Number(et0Hoy.toFixed(1)),
+    etc: Number((balHoy.kcActual * et0Hoy).toFixed(1)),    // gasto de la planta hoy
+    lluvia: Number((climaHoy.lluvia ?? 0).toFixed(1)),
+    dr:  Number(balHoy.Dr.toFixed(1)),                      // déficit acumulado
+    taw: Number(balHoy.taw.toFixed(1)),                     // agua que cabe en el suelo
+    raw: Number(balHoy.raw.toFixed(1)),                     // umbral para regar (45% de TAW)
+    raw_vigilar: Number((0.75 * balHoy.raw).toFixed(1)),
+    efic: balHoy.efic, metodo: u.metodo_riego,
+  };
+
   return res.status(200).json({
     ok: true, vista: "hoy",
-    usuario: { ciudad: u.ciudad, cultivo: (u.cultivos || [])[0] || null,
+    usuario: { ciudad: u.ciudad, cultivo: cultivoId,
                area_m2: u.area_m2, capacidad_regadera: u.capacidad_regadera,
                metodo_riego: u.metodo_riego, caudal: u.caudal },
     hoy: {
@@ -91,7 +109,7 @@ async function vistaHoy(res, u) {
       deficit_mm: Number(balHoy.Dr.toFixed(1)), umbral_mm: Number(balHoy.raw.toFixed(1)),
       et0: Number((climaHoy.et0 ?? 0).toFixed(1)), lluvia: Number((climaHoy.lluvia ?? 0).toFixed(1)),
     },
-    proximo, riegos_recientes: recientes,
+    desglose, proximo, riegos_recientes: recientes,
   });
 }
 

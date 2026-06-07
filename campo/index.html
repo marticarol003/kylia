@@ -68,6 +68,26 @@
   .hist .f { color:var(--slate-500); }
   .hist .v { font-weight:700; color:var(--verde-900); }
 
+  /* Porqué de hoy: barra "hucha de agua" + desglose */
+  .gauge { position:relative; height:26px; background:var(--verde-50); border-radius:8px; overflow:hidden; margin:4px 0 6px; }
+  .gauge .fill { position:absolute; left:0; top:0; bottom:0; border-radius:8px 0 0 8px; transition:width .4s ease; }
+  .gauge .fill.baja  { background:var(--verde); }
+  .gauge .fill.media { background:var(--ambar); }
+  .gauge .fill.alta  { background:var(--rojo); }
+  .gauge .mark { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--slate-700); }
+  .gauge .mark::after { content:"umbral"; position:absolute; top:-15px; left:50%; transform:translateX(-50%);
+                        font-size:0.62rem; font-weight:700; color:var(--slate-700); white-space:nowrap; }
+  .gauge-legend { display:flex; justify-content:space-between; font-size:0.72rem; color:var(--slate-500); margin-bottom:14px; }
+  .calc { list-style:none; }
+  .calc li { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+             padding:8px 0; border-bottom:1px solid var(--slate-200); font-size:0.9rem; }
+  .calc li:last-child { border-bottom:0; }
+  .calc li .k { color:var(--slate-700); }
+  .calc li .v { font-weight:700; color:var(--verde-900); text-align:right; }
+  .calc li.tot .v { font-size:1.05rem; }
+  .calc-note { font-size:0.8rem; color:var(--slate-500); line-height:1.5; margin-top:12px; }
+  .calc-note b { color:var(--slate-700); }
+
   /* Comparativa */
   .totales { display:flex; gap:12px; margin-bottom:18px; }
   .tot { flex:1; border-radius:14px; padding:14px; }
@@ -273,6 +293,8 @@
     }
     html += `</div>`;
 
+    html += desgloseCard(data.desglose, h.nivel);
+
     if (data.riegos_recientes && data.riegos_recientes.length) {
       html += `<div class="card"><div class="label">Riegos registrados</div><ul class="hist">`;
       for (const r of data.riegos_recientes) {
@@ -294,6 +316,39 @@
     } else if (u.capacidad_regadera && u.area_m2) {
       hint.textContent = `Cada cubo = ${u.capacidad_regadera} L sobre ${u.area_m2} m².`;
     } else { hint.textContent = ""; }
+  }
+
+  // Tarjeta "el porqué de hoy": de dónde sale la decisión (balance FAO-56).
+  function desgloseCard(d, nivel) {
+    if (!d) return "";
+    const pct = v => Math.max(0, Math.min(100, (v / d.taw) * 100));
+    const cierre = nivel === "alta"
+      ? `El déficit alcanzó el umbral → <b>toca regar</b>.`
+      : nivel === "media"
+        ? `El déficit se acerca al umbral → <b>conviene vigilar</b>.`
+        : `El déficit está por debajo del umbral → <b>aún hay reserva</b>.`;
+    const fase = d.fase ? `, fase <b>${d.fase}</b>${d.dias_planta != null ? ` (día ${d.dias_planta})` : ""}` : "";
+    return `
+      <div class="card">
+        <div class="label">El porqué de hoy</div>
+        <div class="gauge">
+          <div class="fill ${nivel}" style="width:${pct(d.dr)}%"></div>
+          <div class="mark" style="left:${pct(d.raw)}%"></div>
+        </div>
+        <div class="gauge-legend"><span>suelo lleno</span><span>vacío · ${d.taw} mm</span></div>
+        <ul class="calc">
+          <li><span class="k">Gasto de la planta hoy (ETc = Kc × ET₀)</span>
+              <span class="v">${d.kc} × ${d.et0} = ${d.etc} mm</span></li>
+          <li><span class="k">Lluvia que entró hoy</span><span class="v">− ${d.lluvia} mm</span></li>
+          <li class="tot"><span class="k">Déficit acumulado en el suelo</span><span class="v">${d.dr} mm</span></li>
+          <li><span class="k">Umbral para regar (45% del suelo)</span><span class="v">${d.raw} mm</span></li>
+        </ul>
+        <p class="calc-note">
+          Suelo <b>${d.suelo}</b>: caben <b>${d.taw} mm</b> de agua útil; Kylia riega al gastar el 45%
+          → umbral <b>${d.raw} mm</b>. Cultivo <b>${d.cultivo || "—"}</b>${fase} → bebe Kc=${d.kc}× la
+          evaporación del aire (ET₀, del clima en vivo). ${cierre}
+        </p>
+      </div>`;
   }
 
   function cargarHoy() {

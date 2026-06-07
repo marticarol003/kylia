@@ -43,6 +43,19 @@ function kcDelDia(cultivoId, diasDesdePlantacion) {
   return k.fin;
 }
 
+// Nombre de la fase fenológica del día (inicial→desarrollo→media→final), para
+// explicar en pantalla por qué el Kc es el que es. Misma partición que kcDelDia.
+function faseDelDia(cultivoId, dias) {
+  const k = FAO_KC[cultivoId];
+  if (!k || dias == null) return null;
+  const [Li, Ld, Lm] = k.L;
+  const d = Math.max(0, dias);
+  if (d < Li)           return "inicial";
+  if (d < Li + Ld)      return "desarrollo";
+  if (d < Li + Ld + Lm) return "media";
+  return "final";
+}
+
 // Agua total (TAW) y fácilmente disponible (RAW), en mm, según textura.
 function aguaSuelo(suelo) {
   const awc = SUELO_AWC[suelo] ?? SUELO_AWC_DEFAULT;
@@ -182,5 +195,5 @@ function simularKylia(serie, opts = {}) {
 
 module.exports = {
   FAO_KC, SUELO_AWC, ZR_M, P_AGOTAMIENTO, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
-  kcDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego, simularKylia,
+  kcDelDia, faseDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego, simularKylia,
 };
