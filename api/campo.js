@@ -13,7 +13,7 @@
 // aquí solo se leen las filas y se ensambla.
 
 const { isConfigured, supabaseSelect, preludio } = require("./_supabase.js");
-const { balanceHidrico, decisionRiego, presentarRiego } = require("./_motor-riego.js");
+const { balanceHidrico, decisionRiego, presentarRiego, simularKylia } = require("./_motor-riego.js");
 const { construirReveal } = require("./_reveal.js");
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
@@ -52,7 +52,8 @@ async function vistaHoy(res, u) {
 
   const opts = { suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
                  metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion };
-  const presOpts = { metodoRiego: u.metodo_riego, areaM2: u.area_m2, capacidadRegaderaL: u.capacidad_regadera };
+  const presOpts = { metodoRiego: u.metodo_riego, caudalMmh: u.caudal,
+                     areaM2: u.area_m2, capacidadRegaderaL: u.capacidad_regadera };
 
   const idxHoy = serie.findIndex(s => s.date === hoy);
   const corte  = idxHoy >= 0 ? idxHoy : serie.length - 1;
@@ -82,7 +83,8 @@ async function vistaHoy(res, u) {
   return res.status(200).json({
     ok: true, vista: "hoy",
     usuario: { ciudad: u.ciudad, cultivo: (u.cultivos || [])[0] || null,
-               area_m2: u.area_m2, capacidad_regadera: u.capacidad_regadera },
+               area_m2: u.area_m2, capacidad_regadera: u.capacidad_regadera,
+               metodo_riego: u.metodo_riego, caudal: u.caudal },
     hoy: {
       fecha: hoy, nivel: decHoy.nivel, regar: decHoy.nivel === "alta",
       texto: decHoy.texto, presentacion: presHoy,
@@ -123,6 +125,82 @@ async function vistaReveal(req, res, u) {
   return res.status(200).json(payload);
 }
 
+// ── Vista "comparativa": Kylia(=lo que recomienda) vs lo real del padre ──
+// Dos curvas de agua ACUMULADA por m² sobre el mismo clima y cultivo:
+//   🟢 Kylia  → contrafactual FAO-56 (simularKylia): lo que habría aplicado.
+//   🟤 Padre  → suma de los riegos que registró de verdad (cantidad_l_m2 bruta).
+// El cultivo/suelo/zona/fecha son los del campo cargado (los 500 m² del padre),
+// así la referencia de Kylia es la que le tocaría a SU parcela. Comparación
+// orientativa por m² (no es un ensayo controlado), ver caveat en el front.
+async function vistaComparativa(res, u) {
+  if (u.lat == null || u.lon == null) return res.status(200).json({ ok: false, error: "sin coordenadas" });
+
+  const hoy   = hoyISO();
+  const serie = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
+  const [riegos, aplics] = await Promise.all([
+    supabaseSelect("acciones",
+      `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2&order=fecha_local.asc`),
+    supabaseSelect("acciones",
+      `usuario_id=eq.${u.id}&tipo=eq.aplicacion&select=fecha_local,producto_nombre&order=fecha_local.asc`),
+  ]);
+
+  // Solo días pasados/hoy (sin pronóstico): la comparativa es de lo ya ocurrido.
+  const idxHoy = serie.findIndex(s => s.date === hoy);
+  const dias   = serie.slice(0, (idxHoy >= 0 ? idxHoy : serie.length - 1) + 1);
+
+  // 🟢 Kylia: contrafactual sobre el campo del padre.
+  const kylia = simularKylia(dias, {
+    suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
+    metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
+  });
+  const acumKylia = {};
+  kylia.puntos.forEach(p => { acumKylia[p.date] = p.acum_l_m2; });
+
+  // 🟤 Padre: acumulado de lo realmente vertido por fecha.
+  const realPorDia = {};
+  (riegos || []).forEach(r => {
+    if (r.fecha_local && r.cantidad_l_m2 != null)
+      realPorDia[dia(r.fecha_local)] = (realPorDia[dia(r.fecha_local)] || 0) + r.cantidad_l_m2;
+  });
+  let acumPadre = 0;
+  const puntos = dias.map(d => {
+    acumPadre += realPorDia[d.date] || 0;
+    return { date: d.date,
+             kylia_l_m2: acumKylia[d.date] ?? 0,
+             padre_l_m2: Math.round(acumPadre * 10) / 10 };
+  });
+
+  const ultimo = puntos[puntos.length - 1] || { kylia_l_m2: 0, padre_l_m2: 0 };
+  const area   = u.area_m2 || null;
+  const r1 = x => Math.round(x * 10) / 10;
+  const totales = {
+    kylia_l_m2: r1(ultimo.kylia_l_m2),
+    padre_l_m2: r1(ultimo.padre_l_m2),
+    dif_l_m2:   r1(ultimo.padre_l_m2 - ultimo.kylia_l_m2),
+    dif_pct:    ultimo.kylia_l_m2 > 0
+                  ? Math.round(((ultimo.padre_l_m2 - ultimo.kylia_l_m2) / ultimo.kylia_l_m2) * 100)
+                  : null,
+    kylia_litros: area ? Math.round(ultimo.kylia_l_m2 * area) : null,
+    padre_litros: area ? Math.round(ultimo.padre_l_m2 * area) : null,
+  };
+
+  // Fertilizantes/tratamientos: solo cualitativo (producto + nº de veces).
+  const ferts = {};
+  (aplics || []).forEach(a => {
+    const p = (a.producto_nombre || "sin nombre").trim();
+    ferts[p] = (ferts[p] || 0) + 1;
+  });
+  const fertilizantes = Object.entries(ferts).map(([producto, veces]) => ({ producto, veces }));
+
+  return res.status(200).json({
+    ok: true, vista: "comparativa",
+    campo: { ciudad: u.ciudad, cultivo: (u.cultivos || [])[0] || null,
+             area_m2: area, metodo: u.metodo_riego, caudal_mmh: u.caudal },
+    desde: dias[0]?.date || null, hoy,
+    serie: puntos, totales, fertilizantes,
+  });
+}
+
 module.exports = async (req, res) => {
   if (!preludio(req, res, "GET")) return;
 
@@ -140,7 +218,8 @@ module.exports = async (req, res) => {
     const u = (usuarios || [])[0];
     if (!u) return res.status(404).json({ ok: false, error: "usuario no encontrado (¿ejecutaste el alta?)" });
 
-    if (vista === "reveal") return await vistaReveal(req, res, u);
+    if (vista === "reveal")      return await vistaReveal(req, res, u);
+    if (vista === "comparativa") return await vistaComparativa(res, u);
     return await vistaHoy(res, u);
   } catch (err) {
     console.error("[campo] error:", err.message);
