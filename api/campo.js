@@ -113,6 +113,28 @@ async function vistaHoy(res, u) {
   });
 }
 
+// ── Vista "perfil": config del piloto para su cuaderno (SIN recomendación) ──
+// La consume /piloto/diario, la superficie de registro del piloto silencioso.
+// A propósito NO calcula ni devuelve la decisión de riego: el piloto silencioso
+// no debe ver lo que Kylia recomienda (sesgaría el experimento). Solo la config
+// para adaptar el registro (cubos vs horas) y lo que ya lleva apuntado.
+async function vistaPerfil(res, u) {
+  const accs = await supabaseSelect("acciones",
+    `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2&order=fecha_local.desc&limit=8`);
+  const recientes = (accs || []).filter(f => f.fecha_local).map(f => ({
+    fecha: f.fecha_local, l_m2: f.cantidad_l_m2,
+    cubos: (u.capacidad_regadera && u.area_m2 && f.cantidad_l_m2 != null)
+      ? Math.round((f.cantidad_l_m2 * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
+  }));
+  return res.status(200).json({
+    ok: true, vista: "perfil",
+    usuario: { ciudad: u.ciudad, cultivo: (u.cultivos || [])[0] || null,
+               metodo_riego: u.metodo_riego, caudal: u.caudal, area_m2: u.area_m2,
+               capacidad_regadera: u.capacidad_regadera, fecha_plantacion: u.fecha_plantacion },
+    riegos_recientes: recientes,
+  });
+}
+
 // ── Vista "reveal": informe final del piloto ─────────────────────
 async function vistaReveal(req, res, u) {
   const [recs, acciones, jornadas] = await Promise.all([
@@ -251,6 +273,7 @@ module.exports = async (req, res) => {
 
     if (vista === "reveal")      return await vistaReveal(req, res, u);
     if (vista === "comparativa") return await vistaComparativa(res, u);
+    if (vista === "perfil")      return await vistaPerfil(res, u);
     return await vistaHoy(res, u);
   } catch (err) {
     console.error("[campo] error:", err.message);

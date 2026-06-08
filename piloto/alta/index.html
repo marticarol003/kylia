@@ -183,7 +183,10 @@
       <h1>¡Piloto dado de alta!</h1>
       <p>Kylia ya está observando tu campo. A los 2 meses te enviamos el informe con lo que habrías
          ahorrado siguiéndola.</p>
-      <p class="sub">Puedes cerrar esta página. Nos pondremos en contacto por email.</p>
+      <p>Mientras tanto, apunta lo que vayas haciendo (regar, tratar, lo que veas) en tu cuaderno.
+         <b>Guarda este enlace</b> — es tu cuaderno personal:</p>
+      <a id="ok-diario" class="btn" style="display:inline-block;text-decoration:none;width:auto;padding:13px 22px" href="#">Abrir mi cuaderno</a>
+      <p class="sub" style="margin-top:14px">También te lo enviamos por email.</p>
     </div>
   </div>
   <div id="toast"></div>
@@ -334,6 +337,7 @@
       const j = await res.json().catch(() => ({}));
       if (!res.ok || j.ok === false) throw new Error(j.error || "error al guardar");
       try { localStorage.setItem("kylia_user_id", id); localStorage.setItem("kylia_modo", "piloto"); } catch (_) {}
+      $("ok-diario").href = `/piloto/diario?id=${id}`;
       $("form").style.display = "none";
       $("ok").style.display = "block";
       window.scrollTo(0, 0);

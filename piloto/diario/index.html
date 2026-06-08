@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Tu cuaderno · Kylia</title>
+<meta name="theme-color" content="#013A27" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --verde:#013A27; --verde-700:#002518; --verde-900:#001710; --verde-50:#E7F1EC;
+    --slate-900:#0f172a; --slate-700:#334155; --slate-500:#64748b; --slate-200:#e2e8f0; --slate-50:#f8fafc;
+    --rojo:#9b3a3a;
+    --radius:18px; --shadow:0 8px 24px -8px rgba(15,23,42,0.18);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color:var(--slate-900); line-height:1.55; background:var(--slate-50);
+    -webkit-font-smoothing:antialiased; padding:18px;
+  }
+  .app { max-width:520px; margin:0 auto; }
+  .brand { display:flex; align-items:center; gap:8px; font-weight:800; color:var(--verde-900);
+           letter-spacing:-0.02em; font-size:1.05rem; margin:6px 2px 14px; }
+  .brand .dot { width:11px; height:11px; border-radius:50%; background:var(--verde); }
+  h1 { font-size:1.5rem; color:var(--verde-900); letter-spacing:-0.02em; }
+  .sub { color:var(--slate-500); font-size:0.92rem; margin-top:2px; }
+
+  .silencio { background:var(--verde-50); border-radius:14px; padding:13px 15px; margin-top:14px;
+              font-size:0.9rem; color:var(--verde-900); line-height:1.5; }
+  .silencio b { font-weight:700; }
+
+  .card { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:24px 22px; margin-top:18px; }
+  .label { font-size:0.74rem; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+           color:var(--slate-500); margin-bottom:12px; }
+
+  .tabs { display:flex; gap:6px; margin-bottom:16px; }
+  .tab { flex:1; padding:9px 6px; border:1.5px solid var(--slate-200); background:#fff; border-radius:10px;
+         font-family:inherit; font-weight:700; font-size:0.86rem; color:var(--slate-500); cursor:pointer; }
+  .tab.on { background:var(--verde); border-color:var(--verde); color:#fff; }
+  .pane { display:none; } .pane.on { display:block; }
+
+  .quick-cap { font-size:0.84rem; font-weight:600; color:var(--slate-700); margin-bottom:9px; }
+  .quick { display:flex; gap:8px; flex-wrap:wrap; }
+  .quick button { flex:1 1 calc(50% - 4px); min-width:0; padding:15px 8px; border:1.5px solid var(--slate-200);
+    background:#fff; border-radius:12px; font-family:inherit; font-weight:800; font-size:1.05rem;
+    color:var(--verde-900); cursor:pointer; line-height:1.15; transition:transform .08s ease; }
+  .quick button.reco { border-color:var(--verde); background:var(--verde-50); }
+  .quick button:active { transform:scale(0.97); } .quick button:disabled { opacity:0.5; }
+  .quick button .s { display:block; font-size:0.72rem; font-weight:600; color:var(--slate-500); margin-top:3px; }
+  .quick-toggle { text-align:center; margin:12px 0 2px; }
+  .quick-toggle button { background:none; border:0; color:var(--slate-500); font-family:inherit; font-weight:600;
+    font-size:0.85rem; cursor:pointer; }
+
+  .field { margin-bottom:12px; }
+  .field label { display:block; font-size:0.82rem; font-weight:600; color:var(--slate-700); margin-bottom:5px; }
+  .field input, .field select {
+    width:100%; padding:11px 12px; border:1.5px solid var(--slate-200); border-radius:10px;
+    font-family:inherit; font-size:1rem; color:var(--slate-900); background:#fff; }
+  .field input:focus, .field select:focus { outline:none; border-color:var(--verde); }
+  .hint { font-size:0.8rem; color:var(--slate-500); margin-top:5px; }
+  .btn { width:100%; padding:13px; background:var(--verde); color:#fff; border:0; border-radius:10px;
+         font-family:inherit; font-weight:700; font-size:1rem; cursor:pointer; margin-top:4px; }
+  .btn:disabled { opacity:0.5; }
+  .row2 { display:flex; gap:10px; } .row2 > * { flex:1; }
+
+  .hist { list-style:none; } .hist li { display:flex; justify-content:space-between; padding:10px 0;
+    border-bottom:1px solid var(--slate-200); font-size:0.92rem; } .hist li:last-child { border-bottom:0; }
+  .hist .f { color:var(--slate-500); } .hist .v { font-weight:700; color:var(--verde-900); }
+
+  .foot { text-align:center; color:var(--slate-500); font-size:0.78rem; margin:22px 2px 8px; line-height:1.5; }
+  .msg { text-align:center; color:var(--slate-500); padding:40px 20px; line-height:1.6; }
+  .msg code { background:var(--slate-200); padding:2px 6px; border-radius:6px; font-size:0.85em; }
+  .skel { animation:pulse 1.3s ease-in-out infinite; } @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(80px);
+           background:var(--verde-900); color:#fff; padding:12px 22px; border-radius:999px; font-weight:600;
+           font-size:0.92rem; box-shadow:var(--shadow); transition:transform 0.28s cubic-bezier(0.22,0.61,0.36,1); z-index:99; }
+  #toast.show { transform:translateX(-50%) translateY(0); } #toast.err { background:var(--rojo); }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="brand"><span class="dot"></span> Kylia</div>
+    <div id="root"><div class="msg skel">Cargando tu cuaderno…</div></div>
+
+    <div class="card" id="registro" style="display:none">
+      <div class="label">Apunta lo de hoy</div>
+      <div class="tabs">
+        <button class="tab on" data-pane="riego">💧 Riego</button>
+        <button class="tab" data-pane="trat">🧪 Tratamiento</button>
+        <button class="tab" data-pane="obs">👁️ Observación</button>
+      </div>
+
+      <div class="pane on" data-pane="riego">
+        <div class="quick-cap" id="r-quick-cap">Toca cuánto regaste hoy:</div>
+        <div class="quick" id="r-quick"></div>
+        <div class="quick-toggle"><button type="button" id="r-more">otra cantidad ▾</button></div>
+        <div id="r-manual" style="display:none">
+          <div class="row2">
+            <div class="field"><label for="r-cant" id="r-label">Cantidad</label>
+              <input id="r-cant" type="number" inputmode="decimal" step="0.5" min="0" placeholder="ej. 1.5" /></div>
+            <div class="field"><label for="r-franja">Momento</label>
+              <select id="r-franja"><option value="">—</option><option value="manana">Mañana</option>
+                <option value="mediodia">Mediodía</option><option value="tarde">Tarde</option>
+                <option value="noche">Noche</option></select></div>
+          </div>
+          <div class="hint" id="r-hint"></div>
+          <button class="btn" data-send="riego">Registrar riego</button>
+        </div>
+      </div>
+
+      <div class="pane" data-pane="trat">
+        <div class="field"><label for="t-prod">Producto aplicado</label>
+          <input id="t-prod" type="text" maxlength="160" placeholder="ej. jabón potásico" /></div>
+        <div class="row2">
+          <div class="field"><label for="t-dosis">Dosis (opcional)</label>
+            <input id="t-dosis" type="text" maxlength="80" placeholder="ej. 20 ml/L" /></div>
+          <div class="field"><label for="t-franja">Momento</label>
+            <select id="t-franja"><option value="">—</option><option value="manana">Mañana</option>
+              <option value="mediodia">Mediodía</option><option value="tarde">Tarde</option>
+              <option value="noche">Noche</option></select></div>
+        </div>
+        <div class="field"><label for="t-notas">Notas (opcional)</label>
+          <input id="t-notas" type="text" maxlength="200" placeholder="ej. solo en una zona" /></div>
+        <button class="btn" data-send="trat">Registrar tratamiento</button>
+      </div>
+
+      <div class="pane" data-pane="obs">
+        <div class="row2">
+          <div class="field"><label for="o-tipo">Qué viste</label>
+            <select id="o-tipo"><option value="plaga">Plaga</option><option value="enfermedad">Enfermedad</option>
+              <option value="estres">Estrés (calor, falta de agua…)</option><option value="otro">Otro</option></select></div>
+          <div class="field"><label for="o-sev">Gravedad</label>
+            <select id="o-sev"><option value="">—</option><option value="1">1 · leve</option>
+              <option value="2">2</option><option value="3">3 · media</option><option value="4">4</option>
+              <option value="5">5 · grave</option></select></div>
+        </div>
+        <div class="field"><label for="o-desc">Descripción</label>
+          <input id="o-desc" type="text" maxlength="300" placeholder="ej. pulgón en el envés de una hoja" /></div>
+        <button class="btn" data-send="obs">Registrar observación</button>
+      </div>
+    </div>
+
+    <p class="foot">
+      Kylia observa en silencio durante el piloto. No te dice qué hacer:
+      tú riegas a tu manera y al final ves el informe con lo que habrías ahorrado siguiéndola.
+    </p>
+  </div>
+  <div id="toast"></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  let USUARIO = {};
+  const ID = (params.get("id") || params.get("usuario_id") ||
+              (() => { try { return localStorage.getItem("kylia_user_id"); } catch (_) { return null; } })() || "").trim();
+
+  const fmtFecha = iso => { const [,m,d] = String(iso).split("-"); return `${d}/${m}`; };
+  const hoyLocal = () => { const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+  const franjaAhora = () => { const h = new Date().getHours();
+    return h < 12 ? "manana" : h < 16 ? "mediodia" : h < 21 ? "tarde" : "noche"; };
+  const toast = (txt, err) => { const t = $("toast"); t.textContent = txt; t.className = "show" + (err ? " err" : "");
+    setTimeout(() => { t.className = err ? "err" : ""; }, 2600); };
+
+  function pintar(data) {
+    const root = $("root");
+    if (!data.ok) {
+      root.innerHTML = `<div class="msg">No se pudo cargar tu cuaderno: ${data.error || data.reason || "error"}.</div>`;
+      return;
+    }
+    USUARIO = data.usuario || {};
+    const u = USUARIO;
+    let html = `<h1>Tu cuaderno</h1>
+      <div class="sub">${[u.ciudad, u.cultivo].filter(Boolean).join(" · ") || "Tu campo"}</div>
+      <div class="silencio">🤫 <b>Piloto silencioso.</b> Apunta lo que hagas (regar, tratar, lo que veas).
+        Kylia no te aconseja durante el piloto — así tu informe final es limpio.</div>`;
+
+    if (data.riegos_recientes && data.riegos_recientes.length) {
+      html += `<div class="card"><div class="label">Lo que llevas apuntado</div><ul class="hist">`;
+      for (const r of data.riegos_recientes) {
+        const v = r.cubos != null ? `${r.cubos} cubo${r.cubos === 1 ? "" : "s"}`
+                : r.l_m2 != null ? `${r.l_m2} L/m²` : "riego";
+        html += `<li><span class="f">${fmtFecha(r.fecha)}</span><span class="v">${v}</span></li>`;
+      }
+      html += `</ul></div>`;
+    }
+    root.innerHTML = html;
+
+    // Adaptar el registro al método del campo
+    $("registro").style.display = "";
+    const esAspersion = u.metodo_riego === "aspersion";
+    $("r-label").textContent = esAspersion ? "Horas de aspersor" : (u.capacidad_regadera ? "Cubos echados" : "Litros por m²");
+    const hint = $("r-hint");
+    if (esAspersion && u.caudal) hint.textContent = `≈ ${u.caudal} mm/h · 1 h ≈ ${u.caudal} L/m².`;
+    else if (u.capacidad_regadera && u.area_m2) hint.textContent = `Cada cubo = ${u.capacidad_regadera} L sobre ${u.area_m2} m².`;
+    else hint.textContent = "";
+    pintarChips(u);
+  }
+
+  function pintarChips(u) {
+    const wrap = $("r-quick");
+    const esAspersion = u.metodo_riego === "aspersion";
+    let chips;
+    if (esAspersion) {
+      const c = u.caudal || 10;
+      chips = [0.5, 1, 1.5, 2].map(h => ({ cant: h,
+        label: h === 0.5 ? "30 min" : h === 1.5 ? "1½ h" : `${h} h`,
+        sub: `≈ ${Math.round(h * c * 10) / 10} L/m²`, reco: h === 1.5 }));
+      $("r-quick-cap").textContent = "¿Cuánto regó el aspersor hoy? Toca y listo:";
+    } else if (u.capacidad_regadera && u.area_m2) {
+      const f = u.capacidad_regadera / u.area_m2;
+      chips = [1, 2, 3].map(n => ({ cant: n, label: `${n} cubo${n === 1 ? "" : "s"}`,
+        sub: `≈ ${Math.round(n * f * 10) / 10} L/m²`, reco: false }));
+      $("r-quick-cap").textContent = "¿Cuántos cubos echaste hoy? Toca y listo:";
+    } else {
+      // sin regadera ni aspersión declaradas: cantidades genéricas en L/m²
+      chips = [5, 10, 15, 20].map(v => ({ cant: v, label: `${v} L/m²`, sub: "", reco: false }));
+      $("r-quick-cap").textContent = "¿Cuánta agua echaste hoy? Toca y listo:";
+    }
+    wrap.innerHTML = chips.map(ch =>
+      `<button type="button" class="${ch.reco ? "reco" : ""}" data-cant="${ch.cant}">${ch.label}${ch.sub ? `<span class="s">${ch.sub}</span>` : ""}</button>`
+    ).join("");
+    wrap.querySelectorAll("button").forEach(b => b.addEventListener("click", async () => {
+      wrap.querySelectorAll("button").forEach(x => x.disabled = true);
+      try { await logRiego(parseFloat(b.dataset.cant), true); toast("✓ Riego apuntado"); recargar(); }
+      catch (e) { toast(e.message || "No se pudo guardar", true); wrap.querySelectorAll("button").forEach(x => x.disabled = false); }
+    }));
+  }
+
+  async function enviar(recurso, fila) {
+    const body = { recurso, usuario_id: ID, fecha_local: hoyLocal(), cultivo: USUARIO.cultivo || null, ...fila };
+    const res = await fetch("/api/log", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || j.ok === false) throw new Error(j.error || "error al guardar");
+  }
+
+  const val = id => $(id).value.trim();
+  async function logRiego(cant, quick) {
+    if (!(cant > 0)) { toast("Pon la cantidad", true); return; }
+    const fila = { tipo: "riego", franja_horaria: quick ? franjaAhora() : (val("r-franja") || null) };
+    if (USUARIO.metodo_riego === "aspersion") {
+      fila.duracion_min = Math.round(cant * 60); fila.notas = `${cant} h de aspersión`;
+      if (USUARIO.caudal) fila.cantidad_l_m2 = Math.round((cant * USUARIO.caudal) * 10) / 10;
+    } else if (USUARIO.capacidad_regadera && USUARIO.area_m2) {
+      fila.notas = `${cant} cubo${cant === 1 ? "" : "s"}`;
+      fila.cantidad_l_m2 = Math.round((cant * USUARIO.capacidad_regadera / USUARIO.area_m2) * 10) / 10;
+    } else {
+      fila.cantidad_l_m2 = cant; fila.notas = `${cant} L/m²`;   // chips genéricos ya en L/m²
+    }
+    await enviar("acciones", fila);
+    $("r-cant").value = "";
+  }
+
+  const acciones = {
+    riego: () => logRiego(parseFloat(val("r-cant")), false),
+    trat: async () => {
+      const prod = val("t-prod");
+      if (!prod) { toast("Pon el producto", true); return; }
+      await enviar("acciones", { tipo: "aplicacion", producto_nombre: prod,
+        dosis: val("t-dosis") || null, franja_horaria: val("t-franja") || null, notas: val("t-notas") || null });
+      ["t-prod","t-dosis","t-notas"].forEach(i => $(i).value = "");
+    },
+    obs: async () => {
+      const desc = val("o-desc");
+      if (!desc) { toast("Describe lo que viste", true); return; }
+      await enviar("observaciones", { tipo: val("o-tipo"), descripcion: desc, severidad: val("o-sev") || null });
+      $("o-desc").value = "";
+    },
+  };
+
+  function recargar() {
+    fetch(`/api/campo?vista=perfil&usuario_id=${encodeURIComponent(ID)}`).then(r => r.json()).then(pintar).catch(() => {});
+  }
+
+  // Plegar el input manual
+  $("r-more").addEventListener("click", () => {
+    const m = $("r-manual"), btn = $("r-more"); const open = m.style.display !== "none";
+    m.style.display = open ? "none" : ""; btn.textContent = open ? "otra cantidad ▾" : "ocultar ▴";
+  });
+  // Pestañas
+  document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
+    const p = tab.dataset.pane;
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t === tab));
+    document.querySelectorAll(".pane").forEach(pane => pane.classList.toggle("on", pane.dataset.pane === p));
+  }));
+  // Envío
+  document.querySelectorAll("[data-send]").forEach(btn => btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    try { await acciones[btn.dataset.send](); toast("✓ Apuntado"); recargar(); }
+    catch (e) { toast(e.message || "No se pudo guardar", true); }
+    finally { btn.disabled = false; }
+  }));
+
+  if (!/^[0-9a-f-]{36}$/i.test(ID)) {
+    $("root").innerHTML = `<div class="msg">Este cuaderno necesita tu enlace personal
+      (<code>?id=…</code>). Ábrelo desde el enlace que te dimos al darte de alta.</div>`;
+  } else {
+    recargar();
+  }
+</script>
+</body>
+</html>
