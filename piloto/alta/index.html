@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Alta del piloto · Kylia</title>
+<meta name="theme-color" content="#013A27" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+  :root {
+    --verde:#013A27; --verde-700:#002518; --verde-900:#001710; --verde-50:#E7F1EC;
+    --slate-900:#0f172a; --slate-700:#334155; --slate-500:#64748b; --slate-200:#e2e8f0; --slate-50:#f8fafc;
+    --ambar:#b45309; --ambar-50:#fef3c7; --rojo:#9b3a3a;
+    --radius:18px; --shadow:0 8px 24px -8px rgba(15,23,42,0.18);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color:var(--slate-900); line-height:1.55; background:var(--slate-50);
+    -webkit-font-smoothing:antialiased; padding:18px;
+  }
+  .app { max-width:520px; margin:0 auto; }
+  .brand { display:flex; align-items:center; gap:8px; font-weight:800; color:var(--verde-900);
+           letter-spacing:-0.02em; font-size:1.05rem; margin:6px 2px 14px; }
+  .brand .dot { width:11px; height:11px; border-radius:50%; background:var(--verde); }
+  h1 { font-size:1.5rem; color:var(--verde-900); letter-spacing:-0.02em; }
+  .sub { color:var(--slate-500); font-size:0.92rem; margin-top:2px; margin-bottom:6px; }
+
+  .card { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:24px 22px; margin-top:18px; }
+  .label { font-size:0.74rem; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+           color:var(--slate-500); margin-bottom:14px; }
+
+  .field { margin-bottom:14px; }
+  .field > label { display:block; font-size:0.86rem; font-weight:600; color:var(--slate-700); margin-bottom:6px; }
+  .field .req { color:var(--rojo); }
+  .field input, .field select {
+    width:100%; padding:12px; border:1.5px solid var(--slate-200); border-radius:10px;
+    font-family:inherit; font-size:1rem; color:var(--slate-900); background:#fff;
+  }
+  .field input:focus, .field select:focus { outline:none; border-color:var(--verde); }
+  .hint { font-size:0.8rem; color:var(--slate-500); margin-top:6px; line-height:1.45; }
+  .row2 { display:flex; gap:10px; } .row2 > * { flex:1; }
+
+  /* Selector de cobertura (chips) para método y manejo */
+  .pick { display:flex; gap:8px; flex-wrap:wrap; }
+  .pick button { flex:1 1 calc(50% - 4px); min-width:0; padding:11px 8px; border:1.5px solid var(--slate-200);
+    background:#fff; border-radius:10px; font-family:inherit; font-weight:700; font-size:0.92rem;
+    color:var(--slate-700); cursor:pointer; }
+  .pick button.on { border-color:var(--verde); background:var(--verde-50); color:var(--verde-900); }
+
+  /* Mapa + buscador */
+  .search { display:flex; gap:8px; margin-bottom:10px; }
+  .search input { flex:1; }
+  .search button { padding:0 16px; background:var(--verde); color:#fff; border:0; border-radius:10px;
+    font-family:inherit; font-weight:700; cursor:pointer; white-space:nowrap; }
+  #map { height:280px; border-radius:12px; border:1.5px solid var(--slate-200); background:var(--slate-200); }
+  .map-status { font-size:0.84rem; margin-top:8px; padding:10px 12px; border-radius:10px; line-height:1.45; }
+  .map-status.ok   { background:var(--verde-50);  color:var(--verde-900); }
+  .map-status.warn { background:var(--ambar-50);  color:var(--ambar); }
+  .map-status.idle { background:var(--slate-50);  color:var(--slate-500); }
+
+  .btn { width:100%; padding:14px; background:var(--verde); color:#fff; border:0; border-radius:12px;
+         font-family:inherit; font-weight:800; font-size:1.05rem; cursor:pointer; margin-top:6px; }
+  .btn:disabled { opacity:0.5; }
+
+  .foot { text-align:center; color:var(--slate-500); font-size:0.78rem; margin:22px 2px 8px; line-height:1.5; }
+  .foot a { color:var(--slate-700); }
+
+  /* Éxito */
+  #ok { display:none; text-align:center; padding:40px 24px; }
+  #ok .check { font-size:3rem; }
+  #ok h1 { margin:10px 0 8px; }
+  #ok p { color:var(--slate-700); max-width:360px; margin:0 auto 8px; }
+
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(80px);
+           background:var(--verde-900); color:#fff; padding:12px 22px; border-radius:999px; font-weight:600;
+           font-size:0.92rem; box-shadow:var(--shadow); transition:transform 0.28s cubic-bezier(0.22,0.61,0.36,1);
+           z-index:9999; }
+  #toast.show { transform:translateX(-50%) translateY(0); }
+  #toast.err { background:var(--rojo); }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="brand"><span class="dot"></span> Kylia</div>
+
+    <div id="form">
+      <h1>Alta del piloto</h1>
+      <p class="sub">2 minutos. Kylia observará tu campo en silencio y a los 2 meses te entrega el informe
+        con lo que habrías ahorrado siguiéndola.</p>
+
+      <!-- Cultivo y fechas -->
+      <div class="card">
+        <div class="label">Tu campo</div>
+        <div class="field">
+          <label for="f-cultivo">Cultivo <span class="req">*</span></label>
+          <select id="f-cultivo">
+            <option value="">Elige…</option>
+            <option value="lechuga">Lechuga</option>
+            <option value="espinaca">Espinaca</option>
+            <option value="brassica">Col / brócoli / coliflor (brassica)</option>
+            <option value="tomate">Tomate</option>
+            <option value="pimiento">Pimiento</option>
+            <option value="berenjena">Berenjena</option>
+            <option value="calabacin">Calabacín</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-plant">Fecha de plantación <span class="req">*</span></label>
+          <input id="f-plant" type="date" />
+        </div>
+        <div class="field">
+          <label>Método de riego <span class="req">*</span></label>
+          <div class="pick" id="f-metodo">
+            <button type="button" data-v="goteo">Goteo</button>
+            <button type="button" data-v="aspersion">Aspersión</button>
+            <button type="button" data-v="surco">Surco</button>
+            <button type="button" data-v="manguera">Manguera</button>
+            <button type="button" data-v="regadera">Regadera</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Manejo <span class="req">*</span></label>
+          <div class="pick" id="f-manejo">
+            <button type="button" data-v="convencional">Convencional</button>
+            <button type="button" data-v="ecologico">Ecológico</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Tipo de suelo <span class="req">*</span></label>
+          <div class="pick" id="f-suelo">
+            <button type="button" data-v="arenoso">Arenoso</button>
+            <button type="button" data-v="franco">Franco</button>
+            <button type="button" data-v="arcilloso">Arcilloso</button>
+          </div>
+          <div class="hint"><b>Test del churro:</b> humedece un puñado y haz un rollito.
+            Si no liga → arenoso. Rollito que se agrieta → franco. Rollito largo y plástico → arcilloso.</div>
+        </div>
+      </div>
+
+      <!-- Ubicación con mapa + SIGPAC -->
+      <div class="card">
+        <div class="label">¿Dónde está? <span class="req">*</span></div>
+        <div class="search">
+          <input id="f-pueblo" type="text" placeholder="Escribe tu pueblo y pulsa buscar" autocomplete="off" />
+          <button type="button" id="f-buscar">Buscar</button>
+        </div>
+        <div id="map"></div>
+        <div class="map-status idle" id="f-mapstatus">Busca tu pueblo y toca el mapa sobre tu parcela.</div>
+      </div>
+
+      <!-- Contacto -->
+      <div class="card">
+        <div class="label">Para entregarte el informe</div>
+        <div class="field">
+          <label for="f-email">Email <span class="req">*</span></label>
+          <input id="f-email" type="email" inputmode="email" placeholder="tu@email.com" />
+        </div>
+        <div class="field">
+          <label for="f-tel">WhatsApp (opcional)</label>
+          <input id="f-tel" type="tel" inputmode="tel" placeholder="+34 …" />
+        </div>
+        <div class="field">
+          <label for="f-area">Superficie en m² (opcional)</label>
+          <input id="f-area" type="number" inputmode="numeric" min="0" placeholder="se calcula sola al elegir la parcela" />
+        </div>
+      </div>
+
+      <button class="btn" id="f-enviar">Dar de alta el piloto</button>
+      <p class="foot">
+        Al darte de alta aceptas los <a href="/legal/terminos">términos</a> y la
+        <a href="/legal/privacidad">privacidad</a>. Solo usaremos tu contacto para entregarte el informe.
+      </p>
+    </div>
+
+    <!-- Éxito -->
+    <div id="ok" class="card">
+      <div class="check">🌱</div>
+      <h1>¡Piloto dado de alta!</h1>
+      <p>Kylia ya está observando tu campo. A los 2 meses te enviamos el informe con lo que habrías
+         ahorrado siguiéndola.</p>
+      <p class="sub">Puedes cerrar esta página. Nos pondremos en contacto por email.</p>
+    </div>
+  </div>
+  <div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const toast = (txt, err) => {
+    const t = $("toast"); t.textContent = txt; t.className = "show" + (err ? " err" : "");
+    setTimeout(() => { t.className = err ? "err" : ""; }, 2800);
+  };
+  const newUUID = () => (crypto?.randomUUID ? crypto.randomUUID()
+    : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = Math.random()*16|0, v = c === "x" ? r : (r&0x3|0x8); return v.toString(16); }));
+
+  // Estado de la selección
+  const sel = { metodo:null, manejo:null, suelo:null, lat:null, lon:null, parcela:null, ciudad:null };
+
+  // Chips de elección única (método / manejo / suelo)
+  function wirePick(id, key) {
+    document.querySelectorAll(`#${id} button`).forEach(b => b.addEventListener("click", () => {
+      sel[key] = b.dataset.v;
+      document.querySelectorAll(`#${id} button`).forEach(x => x.classList.toggle("on", x === b));
+    }));
+  }
+  wirePick("f-metodo", "metodo");
+  wirePick("f-manejo", "manejo");
+  wirePick("f-suelo",  "suelo");
+
+  // ── Mapa (Leaflet + ortofoto ESRI, sin API key) ──────────────────
+  const map = L.map("map", { zoomControl: true }).setView([40.1, -3.7], 6); // centro de España
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19, attribution: "Esri" }).addTo(map);
+  let marker = null, parcelaLayer = null;
+
+  // Geocodificar el pueblo (Open-Meteo, gratis, sin key) para recentrar
+  async function buscarPueblo() {
+    const q = $("f-pueblo").value.trim();
+    if (!q) return;
+    try {
+      const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&country=ES&language=es`);
+      const j = await r.json();
+      const hit = j.results && j.results[0];
+      if (!hit) { toast("No encuentro ese pueblo", true); return; }
+      sel.ciudad = hit.name;
+      map.setView([hit.latitude, hit.longitude], 16);
+      setStatus("idle", "Acércate y toca el mapa justo sobre tu parcela.");
+    } catch (_) { toast("No se pudo buscar", true); }
+  }
+  $("f-buscar").addEventListener("click", buscarPueblo);
+  $("f-pueblo").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); buscarPueblo(); } });
+
+  function setStatus(kind, html) { const s = $("f-mapstatus"); s.className = "map-status " + kind; s.innerHTML = html; }
+
+  // Área geodésica de un anillo [ [lon,lat], … ] en m² (FAO-ok para parcelas pequeñas)
+  function areaAnillo(ring) {
+    const R = 6378137; let a = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const [lon1, lat1] = ring[i], [lon2, lat2] = ring[(i + 1) % ring.length];
+      a += (lon2 - lon1) * Math.PI / 180 * (2 + Math.sin(lat1 * Math.PI / 180) + Math.sin(lat2 * Math.PI / 180));
+    }
+    return Math.abs(a * R * R / 2);
+  }
+  function areaGeom(geom) {
+    if (geom.type === "Polygon")      return areaAnillo(geom.coordinates[0]);
+    if (geom.type === "MultiPolygon") return geom.coordinates.reduce((s, p) => s + areaAnillo(p[0]), 0);
+    return 0;
+  }
+
+  // Al tocar el mapa: marcador + intento de enganchar el recinto SIGPAC oficial
+  map.on("click", async (e) => {
+    sel.lat = +e.latlng.lat.toFixed(6); sel.lon = +e.latlng.lng.toFixed(6);
+    if (marker) marker.setLatLng(e.latlng); else marker = L.marker(e.latlng).addTo(map);
+    setStatus("idle", "Buscando tu parcela en SIGPAC…");
+    sel.parcela = null;
+    if (parcelaLayer) { map.removeLayer(parcelaLayer); parcelaLayer = null; }
+    try {
+      const r = await fetch(`/api/sigpac?lat=${sel.lat}&lon=${sel.lon}`);
+      const j = await r.json();
+      if (j.parcela) {
+        sel.parcela = j.parcela;
+        parcelaLayer = L.geoJSON(j.parcela, { style: { color: "#013A27", weight: 2, fillOpacity: 0.15 } }).addTo(map);
+        const area = Math.round(areaGeom(j.parcela));
+        if (area > 0 && !$("f-area").value) $("f-area").value = area;
+        setStatus("ok", `✓ Recinto SIGPAC enganchado · <b>≈ ${area.toLocaleString("es-ES")} m²</b>. Si no es el tuyo, vuelve a tocar.`);
+      } else {
+        setStatus("warn", "Ubicación marcada, pero SIGPAC no devolvió recinto aquí. Vale igual: usamos el punto para el clima.");
+      }
+    } catch (_) {
+      setStatus("warn", "Ubicación marcada (SIGPAC no respondió). Usamos el punto para el clima.");
+    }
+  });
+
+  // ── Envío ────────────────────────────────────────────────────────
+  function validar() {
+    if (!$("f-cultivo").value) return "Elige el cultivo";
+    if (!$("f-plant").value)   return "Pon la fecha de plantación";
+    if (!sel.metodo)           return "Elige el método de riego";
+    if (!sel.manejo)           return "Elige el manejo";
+    if (!sel.suelo)            return "Elige el tipo de suelo";
+    if (sel.lat == null)       return "Marca tu campo en el mapa";
+    const email = $("f-email").value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return "Pon un email válido";
+    return null;
+  }
+
+  $("f-enviar").addEventListener("click", async () => {
+    const err = validar();
+    if (err) { toast(err, true); return; }
+    const btn = $("f-enviar"); btn.disabled = true;
+
+    const params = new URLSearchParams(location.search);
+    const origen = "piloto-alta" + (params.get("ref") ? "|" + params.get("ref").slice(0, 40) : "");
+    const id = newUUID();
+    const area = parseFloat($("f-area").value);
+
+    const payload = {
+      recurso: "registro-usuario", id,
+      piloto_sombra: true,
+      origen,
+      email:    $("f-email").value.trim(),
+      telefono: $("f-tel").value.trim() || null,
+      cultivos: [$("f-cultivo").value],
+      fecha_plantacion: $("f-plant").value,
+      metodo_riego: sel.metodo,
+      manejo: sel.manejo,
+      suelo: sel.suelo,
+      lat: sel.lat, lon: sel.lon,
+      ciudad: sel.ciudad || null,
+      parcela: sel.parcela || null,
+      area_m2: Number.isFinite(area) && area > 0 ? area : null,
+    };
+
+    try {
+      const res = await fetch("/api/log", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || j.ok === false) throw new Error(j.error || "error al guardar");
+      try { localStorage.setItem("kylia_user_id", id); localStorage.setItem("kylia_modo", "piloto"); } catch (_) {}
+      $("form").style.display = "none";
+      $("ok").style.display = "block";
+      window.scrollTo(0, 0);
+    } catch (e) {
+      toast(e.message || "No se pudo dar de alta", true);
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

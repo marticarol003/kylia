@@ -69,6 +69,7 @@ async function handleRegistroUsuario(req, res, body) {
     area_m2:              numOrNull(body.area_m2),
     capacidad_regadera:   numOrNull(body.capacidad_regadera),
     origen:               clean(body.origen,       120)                 || null,
+    piloto_sombra:        body.piloto_sombra === undefined ? undefined : Boolean(body.piloto_sombra),
     preferencias: body.preferencias && typeof body.preferencias === "object" ? body.preferencias : {},
     ua:           clean(req.headers["user-agent"], 400)         || null,
   };
