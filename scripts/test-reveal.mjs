@@ -57,6 +57,14 @@ eq(a.exceso_pct, 50, "exceso% = 50");
 ok(a.riegos_antes_del_registro && a.riegos_antes_del_registro.n === 1, "1 riego anterior al registro, aparte");
 ok(/más/.test(a.veredicto), "veredicto menciona que regó de más");
 
+console.log("\nSerie diaria acumulada (gráfica de 2 líneas, fuente congelada)");
+eq(a.serie.length, 9, "9 días del 10 al 18 de junio");
+eq(a.serie[0].date, "2026-06-10", "arranca el primer día con decisión congelada");
+eq(a.serie[0].kylia_l_m2, 20, "día 1: Kylia acumula 20");
+eq(a.serie[0].real_l_m2, 30, "día 1: real acumula 30");
+eq(a.serie[a.serie.length - 1].kylia_l_m2, 60, "último: Kylia acumula 60 (=lámina total)");
+eq(a.serie[a.serie.length - 1].real_l_m2, 90, "último: real acumula 90 (=agua aplicada)");
+
 console.log("\nDimensión COSTE (solo agua, € validado)");
 const c = r.dimensiones.coste;
 // 30 L/m² × 200 m² = 6000 L = 6 m³ × 0.30 €/m³ = 1.80 €

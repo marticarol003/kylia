@@ -28,6 +28,12 @@ function diasEntreDias(a, b) {
   return Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / 86400000);
 }
 
+function sumarDia(diaStr) {
+  const d = new Date(`${diaStr}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 // Semana ISO ('YYYY-Www') para agrupar la comparativa de agua.
 function semanaISO(diaStr) {
   const d = new Date(`${diaStr}T12:00:00Z`);
@@ -121,6 +127,25 @@ function dimAgua(riegosReales, riegosKylia) {
       exceso_l_m2:      r1(s.aplicada - s.recomendada),
     }));
 
+  // Serie diaria ACUMULADA para la gráfica de 2 líneas del informe:
+  //   🟢 Kylia  = lámina recomendada congelada (suma de las decisiones "alta").
+  //   🟤 real   = lo que el agricultor regó de verdad en el periodo.
+  // Misma fuente que los totales (sin retrovisor): el verde sale de
+  // recomendaciones_log, no de un recálculo en vivo. El eje va del primer día
+  // con decisión congelada hasta el último día con dato (decisión o riego real).
+  const realByDay = {}, kyliaByDay = {};
+  realesEnPeriodo.forEach(r => { if (r.dia) realByDay[r.dia] = (realByDay[r.dia] || 0) + (Number(r.l_m2) || 0); });
+  kyliaAlta.forEach(d => { if (d.dia) kyliaByDay[d.dia] = (kyliaByDay[d.dia] || 0) + (Number(d.l_m2) || 0); });
+  const ultimoReal = realesEnPeriodo.reduce((m, r) => (r.dia && r.dia > m ? r.dia : m), desde);
+  const finSerie = hasta > ultimoReal ? hasta : ultimoReal;
+  const serie = [];
+  let accK = 0, accR = 0;
+  for (let d = desde; d <= finSerie; d = sumarDia(d)) {
+    accK += kyliaByDay[d] || 0;
+    accR += realByDay[d] || 0;
+    serie.push({ date: d, kylia_l_m2: r1(accK), real_l_m2: r1(accR) });
+  }
+
   const excesoPct = aguaKylia > 0 ? r0((exceso / aguaKylia) * 100) : null;
   let veredicto;
   if (aguaReal === 0) {
@@ -146,6 +171,7 @@ function dimAgua(riegosReales, riegosKylia) {
     dias_regado_real:  new Set(realesEnPeriodo.map(r => r.dia)).size,
     dias_regar_kylia:  kyliaAlta.length,
     por_semana: porSemana,
+    serie,
     riegos_antes_del_registro: realesAntes.length
       ? { n: realesAntes.length, l_m2: r1(suma(realesAntes, r => r.l_m2)),
           nota: "Anteriores a la primera decisión congelada: no se comparan." }

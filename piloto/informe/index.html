@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Tu informe · Kylia</title>
+<meta name="theme-color" content="#013A27" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --verde:#013A27; --verde-700:#002518; --verde-900:#001710; --verde-50:#E7F1EC;
+    --marron:#8a5a2b; --marron-50:#f3e9dd;
+    --slate-900:#0f172a; --slate-700:#334155; --slate-500:#64748b; --slate-200:#e2e8f0; --slate-50:#f8fafc;
+    --ambar:#b45309; --ambar-50:#fef3c7; --rojo:#9b3a3a; --rojo-50:#f7ebeb;
+    --radius:18px; --shadow:0 8px 24px -8px rgba(15,23,42,0.18);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color:var(--slate-900); line-height:1.55; background:var(--slate-50);
+    -webkit-font-smoothing:antialiased; padding:18px;
+  }
+  .app { max-width:520px; margin:0 auto; }
+  .brand { display:flex; align-items:center; gap:8px; font-weight:800; color:var(--verde-900);
+           letter-spacing:-0.02em; font-size:1.05rem; margin:6px 2px 14px; }
+  .brand .dot { width:11px; height:11px; border-radius:50%; background:var(--verde); }
+  h1 { font-size:1.5rem; color:var(--verde-900); letter-spacing:-0.02em; }
+  .sub { color:var(--slate-500); font-size:0.92rem; margin-top:2px; }
+
+  .card { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:24px 22px; margin-top:18px; }
+  .label { font-size:0.74rem; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+           color:var(--slate-500); margin-bottom:14px; }
+
+  .hero { text-align:center; padding:30px 22px; border-radius:var(--radius); margin-top:18px; }
+  .hero.ahorro { background:var(--verde-50); }
+  .hero.exceso { background:var(--ambar-50); }
+  .hero.par    { background:var(--slate-50); }
+  .hero .big { font-size:2.4rem; font-weight:800; letter-spacing:-0.02em; margin:6px 0; }
+  .hero.ahorro .big { color:var(--verde-900); }
+  .hero.exceso .big { color:var(--ambar); }
+  .hero .cap { color:var(--slate-700); max-width:360px; margin:0 auto; }
+  .hero .eur { font-size:0.92rem; color:var(--slate-700); margin-top:8px; }
+
+  .totales { display:flex; gap:12px; margin:18px 0; }
+  .tot { flex:1; border-radius:14px; padding:14px; }
+  .tot.kylia { background:var(--verde-50); }
+  .tot.real  { background:var(--marron-50); }
+  .tot .who { font-size:0.78rem; font-weight:700; display:flex; align-items:center; gap:6px; }
+  .tot.kylia .who { color:var(--verde-900); }
+  .tot.real  .who { color:var(--marron); }
+  .tot .swatch { width:11px; height:11px; border-radius:3px; }
+  .tot .num { font-size:1.5rem; font-weight:800; letter-spacing:-0.02em; margin-top:6px; }
+  .tot .uni { font-size:0.8rem; color:var(--slate-500); }
+  svg.chart { width:100%; height:auto; display:block; margin-top:6px; }
+  .legend { display:flex; gap:16px; justify-content:center; margin-top:10px; font-size:0.82rem; color:var(--slate-700); }
+  .legend span { display:flex; align-items:center; gap:6px; }
+  .legend .ln { width:18px; height:3px; border-radius:2px; }
+
+  .dl { list-style:none; }
+  .dl li { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+           padding:9px 0; border-bottom:1px solid var(--slate-200); font-size:0.92rem; }
+  .dl li:last-child { border-bottom:0; }
+  .dl li .k { color:var(--slate-700); } .dl li .v { font-weight:700; color:var(--verde-900); text-align:right; }
+  .veredicto { padding:13px 14px; border-radius:12px; background:var(--slate-50); color:var(--slate-900);
+               font-weight:600; font-size:0.92rem; margin-top:14px; }
+  .pend { background:var(--slate-50); border-radius:12px; padding:13px 14px; font-size:0.88rem;
+          color:var(--slate-700); line-height:1.5; }
+  .pend b { color:var(--slate-900); }
+  .note { font-size:0.82rem; color:var(--slate-500); line-height:1.5; margin-top:12px; }
+  .avisos { list-style:none; }
+  .avisos li { font-size:0.84rem; color:var(--slate-500); line-height:1.5; padding-left:18px; position:relative; margin-bottom:6px; }
+  .avisos li::before { content:"⚠"; position:absolute; left:0; }
+  .foot { text-align:center; color:var(--slate-500); font-size:0.78rem; margin:22px 2px 8px; line-height:1.5; }
+  .msg { text-align:center; color:var(--slate-500); padding:40px 20px; line-height:1.6; }
+  .skel { animation:pulse 1.3s ease-in-out infinite; } @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="brand"><span class="dot"></span> Kylia</div>
+    <div id="root"><div class="msg skel">Cargando tu informe…</div></div>
+    <p class="foot">
+      Informe del piloto silencioso. El agua se traduce a € (modelo validado vs FAO-56);
+      plagas y nutrición se reportan de forma cualitativa.
+    </p>
+  </div>
+
+<script>
+  const fmtFecha = iso => { const [,m,d] = String(iso).split("-"); return `${d}/${m}`; };
+  const params = new URLSearchParams(location.search);
+  const id = params.get("id") || params.get("usuario_id");
+
+  function chartSVG(serie) {
+    const W = 340, H = 200, padL = 6, padR = 6, padT = 16, padB = 26, n = serie.length;
+    const maxY = Math.max(1, ...serie.map(p => Math.max(p.kylia_l_m2, p.real_l_m2)));
+    const xF = i => padL + (n <= 1 ? 0 : (i / (n - 1)) * (W - padL - padR));
+    const yF = v => H - padB - (v / maxY) * (H - padT - padB);
+    const poly = key => serie.map((p, i) => `${xF(i).toFixed(1)},${yF(p[key]).toFixed(1)}`).join(" ");
+    const dot = (key, color) => { const p = serie[n - 1];
+      return `<circle cx="${xF(n-1).toFixed(1)}" cy="${yF(p[key]).toFixed(1)}" r="3.5" fill="${color}"/>`; };
+    return `
+      <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Agua acumulada por m²">
+        <line x1="${padL}" y1="${yF(0)}" x2="${W-padR}" y2="${yF(0)}" stroke="#e2e8f0" stroke-width="1"/>
+        <text x="${padL}" y="${padT-4}" font-size="10" fill="#64748b">${maxY.toFixed(0)} L/m²</text>
+        <polyline fill="none" stroke="#8a5a2b" stroke-width="2.5" stroke-linejoin="round"
+                  stroke-linecap="round" points="${poly("real_l_m2")}"/>
+        <polyline fill="none" stroke="#013A27" stroke-width="2.5" stroke-linejoin="round"
+                  stroke-linecap="round" points="${poly("kylia_l_m2")}"/>
+        ${dot("real_l_m2","#8a5a2b")}${dot("kylia_l_m2","#013A27")}
+        <text x="${padL}" y="${H-8}" font-size="10" fill="#64748b">${fmtFecha(serie[0].date)}</text>
+        <text x="${W-padR}" y="${H-8}" font-size="10" fill="#64748b" text-anchor="end">${fmtFecha(serie[n-1].date)}</text>
+      </svg>`;
+  }
+
+  function heroAgua(agua, coste) {
+    const ex = agua.exceso_l_m2;
+    // Ahorro % sobre el agua que el agricultor REALMENTE usó (no sobre la lámina de
+    // Kylia): "usarías un X% menos del agua que echaste". Misma semántica que el
+    // dashboard del padre; exceso_pct mide otra cosa (cuánto te pasaste sobre Kylia).
+    const ahorroPct = agua.aplicada_l_m2 > 0 ? Math.round((ex / agua.aplicada_l_m2) * 100) : null;
+    let kind, big, cap;
+    if (ex > 0.5) {
+      kind = "ahorro"; big = `${ex} L/m²`;
+      cap = `de agua que habrías <b>ahorrado</b> siguiendo a Kylia${ahorroPct != null ? ` (un ${ahorroPct}% menos)` : ""}.`;
+    } else if (ex < -0.5) {
+      kind = "exceso"; big = `${Math.abs(ex)} L/m²`;
+      cap = `<b>menos</b> de lo que Kylia habría recomendado — posible déficit hídrico a vigilar.`;
+    } else {
+      kind = "par"; big = "A la par";
+      cap = `tu riego coincidió de cerca con la lámina FAO-56 de Kylia.`;
+    }
+    const eur = (coste && coste.agua_eur != null)
+      ? `<div class="eur">≈ <b>${coste.agua_eur.toLocaleString("es-ES")} €</b> de agua en el periodo medido.</div>` : "";
+    return `<div class="hero ${kind}"><div class="label">Durante el piloto</div>
+              <div class="big">${big}</div><p class="cap">${cap}</p>${eur}</div>`;
+  }
+
+  function pintar(data) {
+    const root = document.getElementById("root");
+    if (!data.ok) { root.innerHTML = `<div class="msg">No se pudo cargar el informe: ${data.error || data.reason || "error"}.</div>`; return; }
+    const inf = data.informe, u = inf.usuario, agua = inf.dimensiones.agua;
+
+    let html = `<h1>Tu informe del piloto</h1>
+      <div class="sub">${[u.ciudad, u.cultivo, u.metodo_riego].filter(Boolean).join(" · ")}` +
+      `${inf.periodo ? ` · ${fmtFecha(inf.periodo.desde)}–${fmtFecha(inf.periodo.hasta)}` : ""}</div>`;
+
+    if (!agua.disponible) {
+      html += `<div class="card"><div class="label">Agua aplicada vs recomendada</div>
+        <div class="msg">${agua.motivo}</div></div>`;
+    } else {
+      html += heroAgua(agua, inf.dimensiones.coste);
+      html += `<div class="card">
+        <div class="totales">
+          <div class="tot kylia"><div class="who"><span class="swatch" style="background:#013A27"></span> Kylia recomendaba</div>
+            <div class="num">${agua.recomendada_l_m2} <span class="uni">L/m²</span></div></div>
+          <div class="tot real"><div class="who"><span class="swatch" style="background:#8a5a2b"></span> Tú aplicaste</div>
+            <div class="num">${agua.aplicada_l_m2} <span class="uni">L/m²</span></div></div>
+        </div>
+        ${agua.serie && agua.serie.length ? chartSVG(agua.serie) : `<div class="msg">Sin días suficientes para la gráfica.</div>`}
+        <div class="legend">
+          <span><span class="ln" style="background:#013A27"></span> Kylia (FAO-56, congelado)</span>
+          <span><span class="ln" style="background:#8a5a2b"></span> Tú (real)</span>
+        </div>
+        <div class="veredicto">${agua.veredicto}</div>
+        ${agua.riegos_antes_del_registro ? `<p class="note">${agua.riegos_antes_del_registro.n} riego(s)
+          anteriores al inicio del registro (${agua.riegos_antes_del_registro.l_m2} L/m²) no se comparan.</p>` : ""}
+      </div>`;
+    }
+
+    // Tratamientos (cualitativo)
+    const t = inf.dimensiones.tratamientos;
+    if (t.disponible) {
+      html += `<div class="card"><div class="label">Tratamientos</div>
+        <ul class="dl">
+          <li><span class="k">Aplicados en el periodo</span><span class="v">${t.aplicados}</span></li>
+          <li><span class="k">Alineados con señal de Kylia</span><span class="v">${t.alineados_con_kylia}</span></li>
+          <li><span class="k">Sin señal (preventivos / evitables)</span><span class="v">${t.sin_senal_kylia}</span></li>
+        </ul>
+        <p class="note">${t.nota}</p></div>`;
+    }
+
+    // Coste económico
+    const c = inf.dimensiones.coste;
+    html += `<div class="card"><div class="label">Coste de la divergencia</div>`;
+    if (c.agua_eur != null) {
+      html += `<div class="hero ahorro" style="margin-top:0"><div class="big">${c.agua_eur.toLocaleString("es-ES")} €</div>
+        <p class="cap">en agua de más durante el periodo medido.</p></div>`;
+    } else {
+      html += `<div class="pend">${c.motivo || c.nota}</div>`;
+    }
+    html += `<p class="note">${c.nota}</p></div>`;
+
+    // Horas (proxy honesto)
+    const h = inf.dimensiones.horas;
+    html += `<div class="card"><div class="label">${h.titulo}</div>
+      <div class="pend"><b>Aún no medible.</b> ${h.motivo}</div></div>`;
+
+    // Avisos de transparencia
+    if (inf.avisos && inf.avisos.length) {
+      html += `<div class="card"><div class="label">Lo que este informe aún no afirma</div>
+        <ul class="avisos">${inf.avisos.map(a => `<li>${a}</li>`).join("")}</ul></div>`;
+    }
+
+    root.innerHTML = html;
+  }
+
+  if (!/^[0-9a-f-]{36}$/i.test(id || "")) {
+    document.getElementById("root").innerHTML =
+      `<div class="msg">Falta el identificador del piloto en el enlace (<code>?id=…</code>).</div>`;
+  } else {
+    fetch(`/api/campo?vista=reveal&usuario_id=${encodeURIComponent(id)}`)
+      .then(r => r.json()).then(pintar)
+      .catch(e => { document.getElementById("root").innerHTML =
+        `<div class="msg">No se pudo conectar.<br><small>${e.message}</small></div>`; });
+  }
+</script>
+</body>
+</html>
