@@ -129,6 +129,20 @@
   .row2 { display:flex; gap:10px; }
   .row2 > * { flex:1; }
 
+  /* Registro de 1 toque */
+  .quick-cap { font-size:0.84rem; font-weight:600; color:var(--slate-700); margin-bottom:9px; }
+  .quick { display:flex; gap:8px; flex-wrap:wrap; }
+  .quick button { flex:1 1 calc(50% - 4px); min-width:0; padding:15px 8px; border:1.5px solid var(--slate-200);
+    background:#fff; border-radius:12px; font-family:inherit; font-weight:800; font-size:1.05rem;
+    color:var(--verde-900); cursor:pointer; line-height:1.15; transition:transform .08s ease; }
+  .quick button.reco { border-color:var(--verde); background:var(--verde-50); }
+  .quick button:active { transform:scale(0.97); }
+  .quick button:disabled { opacity:0.5; }
+  .quick button .s { display:block; font-size:0.72rem; font-weight:600; color:var(--slate-500); margin-top:3px; }
+  .quick-toggle { text-align:center; margin:12px 0 2px; }
+  .quick-toggle button { background:none; border:0; color:var(--slate-500); font-family:inherit; font-weight:600;
+    font-size:0.85rem; cursor:pointer; }
+
   .foot { text-align:center; color:var(--slate-500); font-size:0.78rem; margin:22px 2px 8px; line-height:1.5; }
   .msg { text-align:center; color:var(--slate-500); padding:40px 20px; }
   .msg code { background:var(--slate-200); padding:2px 6px; border-radius:6px; font-size:0.85em; }
@@ -166,24 +180,29 @@
       </div>
 
       <div class="pane on" data-pane="riego">
-        <div class="row2">
-          <div class="field">
-            <label for="r-cant" id="r-label">Cubos echados</label>
-            <input id="r-cant" type="number" inputmode="decimal" step="0.5" min="0" placeholder="ej. 1.5" />
+        <div class="quick-cap" id="r-quick-cap">Toca cuánto se regó hoy:</div>
+        <div class="quick" id="r-quick"></div>
+        <div class="quick-toggle"><button type="button" id="r-more">otra cantidad ▾</button></div>
+        <div id="r-manual" style="display:none">
+          <div class="row2">
+            <div class="field">
+              <label for="r-cant" id="r-label">Cubos echados</label>
+              <input id="r-cant" type="number" inputmode="decimal" step="0.5" min="0" placeholder="ej. 1.5" />
+            </div>
+            <div class="field">
+              <label for="r-franja">Momento</label>
+              <select id="r-franja">
+                <option value="">—</option>
+                <option value="manana">Mañana</option>
+                <option value="mediodia">Mediodía</option>
+                <option value="tarde">Tarde</option>
+                <option value="noche">Noche</option>
+              </select>
+            </div>
           </div>
-          <div class="field">
-            <label for="r-franja">Momento</label>
-            <select id="r-franja">
-              <option value="">—</option>
-              <option value="manana">Mañana</option>
-              <option value="mediodia">Mediodía</option>
-              <option value="tarde">Tarde</option>
-              <option value="noche">Noche</option>
-            </select>
-          </div>
+          <div class="hint" id="r-hint"></div>
+          <button class="btn" data-send="riego">Registrar riego</button>
         </div>
-        <div class="hint" id="r-hint"></div>
-        <button class="btn" data-send="riego">Registrar riego</button>
       </div>
 
       <div class="pane" data-pane="trat">
@@ -316,7 +335,48 @@
     } else if (u.capacidad_regadera && u.area_m2) {
       hint.textContent = `Cada cubo = ${u.capacidad_regadera} L sobre ${u.area_m2} m².`;
     } else { hint.textContent = ""; }
+    pintarChipsRiego(u);
   }
+
+  // Registro de 1 toque: chips con la cantidad típica. Tocar = registra ya
+  // (infiere el momento del día por la hora) → quitar la fricción de apuntar
+  // el riego del padre, que es el cuello de botella del experimento.
+  function pintarChipsRiego(u) {
+    const wrap = document.getElementById("r-quick");
+    const esAspersion = u.metodo_riego === "aspersion";
+    let chips;
+    if (esAspersion) {
+      const c = u.caudal || 10;
+      chips = [0.5, 1, 1.5, 2].map(h => ({
+        cant: h,
+        label: h === 0.5 ? "30 min" : h === 1.5 ? "1½ h" : `${h} h`,
+        sub: `≈ ${Math.round(h * c * 10) / 10} L/m²`,
+        reco: h === 1.5,
+      }));
+      document.getElementById("r-quick-cap").textContent = "¿Cuánto regó el aspersor hoy? Toca y listo:";
+    } else {
+      const f = (u.capacidad_regadera && u.area_m2) ? u.capacidad_regadera / u.area_m2 : null;
+      chips = [1, 2, 3].map(n => ({
+        cant: n,
+        label: `${n} cubo${n === 1 ? "" : "s"}`,
+        sub: f ? `≈ ${Math.round(n * f * 10) / 10} L/m²` : "",
+        reco: false,
+      }));
+      document.getElementById("r-quick-cap").textContent = "¿Cuántos cubos echaste hoy? Toca y listo:";
+    }
+    wrap.innerHTML = chips.map(ch =>
+      `<button type="button" class="${ch.reco ? "reco" : ""}" data-cant="${ch.cant}">${ch.label}${ch.sub ? `<span class="s">${ch.sub}</span>` : ""}</button>`
+    ).join("");
+    wrap.querySelectorAll("button").forEach(b => b.addEventListener("click", async () => {
+      wrap.querySelectorAll("button").forEach(x => x.disabled = true);
+      try { await logRiego(parseFloat(b.dataset.cant), true); toast("✓ Riego registrado"); cargarHoy(); }
+      catch (e) { toast(e.message || "No se pudo guardar", true);
+                  wrap.querySelectorAll("button").forEach(x => x.disabled = false); }
+    }));
+  }
+
+  const franjaAhora = () => { const h = new Date().getHours();
+    return h < 12 ? "manana" : h < 16 ? "mediodia" : h < 21 ? "tarde" : "noche"; };
 
   // Tarjeta "el porqué de hoy": de dónde sale la decisión (balance FAO-56).
   function desgloseCard(d, nivel) {
@@ -486,23 +546,27 @@
   }
 
   const val = id => document.getElementById(id).value.trim();
+
+  // Registra un riego de `cant` (horas si aspersión, cubos si regadera).
+  // `quick`=true (chip de 1 toque) infiere el momento por la hora actual.
+  async function logRiego(cant, quick) {
+    if (!(cant > 0)) { toast(USUARIO.metodo_riego === "aspersion" ? "Pon las horas" : "Pon cuántos cubos", true); return; }
+    const fila = { tipo: "riego", franja_horaria: quick ? franjaAhora() : (val("r-franja") || null) };
+    if (USUARIO.metodo_riego === "aspersion") {
+      fila.duracion_min = Math.round(cant * 60);
+      fila.notas = `${cant} h de aspersión`;
+      if (USUARIO.caudal) fila.cantidad_l_m2 = Math.round((cant * USUARIO.caudal) * 10) / 10;  // horas × mm/h
+    } else {
+      fila.notas = `${cant} cubo${cant === 1 ? "" : "s"}`;
+      if (USUARIO.capacidad_regadera && USUARIO.area_m2)
+        fila.cantidad_l_m2 = Math.round((cant * USUARIO.capacidad_regadera / USUARIO.area_m2) * 10) / 10;
+    }
+    await enviar("acciones", fila);
+    document.getElementById("r-cant").value = "";
+  }
+
   const acciones = {
-    riego: async () => {
-      const cant = parseFloat(val("r-cant"));
-      if (!(cant > 0)) { toast(USUARIO.metodo_riego === "aspersion" ? "Pon las horas" : "Pon cuántos cubos", true); return; }
-      const fila = { tipo: "riego", franja_horaria: val("r-franja") || null };
-      if (USUARIO.metodo_riego === "aspersion") {
-        fila.duracion_min = Math.round(cant * 60);
-        fila.notas = `${cant} h de aspersión`;
-        if (USUARIO.caudal) fila.cantidad_l_m2 = Math.round((cant * USUARIO.caudal) * 10) / 10;  // horas × mm/h
-      } else {
-        fila.notas = `${cant} cubo${cant === 1 ? "" : "s"}`;
-        if (USUARIO.capacidad_regadera && USUARIO.area_m2)
-          fila.cantidad_l_m2 = Math.round((cant * USUARIO.capacidad_regadera / USUARIO.area_m2) * 10) / 10;
-      }
-      await enviar("acciones", fila);
-      document.getElementById("r-cant").value = "";
-    },
+    riego: () => logRiego(parseFloat(val("r-cant")), false),
     trat: async () => {
       const prod = val("t-prod");
       if (!prod) { toast("Pon el producto", true); return; }
@@ -517,6 +581,14 @@
       document.getElementById("o-desc").value = "";
     },
   };
+
+  // Plegar/desplegar el input manual de riego (fallback de los chips)
+  document.getElementById("r-more").addEventListener("click", () => {
+    const m = document.getElementById("r-manual"), btn = document.getElementById("r-more");
+    const open = m.style.display !== "none";
+    m.style.display = open ? "none" : "";
+    btn.textContent = open ? "otra cantidad ▾" : "ocultar ▴";
+  });
 
   // Pestañas del cuaderno
   document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
