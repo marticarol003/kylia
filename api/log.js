@@ -85,7 +85,7 @@ async function handleRegistroUsuario(req, res, body) {
     return res.status(200).json({ ok: true, persisted: true, usuario: filas?.[0] || null });
   } catch (err) {
     console.error("[registro-usuario] error:", err.message);
-    return res.status(500).json({ ok: false, error: "no se pudo guardar", detalle: body.debug ? err.message : undefined });
+    return res.status(500).json({ ok: false, error: "no se pudo guardar" });
   }
 }
 
