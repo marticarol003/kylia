@@ -74,7 +74,21 @@ module.exports = async (req, res) => {
     }
 
     const geomWgs84 = { type: feature.geometry.type, coordinates: convertCoords(feature.geometry.coordinates) };
-    return res.status(200).json({ parcela: geomWgs84 });
+
+    // Propiedades oficiales del recinto. La superficie (dn_surface, m²) es más
+    // fiable que calcularla del polígono: los vector tiles RECORTAN la geometría
+    // en el borde del tile, así que un recinto a caballo entre tiles daría un
+    // área geométrica truncada. La referencia SIGPAC completa sirve para el PAC.
+    const p = feature.properties || {};
+    const refPartes = [p.provincia, p.municipio, p.agregado, p.zona, p.poligono, p.parcela, p.recinto];
+    const referencia = refPartes.every(v => v != null) ? refPartes.join(":") : null;
+
+    return res.status(200).json({
+      parcela: geomWgs84,
+      superficie_m2: Number.isFinite(p.dn_surface) ? Math.round(p.dn_surface) : null,
+      uso: p.uso_sigpac || null,
+      referencia,
+    });
   } catch (err) {
     return res.status(502).json({ error: err.message });
   }

@@ -201,7 +201,8 @@
         const r = Math.random()*16|0, v = c === "x" ? r : (r&0x3|0x8); return v.toString(16); }));
 
   // Estado de la selección
-  const sel = { metodo:null, manejo:null, suelo:null, lat:null, lon:null, parcela:null, ciudad:null };
+  const sel = { metodo:null, manejo:null, suelo:null, lat:null, lon:null,
+                parcela:null, ciudad:null, superficie_m2:null, referencia:null, uso:null };
 
   // Chips de elección única (método / manejo / suelo)
   function wirePick(id, key) {
@@ -259,17 +260,21 @@
     sel.lat = +e.latlng.lat.toFixed(6); sel.lon = +e.latlng.lng.toFixed(6);
     if (marker) marker.setLatLng(e.latlng); else marker = L.marker(e.latlng).addTo(map);
     setStatus("idle", "Buscando tu parcela en SIGPAC…");
-    sel.parcela = null;
+    sel.parcela = null; sel.superficie_m2 = null; sel.referencia = null; sel.uso = null;
     if (parcelaLayer) { map.removeLayer(parcelaLayer); parcelaLayer = null; }
     try {
       const r = await fetch(`/api/sigpac?lat=${sel.lat}&lon=${sel.lon}`);
       const j = await r.json();
       if (j.parcela) {
-        sel.parcela = j.parcela;
+        sel.parcela = j.parcela; sel.referencia = j.referencia || null; sel.uso = j.uso || null;
         parcelaLayer = L.geoJSON(j.parcela, { style: { color: "#013A27", weight: 2, fillOpacity: 0.15 } }).addTo(map);
-        const area = Math.round(areaGeom(j.parcela));
-        if (area > 0 && !$("f-area").value) $("f-area").value = area;
-        setStatus("ok", `✓ Recinto SIGPAC enganchado · <b>≈ ${area.toLocaleString("es-ES")} m²</b>. Si no es el tuyo, vuelve a tocar.`);
+        // Superficie OFICIAL de SIGPAC (dn_surface); si falta, caigo al cálculo del polígono.
+        const area = Number.isFinite(j.superficie_m2) ? j.superficie_m2 : Math.round(areaGeom(j.parcela));
+        sel.superficie_m2 = area;
+        if (area > 0) $("f-area").value = area;   // la rellenamos siempre con la oficial (editable)
+        const oficial = Number.isFinite(j.superficie_m2) ? " (superficie oficial)" : "";
+        setStatus("ok", `✓ Recinto SIGPAC enganchado · <b>${area.toLocaleString("es-ES")} m²</b>${oficial}` +
+          `${j.referencia ? ` · ref. ${j.referencia}` : ""}. Si no es el tuyo, vuelve a tocar.`);
       } else {
         setStatus("warn", "Ubicación marcada, pero SIGPAC no devolvió recinto aquí. Vale igual: usamos el punto para el clima.");
       }
@@ -314,8 +319,12 @@
       suelo: sel.suelo,
       lat: sel.lat, lon: sel.lon,
       ciudad: sel.ciudad || null,
-      parcela: sel.parcela || null,
-      area_m2: Number.isFinite(area) && area > 0 ? area : null,
+      // Guardamos geometría + referencia SIGPAC + uso (todo el contexto oficial del
+      // recinto, que el cuaderno PAC necesitará más adelante).
+      parcela: sel.parcela
+        ? { geometria: sel.parcela, referencia: sel.referencia, uso: sel.uso, superficie_m2: sel.superficie_m2 }
+        : null,
+      area_m2: Number.isFinite(area) && area > 0 ? area : (sel.superficie_m2 || null),
     };
 
     try {
