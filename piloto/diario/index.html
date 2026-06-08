@@ -167,6 +167,8 @@
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
   const franjaAhora = () => { const h = new Date().getHours();
     return h < 12 ? "manana" : h < 16 ? "mediodia" : h < 21 ? "tarde" : "noche"; };
+  const durTxt = m => { if (m == null) return null; if (m < 60) return `${m} min`;
+    const h = m / 60; return Number.isInteger(h) ? `${h} h` : (h === 1.5 ? "1½ h" : `${h} h`); };
   const toast = (txt, err) => { const t = $("toast"); t.textContent = txt; t.className = "show" + (err ? " err" : "");
     setTimeout(() => { t.className = err ? "err" : ""; }, 2600); };
 
@@ -186,7 +188,9 @@
     if (data.riegos_recientes && data.riegos_recientes.length) {
       html += `<div class="card"><div class="label">Lo que llevas apuntado</div><ul class="hist">`;
       for (const r of data.riegos_recientes) {
+        const dur = durTxt(r.duracion_min);
         const v = r.cubos != null ? `${r.cubos} cubo${r.cubos === 1 ? "" : "s"}`
+                : dur ? `${dur}${r.l_m2 != null ? ` · ${r.l_m2} L/m²` : ""}`
                 : r.l_m2 != null ? `${r.l_m2} L/m²` : "riego";
         html += `<li><span class="f">${fmtFecha(r.fecha)}</span><span class="r"><span class="v">${v}</span>` +
                 `${r.id != null ? `<button class="del" data-borrar="${r.id}" title="Borrar este riego">✕</button>` : ""}</span></li>`;
@@ -218,8 +222,8 @@
       const c = u.caudal || 10;
       chips = [0.5, 1, 1.5, 2].map(h => ({ cant: h,
         label: h === 0.5 ? "30 min" : h === 1.5 ? "1½ h" : `${h} h`,
-        sub: `≈ ${Math.round(h * c * 10) / 10} L/m²`, reco: h === 1.5 }));
-      $("r-quick-cap").textContent = "¿Cuánto regó el aspersor hoy? Toca y listo:";
+        sub: `≈ ${Math.round(h * c * 10) / 10} L/m²`, reco: false }));   // sin resaltar: en silencioso no se sugiere
+      $("r-quick-cap").textContent = "¿Cuánto regó el aspersor hoy? Toca el tiempo:";
     } else if (u.capacidad_regadera && u.area_m2) {
       const f = u.capacidad_regadera / u.area_m2;
       chips = [1, 2, 3].map(n => ({ cant: n, label: `${n} cubo${n === 1 ? "" : "s"}`,
