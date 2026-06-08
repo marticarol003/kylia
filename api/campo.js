@@ -46,9 +46,9 @@ async function vistaHoy(res, u) {
   const hoy    = hoyISO();
   const serie  = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
   const accs   = await supabaseSelect("acciones",
-    `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2&order=fecha_local.asc`);
+    `usuario_id=eq.${u.id}&tipo=eq.riego&select=id,fecha_local,cantidad_l_m2&order=fecha_local.asc`);
   const riegos = (accs || []).filter(f => f.fecha_local)
-    .map(f => ({ date: f.fecha_local, litros: f.cantidad_l_m2 ?? null }));
+    .map(f => ({ id: f.id, date: f.fecha_local, litros: f.cantidad_l_m2 ?? null }));
 
   const opts = { suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
                  metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion };
@@ -75,7 +75,7 @@ async function vistaHoy(res, u) {
   }
 
   const recientes = riegos.slice(-5).reverse().map(r => ({
-    fecha: r.date, l_m2: r.litros,
+    id: r.id, fecha: r.date, l_m2: r.litros,
     cubos: (u.capacidad_regadera && u.area_m2 && r.litros != null)
       ? Math.round((r.litros * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
   }));
@@ -120,9 +120,9 @@ async function vistaHoy(res, u) {
 // para adaptar el registro (cubos vs horas) y lo que ya lleva apuntado.
 async function vistaPerfil(res, u) {
   const accs = await supabaseSelect("acciones",
-    `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2&order=fecha_local.desc&limit=8`);
+    `usuario_id=eq.${u.id}&tipo=eq.riego&select=id,fecha_local,cantidad_l_m2&order=fecha_local.desc&limit=8`);
   const recientes = (accs || []).filter(f => f.fecha_local).map(f => ({
-    fecha: f.fecha_local, l_m2: f.cantidad_l_m2,
+    id: f.id, fecha: f.fecha_local, l_m2: f.cantidad_l_m2,
     cubos: (u.capacidad_regadera && u.area_m2 && f.cantidad_l_m2 != null)
       ? Math.round((f.cantidad_l_m2 * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
   }));

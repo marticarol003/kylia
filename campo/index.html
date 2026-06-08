@@ -67,6 +67,10 @@
   .hist li:last-child { border-bottom:0; }
   .hist .f { color:var(--slate-500); }
   .hist .v { font-weight:700; color:var(--verde-900); }
+  .hist .r { display:flex; align-items:center; gap:10px; }
+  .hist .del { border:0; background:none; color:var(--slate-500); font-size:0.95rem; cursor:pointer;
+               padding:3px 7px; border-radius:6px; line-height:1; }
+  .hist .del:hover { background:var(--rojo-50); color:var(--rojo); }
 
   /* Porqué de hoy: barra "hucha de agua" + desglose */
   .gauge { position:relative; height:26px; background:var(--verde-50); border-radius:8px; overflow:hidden; margin:4px 0 6px; }
@@ -318,11 +322,16 @@
       html += `<div class="card"><div class="label">Riegos registrados</div><ul class="hist">`;
       for (const r of data.riegos_recientes) {
         const v = r.cubos != null ? `${r.cubos} cubo${r.cubos === 1 ? "" : "s"}` : `${r.l_m2} L/m²`;
-        html += `<li><span class="f">${fmtFecha(r.fecha)}</span><span class="v">${v}</span></li>`;
+        html += `<li><span class="f">${fmtFecha(r.fecha)}</span><span class="r"><span class="v">${v}</span>` +
+                `${r.id != null ? `<button class="del" data-borrar="${r.id}" title="Borrar este riego">✕</button>` : ""}</span></li>`;
       }
       html += `</ul></div>`;
     }
     root.innerHTML = html;
+
+    // Borrar un riego mal apuntado (los botones ✕ de la lista)
+    root.querySelectorAll(".hist .del").forEach(b =>
+      b.addEventListener("click", () => borrarRiego(b.dataset.borrar)));
 
     // Cuaderno + adaptación del input de riego al método del campo
     document.getElementById("registro").style.display = "";
@@ -543,6 +552,20 @@
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok || j.ok === false) throw new Error(j.error || "error al guardar");
+  }
+
+  // Borra un riego ya apuntado (deshacer un error). Para CORREGIR la cantidad:
+  // borra el equivocado y vuelve a apuntar el bueno con los chips.
+  async function borrarRiego(id) {
+    if (!id || !confirm("¿Borrar este riego del registro?")) return;
+    try {
+      const res = await fetch("/api/log", { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recurso: "borrar-accion", usuario_id: campoActual().id, id: Number(id) }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || j.ok === false) throw new Error(j.error || "no se pudo borrar");
+      toast("✓ Riego borrado"); cargarHoy();
+    } catch (e) { toast(e.message || "No se pudo borrar", true); }
   }
 
   const val = id => document.getElementById(id).value.trim();

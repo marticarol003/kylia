@@ -88,6 +88,26 @@ async function supabaseUpdate(table, filter, patch) {
   return await res.json();
 }
 
+// Borra por filtro PostgREST (ej: "id=eq.5&usuario_id=eq.<uuid>").
+// Devuelve las filas borradas (return=representation) para poder confirmar
+// que se borró exactamente lo esperado (0 filas → nada coincidió).
+async function supabaseDelete(table, filter) {
+  if (!isConfigured()) {
+    console.warn(`[supabase] no configurado, omitiendo delete en ${table}`);
+    return { ok: false, reason: "not_configured" };
+  }
+  const url = `${SUPABASE_URL}/rest/v1/${table}?${filter}`;
+  const res = await fetch(url, {
+    method:  "DELETE",
+    headers: { ...authHeaders(), "Prefer": "return=representation" },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Supabase delete ${table} ${res.status}: ${text.slice(0, 400)}`);
+  }
+  return await res.json();
+}
+
 // Select por filtro PostgREST (ej: "id=eq.<uuid>&select=*")
 async function supabaseSelect(table, query = "") {
   if (!isConfigured()) return [];
@@ -126,6 +146,7 @@ module.exports = {
   supabaseInsert,
   supabaseUpdate,
   supabaseSelect,
+  supabaseDelete,
   parseBody,
   preludio,
 };

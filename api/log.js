@@ -10,13 +10,14 @@
 //   mediciones, recomendaciones-log, eventos
 
 const {
-  isConfigured, supabaseInsert, supabaseUpdate, supabaseSelect,
+  isConfigured, supabaseInsert, supabaseUpdate, supabaseSelect, supabaseDelete,
   parseBody, preludio,
 } = require("./_supabase.js");
 
 const HANDLERS = {
   "registro-usuario":    handleRegistroUsuario,
   "acciones":            handleAcciones,
+  "borrar-accion":       handleBorrarAccion,
   "observaciones":       handleObservaciones,
   "jornadas":            handleJornadas,
   "mediciones":          handleMediciones,
@@ -130,6 +131,36 @@ async function handleAcciones(req, res, body) {
   } catch (err) {
     console.error("[acciones] error:", err.message);
     return res.status(500).json({ ok: false, error: "no se pudo guardar" });
+  }
+}
+
+// ─── borrar-accion (deshacer un riego/aplicación mal apuntado) ─────
+// Borra una fila de `acciones` por id, SIEMPRE acotado al usuario_id que la
+// posee (así nadie puede borrar filas de otro adivinando ids). `acciones` no
+// es append-only (solo recomendaciones_log lo es), así que corregir el propio
+// registro real es legítimo.
+async function handleBorrarAccion(req, res, body) {
+  const usuario_id = (body.usuario_id || "").toString().trim();
+  if (!/^[0-9a-f-]{36}$/i.test(usuario_id)) {
+    return res.status(400).json({ error: "usuario_id inválido" });
+  }
+  const id = intOrNull(body.id ?? body.accion_id);
+  if (id == null || id <= 0) return res.status(400).json({ error: "id de acción inválido" });
+
+  console.log("[borrar-accion]", JSON.stringify({ usuario_id, id }));
+
+  if (!isConfigured()) {
+    return res.status(200).json({ ok: true, persisted: false, reason: "supabase_not_configured" });
+  }
+
+  try {
+    const borradas = await supabaseDelete("acciones", `id=eq.${id}&usuario_id=eq.${usuario_id}`);
+    const n = Array.isArray(borradas) ? borradas.length : 0;
+    if (n === 0) return res.status(404).json({ ok: false, error: "no se encontró ese registro" });
+    return res.status(200).json({ ok: true, persisted: true, borradas: n });
+  } catch (err) {
+    console.error("[borrar-accion] error:", err.message);
+    return res.status(500).json({ ok: false, error: "no se pudo borrar" });
   }
 }
 
