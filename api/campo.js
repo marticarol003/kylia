@@ -165,21 +165,30 @@ async function vistaReveal(req, res, u) {
   return res.status(200).json(payload);
 }
 
-// ── Vista "comparativa": Kylia(=lo que recomienda) vs lo real del padre ──
+// ── Vista "comparativa": Kylia (FAO-56) vs lo real del padre, con BANDA de caudal ──
 // Dos curvas de agua ACUMULADA por m² sobre el mismo clima y cultivo:
 //   🟢 Kylia  → contrafactual FAO-56 (simularKylia): lo que habría aplicado.
-//   🟤 Padre  → suma de los riegos que registró de verdad (cantidad_l_m2 bruta).
-// El cultivo/suelo/zona/fecha son los del campo cargado (los 500 m² del padre),
-// así la referencia de Kylia es la que le tocaría a SU parcela. Comparación
-// orientativa por m² (no es un ensayo controlado), ver caveat en el front.
-async function vistaComparativa(res, u) {
+//   🟤 Padre  → su riego real. Como apunta por DURACIÓN, el agua aplicada depende
+//      del caudal del aspersor (aún no medido). En vez de fijar un caudal supuesto,
+//      mostramos una BANDA: escenario bajo y alto. Recibe los inputs del aspersor
+//      por query (?aspersores=&lh_bajo=&lh_alto=) y deriva el caudal:
+//        caudal(mm/h) = aspersores × (L/h por aspersor) / área(m²)
+//      Riegos apuntados con cantidad manual (sin duración) no se reescalan: cuentan
+//      igual en ambos escenarios. Sin esos inputs → un solo caudal (u.caudal) y la
+//      banda colapsa a una línea (compatibilidad). La verde NO depende del caudal.
+// El cultivo/suelo/zona/fecha son los del campo cargado, así la referencia de Kylia
+// es la que le tocaría a SU parcela. Orientativa por m² (no es un ensayo controlado).
+async function vistaComparativa(req, res, u) {
   if (u.lat == null || u.lon == null) return res.status(200).json({ ok: false, error: "sin coordenadas" });
+
+  const r1    = x => Math.round(x * 10) / 10;
+  const numOr = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
 
   const hoy   = hoyISO();
   const serie = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
   const [riegos, aplics] = await Promise.all([
     supabaseSelect("acciones",
-      `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2&order=fecha_local.asc`),
+      `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.asc`),
     supabaseSelect("acciones",
       `usuario_id=eq.${u.id}&tipo=eq.aplicacion&select=fecha_local,producto_nombre&order=fecha_local.asc`),
   ]);
@@ -207,34 +216,59 @@ async function vistaComparativa(res, u) {
   const acumKylia = {};
   kylia.puntos.forEach(p => { acumKylia[p.date] = p.acum_l_m2; });
 
-  // 🟤 Padre: acumulado de lo realmente vertido por fecha (sin el riego de asentamiento).
-  const realPorDia = {};
+  // 🟤 Banda de caudal del padre. Con los inputs del aspersor (y área) derivamos
+  // bajo/alto; si no, un único caudal (u.caudal o 10) y la banda colapsa.
+  const area        = u.area_m2 || null;
+  const aspersores  = numOr(req.query?.aspersores);
+  const lhBajo      = numOr(req.query?.lh_bajo);
+  const lhAlto      = numOr(req.query?.lh_alto);
+  const caudalUnico = numOr(u.caudal) || 10;
+  let caudalBajo, caudalAlto;
+  if (aspersores && lhBajo && lhAlto && area) {
+    caudalBajo = (aspersores * lhBajo) / area;
+    caudalAlto = (aspersores * lhAlto) / area;
+  } else {
+    caudalBajo = caudalAlto = caudalUnico;
+  }
+
+  // L/m² de un riego bajo un caudal dado: duración × mm/h / 60. Sin duración
+  // (cantidad apuntada a mano) → el valor guardado, idéntico en ambos escenarios.
+  const lm2DeRiego = (r, caudal) =>
+    r.duracion_min != null ? (caudal * r.duracion_min) / 60 : (r.cantidad_l_m2 ?? 0);
+
+  const bajoPorDia = {}, altoPorDia = {};
   (riegos || []).forEach(r => {
     const f = dia(r.fecha_local);
-    if (f && r.cantidad_l_m2 != null && (!inicio || f >= inicio))
-      realPorDia[f] = (realPorDia[f] || 0) + r.cantidad_l_m2;
-  });
-  let acumPadre = 0;
-  const puntos = dias.map(d => {
-    acumPadre += realPorDia[d.date] || 0;
-    return { date: d.date,
-             kylia_l_m2: acumKylia[d.date] ?? 0,
-             padre_l_m2: Math.round(acumPadre * 10) / 10 };
+    if (!f || (inicio && f < inicio)) return;
+    bajoPorDia[f] = (bajoPorDia[f] || 0) + lm2DeRiego(r, caudalBajo);
+    altoPorDia[f] = (altoPorDia[f] || 0) + lm2DeRiego(r, caudalAlto);
   });
 
-  const ultimo = puntos[puntos.length - 1] || { kylia_l_m2: 0, padre_l_m2: 0 };
-  const area   = u.area_m2 || null;
-  const r1 = x => Math.round(x * 10) / 10;
+  let accBajo = 0, accAlto = 0;
+  const puntos = dias.map(d => {
+    accBajo += bajoPorDia[d.date] || 0;
+    accAlto += altoPorDia[d.date] || 0;
+    return { date: d.date,
+             kylia_l_m2:      acumKylia[d.date] ?? 0,
+             padre_bajo_l_m2: r1(accBajo),
+             padre_alto_l_m2: r1(accAlto) };
+  });
+
+  const ultimo    = puntos[puntos.length - 1] || { kylia_l_m2: 0, padre_bajo_l_m2: 0, padre_alto_l_m2: 0 };
+  const ahorroPct = padre => padre > 0 ? Math.round(((padre - ultimo.kylia_l_m2) / padre) * 100) : null;
+  const litros    = lm2 => area ? Math.round(lm2 * area) : null;
   const totales = {
-    kylia_l_m2: r1(ultimo.kylia_l_m2),
-    padre_l_m2: r1(ultimo.padre_l_m2),
-    dif_l_m2:   r1(ultimo.padre_l_m2 - ultimo.kylia_l_m2),
-    // % de agua ahorrada siguiendo a Kylia, sobre lo que usa el padre (la base que se reduce).
-    ahorro_pct: ultimo.padre_l_m2 > 0
-                  ? Math.round(((ultimo.padre_l_m2 - ultimo.kylia_l_m2) / ultimo.padre_l_m2) * 100)
-                  : null,
-    kylia_litros: area ? Math.round(ultimo.kylia_l_m2 * area) : null,
-    padre_litros: area ? Math.round(ultimo.padre_l_m2 * area) : null,
+    kylia_l_m2:      r1(ultimo.kylia_l_m2),
+    padre_bajo_l_m2: r1(ultimo.padre_bajo_l_m2),
+    padre_alto_l_m2: r1(ultimo.padre_alto_l_m2),
+    // dif/ahorro siguiendo a Kylia, sobre lo que usa el padre (la base que se reduce).
+    dif_bajo_l_m2:   r1(ultimo.padre_bajo_l_m2 - ultimo.kylia_l_m2),
+    dif_alto_l_m2:   r1(ultimo.padre_alto_l_m2 - ultimo.kylia_l_m2),
+    ahorro_pct_bajo: ahorroPct(ultimo.padre_bajo_l_m2),
+    ahorro_pct_alto: ahorroPct(ultimo.padre_alto_l_m2),
+    kylia_litros:      litros(ultimo.kylia_l_m2),
+    padre_bajo_litros: litros(ultimo.padre_bajo_l_m2),
+    padre_alto_litros: litros(ultimo.padre_alto_l_m2),
   };
 
   // Fertilizantes/tratamientos: solo cualitativo (producto + nº de veces).
@@ -248,7 +282,9 @@ async function vistaComparativa(res, u) {
   return res.status(200).json({
     ok: true, vista: "comparativa",
     campo: { ciudad: u.ciudad, cultivo: (u.cultivos || [])[0] || null,
-             area_m2: area, metodo: u.metodo_riego, caudal_mmh: u.caudal },
+             area_m2: area, metodo: u.metodo_riego, caudal_mmh: r1(caudalUnico) },
+    escenarios: { banda: caudalBajo !== caudalAlto, aspersores, lh_bajo: lhBajo, lh_alto: lhAlto,
+                  caudal_bajo_mmh: r1(caudalBajo), caudal_alto_mmh: r1(caudalAlto) },
     desde: dias[0]?.date || inicio || null, hoy, excluye_asentamiento: true,
     serie: puntos, totales, fertilizantes,
   });
@@ -272,7 +308,7 @@ module.exports = async (req, res) => {
     if (!u) return res.status(404).json({ ok: false, error: "usuario no encontrado (¿ejecutaste el alta?)" });
 
     if (vista === "reveal")      return await vistaReveal(req, res, u);
-    if (vista === "comparativa") return await vistaComparativa(res, u);
+    if (vista === "comparativa") return await vistaComparativa(req, res, u);
     if (vista === "perfil")      return await vistaPerfil(res, u);
     return await vistaHoy(res, u);
   } catch (err) {

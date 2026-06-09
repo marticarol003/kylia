@@ -435,24 +435,43 @@
   }
 
   // ── Pantalla "comparativa" ────────────────────────────────────
-  function chartSVG(serie) {
+  // Escenarios de caudal del aspersor del padre (aún sin medir): 35 microaspersores
+  // a 70–120 L/h cada uno. El endpoint deriva mm/h = aspersores × L/h ÷ área y
+  // devuelve una BANDA (padre_bajo/padre_alto). Cuando se mida el caudal real,
+  // basta poner lh_bajo = lh_alto y la banda colapsa a una línea.
+  const ASP = { aspersores: 35, lhBajo: 70, lhAlto: 120 };
+
+  function chartSVG(serie, banda) {
     const W = 340, H = 200, padL = 6, padR = 6, padT = 16, padB = 26;
     const n = serie.length;
-    const maxY = Math.max(1, ...serie.map(p => Math.max(p.kylia_l_m2, p.padre_l_m2)));
+    const maxY = Math.max(1, ...serie.map(p => Math.max(p.kylia_l_m2, p.padre_alto_l_m2)));
     const xF = i => padL + (n <= 1 ? 0 : (i / (n - 1)) * (W - padL - padR));
     const yF = v => H - padB - (v / maxY) * (H - padT - padB);
     const poly = key => serie.map((p, i) => `${xF(i).toFixed(1)},${yF(p[key]).toFixed(1)}`).join(" ");
     const dot = (key, color) => { const p = serie[n - 1];
       return `<circle cx="${xF(n-1).toFixed(1)}" cy="${yF(p[key]).toFixed(1)}" r="3.5" fill="${color}"/>`; };
+    // Cuando hay banda, el relleno marrón = entre el escenario bajo y el alto.
+    const areaBanda = banda
+      ? `<polygon fill="#8a5a2b" fill-opacity="0.18" stroke="none" points="${
+          serie.map((p, i) => `${xF(i).toFixed(1)},${yF(p.padre_alto_l_m2).toFixed(1)}`).join(" ")} ${
+          [...serie].reverse().map((p, i) => `${xF(n-1-i).toFixed(1)},${yF(p.padre_bajo_l_m2).toFixed(1)}`).join(" ")}"/>`
+      : "";
+    const lineaPadre = banda
+      ? `<polyline fill="none" stroke="#8a5a2b" stroke-width="1.5" stroke-opacity="0.7" stroke-dasharray="2 3"
+                  stroke-linejoin="round" stroke-linecap="round" points="${poly("padre_bajo_l_m2")}"/>
+         <polyline fill="none" stroke="#8a5a2b" stroke-width="2.5"
+                  stroke-linejoin="round" stroke-linecap="round" points="${poly("padre_alto_l_m2")}"/>`
+      : `<polyline fill="none" stroke="#8a5a2b" stroke-width="2.5"
+                  stroke-linejoin="round" stroke-linecap="round" points="${poly("padre_alto_l_m2")}"/>`;
     return `
       <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Agua acumulada por m²">
         <line x1="${padL}" y1="${yF(0)}" x2="${W-padR}" y2="${yF(0)}" stroke="#e2e8f0" stroke-width="1"/>
         <text x="${padL}" y="${padT-4}" font-size="10" fill="#64748b">${maxY.toFixed(0)} L/m²</text>
-        <polyline fill="none" stroke="#8a5a2b" stroke-width="2.5" stroke-linejoin="round"
-                  stroke-linecap="round" points="${poly("padre_l_m2")}"/>
+        ${areaBanda}
+        ${lineaPadre}
         <polyline fill="none" stroke="#013A27" stroke-width="2.5" stroke-linejoin="round"
                   stroke-linecap="round" points="${poly("kylia_l_m2")}"/>
-        ${dot("padre_l_m2","#8a5a2b")}${dot("kylia_l_m2","#013A27")}
+        ${dot("padre_alto_l_m2","#8a5a2b")}${dot("kylia_l_m2","#013A27")}
         <text x="${padL}" y="${H-8}" font-size="10" fill="#64748b">${fmtFecha(serie[0].date)}</text>
         <text x="${W-padR}" y="${H-8}" font-size="10" fill="#64748b" text-anchor="end">${fmtFecha(serie[n-1].date)}</text>
       </svg>`;
@@ -465,20 +484,30 @@
         <small>¿Ejecutaste <code>db/alta-campo-padre-aspersion.sql</code> en Supabase?</small></div>`;
       return;
     }
-    const t = data.totales, c = data.campo;
-    const litros = (lm2) => c.area_m2 ? ` · ≈ ${Math.round(lm2 * c.area_m2).toLocaleString("es-ES")} L` : "";
+    const t = data.totales, c = data.campo, e = data.escenarios || {};
+    const banda = !!e.banda;
+    const m2 = c.area_m2 ? `${c.area_m2} m²` : "el campo";
+    const rango = (a, b, uni) => banda ? `${a}–${b} ${uni}` : `${b} ${uni}`;
+    const rangoLitros = (a, b) => !c.area_m2 ? "" : banda
+      ? "≈ " + Math.round(a).toLocaleString("es-ES") + "–" + Math.round(b).toLocaleString("es-ES") + " L en " + m2
+      : "≈ " + Math.round(b).toLocaleString("es-ES") + " L en " + m2;
 
+    // En banda: el escenario BAJO (menos caudal) → menos agua del padre → MENOS ahorro;
+    // el ALTO → más. Mostramos el rango [bajo, alto].
     let veredicto;
-    if (t.dif_l_m2 > 0.5) {
-      const litros = c.area_m2 ? Math.round(t.dif_l_m2 * c.area_m2).toLocaleString("es-ES") : null;
+    if (t.dif_bajo_l_m2 > 0.5) {
+      const lA = c.area_m2 ? Math.round(t.dif_bajo_l_m2 * c.area_m2).toLocaleString("es-ES") : null;
+      const lB = c.area_m2 ? Math.round(t.dif_alto_l_m2 * c.area_m2).toLocaleString("es-ES") : null;
+      const pct = banda ? `${t.ahorro_pct_bajo}–${t.ahorro_pct_alto}%` : `${t.ahorro_pct_alto}%`;
       veredicto = `Siguiendo a Kylia ahorrarías
-        <b style="color:var(--verde-900)">${t.dif_l_m2} L/m²${t.ahorro_pct != null ? ` (${t.ahorro_pct}%)` : ""}</b>
-        en este campo${litros ? ` · ≈ <b>${litros} L menos</b> en 500 m²` : ""}.`;
-    } else if (t.dif_l_m2 < -0.5) {
-      veredicto = `Aquí Kylia habría regado <b>${Math.abs(t.dif_l_m2)} L/m² más</b> —
-        tu padre se está quedando corto (ojo al estrés hídrico). Ahorrar no es regar menos, es regar lo justo.`;
+        <b style="color:var(--verde-900)">${rango(t.dif_bajo_l_m2, t.dif_alto_l_m2, "L/m²")} (${pct})</b>
+        en este campo${lB ? ` · ≈ <b>${banda ? lA + "–" + lB : lB} L menos</b> en ${m2}` : ""}.`;
+    } else if (t.dif_alto_l_m2 < -0.5) {
+      veredicto = `Incluso en el escenario de más caudal, aquí Kylia habría regado
+        <b>${Math.abs(t.dif_alto_l_m2)} L/m² más</b> — tu padre se está quedando corto
+        (ojo al estrés hídrico). Ahorrar no es regar menos, es regar lo justo.`;
     } else {
-      veredicto = `De momento van <b>a la par</b> (${t.kylia_l_m2} vs ${t.padre_l_m2} L/m²) —
+      veredicto = `De momento van <b>a la par</b> (Kylia ${t.kylia_l_m2} vs padre ${rango(t.padre_bajo_l_m2, t.padre_alto_l_m2, "L/m²")}) —
         el ahorro se verá según avance la campaña.`;
     }
 
@@ -500,37 +529,43 @@
           <div class="tot kylia">
             <div class="who"><span class="swatch" style="background:#013A27"></span> Kylia recomienda</div>
             <div class="num">${t.kylia_l_m2} <span class="uni">L/m²</span></div>
-            <div class="uni">${c.area_m2 ? "≈ " + (t.kylia_litros||0).toLocaleString("es-ES") + " L en 500 m²" : ""}</div>
+            <div class="uni">${c.area_m2 ? "≈ " + (t.kylia_litros||0).toLocaleString("es-ES") + " L en " + m2 : ""}</div>
           </div>
           <div class="tot padre">
             <div class="who"><span class="swatch" style="background:#8a5a2b"></span> Tu padre aplicó</div>
-            <div class="num">${t.padre_l_m2} <span class="uni">L/m²</span></div>
-            <div class="uni">${c.area_m2 ? "≈ " + (t.padre_litros||0).toLocaleString("es-ES") + " L en 500 m²" : ""}</div>
+            <div class="num">${rango(t.padre_bajo_l_m2, t.padre_alto_l_m2, "")}<span class="uni">L/m²</span></div>
+            <div class="uni">${rangoLitros(t.padre_bajo_litros, t.padre_alto_litros)}</div>
           </div>
         </div>
         <div class="veredicto">${veredicto}</div>
-        ${hayDatos ? chartSVG(data.serie) : `<div class="msg">Aún no hay riegos suficientes para la gráfica.</div>`}
+        ${hayDatos ? chartSVG(data.serie, banda) : `<div class="msg">Aún no hay riegos suficientes para la gráfica.</div>`}
         <div class="legend">
           <span><span class="ln" style="background:#013A27"></span> Kylia (FAO-56)</span>
-          <span><span class="ln" style="background:#8a5a2b"></span> Padre (real)</span>
+          <span><span class="ln" style="background:#8a5a2b"></span> Padre ${banda ? "(banda de caudal)" : "(real)"}</span>
         </div>
       </div>
 
       ${ferts}
 
       <p class="caveat">
-        Comparación sobre el <b>mismo campo</b> (los 500 m² de tu padre): misma lluvia, mismo suelo y cultivo.
+        Comparación sobre el <b>mismo campo</b> (${m2} de tu padre): misma lluvia, mismo suelo y cultivo.
         🟤 lo que aplicó él &nbsp;vs&nbsp; 🟢 lo que Kylia le habría recomendado — solo cambia <b>quién decide</b>,
         así el hueco es agua de la decisión, no del tamaño de la parcela. <b>No se cuenta el riego de asentamiento</b>
-        del trasplante (la comparación empieza al día siguiente). El caudal del aspersor (${c.caudal_mmh || 10} mm/h)
-        es estimado — afínalo con el truco del vaso y la gráfica se recalcula.
+        del trasplante (la comparación empieza al día siguiente).
+        ${banda
+          ? `El caudal del aspersor aún no está medido, así que mostramos una <b>banda</b>:
+             ${e.aspersores} aspersores a ${e.lh_bajo}–${e.lh_alto} L/h
+             (≈ ${e.caudal_bajo_mmh}–${e.caudal_alto_mmh} mm/h). Cuando lo midas con el truco del vaso,
+             la banda colapsa a una línea.`
+          : `El caudal del aspersor (${c.caudal_mmh || 10} mm/h) es estimado — afínalo con el truco del vaso y la gráfica se recalcula.`}
       </p>`;
   }
 
   function cargarComparativa() {
     const box = document.getElementById("comparativa");
     box.innerHTML = `<div class="msg skel">Cargando comparativa…</div>`;
-    fetch(`/api/campo?vista=comparativa&usuario_id=${encodeURIComponent(CAMPOS.padre.id)}`)
+    const qs = `&aspersores=${ASP.aspersores}&lh_bajo=${ASP.lhBajo}&lh_alto=${ASP.lhAlto}`;
+    fetch(`/api/campo?vista=comparativa&usuario_id=${encodeURIComponent(CAMPOS.padre.id)}${qs}`)
       .then(r => r.json()).then(pintarComparativa)
       .catch(e => { box.innerHTML = `<div class="msg">No se pudo conectar.<br><small>${e.message}</small></div>`; });
   }
