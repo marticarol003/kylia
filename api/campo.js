@@ -237,9 +237,11 @@ async function vistaComparativa(req, res, u) {
     r.duracion_min != null ? (caudal * r.duracion_min) / 60 : (r.cantidad_l_m2 ?? 0);
 
   const bajoPorDia = {}, altoPorDia = {};
+  let nRiegosPadre = 0;
   (riegos || []).forEach(r => {
     const f = dia(r.fecha_local);
     if (!f || (inicio && f < inicio)) return;
+    nRiegosPadre++;
     bajoPorDia[f] = (bajoPorDia[f] || 0) + lm2DeRiego(r, caudalBajo);
     altoPorDia[f] = (altoPorDia[f] || 0) + lm2DeRiego(r, caudalAlto);
   });
@@ -269,6 +271,10 @@ async function vistaComparativa(req, res, u) {
     kylia_litros:      litros(ultimo.kylia_l_m2),
     padre_bajo_litros: litros(ultimo.padre_bajo_l_m2),
     padre_alto_litros: litros(ultimo.padre_alto_l_m2),
+    // Para el caso "Kylia aún no regaría" / datos escasos: el % de ahorro no es
+    // significativo si la lámina de Kylia es 0 o hay muy pocos días.
+    riegos_padre: nRiegosPadre,
+    dias: dias.length,
   };
 
   // Fertilizantes/tratamientos: solo cualitativo (producto + nº de veces).

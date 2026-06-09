@@ -106,6 +106,7 @@
   .veredicto { text-align:center; padding:14px; border-radius:14px; background:var(--slate-50);
                font-weight:700; color:var(--slate-900); margin-bottom:4px; }
   .veredicto b { color:var(--verde-900); }
+  .nota-escasa { text-align:center; font-size:0.78rem; color:var(--slate-500); margin:8px 0 2px; }
   .legend { display:flex; gap:16px; justify-content:center; margin-top:10px; font-size:0.82rem; color:var(--slate-700); }
   .legend span { display:flex; align-items:center; gap:6px; }
   .legend .ln { width:18px; height:3px; border-radius:2px; }
@@ -494,8 +495,20 @@
 
     // En banda: el escenario BAJO (menos caudal) → menos agua del padre → MENOS ahorro;
     // el ALTO → más. Mostramos el rango [bajo, alto].
+    // Caso honesto: si Kylia aún NO habría regado (lámina 0), el "%" daría 100% y
+    // sería un claim inflado → lo explicamos sin porcentaje. Y avisamos si hay pocos días.
+    const kyliaCero = t.kylia_l_m2 <= 0;
+    const pocosDias = (t.dias != null ? t.dias : (data.serie || []).length) < 10;
     let veredicto;
-    if (t.dif_bajo_l_m2 > 0.5) {
+    if (kyliaCero) {
+      const n = t.riegos_padre || 0;
+      veredicto = n > 0
+        ? `En estos ${t.dias != null ? t.dias + " días" : "días"} Kylia <b>no habría regado todavía</b>
+           (el suelo aún tenía agua), y tú regaste <b>${n} ${n === 1 ? "vez" : "veces"}</b>
+           (${rango(t.padre_bajo_l_m2, t.padre_alto_l_m2, "L/m²")}). El % de ahorro tendrá sentido
+           cuando arranque la demanda de riego.`
+        : `Todavía no hay riegos que comparar — ni tú ni Kylia habríais regado aún en este arranque.`;
+    } else if (t.dif_bajo_l_m2 > 0.5) {
       const lA = c.area_m2 ? Math.round(t.dif_bajo_l_m2 * c.area_m2).toLocaleString("es-ES") : null;
       const lB = c.area_m2 ? Math.round(t.dif_alto_l_m2 * c.area_m2).toLocaleString("es-ES") : null;
       const pct = banda ? `${t.ahorro_pct_bajo}–${t.ahorro_pct_alto}%` : `${t.ahorro_pct_alto}%`;
@@ -538,6 +551,7 @@
           </div>
         </div>
         <div class="veredicto">${veredicto}</div>
+        ${pocosDias && !kyliaCero ? `<div class="nota-escasa">Datos aún escasos (${t.dias != null ? t.dias : (data.serie||[]).length} días): los números se afinarán según avance la campaña.</div>` : ""}
         ${hayDatos ? chartSVG(data.serie, banda) : `<div class="msg">Aún no hay riegos suficientes para la gráfica.</div>`}
         <div class="legend">
           <span><span class="ln" style="background:#013A27"></span> Kylia (FAO-56)</span>
