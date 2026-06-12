@@ -255,10 +255,10 @@
 <script>
   // Dos campos reales del padre, comparados siempre POR m² (escalas distintas):
   //   lechugas → 10 lechugas a regadera (lo que llevamos con Kylia)
-  //   padre    → 500 m² a aspersión (la parcela tradicional, rama de contraste)
+  //   padre    → 440 m² a aspersión (la parcela tradicional, rama de contraste)
   const CAMPOS = {
     lechugas: { id:"9aaa1b25-6fad-4213-9eda-e135af71b2c3", titulo:"Tus 10 lechugas", unidad:"cubos" },
-    padre:    { id:"23567ff1-7368-4dc9-b777-fdeaab9f8714", titulo:"Campo del padre · 500 m²", unidad:"horas" },
+    padre:    { id:"23567ff1-7368-4dc9-b777-fdeaab9f8714", titulo:"Campo del padre · 440 m²", unidad:"horas" },
   };
   let SCREEN = "lechugas";
   let USUARIO = {};            // datos del campo cargado (del fetch de "hoy")
@@ -436,11 +436,11 @@
   }
 
   // ── Pantalla "comparativa" ────────────────────────────────────
-  // Escenarios de caudal del aspersor del padre (aún sin medir): 35 microaspersores
-  // a 70–120 L/h cada uno. El endpoint deriva mm/h = aspersores × L/h ÷ área y
-  // devuelve una BANDA (padre_bajo/padre_alto). Cuando se mida el caudal real,
-  // basta poner lh_bajo = lh_alto y la banda colapsa a una línea.
-  const ASP = { aspersores: 35, lhBajo: 70, lhAlto: 120 };
+  // Caudal del aspersor del padre, MEDIDO con el truco del vaso (12-jun): 3 cm de
+  // agua (= 30 mm) recogidos en 2 h → 15 mm/h. Sustituye a la banda estimada
+  // (35 microaspersores a 70–120 L/h) de antes. Una sola toma con cubo cónico:
+  // afinable con un recipiente recto y varias tomas, pero ya es dato medido.
+  const CAUDAL_MEDIDO = 15;
 
   function chartSVG(serie, banda) {
     const W = 340, H = 200, padL = 6, padR = 6, padT = 16, padB = 26;
@@ -542,7 +542,9 @@
           <div class="tot kylia">
             <div class="who"><span class="swatch" style="background:#013A27"></span> Kylia recomienda</div>
             <div class="num">${t.kylia_l_m2} <span class="uni">L/m²</span></div>
-            <div class="uni">${c.area_m2 ? "≈ " + (t.kylia_litros||0).toLocaleString("es-ES") + " L en " + m2 : ""}</div>
+            <div class="uni">${kyliaCero
+              ? "aún no tocaría regar"
+              : (c.area_m2 ? "≈ " + (t.kylia_litros||0).toLocaleString("es-ES") + " L en " + m2 : "")}</div>
           </div>
           <div class="tot padre">
             <div class="who"><span class="swatch" style="background:#8a5a2b"></span> Tu padre aplicó</div>
@@ -571,14 +573,15 @@
              ${e.aspersores} aspersores a ${e.lh_bajo}–${e.lh_alto} L/h
              (≈ ${e.caudal_bajo_mmh}–${e.caudal_alto_mmh} mm/h). Cuando lo midas con el truco del vaso,
              la banda colapsa a una línea.`
-          : `El caudal del aspersor (${c.caudal_mmh || 10} mm/h) es estimado — afínalo con el truco del vaso y la gráfica se recalcula.`}
+          : `El caudal del aspersor está <b>medido</b> (${c.caudal_mmh || 15} mm/h, truco del vaso: 30 mm en 2 h).
+             Es una sola toma con cubo cónico, así que puede afinarse con un recipiente recto y varias tomas.`}
       </p>`;
   }
 
   function cargarComparativa() {
     const box = document.getElementById("comparativa");
     box.innerHTML = `<div class="msg skel">Cargando comparativa…</div>`;
-    const qs = `&aspersores=${ASP.aspersores}&lh_bajo=${ASP.lhBajo}&lh_alto=${ASP.lhAlto}`;
+    const qs = `&caudal=${CAUDAL_MEDIDO}`;
     fetch(`/api/campo?vista=comparativa&usuario_id=${encodeURIComponent(CAMPOS.padre.id)}${qs}`)
       .then(r => r.json()).then(pintarComparativa)
       .catch(e => { box.innerHTML = `<div class="msg">No se pudo conectar.<br><small>${e.message}</small></div>`; });

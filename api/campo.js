@@ -222,9 +222,12 @@ async function vistaComparativa(req, res, u) {
   const aspersores  = numOr(req.query?.aspersores);
   const lhBajo      = numOr(req.query?.lh_bajo);
   const lhAlto      = numOr(req.query?.lh_alto);
-  const caudalUnico = numOr(u.caudal) || 10;
+  const caudalMedido = numOr(req.query?.caudal);   // mm/h medido con el truco del vaso → línea única
+  const caudalUnico  = caudalMedido || numOr(u.caudal) || 10;
   let caudalBajo, caudalAlto;
-  if (aspersores && lhBajo && lhAlto && area) {
+  if (caudalMedido) {
+    caudalBajo = caudalAlto = caudalMedido;
+  } else if (aspersores && lhBajo && lhAlto && area) {
     caudalBajo = (aspersores * lhBajo) / area;
     caudalAlto = (aspersores * lhAlto) / area;
   } else {
@@ -288,7 +291,7 @@ async function vistaComparativa(req, res, u) {
   return res.status(200).json({
     ok: true, vista: "comparativa",
     campo: { ciudad: u.ciudad, cultivo: (u.cultivos || [])[0] || null,
-             area_m2: area, metodo: u.metodo_riego, caudal_mmh: r1(caudalUnico) },
+             area_m2: area, metodo: u.metodo_riego, caudal_mmh: r1(caudalBajo) },
     escenarios: { banda: caudalBajo !== caudalAlto, aspersores, lh_bajo: lhBajo, lh_alto: lhAlto,
                   caudal_bajo_mmh: r1(caudalBajo), caudal_alto_mmh: r1(caudalAlto) },
     desde: dias[0]?.date || inicio || null, hoy, excluye_asentamiento: true,
