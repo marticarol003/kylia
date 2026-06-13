@@ -13,8 +13,9 @@
 -- Datos del campo (visita 2026-06-13):
 --   • Cultivo: tomate (variedad "tomacó"), ecológico.
 --   • Plantación: ~2026-05-30 (hace 2 semanas).
---   • Geometría: 2 filas × 40 m, 100 plantas/fila (200 plantas), 2 mangueras
---     de goteo por fila a ~20 cm, separación entre filas 35–40 cm.
+--   • Geometría: 2 filas × 40 m, 100 plantas/fila (200 plantas). Cada fila con
+--     una manguera de goteo a cada lado (25 cm entre el par), 45 cm entre filas.
+--     Banda plantada ≈ 0,75 m de ancho → huella 40 × 0,75 ≈ 30 m².
 --   • Suelo: franco-arenoso con arcillas → bucket "franco" (AWC 0,15).
 --   • Riego: goteo automatizado, cada 2 días, 30 min. Caudal 6 mm/h
 --     (DECLARADO; afinar con el "truco del vaso" y luego: update ... caudal=<real>).
@@ -27,7 +28,7 @@
 update usuarios
    set piloto_sombra = true,
        caudal        = 6,        -- mm/h = L/m²·h (goteo declarado)
-       area_m2       = 45        -- huella real plantada; quita esta línea si el alta ya la dejó bien
+       area_m2       = 30        -- huella real plantada (40 m × ~0,75 m banda); quita esta línea si el alta ya la dejó bien
  where email = :'email';
 
 -- Comprobación:
