@@ -206,9 +206,14 @@
     // Adaptar el registro al método del campo
     $("registro").style.display = "";
     const esAspersion = u.metodo_riego === "aspersion";
-    $("r-label").textContent = esAspersion ? "Horas de aspersor" : (u.capacidad_regadera ? "Cubos echados" : "Litros por m²");
+    const esGoteo = u.metodo_riego === "goteo";
+    $("r-label").textContent = esAspersion ? "Horas de aspersor"
+      : esGoteo ? "Minutos de goteo"
+      : (u.capacidad_regadera ? "Cubos echados" : "Litros por m²");
+    if (esGoteo) { $("r-cant").step = "5"; $("r-cant").placeholder = "ej. 30"; }
     const hint = $("r-hint");
     if (esAspersion && u.caudal) hint.textContent = `≈ ${u.caudal} mm/h · 1 h ≈ ${u.caudal} L/m².`;
+    else if (esGoteo && u.caudal) hint.textContent = `≈ ${u.caudal} mm/h · 30 min ≈ ${Math.round(u.caudal / 2 * 10) / 10} L/m².`;
     else if (u.capacidad_regadera && u.area_m2) hint.textContent = `Cada cubo = ${u.capacidad_regadera} L sobre ${u.area_m2} m².`;
     else hint.textContent = "";
     pintarChips(u);
@@ -217,6 +222,7 @@
   function pintarChips(u) {
     const wrap = $("r-quick");
     const esAspersion = u.metodo_riego === "aspersion";
+    const esGoteo = u.metodo_riego === "goteo";
     let chips;
     if (esAspersion) {
       const c = u.caudal || 10;
@@ -224,6 +230,11 @@
         label: h === 0.5 ? "30 min" : h === 1.5 ? "1½ h" : `${h} h`,
         sub: `≈ ${Math.round(h * c * 10) / 10} L/m²`, reco: false }));   // sin resaltar: en silencioso no se sugiere
       $("r-quick-cap").textContent = "¿Cuánto regó el aspersor hoy? Toca el tiempo:";
+    } else if (esGoteo) {
+      const c = u.caudal;
+      chips = [15, 30, 45, 60].map(min => ({ cant: min, label: `${min} min`,
+        sub: c ? `≈ ${Math.round(min / 60 * c * 10) / 10} L/m²` : "", reco: false }));
+      $("r-quick-cap").textContent = "¿Cuántos minutos regó el goteo hoy? Toca el tiempo:";
     } else if (u.capacidad_regadera && u.area_m2) {
       const f = u.capacidad_regadera / u.area_m2;
       chips = [1, 2, 3].map(n => ({ cant: n, label: `${n} cubo${n === 1 ? "" : "s"}`,
@@ -259,6 +270,9 @@
     if (USUARIO.metodo_riego === "aspersion") {
       fila.duracion_min = Math.round(cant * 60); fila.notas = `${cant} h de aspersión`;
       if (USUARIO.caudal) fila.cantidad_l_m2 = Math.round((cant * USUARIO.caudal) * 10) / 10;
+    } else if (USUARIO.metodo_riego === "goteo") {
+      fila.duracion_min = Math.round(cant); fila.notas = `${cant} min de goteo`;
+      if (USUARIO.caudal) fila.cantidad_l_m2 = Math.round((cant / 60 * USUARIO.caudal) * 10) / 10;
     } else if (USUARIO.capacidad_regadera && USUARIO.area_m2) {
       fila.notas = `${cant} cubo${cant === 1 ? "" : "s"}`;
       fila.cantidad_l_m2 = Math.round((cant * USUARIO.capacidad_regadera / USUARIO.area_m2) * 10) / 10;
