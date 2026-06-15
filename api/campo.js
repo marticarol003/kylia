@@ -26,6 +26,17 @@ function diasDesde(fechaIso) {
   return Math.floor((Date.now() - new Date(`${fechaIso}T12:00:00Z`)) / 86400000);
 }
 
+// Lámina (L/m²) a MOSTRAR de un riego registrado. La duración es la fuente de
+// verdad: cuando el riego se apuntó por tiempo (aspersión/goteo) y conocemos el
+// caudal, la lámina = duración(min) × caudal(mm/h) / 60. Así la lista sigue al
+// caudal ACTUAL y no se queda desfasada si se afina con el truco del vaso
+// (mismo criterio que la comparativa, lm2DeRiego). Sin duración o sin caudal
+// (p. ej. regadera por cubos) → se usa la lámina guardada tal cual.
+function laminaMostrada(cantidadGuardada, duracionMin, caudal) {
+  if (duracionMin != null && caudal) return Math.round((caudal * duracionMin / 60) * 10) / 10;
+  return cantidadGuardada ?? null;
+}
+
 async function climaSerie(lat, lon, desde) {
   const past = desde ? Math.min(92, Math.max(1, diasDesde(desde) + 1)) : 30;
   const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}`
@@ -74,11 +85,14 @@ async function vistaHoy(res, u) {
     }
   }
 
-  const recientes = riegos.slice(-5).reverse().map(r => ({
-    id: r.id, fecha: r.date, l_m2: r.litros, duracion_min: r.duracion_min,
-    cubos: (u.capacidad_regadera && u.area_m2 && r.litros != null)
-      ? Math.round((r.litros * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
-  }));
+  const recientes = riegos.slice(-5).reverse().map(r => {
+    const l_m2 = laminaMostrada(r.litros, r.duracion_min, u.caudal);
+    return {
+      id: r.id, fecha: r.date, l_m2, duracion_min: r.duracion_min,
+      cubos: (u.capacidad_regadera && u.area_m2 && l_m2 != null)
+        ? Math.round((l_m2 * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
+    };
+  });
 
   // Desglose del "porqué de hoy": de dónde sale la decisión (para la tarjeta explicativa).
   const cultivoId = (u.cultivos || [])[0] || null;
@@ -121,11 +135,14 @@ async function vistaHoy(res, u) {
 async function vistaPerfil(res, u) {
   const accs = await supabaseSelect("acciones",
     `usuario_id=eq.${u.id}&tipo=eq.riego&select=id,fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.desc&limit=8`);
-  const recientes = (accs || []).filter(f => f.fecha_local).map(f => ({
-    id: f.id, fecha: f.fecha_local, l_m2: f.cantidad_l_m2, duracion_min: f.duracion_min ?? null,
-    cubos: (u.capacidad_regadera && u.area_m2 && f.cantidad_l_m2 != null)
-      ? Math.round((f.cantidad_l_m2 * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
-  }));
+  const recientes = (accs || []).filter(f => f.fecha_local).map(f => {
+    const l_m2 = laminaMostrada(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal);
+    return {
+      id: f.id, fecha: f.fecha_local, l_m2, duracion_min: f.duracion_min ?? null,
+      cubos: (u.capacidad_regadera && u.area_m2 && l_m2 != null)
+        ? Math.round((l_m2 * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
+    };
+  });
   return res.status(200).json({
     ok: true, vista: "perfil",
     usuario: { ciudad: u.ciudad, cultivo: (u.cultivos || [])[0] || null,
@@ -141,7 +158,7 @@ async function vistaReveal(req, res, u) {
     supabaseSelect("recomendaciones_log",
       `usuario_id=eq.${u.id}&select=fecha,tipo,cantidad_l_m2,nivel&order=fecha.asc`),
     supabaseSelect("acciones",
-      `usuario_id=eq.${u.id}&select=fecha_local,tipo,cantidad_l_m2,producto_nombre&order=fecha_local.asc`),
+      `usuario_id=eq.${u.id}&select=fecha_local,tipo,cantidad_l_m2,duracion_min,producto_nombre&order=fecha_local.asc`),
     supabaseSelect("jornadas", `usuario_id=eq.${u.id}&select=fuente_decision`),
   ]);
 
@@ -150,7 +167,7 @@ async function vistaReveal(req, res, u) {
   const tratKylia = (recs || []).filter(r => r.tipo === "tratamiento" || r.tipo === "nutricion")
     .map(r => ({ dia: dia(r.fecha) }));
   const riegosReales = (acciones || []).filter(a => a.tipo === "riego")
-    .map(a => ({ dia: dia(a.fecha_local), l_m2: a.cantidad_l_m2 }));
+    .map(a => ({ dia: dia(a.fecha_local), l_m2: laminaMostrada(a.cantidad_l_m2, a.duracion_min ?? null, u.caudal) }));
   const tratReales = (acciones || []).filter(a => a.tipo === "tratamiento" || a.tipo === "aplicacion")
     .map(a => ({ dia: dia(a.fecha_local), producto: a.producto_nombre }));
 

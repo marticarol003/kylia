@@ -7,7 +7,7 @@
 -- completa lo que el formulario NO captura:
 --   • caudal (mm/h) del goteo  → 6 mm/h (= 6 L/h·m² declarado por el agricultor)
 --   • piloto_sombra = true      → Kylia CALLA y el cron congela su decisión cada noche
---   • (opcional) corrige area_m2 a la huella real plantada (~45 m²) si el
+--   • (opcional) corrige area_m2 a la huella real plantada (~30 m²) si el
 --     formulario la rellenó con el recinto SIGPAC entero.
 --
 -- Datos del campo (visita 2026-06-13):
