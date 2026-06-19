@@ -32,6 +32,13 @@ function diasDesde(fechaIso) {
   return Math.floor((Date.now() - new Date(`${fechaIso}T12:00:00Z`)) / 86400000);
 }
 
+// Suma n días a un 'YYYY-MM-DD' y devuelve 'YYYY-MM-DD'.
+function sumarDias(diaStr, n) {
+  const d = new Date(`${diaStr}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 // Clima diario para un punto: ET₀ FAO + lluvia, desde `desde` hasta hoy (incluido).
 async function climaSerie(lat, lon, desde) {
   const dias = desde ? Math.min(92, Math.max(1, diasDesde(desde) + 1)) : 30;
@@ -56,6 +63,47 @@ async function riegosDe(usuarioId) {
   return (filas || [])
     .filter(f => f.fecha_local)
     .map(f => ({ date: f.fecha_local, litros: f.cantidad_l_m2 ?? null }));
+}
+
+// Materializa los riegos de un piloto de GOTEO AUTOMÁTICO de pauta fija.
+// El goteo riega solo (cada N días, M min) y nadie lo apunta en la app; sin
+// esas filas en `acciones`, el balance creería el cultivo sin regar y dispararía
+// la recomendación. Aquí generamos las que falten desde la fecha ancla hasta hoy
+// (idempotente: salta los días que ya tienen un riego registrado) y las devolvemos
+// para incluirlas en el balance de ESTA corrida. Autocurativo: si un día se cayó,
+// la siguiente corrida lo rellena. En dry-run calcula pero no escribe.
+//
+// Lámina por riego = min/60 × caudal (mm/h = L/m²·h), igual que el cuaderno.
+async function materializarGoteoAuto(u, riegosExistentes, hoy, dry) {
+  if (!u.riego_auto) return [];
+  const cada   = Number(u.riego_auto_cada_dias);
+  const min    = Number(u.riego_auto_min);
+  const caudal = Number(u.caudal);
+  const desde  = u.riego_auto_desde ? String(u.riego_auto_desde).slice(0, 10) : null;
+  if (!desde || !(cada > 0) || !(min > 0) || !(caudal > 0)) return [];
+
+  const lamina = Math.round((min / 60) * caudal * 10) / 10;   // L/m² por riego
+  const yaHay  = new Set((riegosExistentes || []).map(r => r.date));
+
+  const nuevos = [];
+  for (let d = desde; d <= hoy; d = sumarDias(d, cada)) {
+    if (!yaHay.has(d)) nuevos.push(d);
+  }
+  if (!nuevos.length) return [];
+
+  if (!dry) {
+    await supabaseInsert("acciones", nuevos.map(date => ({
+      usuario_id:     u.id,
+      fecha_local:    date,
+      tipo:           "riego",
+      cantidad_l_m2:  lamina,
+      duracion_min:   min,
+      franja_horaria: "manana",
+      motivo:         "goteo-auto",
+      notas:          `pauta fija ${min} min · ${caudal} mm/h (sintetizado por diario-b)`,
+    })));
+  }
+  return nuevos.map(date => ({ date, litros: lamina }));
 }
 
 // ¿Ya hay una decisión de riego congelada para este usuario hoy?
@@ -88,10 +136,11 @@ module.exports = async (req, res) => {
   // de riego corre sobre clima, no satélite. Requiere db/diario-b-produccion.sql.
   let pilotos = [];
   try {
+    // select=* (no explícito): incluye caudal y los campos riego_auto_* del goteo
+    // automático, y evita que un ALTER reciente rompa el select por caché de esquema.
     pilotos = await supabaseSelect(
       "usuarios",
-      "select=id,ciudad,lat,lon,cultivos,suelo,metodo_riego,fecha_plantacion,tarifa_agua"
-      + "&piloto_sombra=eq.true&lat=not.is.null&lon=not.is.null"
+      "select=*&piloto_sombra=eq.true&lat=not.is.null&lon=not.is.null"
     );
   } catch (err) {
     return res.status(500).json({ ok: false, error: `no se pudieron leer pilotos: ${err.message}` });
@@ -105,7 +154,11 @@ module.exports = async (req, res) => {
 
       const serie  = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
       const riegos = await riegosDe(u.id);
-      const bal = balanceHidrico(serie, riegos, {
+      // Goteo automático de pauta fija: rellena los riegos que falten (nadie los
+      // apunta) y súmalos al balance para que no se quede corto.
+      const auto = await materializarGoteoAuto(u, riegos, hoy, dry);
+      if (auto.length) r.goteo_auto = auto.length;
+      const bal = balanceHidrico(serie, riegos.concat(auto), {
         suelo:           u.suelo,
         cultivoId:       (u.cultivos || [])[0] || null,
         metodoRiego:     u.metodo_riego,

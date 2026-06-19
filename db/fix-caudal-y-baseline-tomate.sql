@@ -15,10 +15,24 @@
 -- desde piloto_inicio. 20-jun = primer día con caudal+baseline correctos.
 alter table usuarios add column if not exists piloto_inicio date;
 
--- ── caudal del piloto: 6 → 32 mm/h  +  inicio del reveal ─────────────
+-- ── goteo AUTOMÁTICO de pauta fija: diario-b lo materializa solo ─────
+-- El goteo riega cada 2 días, 30 min, y nadie lo apunta. Con estos campos,
+-- el cron diario-b genera él mismo los riegos que falten (desde la fecha
+-- ancla hasta hoy) en cada corrida. Así el balance y el reveal no se quedan
+-- cortos sin tocar nada a mano. Ver api/diario-b.js (materializarGoteoAuto).
+alter table usuarios add column if not exists riego_auto           boolean default false;
+alter table usuarios add column if not exists riego_auto_desde      date;
+alter table usuarios add column if not exists riego_auto_cada_dias  int;
+alter table usuarios add column if not exists riego_auto_min        int;
+
+-- ── caudal + inicio del reveal + config del goteo automático ─────────
 update usuarios
-   set caudal        = 32,
-       piloto_inicio = '2026-06-20'
+   set caudal               = 32,
+       piloto_inicio        = '2026-06-20',
+       riego_auto           = true,
+       riego_auto_desde     = '2026-06-13',   -- 1er riego (ancla de la pauta día sí día no)
+       riego_auto_cada_dias = 2,
+       riego_auto_min       = 30
  where piloto_sombra = true
    and array_to_string(cultivos, ',') ilike '%tomate%';
 
@@ -53,6 +67,12 @@ select 'caudal (mm/h)' as dato,
 union all
 select 'inicio del reveal',
        (select piloto_inicio::text from usuarios
+         where piloto_sombra=true and array_to_string(cultivos,',') ilike '%tomate%'
+         order by fecha_plantacion desc nulls last limit 1)
+union all
+select 'goteo auto (on / cada / min)',
+       (select riego_auto::text || ' / ' || riego_auto_cada_dias::text || ' / ' || riego_auto_min::text
+          from usuarios
          where piloto_sombra=true and array_to_string(cultivos,',') ilike '%tomate%'
          order by fecha_plantacion desc nulls last limit 1)
 union all
