@@ -154,11 +154,19 @@ async function vistaPerfil(res, u) {
 
 // ── Vista "reveal": informe final del piloto ─────────────────────
 async function vistaReveal(req, res, u) {
+  // Inicio efectivo del piloto: el reveal solo cuenta decisiones y riegos desde
+  // esta fecha. Sirve para dejar fuera un arranque contaminado (p.ej. días en que
+  // Kylia congeló sin tener aún el riego real cargado) SIN tocar el log, que es
+  // append-only por diseño. Si no está fijado, cuenta todo el historial.
+  const desde   = u.piloto_inicio ? String(u.piloto_inicio).slice(0, 10) : null;
+  const fRec    = desde ? `&fecha=gte.${desde}T00:00:00Z` : "";
+  const fAcc    = desde ? `&fecha_local=gte.${desde}` : "";
+
   const [recs, acciones, jornadas] = await Promise.all([
     supabaseSelect("recomendaciones_log",
-      `usuario_id=eq.${u.id}&select=fecha,tipo,cantidad_l_m2,nivel&order=fecha.asc`),
+      `usuario_id=eq.${u.id}${fRec}&select=fecha,tipo,cantidad_l_m2,nivel&order=fecha.asc`),
     supabaseSelect("acciones",
-      `usuario_id=eq.${u.id}&select=fecha_local,tipo,cantidad_l_m2,duracion_min,producto_nombre&order=fecha_local.asc`),
+      `usuario_id=eq.${u.id}${fAcc}&select=fecha_local,tipo,cantidad_l_m2,duracion_min,producto_nombre&order=fecha_local.asc`),
     supabaseSelect("jornadas", `usuario_id=eq.${u.id}&select=fuente_decision`),
   ]);
 
