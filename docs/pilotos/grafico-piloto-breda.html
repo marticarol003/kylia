@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piloto tomate · Breda — Kylia vs agricultor</title>
+<style>
+  :root{ --verde:#013A27; --verde2:#2e7d52; --marron:#9c6b3f; --tinta:#1a2b22; --gris:#6b7a72; }
+  *{ box-sizing:border-box; }
+  body{ font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--tinta);
+        margin:0; padding:32px; background:#f6f8f6; }
+  .wrap{ max-width:860px; margin:0 auto; background:#fff; border:1px solid #e3eae6;
+         border-radius:16px; padding:28px 30px; box-shadow:0 2px 14px rgba(1,58,39,.06); }
+  h1{ font-size:20px; margin:0 0 2px; color:var(--verde); }
+  .sub{ color:var(--gris); font-size:13px; margin:0 0 18px; }
+  .totales{ display:flex; gap:12px; margin:0 0 16px; }
+  .tot{ flex:1; border-radius:12px; padding:12px 14px; font-size:13px; }
+  .tot.verde{ background:#eef4f0; border:1px solid #cfe2d6; } .tot.verde b{ color:var(--verde); }
+  .tot.marron{ background:#fbf4ee; border:1px solid #ecdcc9; } .tot.marron b{ color:var(--marron); }
+  .claim{ background:#f3f7f4; border:1px solid #e3eae6; border-radius:12px; padding:16px 18px;
+          text-align:center; font-size:17px; margin:0 0 20px; }
+  .claim b{ color:var(--verde); }
+  .legend{ display:flex; gap:18px; font-size:13px; justify-content:center; margin:6px 0 4px; }
+  .legend span{ display:inline-flex; align-items:center; gap:7px; }
+  .dot{ width:14px; height:4px; border-radius:2px; display:inline-block; }
+  .notes{ font-size:12px; color:var(--gris); margin:16px 0 0; line-height:1.55; }
+  .notes b{ color:var(--tinta); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Piloto tomate · Breda / Hostalric (La Selva)</h1>
+  <p class="sub">Mismo campo (~30 m²) · goteo · plantado 27-may · periodo 20–27 jun 2026 · misma lluvia (0 mm), mismo suelo (franco)</p>
+
+  <div class="totales">
+    <div class="tot verde">Kylia (FAO-56) habría aplicado <b>23 L/m²</b> · ≈ 690 L en 30 m²</div>
+    <div class="tot marron">El agricultor aplicó <b>64 L/m²</b> · ≈ 1.920 L en 30 m²</div>
+  </div>
+
+  <div class="claim">Siguiendo a Kylia ahorrarías <b>41 L/m² (64%)</b> en este campo · ≈ <b>1.230 L menos</b> en 30 m².</div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#013A27"></i> Kylia (FAO-56)</span>
+    <span><i class="dot" style="background:#9c6b3f"></i> Agricultor (real)</span>
+  </div>
+
+  <!-- Comparativa acumulada (L/m²) -->
+  <svg viewBox="0 0 760 360" width="100%" role="img"
+       aria-label="Agua acumulada Kylia vs agricultor">
+    <g stroke="#e3eae6" stroke-width="1">
+      <line x1="60" y1="40"    x2="720" y2="40"/>
+      <line x1="60" y1="78.6"  x2="720" y2="78.6"/>
+      <line x1="60" y1="155.7" x2="720" y2="155.7"/>
+      <line x1="60" y1="232.9" x2="720" y2="232.9"/>
+      <line x1="60" y1="310"   x2="720" y2="310"/>
+    </g>
+    <g font-size="11" fill="#6b7a72" text-anchor="end">
+      <text x="52" y="44">70</text>
+      <text x="52" y="82.6">60</text>
+      <text x="52" y="159.7">40</text>
+      <text x="52" y="236.9">20</text>
+      <text x="52" y="314">0</text>
+    </g>
+    <text x="16" y="180" font-size="11" fill="#6b7a72" transform="rotate(-90 16 180)" text-anchor="middle">L/m² acumulados</text>
+
+    <!-- agricultor real -->
+    <polyline fill="none" stroke="#9c6b3f" stroke-width="3"
+      points="60,310 148.6,248.3 237.1,248.3 325.7,186.6 414.3,186.6 502.9,124.9 591.4,124.9 680,63.1"/>
+    <circle cx="680" cy="63.1" r="4" fill="#9c6b3f"/>
+
+    <!-- Kylia FAO-56 -->
+    <polyline fill="none" stroke="#013A27" stroke-width="3"
+      points="60,310 148.6,310 237.1,310 325.7,310 414.3,310 502.9,221.3 591.4,221.3 680,221.3"/>
+    <circle cx="680" cy="221.3" r="4" fill="#013A27"/>
+
+    <g font-size="11" fill="#6b7a72" text-anchor="middle">
+      <text x="60" y="330">20</text><text x="148.6" y="330">21</text>
+      <text x="237.1" y="330">22</text><text x="325.7" y="330">23</text>
+      <text x="414.3" y="330">24</text><text x="502.9" y="330">25</text>
+      <text x="591.4" y="330">26</text><text x="680" y="330">27</text>
+      <text x="390" y="350" fill="#9aa8a0">junio 2026</text>
+    </g>
+  </svg>
+
+  <p class="notes">
+  <b>Cómo se calcula (igual que el campo de tu padre):</b> contrafactual FAO-56 independiente
+  (<code>simularKylia</code>) sobre el mismo campo, misma lluvia y mismo suelo, arrancando el suelo lleno.
+  No se contamina con lo que regó el agricultor.<br><br>
+  <b>Por qué riega de más:</b> el tomate está en <b>fase inicial (kc 0,60)</b> — planta joven, transpira poco.
+  El goteo de pauta fija (16 mm cada 2 días ≈ 56 mm/semana) está dosificado como para planta adulta → le mete ~2×.<br><br>
+  <b>Cautelas honestas:</b><br>
+  • Caudal <b>32 mm/h provisional</b> (truco del vaso pendiente): el "64 real" escala con el caudal; si es menor, el ahorro baja.<br>
+  • El 64% es una <b>foto de planta joven</b>: a medida que el tomate madure (kc → 1,15 en julio) su demanda subirá y la pauta fija encajará mejor → el ahorro se estrechará.<br>
+  • Sin tarifa de agua → sin €.<br>
+  <span style="color:#9aa8a0">Fuentes: api/_motor-riego.js (simularKylia, kc 0,60, suelo franco raw 20) + Open-Meteo ET₀ 20–27 jun · usuario c46e9d6d…b2c3</span>
+  </p>
+</div>
+</body>
+</html>

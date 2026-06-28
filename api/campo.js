@@ -179,8 +179,33 @@ async function vistaReveal(req, res, u) {
   const tratReales = (acciones || []).filter(a => a.tipo === "tratamiento" || a.tipo === "aplicacion")
     .map(a => ({ dia: dia(a.fecha_local), producto: a.producto_nombre }));
 
+  // Contrafactual FAO-56 INDEPENDIENTE (simularKylia), la MISMA referencia que la
+  // comparativa del campo del padre. Es la comparación honesta para el agua: la
+  // lámina de Kylia se simula sobre el clima/cultivo/suelo de la parcela SIN ver
+  // el riego real. Evita el sesgo de leer recomendaciones_log, que en goteo de
+  // pauta fija ve el agua ya aplicada y nunca dispara (daba "Kylia = 0"). El suelo
+  // arranca lleno (Dr=0) en `desde`, igual que la comparativa. Sin coordenadas o
+  // sin clima → no se pasa contrafactual y el reveal cae al método heredado.
+  let contrafactual = null;
+  if (u.lat != null && u.lon != null) {
+    try {
+      const serie  = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
+      const idxHoy = serie.findIndex(s => s.date === hoyISO());
+      const hasta  = serie.slice(0, (idxHoy >= 0 ? idxHoy : serie.length - 1) + 1);
+      const dias   = desde ? hasta.filter(d => d.date >= desde) : hasta;
+      if (dias.length) {
+        const sim = simularKylia(dias, {
+          suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
+          metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
+        });
+        contrafactual = { puntos: sim.puntos, total: sim.total };
+      }
+    } catch (_) { /* sin clima → método heredado (recomendaciones_log) */ }
+  }
+
   const informe = construirReveal({
-    usuario: u, riegosReales, riegosKylia, tratReales, tratKylia, jornadas: jornadas || [],
+    usuario: u, riegosReales, riegosKylia, tratReales, tratKylia,
+    jornadas: jornadas || [], contrafactual,
   });
 
   const payload = { ok: true, vista: "reveal", informe };

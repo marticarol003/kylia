@@ -86,7 +86,16 @@ function dimHoras(jornadas) {
 // de 30). Riegos reales anteriores se reportan aparte, no se comparan.
 //   riegosReales:  [{ dia, l_m2 }]  de acciones tipo riego
 //   riegosKylia:   [{ dia, l_m2, nivel }]  de recomendaciones_log tipo riego
-function dimAgua(riegosReales, riegosKylia) {
+function dimAgua(riegosReales, riegosKylia, contrafactual) {
+  // Si llega un contrafactual FAO-56 (simularKylia, la MISMA referencia que la
+  // comparativa del campo del padre en api/campo.js), úsalo: es la comparación
+  // honesta. La lámina de Kylia se simula de forma INDEPENDIENTE y NO se
+  // contamina con lo que regó el agricultor — al revés que leer las decisiones
+  // congeladas, que en goteo ven el agua ya aplicada y por eso nunca disparan.
+  if (contrafactual && Array.isArray(contrafactual.puntos) && contrafactual.puntos.length) {
+    return dimAguaDesdeContrafactual(riegosReales, contrafactual);
+  }
+
   const decisiones = riegosKylia.filter(d => d.dia).sort((a, b) => a.dia.localeCompare(b.dia));
   if (decisiones.length === 0) {
     return {
@@ -175,6 +184,104 @@ function dimAgua(riegosReales, riegosKylia) {
     riegos_antes_del_registro: realesAntes.length
       ? { n: realesAntes.length, l_m2: r1(suma(realesAntes, r => r.l_m2)),
           nota: "Anteriores a la primera decisión congelada: no se comparan." }
+      : null,
+    veredicto,
+  };
+}
+
+// ── Dimensión 2 (variante) · Agua vs contrafactual FAO-56 independiente ──
+// Misma referencia que la comparativa del campo del padre (simularKylia): la
+// lámina de Kylia se calcula sobre el clima/cultivo/suelo de la parcela, SIN ver
+// el riego real. Es la comparación válida para goteo / pauta fija.
+//   contrafactual = { puntos: [{ date, acum_l_m2 }], total }  (acumulado por m²)
+function dimAguaDesdeContrafactual(riegosReales, cf) {
+  const puntos = (cf.puntos || []).filter(p => p.date).sort((a, b) => a.date.localeCompare(b.date));
+  if (puntos.length === 0) {
+    return {
+      titulo: "Agua aplicada vs recomendada",
+      disponible: false,
+      motivo: "Sin clima/periodo para el contrafactual FAO-56 todavía.",
+    };
+  }
+  const desde = puntos[0].date;
+  const hasta = puntos[puntos.length - 1].date;
+
+  const realesEnPeriodo = riegosReales.filter(r => r.dia && r.dia >= desde);
+  const realesAntes     = riegosReales.filter(r => r.dia && r.dia < desde);
+
+  // Lámina diaria de Kylia = diferencias del acumulado del contrafactual.
+  const kyliaByDay = {};
+  let prev = 0;
+  for (const p of puntos) {
+    const acum = Number(p.acum_l_m2) || 0;
+    kyliaByDay[p.date] = acum - prev;
+    prev = acum;
+  }
+  const aguaKylia = cf.total != null ? Number(cf.total) : prev;
+  const aguaReal  = suma(realesEnPeriodo, r => r.l_m2);
+  const exceso    = aguaReal - aguaKylia;
+
+  const realByDay = {};
+  realesEnPeriodo.forEach(r => { if (r.dia) realByDay[r.dia] = (realByDay[r.dia] || 0) + (Number(r.l_m2) || 0); });
+
+  // Comparativa por semana ISO (real vs contrafactual).
+  const semanas = {};
+  const acumula = (diaStr, campo, val) => {
+    const w = semanaISO(diaStr);
+    semanas[w] = semanas[w] || { semana: w, aplicada: 0, recomendada: 0 };
+    semanas[w][campo] += Number(val) || 0;
+  };
+  Object.entries(realByDay).forEach(([d, v]) => acumula(d, "aplicada", v));
+  Object.entries(kyliaByDay).forEach(([d, v]) => acumula(d, "recomendada", v));
+  const porSemana = Object.values(semanas)
+    .sort((a, b) => a.semana.localeCompare(b.semana))
+    .map(s => ({
+      semana: s.semana,
+      aplicada_l_m2:    r1(s.aplicada),
+      recomendada_l_m2: r1(s.recomendada),
+      exceso_l_m2:      r1(s.aplicada - s.recomendada),
+    }));
+
+  // Serie diaria acumulada: 🟢 Kylia (FAO-56) vs 🟤 real.
+  const serie = [];
+  let accK = 0, accR = 0;
+  for (let d = desde; d <= hasta; d = sumarDia(d)) {
+    accK += kyliaByDay[d] || 0;
+    accR += realByDay[d] || 0;
+    serie.push({ date: d, kylia_l_m2: r1(accK), real_l_m2: r1(accR) });
+  }
+
+  const excesoPct = aguaKylia > 0 ? r0((exceso / aguaKylia) * 100) : null;   // cuánto MÁS que Kylia
+  const ahorroPct = aguaReal  > 0 ? r0((exceso / aguaReal)  * 100) : null;   // % del agua real ahorrable
+  let veredicto;
+  if (aguaReal === 0) {
+    veredicto = "No registraste riegos en el periodo medido.";
+  } else if (exceso > 0.5) {
+    veredicto = `Aplicaste ~${r0(exceso)} L/m² más que la lámina FAO-56` +
+                (ahorroPct != null ? ` (ahorrarías ${ahorroPct}%)` : "") + " que Kylia habría aplicado.";
+  } else if (exceso < -0.5) {
+    veredicto = `Aplicaste ~${r0(-exceso)} L/m² menos que la lámina FAO-56: posible déficit hídrico a vigilar.`;
+  } else {
+    veredicto = "Tu riego coincidió de cerca con la lámina FAO-56.";
+  }
+
+  return {
+    titulo: "Agua aplicada vs recomendada",
+    disponible: true,
+    metodo: "contrafactual-fao56",
+    periodo: { desde, hasta },
+    aplicada_l_m2:    r1(aguaReal),
+    recomendada_l_m2: r1(aguaKylia),
+    exceso_l_m2:      r1(exceso),
+    exceso_pct:       excesoPct,
+    ahorro_pct:       ahorroPct,
+    dias_regado_real: new Set(realesEnPeriodo.map(r => r.dia)).size,
+    dias_regar_kylia: Object.values(kyliaByDay).filter(v => v > 0).length,
+    por_semana: porSemana,
+    serie,
+    riegos_antes_del_registro: realesAntes.length
+      ? { n: realesAntes.length, l_m2: r1(suma(realesAntes, r => r.l_m2)),
+          nota: "Anteriores al inicio del piloto: no se comparan." }
       : null,
     veredicto,
   };
@@ -273,7 +380,7 @@ function construirReveal(datos, opts = {}) {
   const riegosKylia  = datos.riegosKylia || [];
   const jornadas     = datos.jornadas || [];
 
-  const agua  = dimAgua(riegosReales, riegosKylia);
+  const agua  = dimAgua(riegosReales, riegosKylia, datos.contrafactual);
   const horas = dimHoras(jornadas);
   const trat  = dimTratamientos(datos.tratReales || [], datos.tratKylia || [], opts.ventanaTratDias);
   const coste = dimCoste(agua, u);
@@ -282,13 +389,18 @@ function construirReveal(datos, opts = {}) {
   let periodo = null;
   if (agua.disponible) {
     const dias = Math.max(0, diasEntreDias(agua.periodo.desde, agua.periodo.hasta)) + 1;
+    // Con contrafactual FAO-56 la referencia se calcula para CADA día del periodo
+    // (cobertura continua). Con el método heredado, depende de las decisiones congeladas.
+    const diasConDecision = datos.contrafactual
+      ? dias
+      : new Set(riegosKylia.map(d => d.dia).filter(Boolean)).size;
     periodo = {
       desde: agua.periodo.desde,
       hasta: agua.periodo.hasta,
       dias,
-      dias_con_decision: new Set(riegosKylia.map(d => d.dia).filter(Boolean)).size,
+      dias_con_decision: diasConDecision,
     };
-    periodo.cobertura_pct = dias > 0 ? r0((periodo.dias_con_decision / dias) * 100) : null;
+    periodo.cobertura_pct = dias > 0 ? r0((diasConDecision / dias) * 100) : null;
   }
 
   // Avisos: lo que el informe NO puede afirmar todavía (transparencia).
@@ -317,5 +429,5 @@ function construirReveal(datos, opts = {}) {
 module.exports = {
   construirReveal,
   // exportadas para test unitario
-  dimAgua, dimHoras, dimTratamientos, dimCoste, semanaISO, soloDia,
+  dimAgua, dimAguaDesdeContrafactual, dimHoras, dimTratamientos, dimCoste, semanaISO, soloDia,
 };

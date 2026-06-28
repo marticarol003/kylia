@@ -92,5 +92,40 @@ console.log("\nEscenario 2: piloto sin Diario B activo aún");
 const vacio = construirReveal({ usuario: datos.usuario, riegosReales: [{ dia: "2026-06-05", l_m2: 20 }], riegosKylia: [] });
 ok(!vacio.dimensiones.agua.disponible, "agua no disponible sin decisiones congeladas");
 
+// ── Escenario 3: contrafactual FAO-56 (goteo de pauta fija riega DE MÁS) ──
+// El caso de Breda: la lámina de Kylia se simula independiente (simularKylia),
+// NO se lee de recomendaciones_log. El goteo fijo aplica 64 L/m² cuando la
+// referencia FAO-56 (planta joven, kc bajo) solo pedía 23.
+console.log("\nEscenario 3: agua con contrafactual FAO-56 (goteo riega de más)");
+const cf = construirReveal({
+  usuario: { id: "22222222-2222-2222-2222-222222222222", ciudad: "Hostalric",
+             cultivos: ["tomate"], metodo_riego: "goteo", fecha_plantacion: "2026-05-27" },
+  riegosReales: [
+    { dia: "2026-06-21", l_m2: 16 }, { dia: "2026-06-23", l_m2: 16 },
+    { dia: "2026-06-25", l_m2: 16 }, { dia: "2026-06-27", l_m2: 16 },
+  ],
+  riegosKylia: [],   // el log está contaminado / vacío: NO se usa
+  contrafactual: {
+    total: 23,
+    puntos: [
+      { date: "2026-06-20", acum_l_m2: 0 },  { date: "2026-06-21", acum_l_m2: 0 },
+      { date: "2026-06-22", acum_l_m2: 0 },  { date: "2026-06-23", acum_l_m2: 0 },
+      { date: "2026-06-24", acum_l_m2: 0 },  { date: "2026-06-25", acum_l_m2: 23 },
+      { date: "2026-06-26", acum_l_m2: 23 }, { date: "2026-06-27", acum_l_m2: 23 },
+    ],
+  },
+}).dimensiones.agua;
+ok(cf.disponible, "agua disponible (contrafactual)");
+eq(cf.metodo, "contrafactual-fao56", "marca el método contrafactual");
+eq(cf.recomendada_l_m2, 23, "Kylia (FAO-56) = 23 (no 0 del log contaminado)");
+eq(cf.aplicada_l_m2, 64, "real = 4×16 = 64");
+eq(cf.exceso_l_m2, 41, "exceso = 64-23");
+eq(cf.exceso_pct, 178, "exceso% sobre Kylia = round(41/23)");
+eq(cf.ahorro_pct, 64, "ahorro% sobre el real = round(41/64) (el número del campo del padre)");
+eq(cf.serie.length, 8, "serie del 20 al 27 de junio");
+eq(cf.serie[cf.serie.length - 1].kylia_l_m2, 23, "último: Kylia acumula 23");
+eq(cf.serie[cf.serie.length - 1].real_l_m2, 64, "último: real acumula 64");
+ok(/más/.test(cf.veredicto), "veredicto: regó de más");
+
 console.log(fallos === 0 ? "\n✅ Todos los asserts pasan." : `\n❌ ${fallos} asserts fallan.`);
 process.exit(fallos === 0 ? 0 : 1);
