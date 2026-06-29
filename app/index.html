@@ -1701,6 +1701,94 @@
     }
     .severidad-row button.activo { background: var(--medium-bg); border-color: var(--medium); color: var(--medium); }
     .severidad-leyenda { font-size: 0.78rem; color: var(--muted); margin-top: -4px; margin-bottom: 12px; display: flex; justify-content: space-between; }
+
+    /* ════════════════════════════════════════════════════════════
+       REDISEÑO COCKPIT — override final: tiles, héroe con número,
+       skeletons de carga y pulido premium. (rama rediseno-dashboard)
+       ════════════════════════════════════════════════════════════ */
+    :root {
+      --shadow-sm: 0 1px 2px rgba(20,40,20,.04), 0 1px 3px rgba(20,40,20,.05);
+      --shadow-md: 0 6px 22px rgba(15,50,25,.10);
+      --ring: rgba(21,128,61,.20);
+      --tile-bd: #e7eee1;
+    }
+    .app { padding: 18px 14px 40px; }
+    .header h1 { letter-spacing: -0.02em; }
+    .card { border-radius: 18px; box-shadow: var(--shadow-sm); border-color: var(--tile-bd); }
+
+    /* ── Héroe: la acción del día manda ── */
+    .card-hoy {
+      border-left: none; border-radius: 20px; padding: 22px 20px;
+      position: relative; overflow: hidden; box-shadow: var(--shadow-md);
+      color: #fff;
+    }
+    .card-hoy.urgente  { background: linear-gradient(155deg,#0a5a2c,#063b1d); }
+    .card-hoy.atencion { background: linear-gradient(155deg,#9a4d09,#6f3705); }
+    .card-hoy.bien     { background: linear-gradient(155deg,#13502e,#0c3a20); }
+    .card-hoy .hoy-icono { font-size: 1.4rem; opacity: .9; margin-bottom: 2px; }
+    .card-hoy .hoy-accion { font-size: 1rem; font-weight: 700; color: inherit; opacity: .9; margin-bottom: 0; text-transform: uppercase; letter-spacing: .04em; }
+    .card-hoy .hoy-razon { color: inherit; opacity: .8; font-size: .88rem; margin: 6px 0 14px; }
+    .hoy-cifra { font-size: 2.7rem; line-height: 1; font-weight: 800; letter-spacing: -.03em; margin: 4px 0 0; }
+    .hoy-cifra small { font-size: 1.05rem; font-weight: 700; opacity: .72; letter-spacing: 0; }
+    .hoy-equiv { font-size: .95rem; font-weight: 600; opacity: .82; margin: 4px 0 14px; }
+    .card-hoy.bien .hoy-cifra, .card-hoy.bien .hoy-equiv { display: none; }
+    .card-hoy .btn-regar-grande {
+      background: rgba(255,255,255,.16); color: #fff;
+      border: 1px solid rgba(255,255,255,.30);
+    }
+    .card-hoy .btn-regar-grande:hover { background: rgba(255,255,255,.26); opacity: 1; }
+    .card-hoy .btn-regar-sec { background: rgba(255,255,255,.16); }
+    .card-hoy .btn-por-que { color: rgba(255,255,255,.72); }
+    .card-hoy .hoy-plazos { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.28); color: #fff; }
+    .card-hoy .hoy-detalle { background: rgba(255,255,255,.14); color: #fff; }
+
+    /* ── Cockpit: rejilla de tiles ── */
+    .cockpit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 2px; }
+    .tile {
+      display: flex; flex-direction: column; gap: 6px; padding: 14px;
+      background: var(--bg); border: 1px solid var(--tile-bd); border-radius: 14px;
+      cursor: pointer; min-height: 96px;
+      transition: transform .12s, box-shadow .12s, border-color .12s;
+    }
+    .tile:hover { box-shadow: var(--shadow-sm); }
+    .tile:active { transform: scale(.985); }
+    .tile:focus-visible { outline: none; border-color: var(--low); box-shadow: 0 0 0 3px var(--ring); }
+    .tile-label {
+      font-size: .7rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+      color: var(--muted); display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    }
+    .tile .ind-badge { align-self: flex-start; font-size: 1rem; padding: 5px 13px; margin-top: auto; }
+    .tile .ind-sub, .tile-sub { font-size: .66rem; color: var(--muted); }
+    .tile-meteo { gap: 4px; }
+    .tile-meteo-temp { font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin-top: 2px; }
+    .tile-meteo-line { display: flex; gap: 9px; font-size: .73rem; color: var(--muted); flex-wrap: wrap; margin-top: auto; }
+    .tile-meteo-line b { color: var(--text); font-weight: 700; }
+    .tile-refresh { font-size: .8rem; padding: 0; border: none; background: none; color: var(--muted); cursor: pointer; }
+    .ind-detalle-panel { margin: 8px 0 0; border-radius: 12px; border: 1px solid var(--border); border-top: 1px solid var(--border); background: var(--card); }
+    .parcela-titulo { letter-spacing: .08em; }
+
+    /* ── Skeleton shimmer (cero "--" mientras carga) ── */
+    .skel {
+      color: transparent !important;
+      background: linear-gradient(100deg,#e6ede2 28%,#f3f7ef 50%,#e6ede2 72%) !important;
+      background-size: 220% 100% !important;
+      animation: kshimmer 1.25s ease-in-out infinite;
+      border-radius: 12px; min-width: 70px;
+    }
+    @keyframes kshimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .tile-meteo-temp.skel { min-width: 78px; display: inline-block; height: 1.7rem; }
+
+    /* ── Plagas plegadas ── */
+    .plagas-toggle {
+      width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 14px 16px; margin-bottom: 12px;
+      background: var(--card); border: 1px solid var(--tile-bd); border-radius: 14px;
+      box-shadow: var(--shadow-sm); cursor: pointer; font-family: inherit;
+      font-size: .9rem; font-weight: 700; color: var(--text); text-align: left;
+    }
+    .plagas-toggle-cta { font-size: .76rem; font-weight: 600; color: var(--low); white-space: nowrap; }
+    .plagas-toggle.abierto .plagas-toggle-cta { color: var(--muted); }
+    .plagas-cards .card-alerta { margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -1919,39 +2007,47 @@
       <div class="hoy-detalle" id="det-hoy"></div>
     </section>
 
-    <!-- Tu parcela -->
-    <section class="card" id="card-parcela" aria-label="Tu parcela">
+    <!-- Cockpit: salud del cultivo + meteo en rejilla de tiles -->
+    <section class="card cockpit" id="card-parcela" aria-label="Tu parcela">
       <div class="parcela-cabecera">
-        <span class="parcela-titulo">Tu parcela</span>
+        <span class="parcela-titulo">Estado de la parcela</span>
         <button class="btn-refresh" id="btn-refresh-parcela" aria-label="Actualizar">&#8635;</button>
       </div>
 
-      <div class="indicadores-grid">
-        <div class="indicador-fila" id="row-vigor" role="button" aria-expanded="false">
-          <span class="ind-nombre">Vigor del cultivo</span>
-          <div class="ind-derecha">
-            <span class="ind-badge" id="ind-vigor">--</span>
-            <span class="ind-sub" id="ind-vigor-sub"></span>
-          </div>
+      <div class="cockpit-grid">
+        <div class="tile" id="row-vigor" role="button" aria-expanded="false" tabindex="0">
+          <span class="tile-label">Vigor del cultivo</span>
+          <span class="ind-badge skel" id="ind-vigor">&nbsp;</span>
+          <span class="tile-sub ind-sub" id="ind-vigor-sub"></span>
         </div>
-        <div class="ind-detalle-panel" id="det-vigor"></div>
-        <div class="indicador-fila" id="row-agua" role="button" aria-expanded="false">
-          <span class="ind-nombre">Agua en la planta</span>
-          <div class="ind-derecha">
-            <span class="ind-badge" id="ind-agua">--</span>
-            <span class="ind-sub" id="ind-agua-sub"></span>
-          </div>
+        <div class="tile" id="row-agua" role="button" aria-expanded="false" tabindex="0">
+          <span class="tile-label">Agua en la planta</span>
+          <span class="ind-badge skel" id="ind-agua">&nbsp;</span>
+          <span class="tile-sub ind-sub" id="ind-agua-sub"></span>
         </div>
-        <div class="ind-detalle-panel" id="det-agua"></div>
-        <div class="indicador-fila" id="row-suelo" role="button" aria-expanded="false">
-          <span class="ind-nombre">Humedad del suelo</span>
-          <div class="ind-derecha">
-            <span class="ind-badge" id="ind-suelo">--</span>
-            <span class="ind-sub" id="ind-suelo-sub"></span>
-          </div>
+        <div class="tile" id="row-suelo" role="button" aria-expanded="false" tabindex="0">
+          <span class="tile-label">Humedad del suelo</span>
+          <span class="ind-badge skel" id="ind-suelo">&nbsp;</span>
+          <span class="tile-sub ind-sub" id="ind-suelo-sub"></span>
         </div>
-        <div class="ind-detalle-panel" id="det-suelo"></div>
+        <div class="tile tile-meteo" aria-label="Condiciones meteorológicas">
+          <span class="tile-label">Ahora mismo
+            <button class="btn-refresh tile-refresh" id="btn-refresh" aria-label="Actualizar datos">&#8635;</button>
+          </span>
+          <span class="tile-meteo-temp" id="temp-value">--</span>
+          <span class="tile-meteo-line">
+            <span>💧 <b id="humidity-value">--</b></span>
+            <span>🌬 <b id="wind-value">--</b></span>
+            <span>🌧 <b id="rain-value">--</b></span>
+          </span>
+          <span class="status tile-sub" id="weather-status" aria-live="polite"></span>
+        </div>
       </div>
+
+      <!-- Paneles de detalle (se abren al tocar un tile; togglean por id) -->
+      <div class="ind-detalle-panel" id="det-vigor"></div>
+      <div class="ind-detalle-panel" id="det-agua"></div>
+      <div class="ind-detalle-panel" id="det-suelo"></div>
 
       <div class="riego-registro" id="riego-registro"></div>
 
@@ -1988,32 +2084,6 @@
     <!-- Alertas plagas -->
     <div id="alertas-container"></div>
 
-    <!-- Tiempo -->
-    <section class="card" aria-label="Condiciones meteorológicas">
-      <div class="weather-header">
-        <span class="weather-label">Ahora mismo</span>
-        <button class="btn-refresh" id="btn-refresh" aria-label="Actualizar datos">&#8635; Actualizar</button>
-      </div>
-      <div class="weather-grid">
-        <div>
-          <div class="weather-stat-value" id="temp-value">--</div>
-          <div class="weather-stat-label">Temperatura</div>
-        </div>
-        <div>
-          <div class="weather-stat-value" id="humidity-value">--</div>
-          <div class="weather-stat-label">Humedad</div>
-        </div>
-        <div>
-          <div class="weather-stat-value" id="wind-value">--</div>
-          <div class="weather-stat-label">Viento</div>
-        </div>
-        <div>
-          <div class="weather-stat-value" id="rain-value">--</div>
-          <div class="weather-stat-label">Lluvia hoy</div>
-        </div>
-      </div>
-      <span id="weather-status" class="status" aria-live="polite">Cargando...</span>
-    </section>
 
     <!-- Preguntas frecuentes -->
     <section class="faq-section" aria-label="Preguntas frecuentes">
@@ -2826,6 +2896,23 @@
         });
       });
 
+      // Cockpit: las plagas viven plegadas tras un único encabezado (menos scroll).
+      const header = document.createElement("button");
+      header.type = "button";
+      header.className = "plagas-toggle";
+      header.innerHTML =
+        `<span class="plagas-toggle-txt">&#128737; Vigilancia de plagas y enfermedades</span>` +
+        `<span class="plagas-toggle-cta">ver detalle &#9662;</span>`;
+      const wrap = document.createElement("div");
+      wrap.className = "plagas-cards";
+      wrap.hidden = true;
+      header.addEventListener("click", () => {
+        wrap.hidden = !wrap.hidden;
+        header.classList.toggle("abierto", !wrap.hidden);
+      });
+      container.appendChild(header);
+      container.appendChild(wrap);
+
       Object.entries(ALERTAS).forEach(([alertaId, alerta]) => {
         if (!alertasActivas.has(alertaId)) return;
 
@@ -2849,7 +2936,7 @@
             `<div class="forecast-label">Próximos 3 días</div>` +
             `<div id="${forecastId}" class="forecast-grid"></div>` +
           `</div>`;
-        container.appendChild(section);
+        wrap.appendChild(section);
 
         if (datosHoy) {
           actualizarPlaga(riskId, reasonId, forecastId, alerta.calcFn, datosHoy, diasFuturos);
@@ -2920,7 +3007,11 @@
         return `${Math.round(mm)} L/m²`;
       }
       const caudal = Number(cfg.caudal) || CAUDAL_DEFAULT_MMH[m];
-      if (caudal > 0) return `${Math.round((mm / caudal) * 60)} min`;
+      if (caudal > 0) {
+        const min = Math.round((mm / caudal) * 60);
+        if (min >= 120) return `${(min / 60).toFixed(1).replace(".", ",")} h`;
+        return `${min} min`;
+      }
       return `${Math.round(mm)} L/m²`;
     }
 
@@ -3486,20 +3577,32 @@
       }
 
       const porQue = `<button class="btn-por-que" id="btn-por-que-hoy">¿Por qué?</button>`;
+      // Lámina a reponer (mm = L/m²): el déficit FAO-56 si lo tenemos, si no el ET₀ acumulado.
+      const _bal = calcularBalanceHidrico();
+      const laminaMm = (lvl) => Math.round(_bal && _bal.Dr > 0 ? _bal.Dr : lvl);
+      const cifra = (mm) => {
+        const eq = fmtRiego(mm);
+        const equivLinea = /L\/m²/.test(eq) ? "" : `<div class="hoy-equiv">≈ ${eq} de riego</div>`;
+        return `<div class="hoy-cifra">${mm}<small> L/m²</small></div>${equivLinea}`;
+      };
       if (alerta) {
+        const mm = laminaMm(alerta.et0);
         card.className = "card card-hoy urgente";
         el.innerHTML =
           `<div class="hoy-icono">💧</div>`
-          + `<div class="hoy-accion">Regar hoy</div>`
-          + `<p class="hoy-razon">Desde ${alerta.desde}, han evaporado <strong>${alerta.et0.toFixed(0)} mm</strong> de agua del suelo.</p>`
+          + `<div class="hoy-accion">Riega hoy</div>`
+          + cifra(mm)
+          + `<p class="hoy-razon">Desde ${alerta.desde} han evaporado ${alerta.et0.toFixed(0)} mm del suelo.</p>`
           + `<button class="btn-regar-grande" id="btn-regar-hoy">He regado hoy</button>`
           + porQue;
       } else if (alertaModesta) {
+        const mm = laminaMm(alertaModesta.et0);
         card.className = "card card-hoy atencion";
         el.innerHTML =
           `<div class="hoy-icono">⚠️</div>`
-          + `<div class="hoy-accion">Revisar el riego</div>`
-          + `<p class="hoy-razon">La planta puede empezar a notar la falta de agua (${alertaModesta.et0.toFixed(0)} mm evaporados). Revisa si toca regar.</p>`
+          + `<div class="hoy-accion">Revisa el riego</div>`
+          + cifra(mm)
+          + `<p class="hoy-razon">La planta empieza a notar la falta de agua (${alertaModesta.et0.toFixed(0)} mm evaporados).</p>`
           + `<button class="btn-regar-grande btn-regar-sec" id="btn-regar-hoy">He regado hoy</button>`
           + porQue;
       } else {
@@ -3542,7 +3645,7 @@
       const vigorSub = document.getElementById("ind-vigor-sub");
       if (vigorEl) {
         if (!ultimoNDVI) {
-          vigorEl.textContent = "--"; vigorEl.className = "ind-badge";
+          vigorEl.innerHTML = "&nbsp;"; vigorEl.className = "ind-badge skel";
           if (vigorSub) vigorSub.textContent = "";
         } else {
           const map = { buena: ["Muy bueno","buena"], moderada: ["Normal","moderada"], estres: ["Bajo","estres"], recuperacion: ["Recuperando","moderada"] };
@@ -3557,7 +3660,7 @@
       const aguaSub = document.getElementById("ind-agua-sub");
       if (aguaEl) {
         if (!ultimoNDMI) {
-          aguaEl.textContent = "--"; aguaEl.className = "ind-badge";
+          aguaEl.innerHTML = "&nbsp;"; aguaEl.className = "ind-badge skel";
           if (aguaSub) aguaSub.textContent = "";
         } else {
           let txt, cls, sub;
@@ -3585,7 +3688,7 @@
       const sueloSub = document.getElementById("ind-suelo-sub");
       if (sueloEl) {
         if (!ultimoSuelo) {
-          sueloEl.textContent = "--"; sueloEl.className = "ind-badge";
+          sueloEl.innerHTML = "&nbsp;"; sueloEl.className = "ind-badge skel";
           if (sueloSub) sueloSub.textContent = "";
         } else {
           const val = ultimoSuelo.hoy[0];
