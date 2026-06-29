@@ -17,6 +17,13 @@ const FAO_KC = {
   pimiento:  { ini: 0.60, med: 1.05, fin: 0.90, L: [30, 35, 40, 20] },
   berenjena: { ini: 0.60, med: 1.05, fin: 0.90, L: [30, 40, 40, 20] },
   calabacin: { ini: 0.50, med: 0.95, fin: 0.75, L: [25, 35, 25, 15] },
+  // Cebolla tierna / cebolleta (green onion, FAO-56 Tablas 11-12), TRASPLANTADA
+  // y cosechada verde (no bulbifica ni se seca → fin sigue ~1.00). Raíz super-
+  // ficial. Adaptado a La Selva en pleno verano (plantada 24-jun): ciclo ~70 d
+  // comprimido y adelantado por el calor, arranque corto por ir de plantel, kc
+  // med subido a 1.05 por clima seco interior (RHmin~35%, FAO-56 ec. 70) y kc
+  // ini a 0.75 por la aspersión frecuente que moja la superficie (más Es).
+  cebolla:   { ini: 0.75, med: 1.05, fin: 1.00, L: [15, 25, 20, 10] },
 };
 const SUELO_AWC = { arenoso: 0.08, franco: 0.15, arcilloso: 0.16 }; // θFC−θWP, FAO-56 Tabla 19
 const SUELO_AWC_DEFAULT = 0.15;   // franco
