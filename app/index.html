@@ -4454,6 +4454,9 @@
       if (!ultimoET0 && !ultimoNDVI && !ultimoMeteo) return;
 
       const recs = generarRecomendaciones();
+      // El riego ya manda en el héroe (card-hoy): no lo repetimos en la lista
+      // visible, pero SÍ sigue en recs para el shadow log y el análisis IA.
+      const visibles = recs.filter(r => r.catClass !== "riego");
       // Persistir el "shadow log" en Supabase: una vez al día por usuario
       enviarRecomendacionesAlLog(recs);
       // Dispara reescritura IA en background (la primera llamada renderiza
@@ -4484,7 +4487,7 @@
         section.appendChild(bloque);
       }
 
-      if (recs.length === 0) {
+      if (visibles.length === 0) {
         const vacia = document.createElement("div");
         vacia.className = "rec-vacia";
         vacia.textContent = "Sin acciones urgentes hoy. El cultivo está bien.";
@@ -4511,7 +4514,7 @@
         return "urgencia-info";
       };
 
-      recs.forEach(rec => {
+      visibles.forEach(rec => {
         // Si la IA reescribió este id, usamos sus textos; si no, los de las reglas
         const reescrito = recomendacionesIA?.[rec.id];
         const titulo  = reescrito?.titulo  || rec.titulo;
