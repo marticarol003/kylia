@@ -1,17 +1,22 @@
 const TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
 
-// NDVI (B04/B08) + NDMI (B08/B11) + dataMask.
-// NDVI = vigor/biomasa; NDMI = contenido de agua en la hoja.
+// NDVI (B04/B08) + NDMI (B08/B11) + NDRE (B08/B05) + dataMask.
+// NDVI = vigor/biomasa; NDMI = agua en la hoja; NDRE = proxy de estado de
+// NITRÓGENO (el red-edge B05 es donde absorbe la clorofila, y el N foliar va
+// casi todo en clorofila). Señal RELATIVA: sin calibrar contra nitrato en
+// tejido es "más/menos verde", no kg — se reporta como tal (ver pilar de
+// fertilizantes). B05 es nativo a 20 m: en parcelas pequeñas, menos fiable.
 // La Statistical API promedia los píxeles válidos dentro de la geometría,
 // de forma que cada parcela devuelve valores específicos, no genéricos.
 const EVALSCRIPT = `//VERSION=3
 function setup() {
   return {
-    input: [{ bands: ["B04", "B08", "B11", "SCL", "dataMask"] }],
+    input: [{ bands: ["B04", "B05", "B08", "B11", "SCL", "dataMask"] }],
     output: [
       { id: "ndvi",     bands: 1, sampleType: "FLOAT32" },
       { id: "ndmi",     bands: 1, sampleType: "FLOAT32" },
+      { id: "ndre",     bands: 1, sampleType: "FLOAT32" },
       { id: "dataMask", bands: 1 }
     ]
   };
@@ -23,9 +28,11 @@ function evaluatePixel(s) {
   var validScl = bad.indexOf(s.SCL) === -1 ? 1 : 0;
   var ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 1e-10);
   var ndmi = (s.B08 - s.B11) / (s.B08 + s.B11 + 1e-10);
+  var ndre = (s.B08 - s.B05) / (s.B08 + s.B05 + 1e-10);
   return {
     ndvi:     [ndvi],
     ndmi:     [ndmi],
+    ndre:     [ndre],
     dataMask: [s.dataMask * validScl]
   };
 }`;
@@ -53,13 +60,14 @@ function pickLatestValid(statsJson) {
     .map((d) => {
       const statsNdvi = d?.outputs?.ndvi?.bands?.B0?.stats;
       const statsNdmi = d?.outputs?.ndmi?.bands?.B0?.stats;
+      const statsNdre = d?.outputs?.ndre?.bands?.B0?.stats;
       if (!statsNdvi) return null;
       const sample = statsNdvi.sampleCount || 0;
       const nodata = statsNdvi.noDataCount || 0;
       const valid  = sample - nodata;
       if (valid <= 0) return null;
       if (typeof statsNdvi.mean !== "number" || Number.isNaN(statsNdvi.mean)) return null;
-      return { from: d.interval.from, statsNdvi, statsNdmi, validPixels: valid };
+      return { from: d.interval.from, statsNdvi, statsNdmi, statsNdre, validPixels: valid };
     })
     .filter(Boolean)
     .sort((a, b) => b.from.localeCompare(a.from));
@@ -140,6 +148,10 @@ module.exports = async (req, res) => {
     ? +latest.statsNdmi.mean.toFixed(3) : null;
   const ndmiStdev = latest.statsNdmi && typeof latest.statsNdmi.stDev === "number"
     ? +latest.statsNdmi.stDev.toFixed(3) : null;
+  const ndre      = latest.statsNdre && typeof latest.statsNdre.mean === "number"
+    ? +latest.statsNdre.mean.toFixed(3) : null;
+  const ndreStdev = latest.statsNdre && typeof latest.statsNdre.stDev === "number"
+    ? +latest.statsNdre.stDev.toFixed(3) : null;
   const fecha  = latest.from.slice(0, 10);
   const estado = ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres";
 
@@ -148,6 +160,8 @@ module.exports = async (req, res) => {
     stdev,
     ndmi,
     ndmiStdev,
+    ndre,
+    ndreStdev,
     fecha,
     estado,
     pixeles: latest.validPixels,

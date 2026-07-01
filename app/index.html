@@ -1949,20 +1949,20 @@
         </div>
       </div>
       <div class="config-field">
-        <label>Ajuste de la cantidad <span style="font-weight:400;color:var(--subtle)">(opcional)</span></label>
-        <p class="config-hint">Para darte el riego en <strong>minutos</strong> (goteo, aspersión, manguera) o en <strong>regaderas</strong>, en vez de litros por m². Si lo dejas vacío, lo estimamos.</p>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-          <div>
-            <label for="input-caudal" class="sub">Caudal (L/m² por hora)</label>
+        <label id="caudal-label">Caudal de tu riego <span style="font-weight:400;color:var(--subtle)">(opcional)</span></label>
+        <p class="config-hint" id="caudal-hint"><strong>Truco del vaso:</strong> pon un vaso recto bajo un gotero o aspersor, riega 15&nbsp;min y mide los mm de agua que se acumulan. Multiplícalos por 4 → ese es tu caudal. Nos deja darte el riego en <strong>minutos</strong> en vez de en L/m². Si lo dejas vacío, lo estimamos.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div id="wrap-caudal">
+            <label for="input-caudal" class="sub">Caudal (L/m² en 1&nbsp;h)</label>
             <input type="number" id="input-caudal" min="0" step="0.5" inputmode="decimal" placeholder="Ej: 4">
           </div>
-          <div>
-            <label for="input-area" class="sub">Superficie (m²)</label>
-            <input type="number" id="input-area" min="0" step="1" inputmode="numeric" placeholder="Ej: 500">
-          </div>
-          <div>
+          <div id="wrap-regadera" hidden>
             <label for="input-capacidad-regadera" class="sub">Regadera (L)</label>
             <input type="number" id="input-capacidad-regadera" min="0" step="1" inputmode="numeric" placeholder="Ej: 10">
+          </div>
+          <div id="wrap-area">
+            <label for="input-area" class="sub">Superficie (m²)</label>
+            <input type="number" id="input-area" min="0" step="1" inputmode="numeric" placeholder="Ej: 500">
           </div>
         </div>
       </div>
@@ -2748,35 +2748,6 @@
       },
     };
 
-    // ─── Catálogo de fertilizantes por grupo de cultivo ───────────────────────
-    const FERTILIZANTES_CULTIVO = {
-      hojas: {
-        titulo: "Abono nitrogenado para cultivos de hoja",
-        porQue: "Las plantas de hoja verde necesitan nitrógeno (N) para producir clorofila. El índice NDVI por debajo de 0.5 indica que las plantas tienen menos clorofila de lo normal — aportar N ahora acelerará la recuperación del verdor y el crecimiento de las hojas.",
-        eco:  { nombre: "Guano líquido o extracto de algas (p.ej. Algamar, Biplantol)", dosis: "5-8 mL/L en fertirriego", modo: "Por la mañana temprano o al atardecer. No aplicar con más de 28°C." },
-        conv: { nombre: "N-P-K 20-20-20 + micros (p.ej. Wuxal Universal) o NAC 27%", dosis: "2-3 g/L en fertirriego, o 2 g/m² de NAC en cobertera", modo: "NAC en cobertera: riega después para que el nitrógeno baje a las raíces." },
-      },
-      fruto: {
-        titulo: "Abono rico en potasio (K) para cultivos de fruto",
-        porQue: "En fase de floración y cuaje, el potasio (K) mejora la calidad del fruto y ayuda a la planta a tolerar el calor y el estrés hídrico. El NDVI bajo sugiere que el cultivo puede estar sin los nutrientes suficientes para sostener el crecimiento del fruto.",
-        eco:  { nombre: "Sulfato potásico (SOP 50% K₂O)", dosis: "2-3 g/L en fertirriego", modo: "Con el primer riego del día o al atardecer. Nunca en el calor del mediodía." },
-        conv: { nombre: "N-P-K 5-10-30 + Mg (p.ej. Compo Frutero, Fertiberia Frutero)", dosis: "3-4 g/L en fertirriego, una vez a la semana", modo: "Riega antes y después para diluir. Nunca a pleno sol." },
-      },
-      brassica: {
-        titulo: "Cobertera nitrogenada para col y coliflor",
-        porQue: "Las coles y coliflores son cultivos muy exigentes en nitrógeno. El NDVI bajo señala posible carencia de N: la cobertera aporta nitrógeno de forma rápida y directa cerca de las raíces.",
-        eco:  { nombre: "Guano sólido granulado o compost maduro", dosis: "100-150 g/m² de guano, o 2-3 kg/m² de compost", modo: "En cobertera. Riega después para que los nutrientes lleguen a las raíces." },
-        conv: { nombre: "Nitrato amónico 33.5% (NAC)", dosis: "15-20 g/m²", modo: "En cobertera. No dejes gránulos sobre las hojas: pueden quemarlas. Riega después." },
-      },
-    };
-
-    function grupoFertilizante(cultivosActivos) {
-      if (cultivosActivos.some(id => ["tomate","pimiento","berenjena","calabacin"].includes(id))) return "fruto";
-      if (cultivosActivos.some(id => ["lechuga","espinaca"].includes(id))) return "hojas";
-      if (cultivosActivos.includes("brassica")) return "brassica";
-      return null;
-    }
-
     // ─── UI helpers ───────────────────────────────────────────────────────────
     function formatearDiaSemana(fechaIso) {
       return new Date(`${fechaIso}T12:00:00`).toLocaleDateString("es-ES", { weekday: "long" });
@@ -3251,7 +3222,7 @@
 
     // Busca una aplicación reciente del catálogo cuyo efecto aún cubra el
     // criterio dado y, por tanto, justifique silenciar la recomendación.
-    // criterio: { tipo: "plaga", clave: "pulgon" } | { tipo: "fertilizante", clave: "hojas"|"fruto"|"brassica" }
+    // criterio: { tipo: "plaga", clave: "pulgon" }
     // Devuelve { aplicacion, producto, diasRestantes, fechaFin } o null.
     function aplicacionReciente(criterio) {
       if (!criterio) return null;
@@ -3264,11 +3235,6 @@
         if (criterio.tipo === "plaga") {
           if (efecto.tipo !== "tratamiento") continue;
           if (!(efecto.producto.plagas || []).includes(criterio.clave)) continue;
-        } else if (criterio.tipo === "fertilizante") {
-          if (efecto.tipo !== "fertilizante") continue;
-          // Cualquier fertilizante reciente silencia la recomendación de nutrición:
-          // compost/estiércol son universales, npk-hoja cubre hojas+brassica,
-          // npk-fruto cubre fruto. Si se aplicó algo, la planta tiene que asentarlo.
         } else {
           continue;
         }
@@ -3968,56 +3934,9 @@
         });
       }
 
-      // 3. NUTRICIÓN — ajustada a la lluvia prevista, silenciada si hay un
-      // abonado reciente (la planta tarda 10-14 días en responder visiblemente
-      // en el NDVI, así que insistir antes lleva a sobrefertilizar).
-      if (ultimoNDVI && enTemp && cfg.cultivos?.length) {
-        const { ndvi } = ultimoNDVI;
-        const sueloSaturado = ultimoSuelo?.hoy[0] != null && ultimoSuelo.hoy[0] > 0.38;
-        if (ndvi < 0.5 && !sueloSaturado) {
-          const grupo = grupoFertilizante(cfg.cultivos);
-          if (grupo) {
-            const fert = FERTILIZANTES_CULTIVO[grupo];
-            const abonadoReciente = aplicacionReciente({ tipo: "fertilizante", clave: grupo });
-
-            if (abonadoReciente) {
-              // El usuario abonó hace poco: no insistir. Mostrar mensaje de "espera".
-              recs.push({
-                id: "nutricion_espera", categoria: "NUTRICIÓN", catClass: "nutricion",
-                titulo: `Abonado reciente — espera a que la planta responda`,
-                detalle: `Aplicaste ${abonadoReciente.aplicacion.productoNombre} el ${abonadoReciente.aplicacion.date}. La planta tarda entre 7 y 14 días en mostrar la respuesta en el satélite, así que aunque el NDVI siga bajo no es momento de volver a abonar. Vuelve a evaluar a partir del ${abonadoReciente.fechaFin}.`,
-                prod: null, prioridad: 6,
-                productoCriterio: { tipo: "fertilizante", clave: grupo },
-                yaProtegido: true,
-              });
-            } else {
-              let titulo, detalle, prioridad;
-              if (lluviaExcesiva) {
-                titulo   = "Espera para abonar — lluvia intensa prevista";
-                detalle  = `Se prevé lluvia intensa en los próximos días. Abonar ahora podría hacer que los nutrientes se lixivien antes de llegar a las raíces. Abona después de que pase la lluvia.`;
-                prioridad = 5;
-              } else if (lluviaInminente) {
-                const diaRain = ultimoPrevision.find(d => (d.lluvia ?? 0) >= 4);
-                titulo   = `Abona hoy antes de la lluvia del ${diaRain.nombreDia} — ahorra el riego`;
-                detalle  = `${fert.porQue} Si abonas en cobertera hoy, la lluvia del ${diaRain.nombreDia} disolverá y llevará el nutriente a las raíces sin necesidad de riego adicional — máximo aprovechamiento con mínimo gasto.`;
-                prioridad = 3;
-              } else {
-                titulo   = "Abona el cultivo esta semana";
-                detalle  = fert.porQue;
-                prioridad = 5;
-              }
-
-              recs.push({
-                id: "nutricion", categoria: "NUTRICIÓN", catClass: "nutricion",
-                titulo, detalle,
-                prod: { titulo: fert.titulo, eco: fert.eco, conv: fert.conv },
-                prioridad,
-                productoCriterio: { tipo: "fertilizante", clave: grupo },
-              });
-            }
-          }
-        }
-      }
+      // 3. NUTRICIÓN — retirada: heurística sin validar (se disparaba con
+      // NDVI<0.5, que es vigor, no nitrógeno). El pilar de fertilizantes se
+      // rehace sobre el balance de masa de api/_motor-nutricion.js.
 
       return recs.sort((a, b) => a.prioridad - b.prioridad);
     }
@@ -4899,10 +4818,34 @@
         document.querySelectorAll("#metodo-riego-grid .btn-cultivo").forEach(btn => {
           btn.classList.toggle("activo", btn.dataset.metodo === cfg.metodoRiego);
         });
+        actualizarCamposCaudal(cfg.metodoRiego);
       }
       function obtenerMetodoRiegoSeleccionado() {
         const el = document.querySelector("#metodo-riego-grid .btn-cultivo.activo");
         return el ? el.dataset.metodo : null;
+      }
+      // Muestra solo el campo relevante: caudal (goteo/aspersión/manguera),
+      // regadera (regadera) o ninguno (surco). La superficie se mantiene siempre.
+      function actualizarCamposCaudal(metodo) {
+        const wrapCaudal   = document.getElementById("wrap-caudal");
+        const wrapRegadera = document.getElementById("wrap-regadera");
+        const label = document.getElementById("caudal-label");
+        const hint  = document.getElementById("caudal-hint");
+        if (!wrapCaudal || !wrapRegadera) return;
+        const esRegadera = metodo === "regadera";
+        const esSurco    = metodo === "surco";
+        wrapCaudal.hidden   = esRegadera || esSurco;
+        wrapRegadera.hidden = !esRegadera;
+        if (esRegadera) {
+          label.innerHTML = 'Tamaño de la regadera <span style="font-weight:400;color:var(--subtle)">(opcional)</span>';
+          hint.innerHTML  = 'Cuántos litros caben en tu regadera. Con la superficie de la parcela te decimos <strong>cuántas regaderas</strong> echar. Si lo dejas vacío, lo estimamos.';
+        } else if (esSurco) {
+          label.innerHTML = 'Superficie de la parcela <span style="font-weight:400;color:var(--subtle)">(opcional)</span>';
+          hint.innerHTML  = 'En riego a surco te damos la lámina en L/m². La superficie nos ayuda a estimar el agua total.';
+        } else {
+          label.innerHTML = 'Caudal de tu riego <span style="font-weight:400;color:var(--subtle)">(opcional)</span>';
+          hint.innerHTML  = '<strong>Truco del vaso:</strong> pon un vaso recto bajo un gotero o aspersor, riega 15&nbsp;min y mide los mm de agua que se acumulan. Multiplícalos por 4 → ese es tu caudal. Nos deja darte el riego en <strong>minutos</strong> en vez de en L/m². Si lo dejas vacío, lo estimamos.';
+        }
       }
       // Single-select del grid de método de riego
       document.querySelectorAll("#metodo-riego-grid .btn-cultivo").forEach(btn => {
@@ -4910,6 +4853,7 @@
           const yaActivo = btn.classList.contains("activo");
           document.querySelectorAll("#metodo-riego-grid .btn-cultivo").forEach(x => x.classList.remove("activo"));
           if (!yaActivo) btn.classList.add("activo");
+          actualizarCamposCaudal(yaActivo ? null : btn.dataset.metodo);
         });
       });
 
