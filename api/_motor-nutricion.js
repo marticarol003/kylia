@@ -18,25 +18,30 @@
 //   química del suelo). Sin analítica, se devuelve la extracción bruta y se
 //   declara `oferta_conocida: false` (no se inventa el aporte).
 //
-// FRONTERA HONESTA: estos coeficientes son valores centrales de guías de
-// fertilización hortícola (extracciones tipo IPNI / Mosaic / guías autonómicas
-// de abonado). Varían por variedad, zona y manejo, así que están MARCADOS PARA
-// VALIDAR contra una calculadora oficial (peldaño 2) antes de traducir a € o a
-// un plan de abonado RD 1051/2022. Lo robusto hoy es la ESTRUCTURA del balance
-// y la relación N:P:K por cultivo, no el segundo decimal.
+// FRONTERA HONESTA: estos coeficientes son el CENTRO de los rangos de
+// extracción por tonelada publicados en guías de abonado españolas (agroes.es,
+// "extracciones y dosis de nutrientes"), que distinguen extracción (lo que
+// retira el cultivo) de dosis (lo que se aplica, mayor, por eficiencia/reservas
+// del suelo). Nosotros usamos EXTRACCIÓN. Varían por variedad, zona y manejo:
+// afinables con guía autonómica / IPNI antes de traducir a € o a un plan de
+// abonado RD 1051/2022. Lo robusto es la estructura del balance y la relación
+// N:P:K por cultivo, no el segundo decimal.
 
 // Extracción en kg por TONELADA de producto cosechado (fresco).
-//   N   = nitrógeno
+//   N    = nitrógeno
 //   P2O5 = fósforo expresado como P₂O₅
 //   K2O  = potasio expresado como K₂O
-// TODO(validar): contrastar cada fila con IPNI/Mosaic o guía autonómica.
+// Rangos fuente (agroes.es, absorción por producción comercializada):
+//   tomate  N 2,5-3,5 · P2O5 1,1-1,5 · K2O 5,0-5,5
+//   cebolla N 2,1-2,5 · P2O5 0,9-1,5 · K2O 3,0-3,8
+//   lechuga N 2,2-2,7 · P2O5 0,8-1,4 · K2O 4,6-6,0
 const EXTRACCION = {
   // Tomate (fruto fresco): muy exigente en K en cuaje/engorde.
-  tomate:  { N: 3.0, P2O5: 1.0, K2O: 5.0 },
+  tomate:  { N: 3.0, P2O5: 1.3, K2O: 5.2 },
   // Cebolla (bulbo / cebolla tierna): demanda moderada, K medio.
-  cebolla: { N: 2.5, P2O5: 1.0, K2O: 3.0 },
+  cebolla: { N: 2.3, P2O5: 1.2, K2O: 3.4 },
   // Lechuga (peso fresco de la pella): K relativamente alto frente a N.
-  lechuga: { N: 2.2, P2O5: 0.8, K2O: 4.0 },
+  lechuga: { N: 2.5, P2O5: 1.1, K2O: 5.3 },
 };
 
 function r1(x) { return Math.round((Number(x) || 0) * 10) / 10; }
@@ -87,7 +92,7 @@ function necesidadNutrientes(cultivoId, rendimientoT, ofertaSuelo) {
       ? "Necesidad neta = extracción del cultivo − aporte del suelo (analítica)."
       : "Sin analítica de suelo: se muestra la extracción bruta del cultivo. " +
         "El aporte del suelo (oferta) necesita un análisis; no se estima por satélite.",
-    validacion: "Coeficientes de extracción por validar contra calculadora oficial (peldaño 2).",
+    validacion: "Coeficientes = centro de rangos de extracción de guías españolas (agroes.es); afinables por zona.",
   };
 }
 
