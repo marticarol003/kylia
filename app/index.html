@@ -1963,6 +1963,9 @@
           <div id="wrap-area">
             <label for="input-area" class="sub">Superficie (m²)</label>
             <input type="number" id="input-area" min="0" step="1" inputmode="numeric" placeholder="Ej: 500">
+            <button type="button" id="btn-area-parcela" hidden
+              style="margin-top:6px;width:100%;font-size:0.82rem;color:#013A27;background:#f1f6f2;border:1px solid #dfe5e0;border-radius:8px;padding:6px 8px;cursor:pointer">
+              📐 Usar toda la parcela</button>
           </div>
         </div>
       </div>
@@ -4680,10 +4683,41 @@
         document.getElementById("btn-confirmar-parcela").classList.remove("visible");
         document.getElementById("parcela-info").textContent =
           "Parcela guardada. El NDVI usará este contorno exacto.";
+        actualizarBotonAreaParcela();
         cargarNDVI(true);
         cargarHumedadSuelo();
         cargarET0();
       });
+    }
+
+    // Área (m²) del contorno de SIGPAC guardado, por la fórmula del área esférica
+    // del polígono (lon/lat en grados). Evita pedir la superficie a mano cuando ya
+    // hay parcela dibujada.
+    function areaParcelaDeContorno() {
+      const p = cfg.parcela;
+      const ring = p ? (p.type === "Polygon" ? p.coordinates[0] : p.coordinates?.[0]?.[0]) : null;
+      if (!ring || ring.length < 3) return null;
+      const R = 6378137, rad = d => d * Math.PI / 180;
+      let a = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const [lo1, la1] = ring[i], [lo2, la2] = ring[(i + 1) % ring.length];
+        a += rad(lo2 - lo1) * (2 + Math.sin(rad(la1)) + Math.sin(rad(la2)));
+      }
+      return Math.round(Math.abs(a * R * R / 2));
+    }
+    // Muestra/oculta el botón "usar toda la parcela" y lo rellena con el área.
+    function actualizarBotonAreaParcela() {
+      const btn = document.getElementById("btn-area-parcela");
+      if (!btn) return;
+      const m2 = areaParcelaDeContorno();
+      if (m2) {
+        btn.hidden = false;
+        btn.textContent = `📐 Usar toda la parcela (≈${m2.toLocaleString("es-ES")} m²)`;
+        btn.onclick = () => { const el = document.getElementById("input-area"); if (el) el.value = m2; };
+      } else {
+        btn.hidden = true;
+        btn.onclick = null;
+      }
     }
 
     // ─── Panel de configuración ───────────────────────────────────────────────
@@ -4867,6 +4901,7 @@
         setNum("input-caudal",              cfg.caudal);
         setNum("input-area",                cfg.areaParcela);
         setNum("input-capacidad-regadera",  cfg.capacidadRegadera);
+        actualizarBotonAreaParcela();
       }
       // Single-select del grid de tipo de suelo
       document.querySelectorAll("#suelo-grid .btn-cultivo").forEach(btn => {
