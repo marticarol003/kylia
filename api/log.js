@@ -82,6 +82,18 @@ async function handleRegistroUsuario(req, res, body) {
   }
 
   try {
+    // Protección anti-sobreescritura de pilotos. La app hace upsert de la fila
+    // ENTERA por el UUID de localStorage; si un dispositivo reutiliza el id de un
+    // piloto silencioso, lo pisa (así se perdió el piloto de tomate de Breda: su
+    // fila quedó con otro email/cultivo). Si la fila existente es piloto_sombra=
+    // true y su email NO coincide con el entrante, es una colisión de id → no la
+    // tocamos y devolvemos 409 en vez de destruir el piloto.
+    const previa = (await supabaseSelect("usuarios", `id=eq.${id}&select=email,piloto_sombra`))[0];
+    if (previa && previa.piloto_sombra && previa.email !== fila.email) {
+      console.warn("[registro-usuario] colisión con piloto silencioso, no se sobrescribe:", id);
+      return res.status(409).json({ ok: false, reason: "pilot_collision", protegido: true });
+    }
+
     const filas = await supabaseInsert("usuarios", fila, { upsert: true });
     return res.status(200).json({ ok: true, persisted: true, usuario: filas?.[0] || null });
   } catch (err) {
