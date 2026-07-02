@@ -114,7 +114,7 @@
 
   if(!key){ pedirClave(); }
   else {
-    fetch(`/api/pilotos?key=${encodeURIComponent(key)}`)
+    fetch(`/api/campo?vista=pilotos&key=${encodeURIComponent(key)}`)
       .then(r=>r.json())
       .then(d=>{
         if(d.reason==="pilotos_key_not_configured"){ cont.innerHTML = `<div class="msg">Falta configurar <code>PILOTOS_KEY</code> en el servidor (Vercel → Environment Variables).</div>`; return; }

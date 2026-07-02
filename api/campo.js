@@ -152,8 +152,9 @@ async function vistaPerfil(res, u) {
   });
 }
 
-// ── Vista "reveal": informe final del piloto ─────────────────────
-async function vistaReveal(req, res, u) {
+// Ensambla el reveal de UN usuario (cruza recomendaciones_log vs acciones +
+// contrafactual FAO-56). Reutilizado por vistaReveal (uno) y vistaPilotos (todos).
+async function revealDeUsuario(u) {
   // Inicio efectivo del piloto: el reveal solo cuenta decisiones y riegos desde
   // esta fecha. Sirve para dejar fuera un arranque contaminado (p.ej. días en que
   // Kylia congeló sin tener aún el riego real cargado) SIN tocar el log, que es
@@ -207,12 +208,48 @@ async function vistaReveal(req, res, u) {
     usuario: u, riegosReales, riegosKylia, tratReales, tratKylia,
     jornadas: jornadas || [], contrafactual,
   });
+  return { informe, crudo: { riegosKylia, tratKylia, riegosReales, tratReales, jornadas } };
+}
 
+// ── Vista "reveal": informe final del piloto ─────────────────────
+async function vistaReveal(req, res, u) {
+  const { informe, crudo } = await revealDeUsuario(u);
   const payload = { ok: true, vista: "reveal", informe };
-  if (String(req.query?.dump || "") === "1") {
-    payload.crudo = { riegosKylia, tratKylia, riegosReales, tratReales, jornadas };
-  }
+  if (String(req.query?.dump || "") === "1") payload.crudo = crudo;
   return res.status(200).json(payload);
+}
+
+// ── Vista "pilotos": panel de TODOS los pilotos silenciosos ──────
+// No lleva usuario_id; se protege con PILOTOS_KEY (expone datos de varios
+// agricultores → RGPD). Reutiliza revealDeUsuario: no duplica la máquina.
+async function vistaPilotos(req, res) {
+  const expected = (process.env.PILOTOS_KEY || "").trim();
+  if (!expected) return res.status(200).json({ ok: false, reason: "pilotos_key_not_configured" });
+  if ((req.query?.key || "").toString() !== expected) return res.status(403).json({ ok: false, error: "key inválida" });
+  if (!isConfigured()) return res.status(200).json({ ok: false, reason: "supabase_not_configured" });
+
+  const usuarios = await supabaseSelect("usuarios", "piloto_sombra=eq.true&select=*&order=ciudad.asc");
+  const pilotos = await Promise.all((usuarios || []).map(async (u) => {
+    try {
+      const { informe } = await revealDeUsuario(u);
+      const a = (informe.dimensiones || {}).agua || {};
+      return {
+        id: u.id, nombre: u.nombre || null, email: u.email || null,
+        ciudad: u.ciudad || null, cultivo: (u.cultivos || [])[0] || null,
+        metodo: u.metodo_riego || null, manejo: u.manejo || null,
+        fecha_plantacion: u.fecha_plantacion || null, periodo: informe.periodo || null,
+        agua: a.disponible
+          ? { disponible: true, aplicada_l_m2: a.aplicada_l_m2, recomendada_l_m2: a.recomendada_l_m2,
+              exceso_l_m2: a.exceso_l_m2, ahorro_pct: a.ahorro_pct ?? null,
+              dias_regado_real: a.dias_regado_real, veredicto: a.veredicto, serie: a.serie || [] }
+          : { disponible: false, motivo: a.motivo || null },
+        avisos: informe.avisos || [],
+      };
+    } catch (e) {
+      return { id: u.id, nombre: u.nombre || null, ciudad: u.ciudad || null, error: e.message };
+    }
+  }));
+  return res.status(200).json({ ok: true, generado_en: new Date().toISOString(), n: pilotos.length, pilotos });
 }
 
 // ── Vista "comparativa": Kylia (FAO-56) vs lo real del padre, con BANDA de caudal ──
@@ -352,11 +389,17 @@ async function vistaComparativa(req, res, u) {
 module.exports = async (req, res) => {
   if (!preludio(req, res, "GET")) return;
 
+  const vista = (req.query?.vista || "hoy").toString();
+
+  // "pilotos" no lleva usuario_id (lista todos): se enruta antes del check de UUID.
+  if (vista === "pilotos") {
+    try { return await vistaPilotos(req, res); }
+    catch (err) { console.error("[campo] pilotos:", err.message); return res.status(500).json({ ok: false, error: err.message }); }
+  }
+
   const usuarioId = (req.query?.usuario_id || "").toString().trim();
   if (!ES_UUID.test(usuarioId)) return res.status(400).json({ error: "usuario_id inválido (UUID)" });
   if (!isConfigured()) return res.status(200).json({ ok: false, reason: "supabase_not_configured" });
-
-  const vista = (req.query?.vista || "hoy").toString();
 
   try {
     // select=* a propósito: tras un ALTER reciente, el caché de esquema de
