@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Pilotos silenciosos · Kylia</title>
+<style>
+  :root{ --verde:#013A27; --verde2:#2e7d52; --marron:#9c6b3f; --tinta:#1a2b22; --gris:#6b7a72; --linea:#e3eae6; }
+  *{ box-sizing:border-box; }
+  body{ font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--tinta);
+        margin:0; padding:24px 16px; background:#f6f8f6; }
+  .wrap{ max-width:760px; margin:0 auto; }
+  h1{ font-size:20px; margin:0 0 2px; color:var(--verde); }
+  .sub{ color:var(--gris); font-size:13px; margin:0 0 18px; }
+  .card{ background:#fff; border:1px solid var(--linea); border-radius:16px; padding:18px 18px;
+         margin:0 0 14px; box-shadow:0 2px 12px rgba(1,58,39,.05); }
+  .head{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .head h2{ font-size:16px; margin:0; color:var(--verde); }
+  .chips{ font-size:12px; color:var(--gris); }
+  .chip{ display:inline-block; background:#eef4f0; border:1px solid #cfe2d6; color:var(--verde);
+         border-radius:20px; padding:2px 9px; margin-left:5px; }
+  .periodo{ font-size:12px; color:var(--gris); margin:4px 0 12px; }
+  .nums{ display:flex; gap:10px; margin:0 0 10px; }
+  .num{ flex:1; border-radius:10px; padding:9px 11px; font-size:12.5px; line-height:1.35; }
+  .num.k{ background:#eef4f0; border:1px solid #cfe2d6; } .num.k b{ color:var(--verde); font-size:16px; }
+  .num.r{ background:#fbf4ee; border:1px solid #ecdcc9; } .num.r b{ color:var(--marron); font-size:16px; }
+  .claim{ font-size:14px; margin:2px 0 10px; }
+  .claim.ahorro b{ color:var(--verde); } .claim.deficit b{ color:#b4532e; }
+  svg{ display:block; width:100%; height:auto; }
+  .veredicto{ font-size:12.5px; color:var(--tinta); margin:8px 0 0; }
+  .avisos{ font-size:11.5px; color:var(--gris); margin:8px 0 0; line-height:1.5; }
+  .nd{ font-size:13px; color:var(--gris); }
+  .legend{ font-size:11.5px; color:var(--gris); margin:6px 0 0; display:flex; gap:14px; }
+  .legend .dot{ width:12px; height:3px; border-radius:2px; display:inline-block; vertical-align:middle; margin-right:5px; }
+  .msg{ background:#fff; border:1px solid var(--linea); border-radius:14px; padding:22px; text-align:center; color:var(--gris); }
+  .msg input{ padding:8px 10px; border:1px solid var(--linea); border-radius:8px; font-size:14px; }
+  .msg button{ padding:8px 14px; border:0; background:var(--verde); color:#fff; border-radius:8px; font-size:14px; cursor:pointer; margin-left:6px; }
+  code{ background:#eef4f0; padding:1px 5px; border-radius:5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pilotos silenciosos</h1>
+  <p class="sub">Agua real de cada agricultor vs lo que Kylia (FAO-56) habría aplicado, sobre el mismo campo. Contrafactual independiente: no se contamina con lo que regó el agricultor.</p>
+  <div id="cont"><div class="msg">Cargando…</div></div>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const key = params.get("key") || "";
+  const cont = document.getElementById("cont");
+
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+  const NOM = { lechuga:"lechuga", espinaca:"espinaca", brassica:"col/coliflor", tomate:"tomate",
+    pimiento:"pimiento", berenjena:"berenjena", calabacin:"calabacín", cebolla:"cebolla tierna" };
+
+  // Sparkline 2 líneas (acumulado): 🟢 Kylia FAO-56 · 🟤 agricultor real.
+  function sparkline(serie){
+    if(!serie || serie.length < 2) return "";
+    const W=680, H=150, pad=8;
+    const max = Math.max(1, ...serie.map(p => Math.max(p.kylia_l_m2||0, p.real_l_m2||0)));
+    const x = i => pad + (i/(serie.length-1))*(W-2*pad);
+    const y = v => (H-pad) - (v/max)*(H-2*pad);
+    const line = (campo,color) => {
+      const pts = serie.map((p,i)=>`${x(i).toFixed(1)},${y(p[campo]||0).toFixed(1)}`).join(" ");
+      const last = serie[serie.length-1][campo]||0;
+      return `<polyline fill="none" stroke="${color}" stroke-width="3" points="${pts}"/>`
+           + `<circle cx="${x(serie.length-1).toFixed(1)}" cy="${y(last).toFixed(1)}" r="4" fill="${color}"/>`;
+    };
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Agua acumulada">`
+      + `<line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="#e3eae6"/>`
+      + line("real_l_m2","#9c6b3f") + line("kylia_l_m2","#013A27") + `</svg>`;
+  }
+
+  function claim(a){
+    if(a.exceso_l_m2 > 0.5)
+      return `<p class="claim ahorro">Siguiendo a Kylia ahorrarías <b>${a.exceso_l_m2} L/m²${a.ahorro_pct!=null?` (${a.ahorro_pct}%)`:""}</b> en este campo.</p>`;
+    if(a.exceso_l_m2 < -0.5)
+      return `<p class="claim deficit">Regó <b>${Math.abs(a.exceso_l_m2)} L/m² menos</b> que la lámina FAO-56 — posible déficit a vigilar.</p>`;
+    return `<p class="claim">Su riego <b>coincidió</b> con la lámina FAO-56.</p>`;
+  }
+
+  function card(p){
+    if(p.error) return `<div class="card"><div class="head"><h2>${esc(p.nombre||p.ciudad||p.id)}</h2></div><p class="nd">No se pudo calcular: ${esc(p.error)}</p></div>`;
+    const cultivo = NOM[p.cultivo] || p.cultivo || "—";
+    const chips = `<span class="chip">${esc(cultivo)}</span>`
+      + (p.metodo?`<span class="chip">${esc(p.metodo)}</span>`:"")
+      + (p.manejo?`<span class="chip">${esc(p.manejo)}</span>`:"");
+    let cuerpo;
+    const a = p.agua || {};
+    if(a.disponible){
+      cuerpo = `<div class="nums">`
+        + `<div class="num k">Kylia (FAO-56) habría aplicado<br><b>${a.recomendada_l_m2} L/m²</b></div>`
+        + `<div class="num r">El agricultor aplicó<br><b>${a.aplicada_l_m2} L/m²</b></div></div>`
+        + claim(a)
+        + sparkline(a.serie)
+        + `<div class="legend"><span><i class="dot" style="background:#013A27"></i>Kylia (FAO-56)</span>`
+        + `<span><i class="dot" style="background:#9c6b3f"></i>Agricultor (real)</span></div>`
+        + (a.veredicto?`<p class="veredicto">${esc(a.veredicto)}</p>`:"");
+    } else {
+      cuerpo = `<p class="nd">${esc(a.motivo || "Sin datos de agua todavía.")}</p>`;
+    }
+    const per = p.periodo ? `<p class="periodo">${esc(p.periodo.desde)} → ${esc(p.periodo.hasta)} · ${p.periodo.dias} días · cobertura ${p.periodo.cobertura_pct??"?"}%</p>` : "";
+    const avisos = (p.avisos&&p.avisos.length) ? `<p class="avisos">⚠︎ ${p.avisos.map(esc).join("<br>⚠︎ ")}</p>` : "";
+    return `<div class="card"><div class="head"><h2>${esc(p.nombre||p.ciudad||"Piloto")}</h2><span class="chips">${chips}</span></div>${per}${cuerpo}${avisos}</div>`;
+  }
+
+  function pedirClave(){
+    cont.innerHTML = `<div class="msg">Este panel es privado. Añade tu clave: <br><br>
+      <input id="k" type="password" placeholder="PILOTOS_KEY" autocomplete="off">
+      <button onclick="location.search='?key='+encodeURIComponent(document.getElementById('k').value)">Ver</button></div>`;
+  }
+
+  if(!key){ pedirClave(); }
+  else {
+    fetch(`/api/pilotos?key=${encodeURIComponent(key)}`)
+      .then(r=>r.json())
+      .then(d=>{
+        if(d.reason==="pilotos_key_not_configured"){ cont.innerHTML = `<div class="msg">Falta configurar <code>PILOTOS_KEY</code> en el servidor (Vercel → Environment Variables).</div>`; return; }
+        if(d.reason==="supabase_not_configured"){ cont.innerHTML = `<div class="msg">Supabase no configurado en el servidor.</div>`; return; }
+        if(d.error || d.ok===false){ pedirClave(); return; }
+        if(!d.pilotos || !d.pilotos.length){ cont.innerHTML = `<div class="msg">No hay pilotos silenciosos activos.</div>`; return; }
+        cont.innerHTML = d.pilotos.map(card).join("");
+      })
+      .catch(e=>{ cont.innerHTML = `<div class="msg">Error al cargar: ${esc(e.message)}</div>`; });
+  }
+</script>
+</body>
+</html>
