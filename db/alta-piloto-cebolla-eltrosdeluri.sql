@@ -31,11 +31,13 @@
 --   • Riego: ASPERSIÓN. El motor convierte horas ↔ mm con `caudal` (mm/h).
 --   • Ubicación: 41.674023 N, 2.766436 E (La Selva, Girona; vecina de Breda).
 --
--- ▶️ PENDIENTE — CAUDAL: aún sin medir. Hasta rellenarlo, la rama de agua REAL
---    del agricultor (min → mm) no se puede calcular. Mídelo con el "truco del
---    vaso" (vasos rectos 1 h → mm acumulados) y luego:
+-- ▶️ CAUDAL: medido con el "truco del vaso" el 2026-07-01 (1 h de riego, cubo a
+--    medio camino entre 2 aspersores). Lámina fina, no medible con precisión desde
+--    foto → PROVISIONAL 12 mm/h (banda 10-15, en línea con el campo del padre =15).
+--    Ya va en el INSERT de abajo. Al afinar con medición precisa (volcar el agua en
+--    botella con marcas → mL) actualiza:
 --        update usuarios set caudal = <mm/h real>
---         where email = 'informacio@eltrosdeluri.cat';
+--         where email = 'eltrosdeluri@gmail.com';
 
 -- ── 1) Columnas necesarias (idempotentes) ────────────────────────
 alter table usuarios add column if not exists suelo            text;
@@ -52,11 +54,11 @@ insert into usuarios (
   area_m2, caudal, piloto_inicio, tarifa_agua, piloto_sombra, origen
 ) values (
   'a7f3c9e1-2b84-4d56-9f10-6c8e2b4a7d33',
-  'informacio@eltrosdeluri.cat',
+  'eltrosdeluri@gmail.com',
   'Piloto cebolla · El Tros de l''Uri',
   41.674023, 2.766436, 'La Selva (Girona)',
   '{cebolla}', 'aspersion', 'ecologico', 'franco', '2026-06-24',
-  380, null, '2026-06-24', null,        -- caudal null: pendiente "truco del vaso"
+  380, 12, '2026-06-24', null,          -- caudal 12 mm/h PROVISIONAL (truco del vaso 1-jul; banda 10-15)
   true, 'piloto-cebolla'
 )
 on conflict (id) do update set
@@ -76,9 +78,9 @@ on conflict (id) do update set
 --      set piloto_sombra = true,
 --          piloto_inicio = '2026-06-24',
 --          area_m2       = 380
---    where email = 'informacio@eltrosdeluri.cat';
+--    where email = 'eltrosdeluri@gmail.com';
 
 -- ── Comprobar ────────────────────────────────────────────────────
 --   select id, ciudad, cultivos, metodo_riego, manejo, suelo,
 --          fecha_plantacion, area_m2, caudal, piloto_inicio, piloto_sombra
---     from usuarios where email = 'informacio@eltrosdeluri.cat';
+--     from usuarios where email = 'eltrosdeluri@gmail.com';
