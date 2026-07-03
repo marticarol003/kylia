@@ -1204,6 +1204,16 @@
     }
 
     /* ── Historial de riegos ── */
+    .historial-desplegable > summary {
+      cursor: pointer; list-style: none;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .historial-desplegable > summary::-webkit-details-marker { display: none; }
+    .historial-desplegable > summary::after {
+      content: "▾"; color: var(--muted); font-size: 0.9rem; transition: transform .2s;
+    }
+    .historial-desplegable[open] > summary::after { transform: rotate(180deg); }
+    .historial-count { font-weight: 400; color: var(--muted); }
     .historial-riegos {
       list-style: none;
       padding: 0;
@@ -2057,8 +2067,10 @@
 
     <!-- Tus últimos riegos -->
     <section class="card" id="card-historial-riegos" aria-label="Tus últimos riegos" hidden>
-      <div class="rec-section-header">Tus últimos riegos</div>
-      <ul id="historial-riegos-lista" class="historial-riegos"></ul>
+      <details class="historial-desplegable">
+        <summary class="rec-section-header">Tus últimos riegos<span id="historial-riegos-count" class="historial-count"></span></summary>
+        <ul id="historial-riegos-lista" class="historial-riegos"></ul>
+      </details>
     </section>
 
     <!-- Tus últimas aplicaciones -->
@@ -3685,7 +3697,9 @@
       if (!card || !lista) return;
       if (!riegos.length) { card.hidden = true; return; }
       card.hidden = false;
-      const ultimos = riegos.slice(-7).reverse(); // más reciente primero
+      const ultimos = [...riegos].reverse(); // TODOS, más reciente primero
+      const count = document.getElementById("historial-riegos-count");
+      if (count) count.textContent = ` (${ultimos.length})`;
       lista.innerHTML = "";
       ultimos.forEach((r, i) => {
         const previa = ultimos[i + 1];
