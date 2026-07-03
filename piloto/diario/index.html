@@ -94,8 +94,9 @@
       <div class="label">Apunta lo de hoy</div>
       <div class="tabs">
         <button class="tab on" data-pane="riego">💧 Riego</button>
-        <button class="tab" data-pane="trat">🧪 Tratamiento</button>
-        <button class="tab" data-pane="obs">👁️ Observación</button>
+        <button class="tab" data-pane="abono">🌱 Abonado</button>
+        <button class="tab" data-pane="trat">🧪 Tratam.</button>
+        <button class="tab" data-pane="obs">👁️ Obs.</button>
       </div>
 
       <div class="pane on" data-pane="riego">
@@ -114,6 +115,20 @@
           <div class="hint" id="r-hint"></div>
           <button class="btn" data-send="riego">Registrar riego</button>
         </div>
+      </div>
+
+      <div class="pane" data-pane="abono">
+        <div class="field"><label for="a-prod">Abono aplicado</label>
+          <input id="a-prod" type="text" maxlength="160" placeholder="ej. estiércol, nitrato amónico" /></div>
+        <div class="row2">
+          <div class="field"><label for="a-cant">Cantidad (opcional)</label>
+            <input id="a-cant" type="text" maxlength="80" placeholder="ej. 2 kg, 5 L" /></div>
+          <div class="field"><label for="a-coste">Coste € (opcional)</label>
+            <input id="a-coste" type="number" inputmode="decimal" step="0.5" min="0" placeholder="ej. 12" /></div>
+        </div>
+        <div class="field"><label for="a-notas">Notas (opcional)</label>
+          <input id="a-notas" type="text" maxlength="200" placeholder="ej. solo media parcela" /></div>
+        <button class="btn" data-send="abono">Registrar abonado</button>
       </div>
 
       <div class="pane" data-pane="trat">
@@ -185,23 +200,30 @@
       <div class="silencio">🤫 <b>Piloto silencioso.</b> Apunta lo que hagas (regar, tratar, lo que veas).
         Kylia no te aconseja durante el piloto — así tu informe final es limpio.</div>`;
 
-    if (data.riegos_recientes && data.riegos_recientes.length) {
+    const riegos = data.riegos_recientes || [], aplics = data.aplicaciones_recientes || [];
+    if (riegos.length || aplics.length) {
       html += `<div class="card"><div class="label">Lo que llevas apuntado</div><ul class="hist">`;
-      for (const r of data.riegos_recientes) {
+      for (const r of riegos) {
         const dur = durTxt(r.duracion_min);
         const v = r.cubos != null ? `${r.cubos} cubo${r.cubos === 1 ? "" : "s"}`
                 : dur ? `${dur}${r.l_m2 != null ? ` · ${r.l_m2} L/m²` : ""}`
                 : r.l_m2 != null ? `${r.l_m2} L/m²` : "riego";
-        html += `<li><span class="f">${fmtFecha(r.fecha)}</span><span class="r"><span class="v">${v}</span>` +
-                `${r.id != null ? `<button class="del" data-borrar="${r.id}" title="Borrar este riego">✕</button>` : ""}</span></li>`;
+        html += `<li><span class="f">${fmtFecha(r.fecha)} 💧</span><span class="r"><span class="v">${v}</span>` +
+                `${r.id != null ? `<button class="del" data-borrar="${r.id}" data-que="riego" title="Borrar este riego">✕</button>` : ""}</span></li>`;
+      }
+      for (const a of aplics) {
+        const esAbono = a.motivo === "abonado";
+        const v = `${a.producto || (esAbono ? "abonado" : "tratamiento")}${a.dosis ? ` · ${a.dosis}` : ""}`;
+        html += `<li><span class="f">${fmtFecha(a.fecha)} ${esAbono ? "🌱" : "🧪"}</span><span class="r"><span class="v">${v}</span>` +
+                `${a.id != null ? `<button class="del" data-borrar="${a.id}" data-que="${esAbono ? "abonado" : "tratamiento"}" title="Borrar este apunte">✕</button>` : ""}</span></li>`;
       }
       html += `</ul></div>`;
     }
     root.innerHTML = html;
 
-    // Borrar un riego mal apuntado
+    // Borrar un apunte mal registrado (riego, abonado o tratamiento)
     root.querySelectorAll(".hist .del").forEach(b =>
-      b.addEventListener("click", () => borrarRiego(b.dataset.borrar)));
+      b.addEventListener("click", () => borrarAccion(b.dataset.borrar, b.dataset.que)));
 
     // Adaptar el registro al método del campo
     $("registro").style.display = "";
@@ -285,6 +307,14 @@
 
   const acciones = {
     riego: () => logRiego(parseFloat(val("r-cant")), false),
+    abono: async () => {
+      const prod = val("a-prod");
+      if (!prod) { toast("Pon el abono", true); return; }
+      const coste = parseFloat(val("a-coste"));
+      await enviar("acciones", { tipo: "aplicacion", motivo: "abonado", producto_nombre: prod,
+        dosis: val("a-cant") || null, coste_estimado_eur: coste > 0 ? coste : null, notas: val("a-notas") || null });
+      ["a-prod","a-cant","a-coste","a-notas"].forEach(i => $(i).value = "");
+    },
     trat: async () => {
       const prod = val("t-prod");
       if (!prod) { toast("Pon el producto", true); return; }
@@ -300,16 +330,16 @@
     },
   };
 
-  // Borra un riego ya apuntado. Para corregir: bórralo y vuelve a apuntar el bueno.
-  async function borrarRiego(id) {
-    if (!id || !confirm("¿Borrar este riego del cuaderno?")) return;
+  // Borra un apunte (riego, abonado o tratamiento). Para corregir: bórralo y apunta el bueno.
+  async function borrarAccion(id, que) {
+    if (!id || !confirm(`¿Borrar este ${que || "apunte"} del cuaderno?`)) return;
     try {
       const res = await fetch("/api/log", { method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recurso: "borrar-accion", usuario_id: ID, id: Number(id) }) });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || j.ok === false) throw new Error(j.error || "no se pudo borrar");
-      toast("✓ Riego borrado"); recargar();
+      toast("✓ Borrado"); recargar();
     } catch (e) { toast(e.message || "No se pudo borrar", true); }
   }
 

@@ -15,6 +15,8 @@
 const { isConfigured, supabaseSelect, preludio } = require("./_supabase.js");
 const { balanceHidrico, decisionRiego, presentarRiego, simularKylia, faseDelDia } = require("./_motor-riego.js");
 const { construirReveal } = require("./_reveal.js");
+const { necesidadNutrientes } = require("./_motor-nutricion.js");
+const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
 const ES_UUID = /^[0-9a-f-]{36}$/i;
@@ -146,8 +148,12 @@ async function vistaHoy(res, u) {
 // no debe ver lo que Kylia recomienda (sesgaría el experimento). Solo la config
 // para adaptar el registro (cubos vs horas) y lo que ya lleva apuntado.
 async function vistaPerfil(res, u) {
-  const accs = await supabaseSelect("acciones",
-    `usuario_id=eq.${u.id}&tipo=eq.riego&select=id,fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.desc&limit=8`);
+  const [accs, aplics] = await Promise.all([
+    supabaseSelect("acciones",
+      `usuario_id=eq.${u.id}&tipo=eq.riego&select=id,fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.desc&limit=8`),
+    supabaseSelect("acciones",
+      `usuario_id=eq.${u.id}&tipo=eq.aplicacion&select=id,fecha_local,producto_nombre,dosis,motivo&order=fecha_local.desc&limit=8`),
+  ]);
   const recientes = (accs || []).filter(f => f.fecha_local).map(f => {
     const l_m2 = laminaMostrada(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal);
     return {
@@ -156,12 +162,47 @@ async function vistaPerfil(res, u) {
         ? Math.round((l_m2 * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
     };
   });
+  // Abonados y tratamientos del cuaderno (motivo "abonado" los distingue).
+  const aplicaciones = (aplics || []).filter(f => f.fecha_local).map(f => ({
+    id: f.id, fecha: f.fecha_local, producto: f.producto_nombre || null,
+    dosis: f.dosis || null, motivo: f.motivo || null,
+  }));
   return res.status(200).json({
     ok: true, vista: "perfil",
     usuario: { ciudad: u.ciudad, cultivo: (u.cultivos || [])[0] || null,
                metodo_riego: u.metodo_riego, caudal: u.caudal, area_m2: u.area_m2,
                capacidad_regadera: u.capacidad_regadera, fecha_plantacion: u.fecha_plantacion },
     riegos_recientes: recientes,
+    aplicaciones_recientes: aplicaciones,
+  });
+}
+
+// ── Vista "cuaderno": cuaderno de fertilización (pilar fertilizantes) ──
+// Dos mitades honestas:
+//   1. Lo REGISTRADO: abonados apuntados en el diario (tipo=aplicacion,
+//      motivo=abonado) — la base del cuaderno RD 1051/2022.
+//   2. El PLAN (opcional): necesidad de nutrientes + coste €, SOLO si llega el
+//      rendimiento esperado (?rend_t= toneladas). Sin rendimiento no se estima:
+//      el motor devuelve disponible:false con su motivo, y así se muestra.
+async function vistaCuaderno(req, res, u) {
+  const abonados = await supabaseSelect("acciones",
+    `usuario_id=eq.${u.id}&tipo=eq.aplicacion&motivo=eq.abonado` +
+    `&select=id,fecha_local,producto_nombre,dosis,coste_estimado_eur,notas&order=fecha_local.asc`);
+
+  const cultivo = (u.cultivos || [])[0] || null;
+  const rendT   = Number(req.query?.rend_t) || null;
+  const plan    = cuadernoFertilizacion(
+    necesidadNutrientes(cultivo, rendT, null),
+    { superficie_m2: u.area_m2 ?? null },
+  );
+
+  return res.status(200).json({
+    ok: true, vista: "cuaderno", cultivo,
+    abonados: (abonados || []).map(a => ({
+      id: a.id, fecha: a.fecha_local, producto: a.producto_nombre || null,
+      dosis: a.dosis || null, coste_eur: a.coste_estimado_eur ?? null, notas: a.notas || null,
+    })),
+    plan,
   });
 }
 
@@ -180,7 +221,7 @@ async function revealDeUsuario(u) {
     supabaseSelect("recomendaciones_log",
       `usuario_id=eq.${u.id}${fRec}&select=fecha,tipo,cantidad_l_m2,nivel&order=fecha.asc`),
     supabaseSelect("acciones",
-      `usuario_id=eq.${u.id}${fAcc}&select=fecha_local,tipo,cantidad_l_m2,duracion_min,producto_nombre&order=fecha_local.asc`),
+      `usuario_id=eq.${u.id}${fAcc}&select=fecha_local,tipo,cantidad_l_m2,duracion_min,producto_nombre,motivo&order=fecha_local.asc`),
     supabaseSelect("jornadas", `usuario_id=eq.${u.id}&select=fuente_decision`),
   ]);
 
@@ -190,7 +231,10 @@ async function revealDeUsuario(u) {
     .map(r => ({ dia: dia(r.fecha) }));
   const riegosReales = (acciones || []).filter(a => a.tipo === "riego")
     .map(a => ({ dia: dia(a.fecha_local), l_m2: laminaMostrada(a.cantidad_l_m2, a.duracion_min ?? null, u.caudal) }));
-  const tratReales = (acciones || []).filter(a => a.tipo === "tratamiento" || a.tipo === "aplicacion")
+  // Los abonados (motivo="abonado") NO son tratamientos fitosanitarios: van al
+  // cuaderno de fertilización (vista=cuaderno), no a la dimensión de plagas.
+  const tratReales = (acciones || [])
+    .filter(a => (a.tipo === "tratamiento" || a.tipo === "aplicacion") && a.motivo !== "abonado")
     .map(a => ({ dia: dia(a.fecha_local), producto: a.producto_nombre }));
 
   // Contrafactual FAO-56 INDEPENDIENTE (simularKylia), la MISMA referencia que la
@@ -425,6 +469,7 @@ module.exports = async (req, res) => {
     if (vista === "reveal")      return await vistaReveal(req, res, u);
     if (vista === "comparativa") return await vistaComparativa(req, res, u);
     if (vista === "perfil")      return await vistaPerfil(res, u);
+    if (vista === "cuaderno")    return await vistaCuaderno(req, res, u);
     return await vistaHoy(res, u);
   } catch (err) {
     console.error("[campo] error:", err.message);
