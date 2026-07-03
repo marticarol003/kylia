@@ -132,8 +132,34 @@ Esto es lo que hoy hace una gestoría agraria por 800-2.000 €/año, reactiva y
 | VisualNACert | Modelo B2B cooperativa, el cliente final no es el agricultor. Capa económica y regulatoria no son su producto. |
 | EOSDA | Producto global con énfasis en analytics satelital. Capa regulatoria española es trabajo local que no escala internacionalmente. |
 | GeoCampo Pro | Suite de gestión integrada SIGPAC. Ya cubre parte de la regulatoria, pero la capa económica y la conversacional con IA están fuera de su ADN. |
+| Dataris | Analítica B2B de maquinaria/ortofotos para explotaciones grandes. Cliente y modelo (drones + maquinaria) opuestos al pequeño agricultor; ni capa económica ni regulatoria PAC. Ver §2.5. |
 
-### 2.5 Frase resumen para pitch o respuesta a evaluador
+### 2.5 Dataris y el ecosistema agtech español
+
+**Dataris** (dataris.es · Alicante · cofundador Guillermo Mateo · acelerada en Lanzadera) es otra agtech española que conviene conocer para demostrar dominio del ecosistema local más allá de los grandes (xarvio/BASF). **No es competidor frontal: juega en el campo opuesto.**
+
+Qué hace — plataforma **B2B de analítica de operaciones para explotaciones grandes**, cuatro patas:
+
+1. **Análisis multimaquinaria** — lee ficheros de máquinas (KML, Shapefile) para evaluar calidad de aplicación aérea, fertilización y cosecha.
+2. **Análisis de ortofotos con IA** — contar plantas, densidad, vigor (vía drones).
+3. **Operaciones digitales** — pasar partes de papel a digital, funciona sin internet.
+4. **GIS agrícola** — mapeo y delimitación de parcelas.
+
+Cliente: operaciones grandes ("Trusted by the leaders"), industria azucarera, palma, centros de I+D, gente con drones.
+
+| Eje | Dataris | Kylia |
+|---|---|---|
+| Cliente | Gran explotación / industria / I+D | Pequeño agricultor (3-15 ha), B2C |
+| Quién actúa | El técnico / gestor de la operación | El agricultor que riega, con el móvil en el campo |
+| Qué entrega | Mapas, análisis de maquinaria y ortofotos (datos para interpretar) | La decisión: "riega 12 L/m² esta tarde" |
+| Input | Drones, ficheros de maquinaria, ortofotos | Satélite gratis + meteo + SIGPAC (cero hardware) |
+| Capas | Una: analítica de campo | Tres: agronómica + económica + regulatoria |
+| Catálogo de producto | No | Catálogo MAPA curado + validador anti-alucinación |
+| Foso de datos | Operacional de cada cliente | Dataset contrafactual (decisión-Kylia × acción-real) |
+
+Lectura: Dataris es la misma categoría que Auravant/xarvio — **te da datos/mapas para que un técnico decida**; Kylia da la decisión directa al pequeño agricultor. Su modelo (drones + maquinaria instrumentada) **no escala al agricultor de 5 ha sin tractor instrumentado**. Riesgo a vigilar: su pata de ortofotos-IA es buena tecnología y podría bajar a fincas medianas, pero estructuralmente no alcanza al arquetipo Marc.
+
+### 2.6 Frase resumen para pitch o respuesta a evaluador
 
 > *La diferenciación no es UX, ni dataset, ni neutralidad — esas son consecuencias. La diferenciación real es de categoría: mientras los cinco competidores compiten en datos satelitales del campo (1 capa), Kylia compite en la decisión completa del agricultor (3 capas: agronómica con producto concreto, económica con predicción de precio de venta, regulatoria con asistente PAC + fitosanitarios + ecoesquemas). Ninguno de los cinco tiene las tres capas hoy, ni puede tenerlas sin rediseñar su producto entero — porque vienen de la cultura SaaS-dashboard para técnicos, no de la cultura decisión-operativa para agricultores. Kylia no compite en el mismo mercado que ellos; abre uno adyacente que ellos no van a ocupar.*
 
