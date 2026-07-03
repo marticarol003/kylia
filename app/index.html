@@ -1232,7 +1232,6 @@
       border-radius: 10px;
     }
     .historial-riegos .h-r-fecha { font-weight: 600; font-size: 0.92rem; }
-    .historial-riegos .h-r-meta  { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
     .historial-riegos .h-r-litros {
       font-weight: 700; font-size: 0.92rem; color: var(--low);
       background: var(--low-bg);
@@ -3701,21 +3700,13 @@
       const count = document.getElementById("historial-riegos-count");
       if (count) count.textContent = ` (${ultimos.length})`;
       lista.innerHTML = "";
-      ultimos.forEach((r, i) => {
-        const previa = ultimos[i + 1];
-        const dDesde = previa
-          ? Math.round((new Date(r.date) - new Date(previa.date)) / 86400000)
-          : null;
-        const meta = dDesde != null ? `Cada ${dDesde} día${dDesde !== 1 ? "s" : ""}` : "Primer riego registrado";
+      ultimos.forEach((r) => {
         const litros = r.litros != null
           ? `<span class="h-r-litros">${r.litros} L/m²</span>`
           : `<span class="h-r-litros sin-cantidad">sin cantidad</span>`;
         const li = document.createElement("li");
         li.innerHTML =
-          `<div>`
-          + `<div class="h-r-fecha">${formatearFechaCorta(r.date)}</div>`
-          + `<div class="h-r-meta">${meta}</div>`
-          + `</div>`
+          `<div class="h-r-fecha">${formatearFechaCorta(r.date)}</div>`
           + `<div class="h-r-row">${litros}<button class="h-r-borrar" data-date="${r.date}" aria-label="Borrar riego del ${r.date}">✕</button></div>`;
         lista.appendChild(li);
       });
