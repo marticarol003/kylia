@@ -54,8 +54,8 @@ Kylia es un SPA monolítico (`/app/index.html`) desplegado en Vercel y servido s
 | `/api/sigpac` | Resuelve parcela SIGPAC oficial por lat/lon |
 | `/api/sentinel` | OAuth2 CDSE + Statistics API para NDVI / NDMI |
 | `/api/waitlist` | Captura emails (landing y gate) |
-| `/api/recomendacion` | Análisis IA (Gemini) — párrafo de contexto |
-| `/api/recomendaciones-texto` | Reescritura IA de las recomendaciones — tono natural preservando cantidades |
+| `/api/ia?tipo=recomendacion` | Análisis IA (Gemini) — párrafo de contexto |
+| `/api/ia?tipo=recomendaciones-texto` | Reescritura IA de las recomendaciones — tono natural preservando cantidades |
 
 ### 2.3 Datos externos consumidos
 
@@ -85,13 +85,13 @@ Kylia es un SPA monolítico (`/app/index.html`) desplegado en Vercel y servido s
 
 | Endpoint | Input | Output | Latencia típica | Coste estimado |
 |---|---|---|---|---|
-| `/api/recomendacion` | Datos parcela (NDVI, NDMI, suelo, ET₀, días sin riego, meteo) | Párrafo libre 2-3 frases | 1-3 s | ~$0.0001 / llamada |
-| `/api/recomendaciones-texto` | Lista de recomendaciones generadas por reglas + contexto | JSON: array `{id, titulo, detalle}` reescrito | 1-3 s | ~$0.0001-0.0002 / llamada |
+| `/api/ia?tipo=recomendacion` | Datos parcela (NDVI, NDMI, suelo, ET₀, días sin riego, meteo) | Párrafo libre 2-3 frases | 1-3 s | ~$0.0001 / llamada |
+| `/api/ia?tipo=recomendaciones-texto` | Lista de recomendaciones generadas por reglas + contexto | JSON: array `{id, titulo, detalle}` reescrito | 1-3 s | ~$0.0001-0.0002 / llamada |
 
 ### 3.3 Frecuencia de llamadas
 
 - Por sesión de usuario: ~2-4 llamadas (al cargar y al refrescar). Coste total despreciable hoy.
-- Frontend hace hash de candidatos para no llamar a `/api/recomendaciones-texto` si el conjunto no cambia.
+- Frontend hace hash de candidatos para no llamar a `/api/ia?tipo=recomendaciones-texto` si el conjunto no cambia.
 
 ### 3.4 Tono y reglas de los prompts
 
@@ -128,7 +128,7 @@ Kylia es un SPA monolítico (`/app/index.html`) desplegado en Vercel y servido s
    - Ordenable: barato / eco / plazo / eficacia.
    - Botón "Voy a usar este" → preferencia en `localStorage["kylia_preferencias_producto"]`.
 
-3. Nuevo endpoint `/api/sugerencia-producto`:
+3. Nuevo endpoint `/api/ia?tipo=sugerencia-producto`:
    - Input: productos filtrados + contexto (cultivo, días estimados a cosecha, meteo).
    - Output: `{ idElegido, razonamiento }`.
    - Gemini elige el mejor producto **de la tabla dada** y razona en 1-2 frases. **No introduce productos nuevos.**
@@ -154,9 +154,9 @@ Aumentar la presencia de IA siempre **donde aporta sin introducir riesgo**. Tres
 
 Casos donde la IA recibe datos ya verificados y solo elige/explica. Ya en curso:
 
-- ✅ Reescritura de recomendaciones (`/api/recomendaciones-texto`)
-- ✅ Análisis global de la parcela (`/api/recomendacion`)
-- 🔜 Selección de producto sobre catálogo curado (`/api/sugerencia-producto`)
+- ✅ Reescritura de recomendaciones (`/api/ia?tipo=recomendaciones-texto`)
+- ✅ Análisis global de la parcela (`/api/ia?tipo=recomendacion`)
+- 🔜 Selección de producto sobre catálogo curado (`/api/ia?tipo=sugerencia-producto`)
 - 🔜 Diagnóstico cuando NDVI baja sin causa clara: IA propone 2-3 hipótesis ordenadas por probabilidad (estrés hídrico vs plaga vs enfermedad fúngica vs nutricional)
 - 🔜 Plan semanal: "Esta semana lo importante es X, Y, Z" — un resumen de 4-5 frases con todas las acciones recomendadas
 
@@ -182,7 +182,7 @@ Casos donde la IA recibe datos ya verificados y solo elige/explica. Ya en curso:
 
 ### 7.2 Cuándo evaluar mejoras
 
-- **Si la calidad de los textos se queda corta** (lenguaje plano, repeticiones, falta de matiz): probar `gemini-2.5-pro` solo en `/api/recomendacion`. Coste ~10× pero latencia y output significativamente mejores.
+- **Si la calidad de los textos se queda corta** (lenguaje plano, repeticiones, falta de matiz): probar `gemini-2.5-pro` solo en `/api/ia?tipo=recomendacion`. Coste ~10× pero latencia y output significativamente mejores.
 - **Si el chat conversacional entra en producción**: usar `gemini-2.5-pro` con `thinkingBudget` moderado para preguntas complejas; mantener `flash` para acciones simples.
 - **Si se introduce visión** (foto de hoja): `gemini-2.5-flash` con input multimodal ya lo soporta. Si la precisión no es suficiente, evaluar `gemini-2.5-pro` o modelos especializados (PlantNet, fine-tunes propios).
 - **Si llegamos a límites de cuota Google**: A/B probar Claude Haiku 4.5 (más barato, similar calidad para reescritura) y mantener Gemini para visión.

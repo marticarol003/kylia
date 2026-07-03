@@ -490,7 +490,7 @@ mostrar respuesta en NDVI; insistir antes sobrefertiliza).
 verificado contra el **registro MAPA** (sustancia activa, dosis, plazo de
 seguridad, eficacia, coste €/ha, cultivos+plagas autorizados).
 
-Flujo (`api/sugerencia-producto.js`):
+Flujo (`api/_ia-sugerencia-producto.js` (vía `/api/ia`)):
 1. El frontend filtra del catálogo los productos válidos para el contexto
    (cultivo, plaga/tipo fertilizante, presupuesto, plazo).
 2. Gemini Flash **elige UNO de la lista recibida** y razona en 1–2 frases.
@@ -507,9 +507,9 @@ Regla sagrada: **IA selectora, nunca generadora, en fitosanitarios.**
 Dos usos, ambos con `gemini-2.5-flash`, `thinkingBudget: 0`, fallback silencioso
 (si falla, queda la regla):
 
-- **`api/recomendacion.js`** — un párrafo de lectura agronómica de la parcela
+- **`api/_ia-recomendacion.js` (vía `/api/ia`)** — un párrafo de lectura agronómica de la parcela
   (2–3 frases, castellano llano, sin siglas). No decide nada: interpreta.
-- **`api/recomendaciones-texto.js`** — reescribe título+detalle de las
+- **`api/_ia-recomendaciones-texto.js` (vía `/api/ia`)** — reescribe título+detalle de las
   recomendaciones **conservando cantidades y productos exactos** de las reglas.
 
 La IA **nunca** genera cantidades de riego, dosis, productos ni umbrales. Solo

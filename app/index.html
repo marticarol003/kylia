@@ -3980,7 +3980,7 @@
       renderRecomendaciones();
 
       try {
-        const resp = await fetch("/api/recomendacion", {
+        const resp = await fetch("/api/ia?tipo=recomendacion", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -4114,7 +4114,7 @@
         lluviaPrevista: ultimoPrevision.reduce((s, d) => s + (d.lluvia ?? 0), 0),
       };
       try {
-        const resp = await fetch("/api/sugerencia-producto", {
+        const resp = await fetch("/api/ia?tipo=sugerencia-producto", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contexto: ctx, candidatos }),
@@ -4277,7 +4277,7 @@
       const lluviaPrevista = ultimoPrevision.reduce((s, d) => s + (d.lluvia ?? 0), 0);
 
       try {
-        const resp = await fetch("/api/recomendaciones-texto", {
+        const resp = await fetch("/api/ia?tipo=recomendaciones-texto", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
