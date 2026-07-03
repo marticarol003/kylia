@@ -12,9 +12,8 @@ flowchart LR
 
   landing -->|/api/waitlist| waitlist[(Vercel KV / DB)]
 
-  app -->|/api/parcela| orquestador
-  orquestador --> sigpac[/api/sigpac/]
-  orquestador --> sentinel[/api/sentinel/]
+  app --> sigpac[/api/sigpac/]
+  app --> sentinel[/api/sentinel/]
 
   sigpac -->|tile geojson| MAPA[(SIGPAC<br/>mapa.gob.es)]
   sentinel -->|OAuth + Statistics API| CDSE[(Copernicus<br/>Data Space)]
@@ -41,7 +40,6 @@ flowchart LR
 | App parcelas | HTML + Leaflet + JS vanilla | producción | `app.html`, almacena selección en localStorage |
 | API SIGPAC   | Node serverless (Vercel) | producción | `/api/sigpac.js` — tile lookup por lat/lon |
 | API Sentinel | Node serverless (Vercel) | producción | `/api/sentinel.js` — Copernicus DataSpace OAuth + Statistics API |
-| API Parcela  | Node serverless (Vercel) | producción | `/api/parcela.js` — orquestador SIGPAC + Sentinel |
 | Waitlist     | Node serverless (Vercel) | producción | `/api/waitlist.js` — captura emails pre-launch |
 
 ## Componentes próximos (orden de prioridad)

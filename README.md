@@ -125,7 +125,6 @@ RESEND_API_KEY=
 | `/api/waitlist` | POST | `{ email, origen }` | `{ ok: true }` |
 | `/api/sigpac` | GET | `lat`, `lon` | geometría parcela WGS84 |
 | `/api/sentinel` | GET | `geometry`, `days` | NDVI, NDMI, fecha |
-| `/api/parcela` | GET | `lat`, `lon` o `ref`, `days` | parcela + índices + interpretación |
 
 ## Deploy
 

@@ -53,7 +53,6 @@ Kylia es un SPA monolítico (`/app/index.html`) desplegado en Vercel y servido s
 |---|---|
 | `/api/sigpac` | Resuelve parcela SIGPAC oficial por lat/lon |
 | `/api/sentinel` | OAuth2 CDSE + Statistics API para NDVI / NDMI |
-| `/api/parcela` | Orquestador SIGPAC + Sentinel |
 | `/api/waitlist` | Captura emails (landing y gate) |
 | `/api/recomendacion` | Análisis IA (Gemini) — párrafo de contexto |
 | `/api/recomendaciones-texto` | Reescritura IA de las recomendaciones — tono natural preservando cantidades |
