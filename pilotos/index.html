@@ -37,6 +37,13 @@
   .msg input{ padding:8px 10px; border:1px solid var(--linea); border-radius:8px; font-size:14px; }
   .msg button{ padding:8px 14px; border:0; background:var(--verde); color:#fff; border-radius:8px; font-size:14px; cursor:pointer; margin-left:6px; }
   code{ background:#eef4f0; padding:1px 5px; border-radius:5px; }
+  .btn-informe{ margin-top:12px; padding:7px 13px; border:1px solid var(--verde); background:#fff;
+                color:var(--verde); border-radius:8px; font-size:13px; cursor:pointer; }
+  .btn-informe:disabled{ opacity:.5; cursor:wait; }
+  .informe{ margin-top:12px; border-top:1px dashed var(--linea); padding-top:12px; font-size:13.5px; line-height:1.55; }
+  .informe h1{ font-size:16px; margin:0 0 8px; } .informe h2{ font-size:14px; margin:14px 0 4px; color:var(--verde); }
+  .informe ul{ margin:4px 0; padding-left:20px; }
+  .informe .fuente{ font-size:11px; color:var(--gris); margin-top:8px; }
 </style>
 </head>
 <body>
@@ -103,7 +110,43 @@
     }
     const per = p.periodo ? `<p class="periodo">${esc(p.periodo.desde)} → ${esc(p.periodo.hasta)} · ${p.periodo.dias} días · cobertura ${p.periodo.cobertura_pct??"?"}%</p>` : "";
     const avisos = (p.avisos&&p.avisos.length) ? `<p class="avisos">⚠︎ ${p.avisos.map(esc).join("<br>⚠︎ ")}</p>` : "";
-    return `<div class="card"><div class="head"><h2>${esc(p.nombre||p.ciudad||"Piloto")}</h2><span class="chips">${chips}</span></div>${per}${cuerpo}${avisos}</div>`;
+    const informe = `<button class="btn-informe" onclick="generarInforme('${esc(p.id)}', this)">📄 Informe científico</button><div class="informe" id="inf-${esc(p.id)}" hidden></div>`;
+    return `<div class="card"><div class="head"><h2>${esc(p.nombre||p.ciudad||"Piloto")}</h2><span class="chips">${chips}</span></div>${per}${cuerpo}${avisos}${informe}</div>`;
+  }
+
+  // Markdown mínimo (títulos, negrita, listas, párrafos) sin dependencias.
+  // Todo pasa por esc() ANTES de convertir: el md nunca inyecta HTML.
+  function mdAHtml(md){
+    const bloques = esc(md).split(/\n{2,}/);
+    return bloques.map(b => {
+      b = b.trim(); if(!b) return "";
+      if(/^#{1,3}\s/.test(b)){ const n = b.match(/^#+/)[0].length; return `<h${Math.min(n,2)}>${b.replace(/^#+\s*/,"")}</h${Math.min(n,2)}>`; }
+      if(/^[-*]\s/m.test(b)) return `<ul>${b.split(/\n/).map(l=>`<li>${l.replace(/^[-*]\s*/,"")}</li>`).join("")}</ul>`;
+      return `<p>${b.replace(/\n/g,"<br>")}</p>`;
+    }).join("").replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+  }
+
+  async function generarInforme(id, btn){
+    const caja = document.getElementById("inf-"+id);
+    if(!caja.hidden && caja.innerHTML){ caja.hidden = true; return; } // toggle
+    if(caja.innerHTML){ caja.hidden = false; return; }
+    btn.disabled = true; btn.textContent = "Generando informe…";
+    try {
+      const r = await fetch("/api/informe-cientifico", {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ usuario_id: id }),
+      });
+      const d = await r.json();
+      if(!r.ok || !d.informe_md) throw new Error(d.error || "sin informe");
+      caja.innerHTML = mdAHtml(d.informe_md)
+        + `<p class="fuente">Fuente: ${d.fuente === "claude" ? "análisis IA (Claude) sobre los datos del reveal" : "plantilla determinista"}${d.cacheado ? " · cacheado hoy" : ""}</p>`;
+      caja.hidden = false;
+      btn.textContent = "📄 Informe científico";
+    } catch(e){
+      caja.innerHTML = `<p class="nd">No se pudo generar: ${esc(e.message)}</p>`; caja.hidden = false;
+      btn.textContent = "📄 Reintentar";
+    }
+    btn.disabled = false;
   }
 
   function pedirClave(){

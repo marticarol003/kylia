@@ -37,17 +37,30 @@ function laminaMostrada(cantidadGuardada, duracionMin, caudal) {
   return cantidadGuardada ?? null;
 }
 
+// Caché en memoria de series de clima (TTL 30 min). El panel /pilotos y el
+// informe científico piden la MISMA serie por piloto en cada carga; sin caché
+// cada refresco son N llamadas a open-meteo y al crecer los pilotos acabaría
+// en rate-limit. Clave por coordenadas redondeadas + ventana pedida.
+const cacheClima = new Map();
+const CLIMA_TTL_MS = 30 * 60 * 1000;
+
 async function climaSerie(lat, lon, desde) {
   const past = desde ? Math.min(92, Math.max(1, diasDesde(desde) + 1)) : 30;
+  const clave = `${Number(lat).toFixed(3)},${Number(lon).toFixed(3)},${past}`;
+  const hit = cacheClima.get(clave);
+  if (hit && Date.now() - hit.t < CLIMA_TTL_MS) return hit.serie;
+
   const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}`
     + `&daily=et0_fao_evapotranspiration,precipitation_sum`
     + `&past_days=${past}&forecast_days=7&timezone=Europe%2FMadrid`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`open-meteo ${res.status}`);
   const d = (await res.json()).daily || {};
-  return (d.time || []).map((date, i) => ({
+  const serie = (d.time || []).map((date, i) => ({
     date, et0: d.et0_fao_evapotranspiration?.[i] ?? 0, lluvia: d.precipitation_sum?.[i] ?? 0,
   }));
+  cacheClima.set(clave, { t: Date.now(), serie });
+  return serie;
 }
 
 // ── Vista "hoy": recomendación de riego del día en cubos ─────────
@@ -418,3 +431,7 @@ module.exports = async (req, res) => {
     return res.status(500).json({ ok: false, error: err.message });
   }
 };
+
+// Reutilizado por api/informe-cientifico.js: reconstruye el reveal en servidor
+// a partir del usuario, sin confiar en números que vengan del cliente.
+module.exports.revealDeUsuario = revealDeUsuario;
