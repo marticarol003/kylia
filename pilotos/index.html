@@ -139,7 +139,9 @@
       const d = await r.json();
       if(!r.ok || !d.informe_md) throw new Error(d.error || "sin informe");
       caja.innerHTML = mdAHtml(d.informe_md)
-        + `<p class="fuente">Fuente: ${d.fuente === "claude" ? "análisis IA (Claude) sobre los datos del reveal" : "plantilla determinista"}${d.cacheado ? " · cacheado hoy" : ""}</p>`;
+        + `<p class="fuente">Fuente: ${d.fuente === "claude" ? "análisis IA (Claude) sobre los datos del reveal"
+            : d.fuente === "gemini" ? "análisis IA (Gemini) sobre los datos del reveal"
+            : "plantilla determinista"}${d.cacheado ? " · cacheado hoy" : ""}</p>`;
       caja.hidden = false;
       btn.textContent = "📄 Informe científico";
     } catch(e){

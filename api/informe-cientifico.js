@@ -12,9 +12,9 @@
 // - Plagas/nutrición son heurísticas: se reportan cualitativas, sin acierto.
 // - Las limitaciones salen de `reveal.avisos`, no de la imaginación del modelo.
 //
-// Si no hay ANTHROPIC_API_KEY o la llamada falla, cae a un informe por
-// plantilla determinista construido con los mismos números (igual que
-// api/optimizacion-calidad.js hace con Gemini).
+// Proveedores en cadena por coste: Claude (solo si hay ANTHROPIC_API_KEY) →
+// Gemini free tier (GEMINI_API_KEY, la misma del resto de la app) → informe
+// por plantilla determinista construido con los mismos números. Nunca rompe.
 //
 // SEGURIDAD: el reveal se reconstruye SIEMPRE en servidor a partir del
 // usuario_id (mismo modelo de auth-por-UUID que el resto de la API). No se
@@ -164,59 +164,83 @@ module.exports = async (req, res) => {
     return res.status(500).json({ ok: false, error: "reveal incompleto" });
   }
 
-  const apiKey = (process.env.ANTHROPIC_API_KEY || "").trim();
-  // Sin clave: informe por plantilla (honesto, con los mismos números).
-  if (!apiKey) {
-    const plantilla = informePlantilla(reveal);
-    cacheInformes.set(claveCache, plantilla);
-    return res.json(plantilla);
-  }
+  // Cadena de proveedores por coste: Claude (si algún día hay clave) →
+  // Gemini free tier (la clave que ya usa el resto de la app) → plantilla.
+  const prompt = construirPrompt(reveal);
+  const claveClaude = (process.env.ANTHROPIC_API_KEY || "").trim();
+  const claveGemini = (process.env.GEMINI_API_KEY || "").trim();
 
-  try {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 2500,
-        messages: [{ role: "user", content: construirPrompt(reveal) }],
-      }),
-    });
+  const intentos = [];
+  if (claveClaude) intentos.push({ fuente: "claude", llamar: () => llamarClaude(claveClaude, prompt) });
+  if (claveGemini) intentos.push({ fuente: "gemini", llamar: () => llamarGemini(claveGemini, prompt) });
 
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`Anthropic ${resp.status}: ${err.slice(0, 200)}`);
+  for (const { fuente, llamar } of intentos) {
+    try {
+      const texto = await llamar();
+      // Tolera fences ```json ... ``` alrededor del JSON.
+      const limpio = texto.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+      let parsed;
+      try { parsed = JSON.parse(limpio); }
+      catch (_) { throw new Error("JSON inválido en respuesta"); }
+
+      const titulo = typeof parsed?.titulo === "string" ? parsed.titulo.trim() : null;
+      const informe_md = typeof parsed?.informe_md === "string" ? parsed.informe_md.trim() : null;
+      if (!informe_md) throw new Error("Falta informe_md en la respuesta");
+
+      const resultado = { titulo, informe_md, fuente };
+      cacheInformes.set(claveCache, resultado);
+      return res.json(resultado);
+    } catch (err) {
+      console.error(`[informe-cientifico] ${fuente}:`, err.message);
+      // sigue con el siguiente proveedor
     }
-
-    const data = await resp.json();
-    // La respuesta trae bloques; nos quedamos con el texto (saltando thinking).
-    const texto = (data?.content || [])
-      .filter(b => b && b.type === "text")
-      .map(b => b.text)
-      .join("")
-      .trim();
-    if (!texto) throw new Error("Respuesta vacía de Claude");
-
-    // Tolera fences ```json ... ``` alrededor del JSON.
-    const limpio = texto.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-    let parsed;
-    try { parsed = JSON.parse(limpio); }
-    catch (_) { throw new Error("JSON inválido en respuesta"); }
-
-    const titulo = typeof parsed?.titulo === "string" ? parsed.titulo.trim() : null;
-    const informe_md = typeof parsed?.informe_md === "string" ? parsed.informe_md.trim() : null;
-    if (!informe_md) throw new Error("Falta informe_md en la respuesta");
-
-    const resultado = { titulo, informe_md, fuente: "claude" };
-    cacheInformes.set(claveCache, resultado);
-    res.json(resultado);
-  } catch (err) {
-    console.error("[informe-cientifico]", err.message);
-    // Ante cualquier fallo, no rompemos: devolvemos el informe por plantilla.
-    res.json(informePlantilla(reveal));
   }
+
+  // Sin claves o con todos los proveedores caídos: plantilla honesta.
+  const plantilla = informePlantilla(reveal);
+  cacheInformes.set(claveCache, plantilla);
+  return res.json(plantilla);
 };
+
+async function llamarClaude(apiKey, prompt) {
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 2500,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!resp.ok) throw new Error(`Anthropic ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+  const data = await resp.json();
+  // La respuesta trae bloques; nos quedamos con el texto (saltando thinking).
+  const texto = (data?.content || [])
+    .filter(b => b && b.type === "text").map(b => b.text).join("").trim();
+  if (!texto) throw new Error("Respuesta vacía de Claude");
+  return texto;
+}
+
+// Mismo prompt sobre Gemini 2.5 Flash (free tier). A diferencia de los textos
+// cortos de /api/ia, aquí se deja el thinking por defecto: el informe es raro
+// (1/piloto/día como mucho por la caché) y la calidad importa más que la latencia.
+async function llamarGemini(apiKey, prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 6000 },
+    }),
+  });
+  if (!resp.ok) throw new Error(`Gemini ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+  const data = await resp.json();
+  const texto = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
+  if (!texto) throw new Error("Respuesta vacía de Gemini");
+  return texto;
+}
