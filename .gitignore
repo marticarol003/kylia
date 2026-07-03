@@ -13,6 +13,9 @@ dist/
 .env.local
 .env.*.local
 
+# Documentos de negocio (no van al repo desplegado)
+*.docx
+
 # OS / editor
 .DS_Store
 Thumbs.db
