@@ -31,6 +31,13 @@ select id, email, nombre, ciudad, origen, piloto_sombra, fecha_alta::date,
    and left(id::text, 8) not in ('b1f7c2d9','a7f3c9e1','23567ff1','9aaa1b25');
 
 -- ── 2) BORRAR (cuando el SELECT muestre SOLO filas de prueba) ──
+-- recomendaciones_log está SELLADA append-only (trg_reclog_append_only,
+-- db/diario-b-produccion.sql §2) y el borrado en cascada choca con el
+-- trigger ("ERROR P0001: DELETE no permitido"). Se desactiva SOLO durante
+-- este borrado y se reactiva justo después — las decisiones de los pilotos
+-- reales no se tocan, solo caen las de las filas de prueba.
+alter table recomendaciones_log disable trigger trg_reclog_append_only;
+
 delete from usuarios u
  where (   email ilike '%solformacion%' or nombre ilike '%solformacion%'
         or email ilike '%solfotmacion%' or nombre ilike '%solfotmacion%'
@@ -39,6 +46,12 @@ delete from usuarios u
         or id = 'c46e9d6d-577f-47ab-8a67-eebadcec7109')
    and coalesce(piloto_sombra, false) = false
    and left(id::text, 8) not in ('b1f7c2d9','a7f3c9e1','23567ff1','9aaa1b25');
+
+alter table recomendaciones_log enable trigger trg_reclog_append_only;
+
+-- Confirmar que el sellado vuelve a estar activo ('O' = enabled):
+select tgname, tgenabled from pg_trigger
+ where tgname = 'trg_reclog_append_only';
 
 -- ── 2b) De paso: la etiqueta del campo del padre decía "500 m²"
 --        (el área real ya está en 440 desde el 12-jun) ──
