@@ -1,6 +1,11 @@
 -- ─────────────────────────────────────────────────────────────────
 -- KYLIA · Cambios de riego reportados por los pilotos (2026-07-08)
 -- ─────────────────────────────────────────────────────────────────
+-- ⚠️ YA APLICADO el 2026-07-09 vía API de producción (recurso
+--    pauta-goteo + borrar-accion/acciones). NO hace falta ejecutarlo.
+--    Se conserva como registro del cambio. (Es idempotente: correrlo
+--    no duplicaría nada, solo pisaría las notas.)
+-- ─────────────────────────────────────────────────────────────────
 -- 1) TOMATE FERRAN (Breda): la pauta del goteo pasó de 30 a 40 min
 --    (sigue día sí día no) hace una semana (~1-jul).
 --    a) usuarios.riego_auto_min 30 → 40 (los riegos futuros que
