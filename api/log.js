@@ -23,6 +23,7 @@ const HANDLERS = {
   "mediciones":          handleMediciones,
   "recomendaciones-log": handleRecomendacionesLog,
   "eventos":             handleEventos,
+  "pauta-goteo":         handlePautaGoteo,
 };
 
 const METODOS_RIEGO = new Set(["goteo", "aspersion", "surco", "manguera", "regadera"]);
@@ -173,6 +174,56 @@ async function handleBorrarAccion(req, res, body) {
   } catch (err) {
     console.error("[borrar-accion] error:", err.message);
     return res.status(500).json({ ok: false, error: "no se pudo borrar" });
+  }
+}
+
+// ─── pauta-goteo (admin: cambia la pauta de riego automático) ──────
+// Los pilotos de goteo cambian el programador (min/frecuencia) y lo avisan
+// por WhatsApp; sin esto solo se podía actualizar con SQL a mano. Protegido
+// con PILOTOS_KEY (misma llave que el panel /pilotos). Solo toca los campos
+// riego_auto_* y caudal — nunca el resto de la fila (a diferencia del upsert
+// de registro-usuario).
+async function handlePautaGoteo(req, res, body) {
+  const expected = (process.env.PILOTOS_KEY || "").trim();
+  if (!expected) return res.status(200).json({ ok: false, reason: "pilotos_key_not_configured" });
+  if ((body.key || "").toString() !== expected) return res.status(403).json({ ok: false, error: "key inválida" });
+
+  const usuario_id = (body.usuario_id || "").toString().trim();
+  if (!/^[0-9a-f-]{36}$/i.test(usuario_id)) {
+    return res.status(400).json({ error: "usuario_id inválido" });
+  }
+
+  const patch = {};
+  if (body.riego_auto !== undefined)           patch.riego_auto           = Boolean(body.riego_auto);
+  if (body.riego_auto_desde !== undefined)     patch.riego_auto_desde     = dateOrNull(body.riego_auto_desde);
+  if (body.riego_auto_cada_dias !== undefined) patch.riego_auto_cada_dias = intOrNull(body.riego_auto_cada_dias);
+  if (body.riego_auto_min !== undefined)       patch.riego_auto_min       = intOrNull(body.riego_auto_min);
+  if (body.caudal !== undefined)               patch.caudal               = numOrNull(body.caudal);
+  if (!Object.keys(patch).length) return res.status(400).json({ error: "nada que actualizar" });
+
+  console.log("[pauta-goteo]", JSON.stringify({ usuario_id, patch }));
+
+  if (!isConfigured()) {
+    return res.status(200).json({ ok: true, persisted: false, reason: "supabase_not_configured" });
+  }
+
+  try {
+    const filas = await supabaseUpdate("usuarios", `id=eq.${usuario_id}`, patch);
+    if (!Array.isArray(filas) || filas.length === 0) {
+      return res.status(404).json({ ok: false, error: "usuario no encontrado" });
+    }
+    const u = filas[0];
+    return res.status(200).json({
+      ok: true, persisted: true,
+      pauta: {
+        riego_auto: u.riego_auto, riego_auto_desde: u.riego_auto_desde,
+        riego_auto_cada_dias: u.riego_auto_cada_dias, riego_auto_min: u.riego_auto_min,
+        caudal: u.caudal,
+      },
+    });
+  } catch (err) {
+    console.error("[pauta-goteo] error:", err.message);
+    return res.status(500).json({ ok: false, error: "no se pudo actualizar" });
   }
 }
 
