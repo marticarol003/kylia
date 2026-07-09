@@ -11,7 +11,12 @@
 --   • a7f3c9e1…  → cebolla El Tros de l'Uri (piloto real)
 --   • 23567ff1…  → campo del padre 440 m² aspersión (piloto real)
 --   • 9aaa1b25…  → 10 lechugas del padre (fuera del panel, se queda)
---   • c46e9d6d…  → prueba del usuario (lechuga Barcelona) — dijo DEJARLA
+--
+-- SE BORRA TAMBIÉN (decisión del 9-jul):
+--   • c46e9d6d…  → prueba del usuario (lechuga Barcelona): tenía riego_auto
+--     heredado de tests y el diario-b le sintetizaba riegos ficticios.
+--     Ya está fuera del panel (piloto_sombra=false, riego_auto=false vía API);
+--     aquí cae la fila entera con sus acciones en cascada.
 
 -- ── 1) COMPROBAR qué se va a borrar (ejecuta solo este SELECT) ──
 select id, email, nombre, ciudad, origen, piloto_sombra, fecha_alta::date,
@@ -20,18 +25,20 @@ select id, email, nombre, ciudad, origen, piloto_sombra, fecha_alta::date,
  where (   email ilike '%solformacion%' or nombre ilike '%solformacion%'
         or email ilike '%solfotmacion%' or nombre ilike '%solfotmacion%'
         or email = 'verif@kylia.local'
-        or origen = 'verif-fix')
+        or origen = 'verif-fix'
+        or id = 'c46e9d6d-577f-47ab-8a67-eebadcec7109')
    and coalesce(piloto_sombra, false) = false
-   and left(id::text, 8) not in ('b1f7c2d9','a7f3c9e1','23567ff1','9aaa1b25','c46e9d6d');
+   and left(id::text, 8) not in ('b1f7c2d9','a7f3c9e1','23567ff1','9aaa1b25');
 
 -- ── 2) BORRAR (cuando el SELECT muestre SOLO filas de prueba) ──
 delete from usuarios u
  where (   email ilike '%solformacion%' or nombre ilike '%solformacion%'
         or email ilike '%solfotmacion%' or nombre ilike '%solfotmacion%'
         or email = 'verif@kylia.local'
-        or origen = 'verif-fix')
+        or origen = 'verif-fix'
+        or id = 'c46e9d6d-577f-47ab-8a67-eebadcec7109')
    and coalesce(piloto_sombra, false) = false
-   and left(id::text, 8) not in ('b1f7c2d9','a7f3c9e1','23567ff1','9aaa1b25','c46e9d6d');
+   and left(id::text, 8) not in ('b1f7c2d9','a7f3c9e1','23567ff1','9aaa1b25');
 
 -- ── 2b) De paso: la etiqueta del campo del padre decía "500 m²"
 --        (el área real ya está en 440 desde el 12-jun) ──
@@ -44,4 +51,4 @@ select left(id::text, 8) as id, email, ciudad, cultivos, piloto_sombra, fecha_al
   from usuarios
  order by fecha_alta;
 -- Esperado: b1f7c2d9 (tomate), a7f3c9e1 (cebolla), 23567ff1 (padre 440),
---           9aaa1b25 (10 lechugas), c46e9d6d (prueba del usuario). Nada más.
+--           9aaa1b25 (10 lechugas). Nada más.
