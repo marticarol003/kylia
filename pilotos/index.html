@@ -40,6 +40,20 @@
   .btn-informe{ margin-top:12px; padding:7px 13px; border:1px solid var(--verde); background:#fff;
                 color:var(--verde); border-radius:8px; font-size:13px; cursor:pointer; }
   .btn-informe:disabled{ opacity:.5; cursor:wait; }
+  .admin{ margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .admin .btn{ padding:7px 13px; border:1px solid var(--linea); background:#fff; color:var(--tinta);
+               border-radius:8px; font-size:13px; cursor:pointer; }
+  .admin a.btn{ text-decoration:none; display:inline-block; }
+  .form-riego{ margin-top:8px; padding:10px; background:#f6f8f6; border:1px solid var(--linea);
+               border-radius:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:13px; }
+  .form-riego input{ padding:7px 9px; border:1px solid var(--linea); border-radius:8px; font-size:14px; }
+  .form-riego input[type=number]{ width:74px; }
+  .form-riego .eq{ color:var(--gris); min-width:80px; }
+  .form-riego button{ padding:7px 13px; border:0; background:var(--verde); color:#fff;
+                      border-radius:8px; font-size:13px; cursor:pointer; }
+  .form-riego button:disabled{ opacity:.5; cursor:wait; }
+  .form-riego .fr-msg{ font-size:12px; width:100%; }
+  .form-riego .fr-msg.err{ color:#b4532e; }
   .informe{ margin-top:12px; border-top:1px dashed var(--linea); padding-top:12px; font-size:13.5px; line-height:1.55; }
   .informe h1{ font-size:16px; margin:0 0 8px; } .informe h2{ font-size:14px; margin:14px 0 4px; color:var(--verde); }
   .informe ul{ margin:4px 0; padding-left:20px; }
@@ -110,8 +124,87 @@
     }
     const per = p.periodo ? `<p class="periodo">${esc(p.periodo.desde)} → ${esc(p.periodo.hasta)} · ${p.periodo.dias} días · cobertura ${p.periodo.cobertura_pct??"?"}%</p>` : "";
     const avisos = (p.avisos&&p.avisos.length) ? `<p class="avisos">⚠︎ ${p.avisos.map(esc).join("<br>⚠︎ ")}</p>` : "";
-    const informe = `<button class="btn-informe" onclick="generarInforme('${esc(p.id)}', this)">📄 Informe científico</button><div class="informe" id="inf-${esc(p.id)}" hidden></div>`;
-    return `<div class="card"><div class="head"><h2>${esc(p.nombre||p.ciudad||"Piloto")}</h2><span class="chips">${chips}</span></div>${per}${cuerpo}${avisos}${informe}</div>`;
+    const informe = `<button class="btn-informe" onclick="generarInforme('${esc(p.id)}', this)">📄 Informe científico</button>`;
+    const admin = adminHtml(p);
+    return `<div class="card"><div class="head"><h2>${esc(p.nombre||p.ciudad||"Piloto")}</h2><span class="chips">${chips}</span></div>${per}${cuerpo}${avisos}<div class="admin">${informe}${admin}</div><div class="informe" id="inf-${esc(p.id)}" hidden></div></div>`;
+  }
+
+  // ── Registro admin: riego retroactivo + pauta del goteo automático ──
+  // El piloto avisa por WhatsApp ("regué el domingo 2 h", "he subido el
+  // programador a 40 min") y se apunta desde aquí sin SQL ni curl.
+  function adminHtml(p){
+    const id = esc(p.id);
+    let h = `<button class="btn" onclick="toggleForm('riego-${id}')">＋ Riego</button>`;
+    if(p.pauta) h += `<button class="btn" onclick="toggleForm('pauta-${id}')">⚙️ Pauta ${p.pauta.min??"?"} min / ${p.pauta.cada_dias??"?"} días</button>`;
+    h += `<a class="btn" href="/piloto/diario?id=${id}" target="_blank">📓 Diario</a>`;
+    const litros = p.caudal
+      ? `<span class="eq" id="eq-${id}">= … L/m²</span>`
+      : `<label>L/m² <input type="number" id="lm2-${id}" step="0.1" min="0"></label>`;
+    h += `<div class="form-riego" id="riego-${id}" hidden>
+      <input type="date" id="fecha-${id}" value="${hoyLocal()}" max="${hoyLocal()}">
+      <label>min <input type="number" id="min-${id}" min="1" step="1" ${p.caudal?`oninput="calcEq('${id}',${p.caudal})"`:""}></label>
+      ${litros}
+      <button onclick="guardarRiego('${id}',${p.caudal??"null"},this)">Guardar</button>
+      <span class="fr-msg" id="msgr-${id}"></span>
+    </div>`;
+    if(p.pauta) h += `<div class="form-riego" id="pauta-${id}" hidden>
+      <label>min <input type="number" id="pmin-${id}" min="1" step="1" value="${p.pauta.min??""}"></label>
+      <label>cada <input type="number" id="pcada-${id}" min="1" step="1" value="${p.pauta.cada_dias??""}"> días</label>
+      <button onclick="guardarPauta('${id}',this)">Cambiar</button>
+      <span class="fr-msg" id="msgp-${id}"></span>
+    </div>`;
+    return h;
+  }
+
+  function hoyLocal(){
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+  function toggleForm(fid){ const el = document.getElementById(fid); if(el) el.hidden = !el.hidden; }
+  function calcEq(id, caudal){
+    const min = Number(document.getElementById(`min-${id}`).value);
+    const eq = document.getElementById(`eq-${id}`);
+    // Misma fórmula y redondeo que materializarGoteoAuto: min/60 × caudal(mm/h)
+    eq.textContent = min > 0 ? `= ${(Math.round((min/60)*caudal*10)/10).toLocaleString("es")} L/m²` : "= … L/m²";
+  }
+
+  async function guardarRiego(id, caudal, btn){
+    const msg = document.getElementById(`msgr-${id}`);
+    const fecha = document.getElementById(`fecha-${id}`).value;
+    const min = Number(document.getElementById(`min-${id}`).value) || null;
+    const lm2 = caudal
+      ? (min > 0 ? Math.round((min/60)*caudal*10)/10 : null)
+      : (Number(document.getElementById(`lm2-${id}`).value) || null);
+    if(!fecha || lm2 == null){ msg.textContent = "Falta la fecha o la cantidad."; msg.className = "fr-msg err"; return; }
+    btn.disabled = true; msg.textContent = ""; msg.className = "fr-msg";
+    try {
+      const r = await fetch("/api/log", { method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ recurso:"acciones", usuario_id:id, tipo:"riego", fecha_local:fecha,
+          cantidad_l_m2:lm2, duracion_min:min, notas:"apuntado desde el panel /pilotos" }) });
+      const d = await r.json();
+      if(!r.ok || !d.ok) throw new Error(d.error || "no se pudo guardar");
+      msg.textContent = `✓ Riego del ${fecha} guardado (${lm2.toLocaleString("es")} L/m²). Recargando…`;
+      setTimeout(()=>location.reload(), 900);
+    } catch(e){ msg.textContent = e.message; msg.className = "fr-msg err"; btn.disabled = false; }
+  }
+
+  async function guardarPauta(id, btn){
+    const msg = document.getElementById(`msgp-${id}`);
+    const min = Number(document.getElementById(`pmin-${id}`).value) || null;
+    const cada = Number(document.getElementById(`pcada-${id}`).value) || null;
+    if(!min && !cada){ msg.textContent = "Nada que cambiar."; msg.className = "fr-msg err"; return; }
+    btn.disabled = true; msg.textContent = ""; msg.className = "fr-msg";
+    const body = { recurso:"pauta-goteo", key, usuario_id:id };
+    if(min)  body.riego_auto_min = min;
+    if(cada) body.riego_auto_cada_dias = cada;
+    try {
+      const r = await fetch("/api/log", { method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(body) });
+      const d = await r.json();
+      if(!r.ok || !d.ok) throw new Error(d.error || "no se pudo cambiar");
+      msg.textContent = `✓ Pauta: ${d.pauta.riego_auto_min} min cada ${d.pauta.riego_auto_cada_dias} días (desde hoy; los riegos ya sintetizados no cambian). Recargando…`;
+      setTimeout(()=>location.reload(), 1400);
+    } catch(e){ msg.textContent = e.message; msg.className = "fr-msg err"; btn.disabled = false; }
   }
 
   // Markdown mínimo (títulos, negrita, listas, párrafos) sin dependencias.

@@ -295,6 +295,12 @@ async function vistaPilotos(req, res) {
         ciudad: u.ciudad || null, cultivo: (u.cultivos || [])[0] || null,
         metodo: u.metodo_riego || null, manejo: u.manejo || null,
         fecha_plantacion: u.fecha_plantacion || null, periodo: informe.periodo || null,
+        // Para el registro admin del panel: L/m² = min/60 × caudal, y la pauta
+        // del goteo automático (editable vía recurso pauta-goteo de /api/log).
+        caudal: u.caudal ?? null,
+        pauta: u.riego_auto
+          ? { min: u.riego_auto_min ?? null, cada_dias: u.riego_auto_cada_dias ?? null, desde: u.riego_auto_desde ?? null }
+          : null,
         agua: a.disponible
           ? { disponible: true, aplicada_l_m2: a.aplicada_l_m2, recomendada_l_m2: a.recomendada_l_m2,
               exceso_l_m2: a.exceso_l_m2, ahorro_pct: a.ahorro_pct ?? null,
