@@ -33,6 +33,12 @@ delete from usuarios u
    and coalesce(piloto_sombra, false) = false
    and left(id::text, 8) not in ('b1f7c2d9','a7f3c9e1','23567ff1','9aaa1b25','c46e9d6d');
 
+-- ── 2b) De paso: la etiqueta del campo del padre decía "500 m²"
+--        (el área real ya está en 440 desde el 12-jun) ──
+update usuarios
+   set nombre = replace(nombre, '500 m²', '440 m²')
+ where left(id::text, 8) = '23567ff1' and nombre like '%500 m²%';
+
 -- ── 3) Verificar lo que queda ──
 select left(id::text, 8) as id, email, ciudad, cultivos, piloto_sombra, fecha_alta::date
   from usuarios

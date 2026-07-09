@@ -185,9 +185,19 @@ async function vistaPerfil(res, u) {
 //      rendimiento esperado (?rend_t= toneladas). Sin rendimiento no se estima:
 //      el motor devuelve disponible:false con su motivo, y así se muestra.
 async function vistaCuaderno(req, res, u) {
-  const abonados = await supabaseSelect("acciones",
-    `usuario_id=eq.${u.id}&tipo=eq.aplicacion&motivo=eq.abonado` +
-    `&select=id,fecha_local,producto_nombre,dosis,coste_estimado_eur,notas&order=fecha_local.asc`);
+  // motivo=neq.abonado a secas dejaría fuera los motivo NULL (SQL de 3 valores):
+  // los tratamientos sin motivo también son tratamientos.
+  const [abonados, riegos, trats] = await Promise.all([
+    supabaseSelect("acciones",
+      `usuario_id=eq.${u.id}&tipo=eq.aplicacion&motivo=eq.abonado` +
+      `&select=id,fecha_local,producto_nombre,dosis,coste_estimado_eur,notas&order=fecha_local.asc`),
+    supabaseSelect("acciones",
+      `usuario_id=eq.${u.id}&tipo=eq.riego` +
+      `&select=fecha_local,cantidad_l_m2,duracion_min,franja_horaria&order=fecha_local.asc`),
+    supabaseSelect("acciones",
+      `usuario_id=eq.${u.id}&tipo=in.(aplicacion,tratamiento)&or=(motivo.neq.abonado,motivo.is.null)` +
+      `&select=id,fecha_local,producto_nombre,sustancia_activa,dosis,plazo_seguridad_dias,motivo,notas&order=fecha_local.asc`),
+  ]);
 
   const cultivo = (u.cultivos || [])[0] || null;
   const rendT   = Number(req.query?.rend_t) || null;
@@ -198,6 +208,22 @@ async function vistaCuaderno(req, res, u) {
 
   return res.status(200).json({
     ok: true, vista: "cuaderno", cultivo,
+    parcela: {
+      nombre: u.nombre || null, ciudad: u.ciudad || null, cultivo,
+      area_m2: u.area_m2 ?? null, metodo_riego: u.metodo_riego || null,
+      manejo: u.manejo || null, fecha_plantacion: u.fecha_plantacion || null,
+    },
+    riegos: (riegos || []).filter(r => r.fecha_local).map(r => ({
+      fecha: r.fecha_local, duracion_min: r.duracion_min ?? null,
+      l_m2: laminaMostrada(r.cantidad_l_m2, r.duracion_min ?? null, u.caudal),
+      franja: r.franja_horaria || null,
+    })),
+    tratamientos: (trats || []).filter(t => t.fecha_local).map(t => ({
+      id: t.id, fecha: t.fecha_local, producto: t.producto_nombre || null,
+      sustancia: t.sustancia_activa || null, dosis: t.dosis || null,
+      plazo_seguridad_dias: t.plazo_seguridad_dias ?? null,
+      motivo: t.motivo || null, notas: t.notas || null,
+    })),
     abonados: (abonados || []).map(a => ({
       id: a.id, fecha: a.fecha_local, producto: a.producto_nombre || null,
       dosis: a.dosis || null, coste_eur: a.coste_estimado_eur ?? null, notas: a.notas || null,

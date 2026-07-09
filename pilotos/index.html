@@ -137,6 +137,7 @@
     let h = `<button class="btn" onclick="toggleForm('riego-${id}')">＋ Riego</button>`;
     if(p.pauta) h += `<button class="btn" onclick="toggleForm('pauta-${id}')">⚙️ Pauta ${p.pauta.min??"?"} min / ${p.pauta.cada_dias??"?"} días</button>`;
     h += `<a class="btn" href="/piloto/diario?id=${id}" target="_blank">📓 Diario</a>`;
+    h += `<a class="btn" href="/piloto/cuaderno?id=${id}" target="_blank">📋 Cuaderno</a>`;
     const litros = p.caudal
       ? `<span class="eq" id="eq-${id}">= … L/m²</span>`
       : `<label>L/m² <input type="number" id="lm2-${id}" step="0.1" min="0"></label>`;

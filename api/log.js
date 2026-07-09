@@ -139,6 +139,24 @@ async function handleAcciones(req, res, body) {
   }
 
   try {
+    // Anti-doble-toque: un riego IDÉNTICO (mismo día, misma duración/cantidad)
+    // insertado hace <90 s es el mismo botón pulsado dos veces, no un segundo
+    // riego real (dos riegos reales el mismo día siguen entrando sin problema).
+    // Vimos un triple registro así el 23-jun en el campo del padre.
+    if (tipo === "riego" && fila.fecha_local) {
+      const haceUnMomento = new Date(Date.now() - 90_000).toISOString();
+      const dup = await supabaseSelect("acciones",
+        `usuario_id=eq.${usuario_id}&tipo=eq.riego&fecha_local=eq.${fila.fecha_local}` +
+        `&fecha=gte.${haceUnMomento}&select=id,duracion_min,cantidad_l_m2&limit=3`);
+      const igual = (dup || []).find(d =>
+        (d.duracion_min ?? null) === (fila.duracion_min ?? null) &&
+        (d.cantidad_l_m2 ?? null) === (fila.cantidad_l_m2 ?? null));
+      if (igual) {
+        console.warn("[acciones] doble toque ignorado:", JSON.stringify({ usuario_id, fecha: fila.fecha_local, id: igual.id }));
+        return res.status(200).json({ ok: true, persisted: true, duplicado: true, accion: igual });
+      }
+    }
+
     const filas = await supabaseInsert("acciones", fila);
     return res.status(200).json({ ok: true, persisted: true, accion: filas?.[0] || null });
   } catch (err) {
