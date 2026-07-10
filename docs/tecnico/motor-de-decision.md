@@ -227,16 +227,25 @@ RAW = p × TAW                           (agua fácilmente disponible, mm)
 
   > En el **campo de validación** se sustituye por θ_FC y θ_WP del análisis de
   > suelo real (más preciso que la tabla por textura).
-- `Zr` profundidad radicular efectiva ≈ 0.3 m (hortícola superficial), crece con la fase.
-- `p` fracción de agotamiento sin estrés ≈ 0.45 para hortícolas (FAO-56 Tabla 22),
-  ajustable por ETc (p_aj = p + 0.04·(5 − ETc)).
+- `Zr` profundidad radicular efectiva **por cultivo y día** (implementado 10-jul-2026):
+  crece linealmente de `zr_min = 0.20 m` (trasplante) a `zr_max` durante las fases
+  inicial+desarrollo (FAO-56 §8.3). `zr_max` = cota inferior del rango de la Tabla 22
+  (conservador para huerta pequeña): lechuga/espinaca/cebolla verde 0.30, col 0.50,
+  pimiento 0.50, calabacín 0.60, tomate/berenjena 0.70. Sin cultivo conocido →
+  fallback fijo 0.30 m (comportamiento legacy).
+- `p` fracción de agotamiento sin estrés **por cultivo** (FAO-56 Tabla 22):
+  espinaca 0.20, lechuga/cebolla/pimiento 0.30, tomate 0.40, col/berenjena 0.45,
+  calabacín 0.50. Sin cultivo → 0.45. (El ajuste por ETc, p_aj = p + 0.04·(5 − ETc),
+  queda como refinamiento futuro.)
 
 #### c) Balance hídrico diario (agotamiento de la zona radicular)
 ```
 Dr,i = Dr,i-1 − (P − RO)i − Ii + ETc,i        (acotado a [0, TAW])
 ```
-- `P` lluvia diaria; `RO` escorrentía; `(P − RO)` = **lluvia efectiva** (P>0:
-  método simple, descarta el exceso sobre TAW − Dr).
+- `P` lluvia diaria; `RO` escorrentía; `(P − RO)` = **lluvia efectiva**: las lluvias
+  de **< 2 mm/día se descartan** (se interceptan/evaporan de la superficie sin llegar
+  a la zona radicular; criterio conservador, FAO-56 cap. 8) y el exceso sobre
+  TAW − Dr se pierde por percolación (el clamp de Dr a [0, TAW] lo descarta).
 - `Ii` riego neto aplicado el día i = L/m² registrados × eficiencia del sistema
   (goteo ≈ 0.90, aspersión ≈ 0.75).
 - `Dr` es el déficit acumulado en mm.

@@ -283,6 +283,13 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
       ? { n: realesAntes.length, l_m2: r1(suma(realesAntes, r => r.l_m2)),
           nota: "Anteriores al inicio del piloto: no se comparan." }
       : null,
+    // Honestidad del corte: comparar acumulados a igual fecha favorece a quien
+    // riega menos a menudo. Si Kylia tenía agua "en cola" (déficit acumulado aún
+    // por debajo del umbral de riego), se explicita en vez de ocultarse.
+    pendiente_al_corte_l_m2: cf.deficitFinal != null ? r1(cf.deficitFinal) : null,
+    nota_pendiente: (cf.deficitFinal ?? 0) > 5
+      ? `Al corte, Kylia llevaba ~${r0(cf.deficitFinal)} L/m² de déficit acumulado aún sin regar (los aplicaría en su próximo riego); el exceso real puede ser hasta esa cantidad menor.`
+      : null,
     veredicto,
   };
 }

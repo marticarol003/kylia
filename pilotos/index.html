@@ -118,7 +118,8 @@
         + sparkline(a.serie)
         + `<div class="legend"><span><i class="dot" style="background:#013A27"></i>Kylia (FAO-56)</span>`
         + `<span><i class="dot" style="background:#9c6b3f"></i>Agricultor (real)</span></div>`
-        + (a.veredicto?`<p class="veredicto">${esc(a.veredicto)}</p>`:"");
+        + (a.veredicto?`<p class="veredicto">${esc(a.veredicto)}</p>`:"")
+        + (a.nota_pendiente?`<p class="avisos">ⓘ ${esc(a.nota_pendiente)}</p>`:"");
     } else {
       cuerpo = `<p class="nd">${esc(a.motivo || "Sin datos de agua todavía.")}</p>`;
     }

@@ -282,7 +282,7 @@ async function revealDeUsuario(u) {
           suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
           metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
         });
-        contrafactual = { puntos: sim.puntos, total: sim.total };
+        contrafactual = { puntos: sim.puntos, total: sim.total, deficitFinal: sim.deficitFinal };
       }
     } catch (_) { /* sin clima → método heredado (recomendaciones_log) */ }
   }
@@ -330,7 +330,8 @@ async function vistaPilotos(req, res) {
         agua: a.disponible
           ? { disponible: true, aplicada_l_m2: a.aplicada_l_m2, recomendada_l_m2: a.recomendada_l_m2,
               exceso_l_m2: a.exceso_l_m2, ahorro_pct: a.ahorro_pct ?? null,
-              dias_regado_real: a.dias_regado_real, veredicto: a.veredicto, serie: a.serie || [] }
+              dias_regado_real: a.dias_regado_real, veredicto: a.veredicto, serie: a.serie || [],
+              nota_pendiente: a.nota_pendiente || null }
           : { disponible: false, motivo: a.motivo || null },
         avisos: informe.avisos || [],
       };
