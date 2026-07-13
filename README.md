@@ -3,7 +3,7 @@
 Monitorización agronómica por satélite para parcelas SIGPAC.
 Vigor del cultivo (NDVI), humedad (NDMI) y recomendación de riego — sin sensores, sin formación, sin €/ha lineal.
 
-**Stack**: HTML + JS vanilla en frontend · Vercel serverless functions en backend · Sentinel-2 (Copernicus DataSpace) + SIGPAC + DWD ICON / Open-Meteo como fuentes de datos. Postgres (Supabase) cuando entre la auth.
+**Stack**: HTML + JS vanilla en frontend · Vercel serverless functions en backend · Sentinel-2 (Copernicus Data Space) + SIGPAC + Open-Meteo + SoilGrids como fuentes de datos · Postgres (Supabase) como base de datos.
 
 ---
 
@@ -29,13 +29,19 @@ kylia-1/
 │   └── index.html          Producto (URL: /app)
 │
 │ ── Backend ──
-├── api/                    Serverless Functions (Vercel/Node)
-│   ├── waitlist.js         POST captura de leads pre-launch
+├── api/                    Serverless Functions (Vercel/Node) — routers por el límite Hobby (12)
+│   ├── log.js              POST router del piloto (acciones, jornadas, mediciones, …)
+│   ├── campo.js            GET router de lecturas (hoy, reveal, comparativa, cuaderno, pilotos)
+│   ├── diario-b.js         Cron: congela la decisión de riego del piloto silencioso
+│   ├── sentinel.js         OAuth Copernicus + Statistics API (NDVI/NDMI/NDRE)
 │   ├── sigpac.js           Lookup SIGPAC por lat/lon
-│   ├── sentinel.js         OAuth Copernicus + Statistics API
-│   └── parcela.js          Orquestador (sigpac + sentinel + interpretación)
+│   ├── ia.js               POST router de IA de texto (Gemini)
+│   ├── informe-cientifico.js  Informe del piloto (cascada Claude→Gemini→plantilla)
+│   ├── _motor-*.js         Motores puros: riego (FAO-56), nutrición, cuaderno €
+│   ├── _suelo-oferta.js    Oferta de N del suelo por coordenada (SoilGrids)
+│   └── _reveal.js          Contrafactual del reveal
 ├── db/
-│   └── schema.sql          Esquema Postgres (Supabase) con RLS
+│   └── schema.sql          Esquema Postgres (Supabase) consolidado — fuente de verdad
 │
 │ ── Estáticos ──
 ├── assets/
@@ -98,23 +104,25 @@ npx serve .                          # http://localhost:3000
 npx vercel dev                       # http://localhost:3000 con /api/*
 ```
 
-Variables de entorno (`.env.local`):
+Variables de entorno: ver **`.env.example`** (lista exacta, solo lo que el código
+lee). Las principales:
 
 ```
-# Copernicus DataSpace (gratis tras registro en dataspace.copernicus.eu)
-SH_CLIENT_ID=
-SH_CLIENT_SECRET=
-
-# Supabase (cuando entre la auth)
+# Supabase · Postgres (fuente de datos)
 SUPABASE_URL=
-SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_SERVICE_KEY=
 
-# Stripe (cuando entren los planes Pro)
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
+# Copernicus Data Space · Sentinel-2
+CDSE_CLIENT_ID=
+CDSE_CLIENT_SECRET=
 
-# Resend (email transaccional)
+# IA de texto + informe
+GEMINI_API_KEY=
+ANTHROPIC_API_KEY=      # opcional
+
+# Cron diario-b + panel /pilotos + email
+DIARIO_B_LIVE=          # "1" habilita la escritura del cron
+PILOTOS_KEY=
 RESEND_API_KEY=
 ```
 

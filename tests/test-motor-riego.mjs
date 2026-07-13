@@ -1,11 +1,11 @@
 // Tests del motor de riego FAO-56 (api/_motor-riego.js).
-// Correr con: node test-motor-riego.mjs
+// Correr con: node tests/test-motor-riego.mjs
 // Cubre los refinamientos de precisión del 10-jul: Zr/p por cultivo (Tabla 22),
 // raíz creciente (§8.3) y lluvia efectiva (<2 mm no infiltra), más los
 // invariantes de siempre (fallbacks legacy, reproducibilidad del balance).
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const M = require("./api/_motor-riego.js");
+const M = require("../api/_motor-riego.js");
 
 let fallos = 0;
 function ok(cond, msg) {

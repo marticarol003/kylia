@@ -3,7 +3,8 @@
 > Última actualización: **2026-07-12**. Los cinco motores viven en `api/_motor-*.js`
 > y `api/_suelo-oferta.js` / `api/_reveal.js`. Son **núcleos puros**: sin red ni
 > estado (salvo la única llamada HTTP de `_suelo-oferta`), para poder testearse
-> determinista y correr idénticos en cliente y servidor. Tests en `test-*.mjs`.
+> determinista y correr idénticos en cliente y servidor. Tests en `tests/*.mjs`
+> (`npm test` para los deterministas).
 
 Índice: [Riego FAO-56](#1-riego--fao-56) · [Nutrición](#2-nutrición--balance-de-masa) ·
 [Cuaderno €](#3-cuaderno-de-fertilización--) · [Suelo satelital](#4-oferta-del-suelo--soilgrids) ·

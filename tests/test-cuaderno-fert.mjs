@@ -1,9 +1,9 @@
 // Test del motor de cuaderno de fertilización (€ + plan de abonado).
-//   node test-cuaderno-fert.mjs
+//   node tests/test-cuaderno-fert.mjs
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const { necesidadNutrientes } = require("./api/_motor-nutricion.js");
-const { cuadernoFertilizacion, PRECIO_REF_EUR_KG } = require("./api/_motor-cuaderno-fert.js");
+const { necesidadNutrientes } = require("../api/_motor-nutricion.js");
+const { cuadernoFertilizacion, PRECIO_REF_EUR_KG } = require("../api/_motor-cuaderno-fert.js");
 
 let fallos = 0;
 function ok(cond, msg) {

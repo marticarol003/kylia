@@ -1,0 +1,23 @@
+# Kylia · qué NO se despliega a Vercel.
+# El sitio es estático y sirve TODO el repo en público; sin esto, cosas como
+# kylia.app/db/schema.sql o kylia.app/docs/tecnico/dossier.md serían descargables.
+# Solo debe publicarse la web (index, app/, api/, assets/, data/, legal/, etc.).
+
+# Documentación interna y de negocio
+docs/
+README.md
+LICENSE
+
+# Base de datos (migraciones y SQL de pilotos)
+db/
+
+# Herramientas de desarrollo (mockups, PDFs, validación)
+scripts/
+
+# Tests
+tests/
+test-*.mjs
+
+# Config y documentos que no son web
+.env.example
+*.docx

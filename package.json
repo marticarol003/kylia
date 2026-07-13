@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "test": "node tests/test-motor-riego.mjs && node tests/test-nutricion.mjs && node tests/test-cuaderno-fert.mjs",
+    "test:suelo": "node tests/test-suelo-oferta.mjs"
+  },
   "devDependencies": {
     "puppeteer": "^24.43.0"
   }

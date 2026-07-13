@@ -19,15 +19,14 @@ Este directorio agrupa toda la documentación interna del proyecto, organizada p
 - **`04-piloto-silencioso-y-reveal.md`** — el circuito de extremo a extremo: alta → registro → congelado nocturno → reveal, y cómo verificarlo en vivo.
 - **`dossier.md`** — documento de una sentada: qué es, en base a qué se toma cada recomendación (FAO-56, balance de masa, SoilGrids, NDRE), la frontera honesta, el método de prueba (reveal) y la defensibilidad. Destila la serie `0x-` sin el detalle de implementación.
 
-**Profundizaciones y documentos previos** (algunos parcialmente desfasados; manda la serie `0x-`):
-- **`arquitectura.md`** — diagrama Mermaid del sistema, decisiones de stack (Vercel + Supabase + Copernicus), costes mensuales estimados, plan de disaster recovery. *(Nota: describe Supabase como "próximamente"; hoy es central.)*
-- **`estado-y-roadmap.md`** — estado funcional actual y siguientes pasos técnicos.
+**Profundizaciones** (deep-dives que la serie `0x-` enlaza; siguen vigentes):
 - **`fase-2-integracion-mapa.md`** — diseño de la integración con el dump oficial MAPA (Fase 2, pendiente de implementación).
 - **`motor-de-decision.md`** — referencia del motor agronómico: datos, cálculos FAO-56 del riego, estado de validación honesto por modelo.
 - **`shadow-log-recomendaciones.md`** — cómo una recomendación pasa a ser texto en Supabase (registro silencioso) + el cron Diario B.
 - **`generador-reveal.md`** — el informe final del piloto: cruza lo que Kylia decidió vs lo que el agricultor hizo (4 dimensiones de /piloto), € solo en agua.
 - **`runbook-piloto-silencioso.md`** — pasos operativos para activar los pilotos silenciosos y montar el campo del padre, dejándolo todo registrado.
 - **`dossier-tecnico.pdf`** — versión imprimible para enseñar a un CTO o a un partner técnico.
+- **`historico/`** — snapshots superados por la serie `0x-` (`arquitectura.md`, `estado-y-roadmap.md`), conservados por su detalle de costes/DR/roadmap.
 
 ### `negocio/` — Estrategia y captación de capital
 - **`dossier-mercado.md`** — documento de una sentada: mapa de mercado (cliente arquetípico, geografía), tamaño (anclajes oficiales INE/MAPA + embudo TAM/SAM/SOM etiquetado), diferenciación (las 3 capas + mapa competitivo) y tracción real (pilotos, primer resultado, estado honesto). Pareja de `tecnico/dossier.md`.

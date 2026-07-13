@@ -1,10 +1,10 @@
 // Test del motor de nutrición (pilar fertilizantes).
-//   node test-nutricion.mjs
+//   node tests/test-nutricion.mjs
 // Verifica que los coeficientes de extracción caen dentro de los rangos de
 // guías españolas (agroes.es, peldaño 2) y que el balance de masa cuadra.
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const { EXTRACCION, necesidadNutrientes } = require("./api/_motor-nutricion.js");
+const { EXTRACCION, necesidadNutrientes } = require("../api/_motor-nutricion.js");
 
 let fallos = 0;
 function ok(cond, msg) {

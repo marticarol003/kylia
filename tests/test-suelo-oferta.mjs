@@ -1,10 +1,10 @@
 // Demo/prueba real: oferta de suelo desde SoilGrids en los pilotos + efecto en
 // la recomendación de nutrición. Hace llamadas de red reales (SoilGrids).
-//   node test-suelo-oferta.mjs
+//   node tests/test-suelo-oferta.mjs
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const { ofertaSuelo } = require("./api/_suelo-oferta.js");
-const { necesidadNutrientes } = require("./api/_motor-nutricion.js");
+const { ofertaSuelo } = require("../api/_suelo-oferta.js");
+const { necesidadNutrientes } = require("../api/_motor-nutricion.js");
 
 // Pilotos reales (coordenadas de memoria) + rendimiento esperado orientativo.
 const PILOTOS = [
