@@ -89,7 +89,7 @@ function necesidadNutrientes(cultivoId, rendimientoT, ofertaSuelo) {
     oferta_conocida: ofertaConocida,
     nutrientes: porNutriente,
     nota: ofertaConocida
-      ? "Necesidad neta = extracción del cultivo − aporte del suelo (analítica)."
+      ? "Necesidad neta = extracción del cultivo − aporte estimado del suelo."
       : "Sin analítica de suelo: se muestra la extracción bruta del cultivo. " +
         "El aporte del suelo (oferta) necesita un análisis; no se estima por satélite.",
     validacion: "Coeficientes = centro de rangos de extracción de guías españolas (agroes.es); afinables por zona.",

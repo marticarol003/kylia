@@ -12,11 +12,12 @@
 // El cálculo vive en los módulos puros _motor-riego.js y _reveal.js (testeados);
 // aquí solo se leen las filas y se ensambla.
 
-const { isConfigured, supabaseSelect, preludio } = require("./_supabase.js");
+const { isConfigured, supabaseSelect, supabaseUpdate, preludio } = require("./_supabase.js");
 const { balanceHidrico, decisionRiego, presentarRiego, simularKylia, faseDelDia } = require("./_motor-riego.js");
 const { construirReveal } = require("./_reveal.js");
 const { necesidadNutrientes } = require("./_motor-nutricion.js");
 const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
+const { ofertaSuelo } = require("./_suelo-oferta.js");
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
 const ES_UUID = /^[0-9a-f-]{36}$/i;
@@ -177,6 +178,32 @@ async function vistaPerfil(res, u) {
   });
 }
 
+// Oferta de nutrientes del suelo (SoilGrids), con caché persist-once en la fila
+// del usuario: el suelo no cambia, así que se calcula UNA vez y se guarda en
+// usuarios.suelo_oferta. Solo se llama a SoilGrids (red, varios segundos) si la
+// caché está vacía y hay coordenadas. Nunca revienta la vista: ante cualquier
+// fallo devuelve null y el cuaderno cae a extracción bruta.
+async function obtenerOfertaSuelo(u) {
+  if (u.suelo_oferta && typeof u.suelo_oferta === "object") return u.suelo_oferta;
+  if (!(Number.isFinite(u.lat) && Number.isFinite(u.lon))) return null;
+
+  let oferta;
+  try {
+    oferta = await ofertaSuelo(u.lat, u.lon, u.area_m2);
+  } catch (e) {
+    console.warn("[campo] ofertaSuelo falló:", e.message);
+    return null;
+  }
+  // Cacheamos también el "no disponible" para no reintentar en cada carga.
+  const cache = { ...oferta, calculado: hoyISO() };
+  try {
+    await supabaseUpdate("usuarios", `id=eq.${u.id}`, { suelo_oferta: cache });
+  } catch (e) {
+    console.warn("[campo] no se pudo cachear suelo_oferta:", e.message);
+  }
+  return cache;
+}
+
 // ── Vista "cuaderno": cuaderno de fertilización (pilar fertilizantes) ──
 // Dos mitades honestas:
 //   1. Lo REGISTRADO: abonados apuntados en el diario (tipo=aplicacion,
@@ -201,13 +228,29 @@ async function vistaCuaderno(req, res, u) {
 
   const cultivo = (u.cultivos || [])[0] || null;
   const rendT   = Number(req.query?.rend_t) || null;
-  const plan    = cuadernoFertilizacion(
-    necesidadNutrientes(cultivo, rendT, null),
+
+  // Oferta del suelo (SoilGrids): descuenta lo que ya aporta el suelo del plan.
+  const oferta = await obtenerOfertaSuelo(u);
+  const ofertaMotor = oferta && oferta.disponible
+    ? { N: oferta.N, P2O5: oferta.P2O5, K2O: oferta.K2O }
+    : null;
+
+  const plan = cuadernoFertilizacion(
+    necesidadNutrientes(cultivo, rendT, ofertaMotor),
     { superficie_m2: u.area_m2 ?? null },
   );
 
   return res.status(200).json({
     ok: true, vista: "cuaderno", cultivo,
+    suelo: oferta && oferta.disponible
+      ? {
+          fuente: oferta.fuente,
+          fuente_punto: oferta.fuente_punto,
+          n_disponible_kg: oferta.N,
+          observado: oferta.observado,
+          nota: oferta.nota,
+        }
+      : { disponible: false, nota: (oferta && oferta.motivo) || "Sin prior de suelo; plan sobre extracción bruta." },
     parcela: {
       nombre: u.nombre || null, ciudad: u.ciudad || null, cultivo,
       area_m2: u.area_m2 ?? null, metodo_riego: u.metodo_riego || null,

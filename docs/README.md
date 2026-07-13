@@ -10,7 +10,17 @@ Este directorio agrupa toda la documentación interna del proyecto, organizada p
 - **`anexo-2026-diferenciacion-y-escalado.md`** — anexo operativo: cliente arquetípico (Marc), reencuadre del eje competitivo (3 capas), agente IA como motor del producto, escenarios futuros y opcionalidad estratégica, path realista a enterprise.
 
 ### `tecnico/` — Cómo está construido Kylia
-- **`arquitectura.md`** — diagrama Mermaid del sistema, decisiones de stack (Vercel + Supabase + Copernicus), costes mensuales estimados, plan de disaster recovery.
+
+**Referencia técnica completa y actual (2026-07, escrita desde el código real) — empieza aquí:**
+- **`00-panorama-tecnico.md`** — documento maestro: qué es Kylia, stack, topología, fuentes de datos, variables de entorno, la frontera honesta por subsistema, despliegue. Índice de los demás.
+- **`01-modelo-de-datos.md`** — las 7 tablas Postgres reales (base + ALTERs), el trigger append-only, convenciones de `acciones`, y qué hace cada fichero SQL.
+- **`02-motores-agronomicos.md`** — los cinco motores puros: riego FAO-56, nutrición (balance de masa), cuaderno €/PAC, oferta de suelo por satélite (SoilGrids), y el reveal, con fórmulas.
+- **`03-referencia-api.md`** — cada endpoint serverless: routers (`log`, `campo`, `ia`), crons (`diario-b`, `recordatorio-wizard`), satélite (`sentinel`), SIGPAC, informe.
+- **`04-piloto-silencioso-y-reveal.md`** — el circuito de extremo a extremo: alta → registro → congelado nocturno → reveal, y cómo verificarlo en vivo.
+- **`dossier.md`** — documento de una sentada: qué es, en base a qué se toma cada recomendación (FAO-56, balance de masa, SoilGrids, NDRE), la frontera honesta, el método de prueba (reveal) y la defensibilidad. Destila la serie `0x-` sin el detalle de implementación.
+
+**Profundizaciones y documentos previos** (algunos parcialmente desfasados; manda la serie `0x-`):
+- **`arquitectura.md`** — diagrama Mermaid del sistema, decisiones de stack (Vercel + Supabase + Copernicus), costes mensuales estimados, plan de disaster recovery. *(Nota: describe Supabase como "próximamente"; hoy es central.)*
 - **`estado-y-roadmap.md`** — estado funcional actual y siguientes pasos técnicos.
 - **`fase-2-integracion-mapa.md`** — diseño de la integración con el dump oficial MAPA (Fase 2, pendiente de implementación).
 - **`motor-de-decision.md`** — referencia del motor agronómico: datos, cálculos FAO-56 del riego, estado de validación honesto por modelo.
@@ -20,6 +30,7 @@ Este directorio agrupa toda la documentación interna del proyecto, organizada p
 - **`dossier-tecnico.pdf`** — versión imprimible para enseñar a un CTO o a un partner técnico.
 
 ### `negocio/` — Estrategia y captación de capital
+- **`dossier-mercado.md`** — documento de una sentada: mapa de mercado (cliente arquetípico, geografía), tamaño (anclajes oficiales INE/MAPA + embudo TAM/SAM/SOM etiquetado), diferenciación (las 3 capas + mapa competitivo) y tracción real (pilotos, primer resultado, estado honesto). Pareja de `tecnico/dossier.md`.
 - **`go-to-market.md`** — plan de lanzamiento, segmentos prioritarios, canales y métricas de éxito.
 - **`Presentacion_Kylia.pdf`** — presentación corta de Kylia.
 - **`dossier-inversores.pdf`** — pitch deck en PDF para enviar a fondos / business angels.
