@@ -80,16 +80,17 @@ franco, N total 2,09 g/kg, densidad 1,43):
 | N total del suelo | 8.966 kg/ha | — |
 | N mineralizable | **108 kg/ha por ciclo** | ~91 kg/ha·año → **~46 kg/ha por ciclo de verano** |
 
-**Veredicto: el modelo sobreestima el N del suelo ×2,4.** Consecuencia: sobre-acredita
-el aporte del suelo y por tanto **recomienda menos nitrógeno del que MAPA aplicaría**.
-La causa es el coeficiente `k=1,2 %/ciclo` sobre el N total (demasiado alto): la tasa
-oficial implícita en la Tabla 4.2 equivale a ~1 %/año, y una fracción de ciclo de verano.
+**Hallazgo (antes de recalibrar): el modelo sobreestimaba el N del suelo ×2,4**, sobre-
+acreditando el suelo y recomendando menos nitrógeno del que MAPA aplicaría. Causa: el
+coeficiente `k=1,2 %/ciclo` sobre el N total era demasiado alto.
 
-### Recalibración recomendada
-Alinear `_suelo-oferta.js` a la Tabla 4.2 en vez del `k` mecanicista: usar
-`MO% (= C org. × 1,724) + textura + clima → kg N/ha·año` por interpolación de la tabla,
-× fracción de ciclo. Así la salida **reproduce el método oficial de MAPA** (la
-validación más fuerte posible). Alternativa mínima: bajar `k` de 1,2 % a ~0,5 %/ciclo.
+### ✅ Recalibración APLICADA (2026-07-16)
+`_suelo-oferta.js` ya no usa el `k` mecanicista: implementa la **Tabla 4.2 de MAPA**,
+que es exactamente lineal → `N_anual (kg/ha) = FACTOR[textura] × MO%`, con
+`FACTOR = {arcilloso 15, franco 22, arenoso 30}` y `MO% = C org.% × 1,724`, por la
+fracción de ciclo de verano (~½ del anual). La textura se clasifica desde clay/sand de
+SoilGrids. Resultado sobre La Selva: **~47–56 kg N/ha·ciclo** (antes 108) → alineado con
+la tabla oficial. La salida ahora **reproduce el método oficial de MAPA**.
 
 ---
 
@@ -119,7 +120,7 @@ motor es un estimador central razonable — pero no es la dosis rigurosa de MAPA
 | Coeficientes de extracción | ✅ Validados contra MAPA (9/9 en rango) |
 | Estructura del balance | ✅ Es el método oficial de MAPA |
 | Enfoque de N del suelo (SoilGrids) | ✅ Avalado por MAPA (Tabla 4.2) |
-| Coeficiente de mineralización | ⚠️ Sobreestima ×2,4 → recalibrar a Tabla 4.2 |
+| Coeficiente de mineralización | ✅ Recalibrado a la Tabla 4.2 (2026-07-16) |
 | Eficiencia / pérdidas / colchón N | ❌ No modelado (gap conocido) |
 | Oferta de suelo P/K | ❌ No derivable de satélite (declarado) |
 

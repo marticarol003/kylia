@@ -26,7 +26,7 @@ for (const p of PILOTOS) {
     console.log(`  Suelo (SoilGrids, punto ${oferta.fuente_punto}): ` +
       `N total ${o.n_total_g_kg} g/kg · MO(C) ${o.carbono_org_g_kg} g/kg · pH ${o.ph} · ` +
       `arcilla ${o.arcilla_pct}% · dens ${o.densidad_t_m3} t/m³`);
-    console.log(`  Modelo N: ${oferta.modelo_n.n_mineralizable_kg_ha} kg/ha mineralizable ` +
+    console.log(`  Modelo N (MAPA Tabla 4.2): ${oferta.modelo_n.n_mineralizable_ciclo_kg_ha} kg/ha·ciclo ` +
       `→ ${kg(oferta.N)} disponibles en la parcela`);
   }
 
