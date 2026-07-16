@@ -26,6 +26,7 @@ Este directorio agrupa toda la documentación interna del proyecto, organizada p
 - **`generador-reveal.md`** — el informe final del piloto: cruza lo que Kylia decidió vs lo que el agricultor hizo (4 dimensiones de /piloto), € solo en agua.
 - **`runbook-piloto-silencioso.md`** — pasos operativos para activar los pilotos silenciosos y montar el campo del padre, dejándolo todo registrado.
 - **`dossier-tecnico.pdf`** — versión imprimible para enseñar a un CTO o a un partner técnico.
+- **`validacion-nutricion.md`** — validación del motor de fertilizantes contra la Guía de fertilización de MAPA: coeficientes de extracción (9/9 en rango), estructura del balance (= método oficial), y el modelo de N del suelo (sobreestima ×2,4 → recalibrar a la Tabla 4.2).
 - **`historico/`** — snapshots superados por la serie `0x-` (`arquitectura.md`, `estado-y-roadmap.md`), conservados por su detalle de costes/DR/roadmap.
 
 ### `negocio/` — Estrategia y captación de capital
