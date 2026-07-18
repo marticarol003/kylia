@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────
-// /api/aviso-lechugas — avisos por email del bancal de 33 lechugas
+// /api/aviso-lechugas — avisos (WhatsApp/email) del bancal de 33 lechugas
 // ─────────────────────────────────────────────────────────────────
 // El bancal de 33 lechugas es el primer campo donde las decisiones de Kylia
 // SE EJECUTAN (Kylia decide, el padre riega a las 8-9). Dos avisos diarios:
@@ -17,20 +17,38 @@
 // fuente que ve el padre en la pantalla), así el email y la app nunca discrepan.
 //
 // Config (Vercel):
-//   LECHUGAS_EMAILS  destinatarios separados por coma (Martí + padre).
-//   AVISO_TOKEN      opcional; si está, el GET exige ?token= (mismo patrón
-//                    que RECORDATORIO_TOKEN en recordatorio-wizard).
+//   LECHUGAS_WHATSAPP  canal principal: "34600111222:APIKEY,34600333444:APIKEY"
+//                      (teléfono:apikey de CallMeBot, separados por coma).
+//                      Cada teléfono se activa UNA vez: enviar por WhatsApp el
+//                      mensaje de autorización al número que indica
+//                      callmebot.com/blog/free-api-whatsapp-messages/ y te
+//                      responde con tu apikey. Gratis, para uso personal.
+//   LECHUGAS_EMAILS    canal secundario opcional (coma-separado). Si no hay
+//                      NINGÚN canal configurado, cae al email de Martí.
+//   AVISO_TOKEN        opcional; si está, el GET exige ?token= (mismo patrón
+//                      que RECORDATORIO_TOKEN en recordatorio-wizard).
 // Para test manual: GET /api/aviso-lechugas?fase=manana&dry=1
 
 const { isConfigured, supabaseSelect } = require("./_supabase.js");
 
 const USUARIO_ID = "d5475c3d-365b-47ff-b31e-fa659a8362fb"; // 33 lechugas · aspersión
 const CAMPO_URL  = "https://kylia.app/campo";
-const DESTINATARIOS_DEFECTO = ["marticarol003@gmail.com"];
+const EMAIL_DEFECTO = "marticarol003@gmail.com";
 
-function destinatarios() {
-  const env = (process.env.LECHUGAS_EMAILS || "").split(",").map(s => s.trim()).filter(Boolean);
-  return env.length ? env : DESTINATARIOS_DEFECTO;
+const lista = v => (v || "").split(",").map(s => s.trim()).filter(Boolean);
+
+// [{ phone, apikey }] desde LECHUGAS_WHATSAPP ("teléfono:apikey,...")
+function destinatariosWhatsapp() {
+  return lista(process.env.LECHUGAS_WHATSAPP).map(par => {
+    const [phone, apikey] = par.split(":").map(s => s.trim());
+    return phone && apikey ? { phone, apikey } : null;
+  }).filter(Boolean);
+}
+
+function destinatariosEmail(hayWhatsapp) {
+  const env = lista(process.env.LECHUGAS_EMAILS);
+  if (env.length) return env;
+  return hayWhatsapp ? [] : [EMAIL_DEFECTO];  // sin ningún canal → email de Martí
 }
 
 function hoyISO() { return new Date().toISOString().slice(0, 10); }
@@ -73,6 +91,8 @@ function emailManana(data) {
   if (h.regar && h.presentacion) {
     return {
       subject: `💧 Kylia · hoy riega ${h.presentacion.texto}`,
+      texto: `💧 Kylia — HOY TOCA REGAR las lechugas: ${h.presentacion.texto} de aspersor (${h.presentacion.mm} mm). ` +
+             `El suelo lleva ${h.deficit_mm} mm de déficit (umbral ${h.umbral_mm}). Cuando riegues, apúntalo: ${CAMPO_URL}`,
       html: htmlBase("💧 Hoy toca regar", `
         <p style="font-size:1.6rem;font-weight:800;color:#013A27;margin:0 0 10px;">${h.presentacion.texto} de aspersor</p>
         <p style="margin:0 0 6px;">El suelo lleva un déficit de <b>${h.deficit_mm} mm</b> y el umbral para regar es <b>${h.umbral_mm} mm</b>. Con ${h.presentacion.texto} (${h.presentacion.mm} mm) queda repuesto.</p>
@@ -80,17 +100,19 @@ function emailManana(data) {
         ${boton("Regado ✓ — registrar con 1 toque")}`),
     };
   }
-  const proximo = data.proximo
-    ? `Próximo riego previsto: <b>${fmtFecha(data.proximo.fecha)}</b> (aprox. ${data.proximo.presentacion?.texto || "—"}).`
+  const proximoTxt = data.proximo
+    ? `Próximo riego previsto: ${fmtFecha(data.proximo.fecha)} (aprox. ${data.proximo.presentacion?.texto || "—"}).`
     : "Sin riego previsto en los próximos 7 días.";
+  const vigilaTxt = h.nivel === "media" ? " Ojo: el déficit se acerca al umbral, probablemente mañana toque." : "";
   const vigila = h.nivel === "media"
     ? `<p style="margin:0 0 6px;color:#b45309;"><b>Ojo:</b> el déficit (${h.deficit_mm} mm) se acerca al umbral (${h.umbral_mm} mm) — probablemente mañana toque.</p>` : "";
   return {
     subject: `✅ Kylia · hoy no toca regar`,
+    texto: `✅ Kylia — hoy NO toca regar las lechugas. Déficit ${h.deficit_mm} de ${h.umbral_mm} mm.${vigilaTxt} ${proximoTxt}`,
     html: htmlBase("✅ Hoy no toca regar", `
       <p style="font-size:1.3rem;font-weight:800;color:#013A27;margin:0 0 10px;">El suelo aún tiene reserva</p>
       ${vigila}
-      <p style="margin:0 0 6px;">Déficit <b>${h.deficit_mm} mm</b> de un umbral de <b>${h.umbral_mm} mm</b>. ${proximo}</p>
+      <p style="margin:0 0 6px;">Déficit <b>${h.deficit_mm} mm</b> de un umbral de <b>${h.umbral_mm} mm</b>. ${proximoTxt}</p>
       <p style="color:#5a685a;font-size:0.9rem;margin:0;">Hoy: lluvia ${h.lluvia} mm · evaporación ${h.et0} mm.</p>`),
   };
 }
@@ -104,10 +126,13 @@ function emailMediodia(data, riego) {
 
   if (h.regar && riego) return {
     subject: "✅ Kylia · riego hecho y registrado",
+    texto: `✅ Kylia — riego de las lechugas hecho y registrado (${detalle}). Todo en orden.`,
     html: htmlBase("✅ Riego hecho", `<p style="margin:0;">Tocaba regar y consta el riego de hoy (<b>${detalle}</b>). Todo en orden.</p>`),
   };
   if (h.regar && !riego) return {
     subject: "⚠️ Kylia · aún no consta el riego de hoy",
+    texto: `⚠️ Kylia — esta mañana tocaba regar las lechugas ${h.presentacion?.texto || ""} y no consta ningún riego. ` +
+           `Si se regó, apúntalo (1 toque): ${CAMPO_URL} — y si no, aún se está a tiempo esta tarde.`,
     html: htmlBase("⚠️ Falta el riego de hoy", `
       <p style="margin:0 0 6px;">Esta mañana tocaba regar <b>${h.presentacion?.texto || "—"}</b> y a mediodía no consta ningún riego registrado.</p>
       <p style="margin:0;">Si se regó, regístralo (1 toque). Si no, aún se está a tiempo esta tarde.</p>
@@ -115,12 +140,23 @@ function emailMediodia(data, riego) {
   };
   if (!h.regar && riego) return {
     subject: "ℹ️ Kylia · consta un riego que no tocaba",
+    texto: `ℹ️ Kylia — hoy no tocaba regar las lechugas pero consta un riego (${detalle}). Si fue un error de registro, se puede borrar con la ✕ en ${CAMPO_URL}`,
     html: htmlBase("ℹ️ Riego fuera de pauta", `<p style="margin:0;">Hoy no tocaba regar pero consta un riego (<b>${detalle}</b>). Si fue un error de registro, se puede borrar con la ✕ en la lista.</p>`),
   };
   return {
     subject: "✅ Kylia · hoy no tocaba y no se regó",
+    texto: `✅ Kylia — hoy no tocaba regar las lechugas y no consta riego. Suelo con reserva (déficit ${h.deficit_mm} de ${h.umbral_mm} mm).`,
     html: htmlBase("✅ Todo en orden", `<p style="margin:0;">Hoy no tocaba regar y no consta ningún riego. El suelo sigue con reserva (déficit ${h.deficit_mm} de ${h.umbral_mm} mm).</p>`),
   };
+}
+
+// WhatsApp vía CallMeBot (gratis, uso personal): GET simple con el texto plano.
+// Cada teléfono autorizó al bot una vez y tiene su apikey (ver cabecera).
+async function enviarWhatsApp({ phone, apikey, texto }) {
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}` +
+              `&apikey=${encodeURIComponent(apikey)}&text=${encodeURIComponent(texto)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`callmebot ${res.status}`);
 }
 
 async function enviarEmail({ to, subject, html }) {
@@ -156,9 +192,16 @@ module.exports = async (req, res) => {
       ? emailManana(data)
       : emailMediodia(data, await riegoDeHoy());
 
-    const to = destinatarios();
-    const resultados = [];
-    for (const dest of to) {
+    const porWhatsapp = destinatariosWhatsapp();
+    const porEmail    = destinatariosEmail(porWhatsapp.length > 0);
+    const resultados  = [];
+
+    for (const w of porWhatsapp) {
+      if (dry) { resultados.push({ whatsapp: w.phone, dry: true }); continue; }
+      try { await enviarWhatsApp({ ...w, texto: email.texto }); resultados.push({ whatsapp: w.phone, enviado: true }); }
+      catch (err) { resultados.push({ whatsapp: w.phone, error: err.message }); }
+    }
+    for (const dest of porEmail) {
       if (dry) { resultados.push({ to: dest, dry: true }); continue; }
       if (!process.env.RESEND_API_KEY) { resultados.push({ to: dest, error: "RESEND_API_KEY no configurada" }); continue; }
       try { await enviarEmail({ to: dest, ...email }); resultados.push({ to: dest, enviado: true }); }
