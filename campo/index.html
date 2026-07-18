@@ -167,8 +167,9 @@
     <div class="brand"><span class="dot"></span> Kylia</div>
 
     <nav class="nav">
-      <button data-screen="lechugas" class="on">🪣 Mis lechugas</button>
-      <button data-screen="padre">💦 Campo del padre</button>
+      <button data-screen="nuevas" class="on">🥬 33 lechugas</button>
+      <button data-screen="lechugas">🪣 Las 10</button>
+      <button data-screen="padre">💦 Padre</button>
       <button data-screen="comparativa">📊 Comparativa</button>
     </nav>
 
@@ -188,6 +189,13 @@
         <div class="quick-cap" id="r-quick-cap">Toca cuánto se regó hoy:</div>
         <div class="quick" id="r-quick"></div>
         <div class="quick-toggle"><button type="button" id="r-more">otra cantidad ▾</button></div>
+        <!-- Contrafactual: qué habría hecho el padre hoy (solo bancal 33 lechugas).
+             Va a `observaciones` (tipo otro, notas=contrafactual-padre), NUNCA a
+             acciones: no debe contaminar el balance hídrico del riego real. -->
+        <div id="padre-habria" style="display:none">
+          <div class="quick-cap" style="margin-top:18px">Y tu padre, ¿qué habría hecho hoy? <span style="font-weight:400;color:var(--slate-500)">(para el informe)</span></div>
+          <div class="quick" id="ph-quick"></div>
+        </div>
         <div id="r-manual" style="display:none">
           <div class="row2">
             <div class="field">
@@ -253,14 +261,17 @@
   <div id="toast"></div>
 
 <script>
-  // Dos campos reales del padre, comparados siempre POR m² (escalas distintas):
-  //   lechugas → 10 lechugas a regadera (lo que llevamos con Kylia)
+  // Tres campos reales del padre, comparados siempre POR m² (escalas distintas):
+  //   nuevas   → 33 lechugas a aspersión (2 aspersores con llave propia, 15 mm/h):
+  //              AQUÍ las decisiones de Kylia SE EJECUTAN (Kylia decide, padre riega)
+  //   lechugas → 10 lechugas a regadera (el experimento original con cubos)
   //   padre    → 440 m² a aspersión (la parcela tradicional, rama de contraste)
   const CAMPOS = {
+    nuevas:   { id:"d5475c3d-365b-47ff-b31e-fa659a8362fb", titulo:"33 lechugas · aspersión", unidad:"horas" },
     lechugas: { id:"9aaa1b25-6fad-4213-9eda-e135af71b2c3", titulo:"Tus 10 lechugas", unidad:"cubos" },
     padre:    { id:"23567ff1-7368-4dc9-b777-fdeaab9f8714", titulo:"Campo del padre · 440 m²", unidad:"horas" },
   };
-  let SCREEN = "lechugas";
+  let SCREEN = "nuevas";
   let USUARIO = {};            // datos del campo cargado (del fetch de "hoy")
   const campoActual = () => CAMPOS[SCREEN === "comparativa" ? "lechugas" : SCREEN];
 
@@ -346,28 +357,36 @@
     document.getElementById("r-cant").placeholder = esAspersion ? "ej. 1.5" : "ej. 1.5";
     const hint = document.getElementById("r-hint");
     if (esAspersion && u.caudal) {
-      hint.textContent = `≈ ${u.caudal} mm/h (estimado) · 1 h ≈ ${u.caudal} L/m².`;
+      hint.textContent = `≈ ${u.caudal} mm/h (truco del vaso) · 1 h ≈ ${u.caudal} L/m².`;
     } else if (u.capacidad_regadera && u.area_m2) {
       hint.textContent = `Cada cubo = ${u.capacidad_regadera} L sobre ${u.area_m2} m².`;
     } else { hint.textContent = ""; }
-    pintarChipsRiego(u);
+    pintarChipsRiego(u, h);
+    pintarContrafactual();
   }
 
   // Registro de 1 toque: chips con la cantidad típica. Tocar = registra ya
   // (infiere el momento del día por la hora) → quitar la fricción de apuntar
   // el riego del padre, que es el cuello de botella del experimento.
-  function pintarChipsRiego(u) {
+  function pintarChipsRiego(u, hoy) {
     const wrap = document.getElementById("r-quick");
     const esAspersion = u.metodo_riego === "aspersion";
     let chips;
     if (esAspersion) {
       const c = u.caudal || 10;
-      chips = [0.5, 1, 1.5, 2].map(h => ({
+      // Si hoy toca regar, el primer chip es EXACTAMENTE lo que dijo Kylia:
+      // 1 toque = registrar el riego recomendado (el camino feliz del bancal
+      // donde las decisiones se ejecutan).
+      const rec = hoy && hoy.regar && hoy.presentacion && hoy.presentacion.unidad === "min"
+        ? [{ cant: Math.round((hoy.presentacion.valor / 60) * 100) / 100,
+             label: `${hoy.presentacion.valor} min`, sub: "lo que dijo Kylia", reco: true }]
+        : [];
+      chips = rec.concat([0.5, 1, 1.5, 2].map(h => ({
         cant: h,
         label: h === 0.5 ? "30 min" : h === 1.5 ? "1½ h" : `${h} h`,
         sub: `≈ ${Math.round(h * c * 10) / 10} L/m²`,
-        reco: h === 1.5,
-      }));
+        reco: false,
+      })));
       document.getElementById("r-quick-cap").textContent = "¿Cuánto regó el aspersor hoy? Toca y listo:";
     } else {
       const f = (u.capacidad_regadera && u.area_m2) ? u.capacidad_regadera / u.area_m2 : null;
@@ -387,6 +406,33 @@
       try { await logRiego(parseFloat(b.dataset.cant), true); toast("✓ Riego registrado"); cargarHoy(); }
       catch (e) { toast(e.message || "No se pudo guardar", true);
                   wrap.querySelectorAll("button").forEach(x => x.disabled = false); }
+    }));
+  }
+
+  // Contrafactual diario del bancal de 33 lechugas: "¿qué habría hecho tu padre
+  // hoy?" en 1 toque. Se guarda como observación (tipo otro, notas fijas) para
+  // no tocar `acciones` (el balance hídrico solo debe ver los riegos reales).
+  // Es el dato de oro del informe: Kylia-real vs padre-hipotético en el MISMO bancal.
+  function pintarContrafactual() {
+    const box = document.getElementById("padre-habria");
+    if (SCREEN !== "nuevas") { box.style.display = "none"; return; }
+    box.style.display = "";
+    const wrap = document.getElementById("ph-quick");
+    const chips = [
+      { txt: "No habría regado", label: "Nada" },
+      ...[1, 2, 3].map(h => ({ txt: `Habría regado ${h} h`, label: `${h} h` })),
+    ];
+    wrap.innerHTML = chips.map((ch, i) =>
+      `<button type="button" data-ph="${i}">${ch.label}</button>`).join("");
+    wrap.querySelectorAll("button").forEach(b => b.addEventListener("click", async () => {
+      wrap.querySelectorAll("button").forEach(x => x.disabled = true);
+      try {
+        await enviar("observaciones", { tipo: "otro",
+          descripcion: `Contrafactual: ${chips[Number(b.dataset.ph)].txt} hoy.`,
+          notas: "contrafactual-padre" });
+        toast("✓ Apuntado para el informe");
+      } catch (e) { toast(e.message || "No se pudo guardar", true); }
+      finally { wrap.querySelectorAll("button").forEach(x => x.disabled = false); }
     }));
   }
 
@@ -634,7 +680,7 @@
     const fila = { tipo: "riego", franja_horaria: quick ? franjaAhora() : (val("r-franja") || null) };
     if (USUARIO.metodo_riego === "aspersion") {
       fila.duracion_min = Math.round(cant * 60);
-      fila.notas = `${cant} h de aspersión`;
+      fila.notas = `${durTxt(fila.duracion_min)} de aspersión`;
       if (USUARIO.caudal) fila.cantidad_l_m2 = Math.round((cant * USUARIO.caudal) * 10) / 10;  // horas × mm/h
     } else {
       fila.notas = `${cant} cubo${cant === 1 ? "" : "s"}`;
@@ -684,7 +730,7 @@
     finally { btn.disabled = false; }
   }));
 
-  irA("lechugas");
+  irA("nuevas");
 </script>
 </body>
 </html>
