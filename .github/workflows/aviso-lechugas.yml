@@ -1,0 +1,42 @@
+# Avisos del bancal de 33 lechugas (el campo donde Kylia decide de verdad).
+# Los 2 crons de Vercel Hobby están ocupados (recordatorio-wizard + diario-b),
+# así que estos dos disparos diarios van por GitHub Actions:
+#
+#   07:10 Madrid (verano) → fase=manana   · la decisión antes del riego de 8-9
+#   13:10 Madrid (verano) → fase=mediodia · ¿consta el riego que tocaba?
+#
+# Los cron de GitHub van en UTC fijo: en invierno se desplazan a 06:10/12:10
+# hora local, que sigue valiendo. GitHub puede retrasar el disparo unos minutos.
+#
+# Secret opcional AVISO_TOKEN (Settings → Secrets → Actions): si se define aquí
+# y en Vercel, el endpoint exige el token; sin definirlo, funciona abierto
+# (mismo criterio que el resto de crons actuales).
+
+name: aviso-lechugas
+
+on:
+  schedule:
+    - cron: "10 5 * * *"   # mañana
+    - cron: "10 11 * * *"  # mediodía
+  workflow_dispatch:
+    inputs:
+      fase:
+        description: "manana o mediodia"
+        required: true
+        default: "manana"
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar al endpoint de avisos
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FASE="${{ inputs.fase }}"
+          elif [ "${{ github.event.schedule }}" = "10 5 * * *" ]; then
+            FASE="manana"
+          else
+            FASE="mediodia"
+          fi
+          echo "fase=$FASE"
+          curl -fsS "https://kylia.app/api/aviso-lechugas?fase=$FASE&token=${{ secrets.AVISO_TOKEN }}"
