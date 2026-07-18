@@ -5,5 +5,8 @@
   },
   "devDependencies": {
     "puppeteer": "^24.43.0"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
   }
 }

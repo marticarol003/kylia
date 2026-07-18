@@ -6,6 +6,8 @@
 <meta name="robots" content="noindex" />
 <title>Campo del padre · Kylia</title>
 <meta name="theme-color" content="#013A27" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" href="/assets/img/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <style>
@@ -252,6 +254,19 @@
 
     <!-- Pantalla: comparativa Kylia vs padre -->
     <div id="comparativa" style="display:none"><div class="msg skel">Cargando comparativa…</div></div>
+
+    <!-- Avisos push en este móvil (oculto si el navegador no soporta push) -->
+    <div class="card" id="push-card" style="display:none">
+      <div class="label">Avisos en este móvil</div>
+      <p id="push-estado" style="font-size:0.92rem;color:var(--slate-700);margin:0 0 12px;">
+        Recibe cada mañana la decisión de riego y a mediodía la confirmación, como notificación en el móvil.
+      </p>
+      <button class="btn" id="push-btn">🔔 Activar avisos</button>
+      <p class="hint" id="push-ios" style="display:none">
+        En iPhone: toca <b>Compartir → Añadir a pantalla de inicio</b>, abre Kylia
+        desde ese icono nuevo y pulsa aquí Activar.
+      </p>
+    </div>
 
     <p class="foot">
       Cálculo FAO-56 con el clima de Sant Boi en vivo (Open-Meteo).<br>
@@ -730,7 +745,69 @@
     finally { btn.disabled = false; }
   }));
 
+  // ── Avisos push en este móvil ─────────────────────────────────
+  // Suscribe el navegador a los avisos del bancal de 33 lechugas (decisión de
+  // la mañana + confirmación de mediodía, enviados por /api/aviso-lechugas).
+  // En iPhone el push solo funciona si la web está añadida a pantalla de inicio.
+  const VAPID_PUBLIC = "BHlBoGNcqJnhEiEyFXmP_NCbElOMynWyLpzpjqlFj3s-oZ3236Zdujr1ToybTRM4M3Mp0nJzJ4zfdVtTUNPBVr0";
+  const b64aU8 = (b64) => {
+    const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  };
+
+  async function initPush() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return; // sin soporte → tarjeta oculta
+    const card   = document.getElementById("push-card");
+    const estado = document.getElementById("push-estado");
+    const btn    = document.getElementById("push-btn");
+    card.style.display = "";
+
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    const ya  = await reg.pushManager.getSubscription();
+    if (ya) {
+      estado.textContent = "✓ Avisos activados en este móvil: decisión por la mañana y confirmación a mediodía.";
+      btn.style.display = "none";
+      return;
+    }
+
+    const esIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const instalada = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+    if (esIOS && !instalada) {
+      document.getElementById("push-ios").style.display = "";
+      btn.disabled = true;
+      return;
+    }
+
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        const permiso = await Notification.requestPermission();
+        if (permiso !== "granted") throw new Error("Permiso de notificaciones denegado");
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true, applicationServerKey: b64aU8(VAPID_PUBLIC),
+        });
+        const j = sub.toJSON();
+        await enviarPushSub({ endpoint: sub.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
+        estado.textContent = "✓ Avisos activados en este móvil: decisión por la mañana y confirmación a mediodía.";
+        btn.style.display = "none";
+        toast("✓ Avisos activados");
+      } catch (e) { toast(e.message || "No se pudo activar", true); btn.disabled = false; }
+    });
+  }
+
+  async function enviarPushSub({ endpoint, p256dh, auth }) {
+    const res = await fetch("/api/log", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recurso: "push-sub", usuario_id: CAMPOS.nuevas.id,
+        endpoint, p256dh, auth, etiqueta: navigator.userAgent.slice(0, 110) }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || j.ok === false) throw new Error(j.error || "no se pudo guardar la suscripción");
+  }
+
   irA("nuevas");
+  initPush().catch((e) => console.warn("push no disponible:", e.message));
 </script>
 </body>
 </html>

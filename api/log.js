@@ -24,6 +24,7 @@ const HANDLERS = {
   "recomendaciones-log": handleRecomendacionesLog,
   "eventos":             handleEventos,
   "pauta-goteo":         handlePautaGoteo,
+  "push-sub":            handlePushSub,
 };
 
 const METODOS_RIEGO = new Set(["goteo", "aspersion", "surco", "manguera", "regadera"]);
@@ -278,6 +279,39 @@ async function handleObservaciones(req, res, body) {
     return res.status(200).json({ ok: true, persisted: true, observacion: filas?.[0] || null });
   } catch (err) {
     console.error("[observaciones] error:", err.message);
+    return res.status(500).json({ ok: false, error: "no se pudo guardar" });
+  }
+}
+
+// ─── push-sub (suscripción de push web del navegador) ──────────────
+// La envía /campo al pulsar "Activar avisos". Upsert por endpoint (si el
+// navegador renueva la suscripción, la fila vieja se sustituye). Las muertas
+// las poda /api/aviso-lechugas al recibir 404/410 del servicio push.
+async function handlePushSub(req, res, body) {
+  const usuario_id = (body.usuario_id || "").toString().trim();
+  if (!/^[0-9a-f-]{36}$/i.test(usuario_id)) {
+    return res.status(400).json({ error: "usuario_id inválido" });
+  }
+  const endpoint = (body.endpoint || "").toString();
+  const p256dh   = clean(body.p256dh, 300);
+  const auth     = clean(body.auth,   120);
+  if (!/^https:\/\/.{10,600}$/.test(endpoint) || !p256dh || !auth) {
+    return res.status(400).json({ error: "suscripción incompleta" });
+  }
+
+  const fila = { usuario_id, endpoint, p256dh, auth, etiqueta: clean(body.etiqueta, 120) };
+  console.log("[push-sub]", JSON.stringify({ usuario_id, etiqueta: fila.etiqueta }));
+
+  if (!isConfigured()) {
+    return res.status(200).json({ ok: true, persisted: false, reason: "supabase_not_configured" });
+  }
+
+  try {
+    await supabaseDelete("push_subs", `endpoint=eq.${encodeURIComponent(endpoint)}`);
+    await supabaseInsert("push_subs", fila);
+    return res.status(200).json({ ok: true, persisted: true });
+  } catch (err) {
+    console.error("[push-sub] error:", err.message);
     return res.status(500).json({ ok: false, error: "no se pudo guardar" });
   }
 }

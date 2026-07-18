@@ -17,7 +17,11 @@
 // fuente que ve el padre en la pantalla), así el email y la app nunca discrepan.
 //
 // Config (Vercel):
-//   LECHUGAS_WHATSAPP  canal principal: "34600111222:APIKEY,34600333444:APIKEY"
+//   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT
+//                      canal PRINCIPAL: push web a los móviles suscritos desde
+//                      /campo (tabla push_subs; ver db/push-subs.sql). Las
+//                      suscripciones muertas (404/410) se podan al enviar.
+//   LECHUGAS_WHATSAPP  canal secundario: "34600111222:APIKEY,34600333444:APIKEY"
 //                      (teléfono:apikey de CallMeBot, separados por coma).
 //                      Cada teléfono se activa UNA vez: enviar por WhatsApp el
 //                      mensaje de autorización al número que indica
@@ -29,7 +33,8 @@
 //                      que RECORDATORIO_TOKEN en recordatorio-wizard).
 // Para test manual: GET /api/aviso-lechugas?fase=manana&dry=1
 
-const { isConfigured, supabaseSelect } = require("./_supabase.js");
+const { isConfigured, supabaseSelect, supabaseDelete } = require("./_supabase.js");
+const webpush = require("web-push");
 
 const USUARIO_ID = "d5475c3d-365b-47ff-b31e-fa659a8362fb"; // 33 lechugas · aspersión
 const CAMPO_URL  = "https://kylia.app/campo";
@@ -150,6 +155,37 @@ function emailMediodia(data, riego) {
   };
 }
 
+// ── Push web (canal principal) ───────────────────────────────────
+function pushConfigurado() {
+  return !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+}
+
+async function destinatariosPush() {
+  if (!pushConfigurado() || !isConfigured()) return [];
+  const filas = await supabaseSelect("push_subs",
+    `usuario_id=eq.${USUARIO_ID}&select=endpoint,p256dh,auth`);
+  return filas || [];
+}
+
+async function enviarPush(sub, { subject, texto, fase }) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || "mailto:marticarol003@gmail.com",
+    process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+  try {
+    await webpush.sendNotification(
+      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+      JSON.stringify({ titulo: subject, cuerpo: texto, url: "/campo", tag: `kylia-${fase}` }),
+      { TTL: 6 * 3600 });
+  } catch (err) {
+    // Suscripción caducada o revocada → podarla para no reintentar cada día.
+    if (err.statusCode === 404 || err.statusCode === 410) {
+      await supabaseDelete("push_subs", `endpoint=eq.${encodeURIComponent(sub.endpoint)}`);
+      throw new Error("suscripción caducada (podada)");
+    }
+    throw err;
+  }
+}
+
 // WhatsApp vía CallMeBot (gratis, uso personal): GET simple con el texto plano.
 // Cada teléfono autorizó al bot una vez y tiene su apikey (ver cabecera).
 async function enviarWhatsApp({ phone, apikey, texto }) {
@@ -192,10 +228,17 @@ module.exports = async (req, res) => {
       ? emailManana(data)
       : emailMediodia(data, await riegoDeHoy());
 
+    const porPush     = await destinatariosPush();
     const porWhatsapp = destinatariosWhatsapp();
-    const porEmail    = destinatariosEmail(porWhatsapp.length > 0);
+    const porEmail    = destinatariosEmail(porPush.length > 0 || porWhatsapp.length > 0);
     const resultados  = [];
 
+    for (const s of porPush) {
+      const corto = s.endpoint.slice(-12);
+      if (dry) { resultados.push({ push: corto, dry: true }); continue; }
+      try { await enviarPush(s, { ...email, fase }); resultados.push({ push: corto, enviado: true }); }
+      catch (err) { resultados.push({ push: corto, error: err.message }); }
+    }
     for (const w of porWhatsapp) {
       if (dry) { resultados.push({ whatsapp: w.phone, dry: true }); continue; }
       try { await enviarWhatsApp({ ...w, texto: email.texto }); resultados.push({ whatsapp: w.phone, enviado: true }); }
