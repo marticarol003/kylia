@@ -39,4 +39,7 @@ jobs:
             FASE="mediodia"
           fi
           echo "fase=$FASE"
-          curl -fsS "https://kylia.app/api/aviso-lechugas?fase=$FASE&token=${{ secrets.AVISO_TOKEN }}"
+          # --retry cubre transitorios (timeouts, 5xx): 3 intentos espaciados.
+          # Si aun así falla (el endpoint devuelve 500 cuando ningún canal
+          # entrega), el job falla y GitHub avisa por email del workflow roto.
+          curl -fsS --retry 3 --retry-delay 30 "https://kylia.app/api/aviso-lechugas?fase=$FASE&token=${{ secrets.AVISO_TOKEN }}"

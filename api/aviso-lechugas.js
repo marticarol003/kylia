@@ -252,6 +252,14 @@ module.exports = async (req, res) => {
     }
 
     console.log("[aviso-lechugas]", JSON.stringify({ fase, dry, subject: email.subject, resultados }));
+
+    // Si NINGÚN canal entregó, responder 500: así el curl -fsS del workflow
+    // falla y GitHub avisa por email del fallo (si no, el aviso se pierde en
+    // silencio y nadie se entera de que el padre no recibió la decisión).
+    const entregados = resultados.filter(r => r.enviado).length;
+    if (!dry && resultados.length > 0 && entregados === 0) {
+      return res.status(500).json({ ok: false, fase, subject: email.subject, error: "ningún canal entregó el aviso", resultados });
+    }
     return res.status(200).json({ ok: true, fase, dry, subject: email.subject, resultados });
   } catch (err) {
     console.error("[aviso-lechugas] error:", err.message);

@@ -203,5 +203,12 @@ module.exports = async (req, res) => {
 
   console.log(`[diario-b] hoy=${hoy} dry=${dry} pilotos=${pilotos.length} ` +
               `congelados=${resultados.filter(x => x.persisted).length}`);
+
+  // Si TODOS los pilotos fallaron, responder 500 para que el fallo sea visible
+  // en el cron (logs de Vercel) en vez de un 200 que parece un día normal.
+  const fallidos = resultados.filter(x => x.error).length;
+  if (pilotos.length > 0 && fallidos === pilotos.length) {
+    return res.status(500).json({ ok: false, dry, fecha: hoy, n: pilotos.length, error: "todos los pilotos fallaron", resultados });
+  }
   return res.status(200).json({ ok: true, dry, fecha: hoy, n: pilotos.length, resultados });
 };
