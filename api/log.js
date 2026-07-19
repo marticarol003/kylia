@@ -308,6 +308,12 @@ async function handlePushSub(req, res, body) {
 
   try {
     await supabaseDelete("push_subs", `endpoint=eq.${encodeURIComponent(endpoint)}`);
+    // Tope por usuario: un hogar son 2-3 móviles; sin tope, cualquiera podría
+    // inflar la tabla y el aviso diario acabaría enviando a endpoints basura.
+    const actuales = await supabaseSelect("push_subs", `usuario_id=eq.${usuario_id}&select=id`);
+    if (Array.isArray(actuales) && actuales.length >= 10) {
+      return res.status(429).json({ ok: false, error: "demasiadas suscripciones para este usuario" });
+    }
     await supabaseInsert("push_subs", fila);
     return res.status(200).json({ ok: true, persisted: true });
   } catch (err) {
