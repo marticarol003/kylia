@@ -11,7 +11,8 @@
 //
 // Los 2 crons de Vercel (plan Hobby) están ocupados (recordatorio-wizard y
 // diario-b), así que esto lo dispara GitHub Actions:
-// .github/workflows/aviso-lechugas.yml (07:10 y 13:10 hora de Madrid en verano).
+// .github/workflows/aviso-lechugas.yml (06:45 y 13:10 hora de Madrid en verano;
+// la mañana se lanza con margen para llegar al buzón ~7:30).
 //
 // La decisión NO se calcula aquí: se pide a /api/campo?vista=hoy (la misma
 // fuente que ve el padre en la pantalla), así el email y la app nunca discrepan.

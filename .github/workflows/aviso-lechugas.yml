@@ -2,11 +2,14 @@
 # Los 2 crons de Vercel Hobby están ocupados (recordatorio-wizard + diario-b),
 # así que estos dos disparos diarios van por GitHub Actions:
 #
-#   07:10 Madrid (verano) → fase=manana   · la decisión antes del riego de 8-9
+#   06:45 Madrid (verano) → fase=manana   · la decisión, en el buzón para ~7:30
 #   13:10 Madrid (verano) → fase=mediodia · ¿consta el riego que tocaba?
 #
-# Los cron de GitHub van en UTC fijo: en invierno se desplazan a 06:10/12:10
-# hora local, que sigue valiendo. GitHub puede retrasar el disparo unos minutos.
+# El de la mañana se programa 06:45 (no 07:30) A PROPÓSITO: el scheduler de
+# GitHub (gratis) retrasa el disparo un rato variable, así que se lanza con
+# margen para que el correo esté en el buzón sobre las 7:30, antes del riego.
+# Los cron de GitHub van en UTC fijo: en invierno se desplazan a 05:45/12:10
+# hora local, que sigue valiendo.
 #
 # Secret opcional AVISO_TOKEN (Settings → Secrets → Actions): si se define aquí
 # y en Vercel, el endpoint exige el token; sin definirlo, funciona abierto
@@ -16,7 +19,7 @@ name: aviso-lechugas
 
 on:
   schedule:
-    - cron: "10 5 * * *"   # mañana
+    - cron: "45 4 * * *"   # mañana (06:45 Madrid verano; margen para llegar ~7:30)
     - cron: "10 11 * * *"  # mediodía
   workflow_dispatch:
     inputs:
@@ -33,7 +36,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             FASE="${{ inputs.fase }}"
-          elif [ "${{ github.event.schedule }}" = "10 5 * * *" ]; then
+          elif [ "${{ github.event.schedule }}" = "45 4 * * *" ]; then
             FASE="manana"
           else
             FASE="mediodia"
