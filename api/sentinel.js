@@ -1,3 +1,5 @@
+const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js");
+
 const TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
 
@@ -75,17 +77,8 @@ function pickLatestValid(statsJson) {
   return items[0] || null;
 }
 
-module.exports = async (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  if (req.method === "OPTIONS") return res.status(204).end();
-
-  const lat = parseFloat(req.query.lat);
-  const lon = parseFloat(req.query.lon);
-  if (isNaN(lat) || isNaN(lon)) {
-    return res.status(400).json({ error: "lat/lon requeridos" });
-  }
-
-  // ─── OAuth2 Copernicus ────────────────────────────────────────────
+// OAuth2 Copernicus: un token, reutilizable para varias parcelas en un lote.
+async function obtenerToken() {
   const tokenRes = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -95,75 +88,130 @@ module.exports = async (req, res) => {
       client_secret: process.env.CDSE_CLIENT_SECRET,
     }),
   });
-  if (!tokenRes.ok) return res.status(502).json({ error: "Auth failed" });
-  const { access_token } = await tokenRes.json();
+  if (!tokenRes.ok) return null;
+  const j = await tokenRes.json();
+  return j.access_token || null;
+}
 
-  // Rango: últimos 30 días. Se queda con la observación válida más reciente.
+// Mide UNA parcela: Statistical API sobre su geometría (o bbox del punto) en los
+// últimos 30 días, se queda con la observación válida más reciente. Devuelve el
+// objeto de medición o null (sin paso limpio). Lanza si la API responde error.
+async function medirParcela(token, lat, lon, geometry) {
   const hoy    = new Date().toISOString().slice(0, 10);
   const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
-  const bounds = buildBounds(req.query.geometry, lat, lon);
+  const bounds = buildBounds(geometry, lat, lon);
 
   const statsReq = {
-    input: {
-      bounds,
-      data: [{
-        type: "sentinel-2-l2a",
-        dataFilter: { maxCloudCoverage: 60 },
-      }],
-    },
+    input: { bounds, data: [{ type: "sentinel-2-l2a", dataFilter: { maxCloudCoverage: 60 } }] },
     aggregation: {
       timeRange:           { from: `${hace30}T00:00:00Z`, to: `${hoy}T23:59:59Z` },
       aggregationInterval: { of: "P1D" },
       evalscript:          EVALSCRIPT,
-      resx: 10,
-      resy: 10,
+      resx: 10, resy: 10,
     },
   };
 
   const statsRes = await fetch(STATS_URL, {
     method: "POST",
     headers: {
-      Authorization:  `Bearer ${access_token}`,
+      Authorization:  `Bearer ${token}`,
       "Content-Type": "application/json",
       "Accept":       "application/json",
     },
     body: JSON.stringify(statsReq),
   });
+  if (!statsRes.ok) throw new Error(`Statistics API ${statsRes.status}: ${await statsRes.text()}`);
 
-  if (!statsRes.ok) {
-    const err = await statsRes.text();
-    return res.status(502).json({ error: "Statistics API failed", detail: err });
-  }
+  const latest = pickLatestValid(await statsRes.json());
+  if (!latest) return null;
 
-  const statsJson = await statsRes.json();
-  const latest    = pickLatestValid(statsJson);
-
-  if (!latest) {
-    return res.status(200).json({ ndvi: null, motivo: "sin_datos" });
-  }
-
-  const ndvi   = +latest.statsNdvi.mean.toFixed(3);
-  const stdev  = typeof latest.statsNdvi.stDev === "number" ? +latest.statsNdvi.stDev.toFixed(3) : null;
-  const ndmi      = latest.statsNdmi && typeof latest.statsNdmi.mean === "number"
-    ? +latest.statsNdmi.mean.toFixed(3) : null;
-  const ndmiStdev = latest.statsNdmi && typeof latest.statsNdmi.stDev === "number"
-    ? +latest.statsNdmi.stDev.toFixed(3) : null;
-  const ndre      = latest.statsNdre && typeof latest.statsNdre.mean === "number"
-    ? +latest.statsNdre.mean.toFixed(3) : null;
-  const ndreStdev = latest.statsNdre && typeof latest.statsNdre.stDev === "number"
-    ? +latest.statsNdre.stDev.toFixed(3) : null;
-  const fecha  = latest.from.slice(0, 10);
-  const estado = ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres";
-
-  return res.status(200).json({
+  const num = (x) => (typeof x === "number" && !Number.isNaN(x) ? x : null);
+  const ndvi = +latest.statsNdvi.mean.toFixed(3);
+  return {
     ndvi,
-    stdev,
-    ndmi,
-    ndmiStdev,
-    ndre,
-    ndreStdev,
-    fecha,
-    estado,
-    pixeles: latest.validPixels,
-  });
+    stdev:     num(latest.statsNdvi.stDev) != null ? +latest.statsNdvi.stDev.toFixed(3) : null,
+    ndmi:      latest.statsNdmi && num(latest.statsNdmi.mean)  != null ? +latest.statsNdmi.mean.toFixed(3)  : null,
+    ndmiStdev: latest.statsNdmi && num(latest.statsNdmi.stDev) != null ? +latest.statsNdmi.stDev.toFixed(3) : null,
+    ndre:      latest.statsNdre && num(latest.statsNdre.mean)  != null ? +latest.statsNdre.mean.toFixed(3)  : null,
+    ndreStdev: latest.statsNdre && num(latest.statsNdre.stDev) != null ? +latest.statsNdre.stDev.toFixed(3) : null,
+    fecha:     latest.from.slice(0, 10),
+    estado:    ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres",
+    pixeles:   latest.validPixels,
+  };
+}
+
+// ─── Refresco por lote (el puente que faltaba) ────────────────────────
+// Sentinel calculaba pero NADIE lo persistía → `mediciones` sin NDVI → el factor
+// de vigor del rendimiento (y la señal NDRE de nutrición) quedaban inertes. Este
+// modo recorre los pilotos con coordenadas y escribe su NDVI/NDMI en `mediciones`.
+// Lo dispara el cron sentinel-refresh (GitHub Actions). Protegido con SENTINEL_TOKEN
+// opcional (mismo patrón que AVISO_TOKEN). La tabla no tiene columna ndre hoy: se
+// persiste ndvi/ndmi; ndre queda como follow-up (necesita ALTER + señal de N).
+async function refrescarMediciones(req, res) {
+  if (process.env.SENTINEL_TOKEN) {
+    const t = (req.query?.token || req.headers["x-sentinel-token"] || "").toString();
+    if (t !== process.env.SENTINEL_TOKEN) return res.status(401).json({ error: "no autorizado" });
+  }
+  if (!isConfigured()) return res.status(200).json({ ok: false, reason: "supabase_not_configured" });
+
+  const cdseToken = await obtenerToken();
+  if (!cdseToken) {
+    return res.status(502).json({ ok: false, error: "Copernicus auth failed (revisa CDSE_CLIENT_ID / CDSE_CLIENT_SECRET en Vercel)" });
+  }
+
+  const pilotos = await supabaseSelect("usuarios",
+    "piloto_sombra=eq.true&lat=not.is.null&lon=not.is.null&select=id,lat,lon,parcela,nombre");
+
+  let escritos = 0, sinDatos = 0, errores = 0;
+  for (const u of (pilotos || [])) {
+    try {
+      // Geometría real del recinto si el onboarding la guardó; si no, bbox del punto.
+      const geom = u.parcela && u.parcela.geometry ? JSON.stringify(u.parcela.geometry) : null;
+      const m = await medirParcela(cdseToken, Number(u.lat), Number(u.lon), geom);
+      if (!m) { sinDatos++; continue; }
+      await supabaseInsert("mediciones", {
+        usuario_id: u.id, fecha: m.fecha,
+        ndvi: m.ndvi, ndmi: m.ndmi, ndmi_stdev: m.ndmiStdev,
+        fuente: "sentinel-2",
+      }, { upsert: true });
+      escritos++;
+    } catch (e) {
+      console.error("[sentinel-refresh]", u.id, e.message);
+      errores++;
+    }
+  }
+
+  const resultado = {
+    ok: errores === 0, generado_en: new Date().toISOString(),
+    pilotos: (pilotos || []).length, escritos, sin_datos: sinDatos, errores,
+  };
+  // Si había parcelas y NINGUNA se escribió por error, 500 → el cron avisa con ruido.
+  if ((pilotos || []).length > 0 && escritos === 0 && errores > 0) return res.status(500).json(resultado);
+  return res.status(200).json(resultado);
+}
+
+module.exports = async (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  if (req.method === "OPTIONS") return res.status(204).end();
+
+  // Modo lote (cron): escribe el NDVI de todos los pilotos en `mediciones`.
+  if (req.query?.refresh === "1" || req.query?.refresh === "true") {
+    try { return await refrescarMediciones(req, res); }
+    catch (e) { console.error("[sentinel-refresh]", e.message); return res.status(500).json({ ok: false, error: e.message }); }
+  }
+
+  // Modo punto: NDVI de UNA parcela (lat/lon[/geometry]). Lo usa la app/landing.
+  const lat = parseFloat(req.query.lat);
+  const lon = parseFloat(req.query.lon);
+  if (isNaN(lat) || isNaN(lon)) return res.status(400).json({ error: "lat/lon requeridos" });
+
+  const token = await obtenerToken();
+  if (!token) return res.status(502).json({ error: "Auth failed" });
+
+  let m;
+  try { m = await medirParcela(token, lat, lon, req.query.geometry); }
+  catch (e) { return res.status(502).json({ error: "Statistics API failed", detail: e.message }); }
+
+  if (!m) return res.status(200).json({ ndvi: null, motivo: "sin_datos" });
+  return res.status(200).json(m);
 };

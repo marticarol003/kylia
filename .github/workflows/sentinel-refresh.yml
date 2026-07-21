@@ -1,0 +1,39 @@
+# Refresco de NDVI por parcela desde Sentinel-2 (el puente que faltaba).
+#
+# Hasta ahora `api/sentinel.js` calculaba el NDVI pero NADIE lo llamaba ni lo
+# persistía, así que la tabla `mediciones` estaba vacía y el factor de vigor del
+# estimador de rendimiento (y la señal NDRE de nutrición) quedaban inertes.
+#
+# Este cron llama a /api/sentinel?refresh=1, que recorre los pilotos con
+# coordenadas y escribe su NDVI/NDMI más reciente en `mediciones` (upsert por
+# fecha → idempotente; se puede correr a diario aunque Sentinel pase cada ~5 días).
+#
+# Los 2 crons de Vercel Hobby están ocupados (recordatorio-wizard + diario-b) y
+# aviso-lechugas ya va por GitHub Actions: este es el segundo workflow de Actions.
+#
+# ⚠️ Requiere las credenciales de Copernicus en Vercel: CDSE_CLIENT_ID y
+# CDSE_CLIENT_SECRET. Sin ellas el endpoint devuelve 502 y este job falla con
+# ruido (a propósito: es el recordatorio de que hay que configurarlas).
+#
+# Secret opcional SENTINEL_TOKEN (Settings → Secrets → Actions): si se define
+# aquí y en Vercel, el endpoint exige ?token=; sin definirlo, va abierto (mismo
+# criterio que aviso-lechugas).
+
+name: sentinel-refresh
+
+on:
+  schedule:
+    - cron: "10 5 * * *"   # a diario, 05:10 UTC (el upsert por fecha lo hace idempotente)
+  workflow_dispatch:
+
+jobs:
+  refrescar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Escribir el NDVI de los pilotos en mediciones
+        run: |
+          # --retry cubre transitorios; si aun así falla (p.ej. auth de Copernicus
+          # rota → 502, o todas las parcelas dan error → 500) el job falla y GitHub
+          # avisa por email del workflow roto.
+          curl -fsS --retry 3 --retry-delay 30 \
+            "https://kylia.app/api/sentinel?refresh=1&token=${{ secrets.SENTINEL_TOKEN }}"
