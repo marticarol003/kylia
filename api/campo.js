@@ -18,6 +18,7 @@ const { construirReveal } = require("./_reveal.js");
 const { necesidadNutrientes } = require("./_motor-nutricion.js");
 const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
 const { ofertaSuelo } = require("./_suelo-oferta.js");
+const { rendimientoEsperadoT } = require("./_rendimiento.js");
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
 const ES_UUID = /^[0-9a-f-]{36}$/i;
@@ -204,6 +205,21 @@ async function obtenerOfertaSuelo(u) {
   return cache;
 }
 
+// NDVI más reciente cacheado de la parcela (tabla mediciones), para el estimador
+// de rendimiento. null si no hay ninguna medición o falla la lectura (el estimador
+// cae entonces al rinde de referencia sin ajuste de vigor).
+async function ultimoNdvi(usuarioId) {
+  try {
+    const filas = await supabaseSelect("mediciones",
+      `usuario_id=eq.${usuarioId}&ndvi=not.is.null&select=ndvi,fecha&order=fecha.desc&limit=1`);
+    const v = filas && filas[0] ? Number(filas[0].ndvi) : null;
+    return Number.isFinite(v) ? v : null;
+  } catch (e) {
+    console.warn("[campo] ultimoNdvi:", e.message);
+    return null;
+  }
+}
+
 // ── Vista "cuaderno": cuaderno de fertilización (pilar fertilizantes) ──
 // Dos mitades honestas:
 //   1. Lo REGISTRADO: abonados apuntados en el diario (tipo=aplicacion,
@@ -227,7 +243,19 @@ async function vistaCuaderno(req, res, u) {
   ]);
 
   const cultivo = (u.cultivos || [])[0] || null;
-  const rendT   = Number(req.query?.rend_t) || null;
+
+  // Rendimiento esperado: manda el del onboarding (?rend_t). Si no llega, se estima
+  // por satélite (rinde de referencia × factor de vigor NDVI) para que el plan de
+  // abonado funcione sin que el agricultor teclee nada. Ver _rendimiento.js.
+  const rendOnboarding = Number(req.query?.rend_t) || null;
+  let rendEstimado = null;
+  if (rendOnboarding == null && cultivo) {
+    const ndvi = await ultimoNdvi(u.id);
+    rendEstimado = rendimientoEsperadoT(cultivo, u.area_m2, { ndvi });
+  }
+  const rendT = rendOnboarding != null
+    ? rendOnboarding
+    : (rendEstimado && rendEstimado.disponible ? rendEstimado.rendimiento_t : null);
 
   // Oferta del suelo (SoilGrids): descuenta lo que ya aporta el suelo del plan.
   const oferta = await obtenerOfertaSuelo(u);
@@ -257,6 +285,14 @@ async function vistaCuaderno(req, res, u) {
       nombre: u.nombre || null, ciudad: u.ciudad || null, cultivo,
       area_m2: u.area_m2 ?? null, metodo_riego: u.metodo_riego || null,
       manejo: u.manejo || null, fecha_plantacion: u.fecha_plantacion || null,
+    },
+    // Rendimiento con el que se calcula el plan y de dónde sale (onboarding manda;
+    // si no, estimación por satélite declarada como peldaño 1, no un B1 calibrado).
+    rendimiento: {
+      usado_t: rendT,
+      origen: rendOnboarding != null ? "onboarding"
+            : (rendEstimado && rendEstimado.disponible ? "estimado_satelite" : "sin_dato"),
+      estimacion: rendEstimado || null,
     },
     riegos: (riegos || []).filter(r => r.fecha_local).map(r => ({
       fecha: r.fecha_local, duracion_min: r.duracion_min ?? null,
