@@ -236,7 +236,9 @@ async function vistaCuaderno(req, res, u) {
     : null;
 
   const plan = cuadernoFertilizacion(
-    necesidadNutrientes(cultivo, rendT, ofertaMotor),
+    // area_m2 activa los términos de N de MAPA (colchón final + crédito de residuos).
+    // El crédito de residuos entrará cuando el onboarding capture el cultivo anterior.
+    necesidadNutrientes(cultivo, rendT, ofertaMotor, { area_m2: u.area_m2 ?? null }),
     { superficie_m2: u.area_m2 ?? null },
   );
 
