@@ -191,13 +191,6 @@
         <div class="quick-cap" id="r-quick-cap">Toca cuánto se regó hoy:</div>
         <div class="quick" id="r-quick"></div>
         <div class="quick-toggle"><button type="button" id="r-more">otra cantidad ▾</button></div>
-        <!-- Contrafactual: qué habría hecho el padre hoy (solo bancal 33 lechugas).
-             Va a `observaciones` (tipo otro, notas=contrafactual-padre), NUNCA a
-             acciones: no debe contaminar el balance hídrico del riego real. -->
-        <div id="padre-habria" style="display:none">
-          <div class="quick-cap" style="margin-top:18px">Y tu padre, ¿qué habría hecho hoy? <span style="font-weight:400;color:var(--slate-500)">(para el informe)</span></div>
-          <div class="quick" id="ph-quick"></div>
-        </div>
         <div id="r-manual" style="display:none">
           <div class="row2">
             <div class="field">
@@ -377,7 +370,6 @@
       hint.textContent = `Cada cubo = ${u.capacidad_regadera} L sobre ${u.area_m2} m².`;
     } else { hint.textContent = ""; }
     pintarChipsRiego(u, h);
-    pintarContrafactual();
   }
 
   // Registro de 1 toque: chips con la cantidad típica. Tocar = registra ya
@@ -421,33 +413,6 @@
       try { await logRiego(parseFloat(b.dataset.cant), true); toast("✓ Riego registrado"); cargarHoy(); }
       catch (e) { toast(e.message || "No se pudo guardar", true);
                   wrap.querySelectorAll("button").forEach(x => x.disabled = false); }
-    }));
-  }
-
-  // Contrafactual diario del bancal de 33 lechugas: "¿qué habría hecho tu padre
-  // hoy?" en 1 toque. Se guarda como observación (tipo otro, notas fijas) para
-  // no tocar `acciones` (el balance hídrico solo debe ver los riegos reales).
-  // Es el dato de oro del informe: Kylia-real vs padre-hipotético en el MISMO bancal.
-  function pintarContrafactual() {
-    const box = document.getElementById("padre-habria");
-    if (SCREEN !== "nuevas") { box.style.display = "none"; return; }
-    box.style.display = "";
-    const wrap = document.getElementById("ph-quick");
-    const chips = [
-      { txt: "No habría regado", label: "Nada" },
-      ...[1, 2, 3].map(h => ({ txt: `Habría regado ${h} h`, label: `${h} h` })),
-    ];
-    wrap.innerHTML = chips.map((ch, i) =>
-      `<button type="button" data-ph="${i}">${ch.label}</button>`).join("");
-    wrap.querySelectorAll("button").forEach(b => b.addEventListener("click", async () => {
-      wrap.querySelectorAll("button").forEach(x => x.disabled = true);
-      try {
-        await enviar("observaciones", { tipo: "otro",
-          descripcion: `Contrafactual: ${chips[Number(b.dataset.ph)].txt} hoy.`,
-          notas: "contrafactual-padre" });
-        toast("✓ Apuntado para el informe");
-      } catch (e) { toast(e.message || "No se pudo guardar", true); }
-      finally { wrap.querySelectorAll("button").forEach(x => x.disabled = false); }
     }));
   }
 

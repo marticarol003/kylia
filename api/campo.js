@@ -354,7 +354,12 @@ async function vistaPilotos(req, res) {
   if ((req.query?.key || "").toString() !== expected) return res.status(403).json({ ok: false, error: "key inválida" });
   if (!isConfigured()) return res.status(200).json({ ok: false, reason: "supabase_not_configured" });
 
-  const usuarios = await supabaseSelect("usuarios", "piloto_sombra=eq.true&select=*&order=ciudad.asc");
+  // El bancal de las 33 lechugas lleva piloto_sombra=true SOLO para que el Diario B
+  // congele la decisión diaria — pero NO es un piloto silencioso: ahí Kylia decide y
+  // el padre ejecuta, así que hecho = recomendado y el contrafactual daría siempre 0.
+  // No pinta nada en un panel que es puramente "agua real del agricultor vs Kylia".
+  const usuarios = (await supabaseSelect("usuarios", "piloto_sombra=eq.true&select=*&order=ciudad.asc"))
+    .filter(u => u.origen !== "lechugas-33-aspersion");
   const pilotos = await Promise.all((usuarios || []).map(async (u) => {
     try {
       const { informe } = await revealDeUsuario(u);
