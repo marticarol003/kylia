@@ -2,12 +2,17 @@
 // /api/aviso-lechugas — avisos (WhatsApp/email) del bancal de 33 lechugas
 // ─────────────────────────────────────────────────────────────────
 // El bancal de 33 lechugas es el primer campo donde las decisiones de Kylia
-// SE EJECUTAN (Kylia decide, el padre riega a las 8-9). Dos avisos diarios:
+// SE EJECUTAN (Kylia decide, el padre riega a las 8-9).
 //
-//   GET /api/aviso-lechugas?fase=manana   → la decisión de HOY antes del riego
-//        ("riega X min" / "no toca"), con el porqué en una frase.
-//   GET /api/aviso-lechugas?fase=mediodia → confirmación tras la ventana de
-//        riego: ¿consta el riego que tocaba? (✓ hecho / ⚠️ falta registrar).
+// SOLO se avisa los días que TOCA REGAR (para hacerlo fácil: el padre recibe algo
+// únicamente cuando hay una acción que hacer, no un "todo en orden" diario). Los
+// días sin riego, el endpoint responde 200 sin enviar nada. Dos fases en los días
+// de riego:
+//
+//   GET /api/aviso-lechugas?fase=manana   → la orden de riego de HOY antes de regar
+//        ("riega X min"), con el porqué en una frase.
+//   GET /api/aviso-lechugas?fase=mediodia → tras la ventana de riego: ¿consta el
+//        riego que tocaba? (✓ hecho / ⚠️ falta registrar).
 //
 // Los 2 crons de Vercel (plan Hobby) están ocupados (recordatorio-wizard y
 // diario-b), así que esto lo dispara GitHub Actions:
@@ -224,7 +229,17 @@ module.exports = async (req, res) => {
   const dry = String(req.query?.dry || "") === "1";
 
   try {
-    const data  = await decisionDeHoy(req);
+    const data = await decisionDeHoy(req);
+
+    // Solo se avisa los días que TOCA REGAR: si hoy no toca, no se envía nada por
+    // ningún canal (menos ruido para el padre). No es un fallo de entrega → 200,
+    // así el curl -fsS del workflow no rompe.
+    if (!data.hoy?.regar) {
+      const salida = { ok: true, fase, dry, omitido: true, motivo: "hoy no toca regar", nivel: data.hoy?.nivel || null };
+      console.log("[aviso-lechugas]", JSON.stringify(salida));
+      return res.status(200).json(salida);
+    }
+
     const email = fase === "manana"
       ? emailManana(data)
       : emailMediodia(data, await riegoDeHoy());
