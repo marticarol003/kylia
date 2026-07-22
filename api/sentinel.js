@@ -3,6 +3,17 @@ const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js
 const TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
 
+// Calidad mínima para fiarnos de una observación. La nube se filtra por píxel
+// (SCL), pero una escena casi toda tapada deja unos pocos supervivientes cuyo
+// promedio es RUIDO (así salían todos los pilotos a NDVI ~0,3 con 1 píxel el
+// 20-jul). Exigimos un mínimo de píxeles válidos Y una fracción válida alta;
+// como las parcelas son diminutas (pocos píxeles a 10 m), la FRACCIÓN es el guard
+// robusto (escala-independiente) y el mínimo absoluto solo descarta el caso peor.
+// Si ningún paso de los últimos 30 días lo cumple → "sin datos" (mejor que un
+// número inventado: el estimador de rendimiento cae al rinde de referencia).
+const MIN_PIXELES_VALIDOS = 2;
+const MIN_FRACCION_VALIDA = 0.5;
+
 // NDVI (B04/B08) + NDMI (B08/B11) + NDRE (B08/B05) + dataMask.
 // NDVI = vigor/biomasa; NDMI = agua en la hoja; NDRE = proxy de estado de
 // NITRÓGENO (el red-edge B05 es donde absorbe la clorofila, y el N foliar va
@@ -67,9 +78,14 @@ function pickLatestValid(statsJson) {
       const sample = statsNdvi.sampleCount || 0;
       const nodata = statsNdvi.noDataCount || 0;
       const valid  = sample - nodata;
-      if (valid <= 0) return null;
+      const fraccion = sample > 0 ? valid / sample : 0;
+      // Guard de calidad: descarta pasos casi todos enmascarados por nube.
+      if (valid < MIN_PIXELES_VALIDOS || fraccion < MIN_FRACCION_VALIDA) return null;
       if (typeof statsNdvi.mean !== "number" || Number.isNaN(statsNdvi.mean)) return null;
-      return { from: d.interval.from, statsNdvi, statsNdmi, statsNdre, validPixels: valid };
+      return {
+        from: d.interval.from, statsNdvi, statsNdmi, statsNdre,
+        validPixels: valid, fraccionValida: Math.round(fraccion * 100) / 100,
+      };
     })
     .filter(Boolean)
     .sort((a, b) => b.from.localeCompare(a.from));
@@ -137,6 +153,7 @@ async function medirParcela(token, lat, lon, geometry) {
     fecha:     latest.from.slice(0, 10),
     estado:    ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres",
     pixeles:   latest.validPixels,
+    fraccion_valida: latest.fraccionValida,
   };
 }
 
@@ -215,3 +232,8 @@ module.exports = async (req, res) => {
   if (!m) return res.status(200).json({ ndvi: null, motivo: "sin_datos" });
   return res.status(200).json(m);
 };
+
+// Expuestos para test (Vercel llama a la función; los tests leen estas props).
+module.exports.pickLatestValid = pickLatestValid;
+module.exports.MIN_PIXELES_VALIDOS = MIN_PIXELES_VALIDOS;
+module.exports.MIN_FRACCION_VALIDA = MIN_FRACCION_VALIDA;
