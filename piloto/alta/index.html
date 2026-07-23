@@ -140,6 +140,29 @@
           <div class="hint"><b>Test del churro:</b> humedece un puñado y haz un rollito.
             Si no liga → arenoso. Rollito que se agrieta → franco. Rollito largo y plástico → arcilloso.</div>
         </div>
+        <div class="field">
+          <label for="f-cultivo-ant">¿Qué había plantado antes aquí? (opcional)</label>
+          <select id="f-cultivo-ant">
+            <option value="">No lo sé / primer cultivo</option>
+            <option value="lechuga">Lechuga</option>
+            <option value="espinaca">Espinaca</option>
+            <option value="brassica">Col / brócoli / coliflor (brassica)</option>
+            <option value="tomate">Tomate</option>
+            <option value="pimiento">Pimiento</option>
+            <option value="berenjena">Berenjena</option>
+            <option value="calabacin">Calabacín</option>
+            <option value="cebolla">Cebolla</option>
+          </select>
+          <div class="hint">Sus restos dejan nitrógeno en el suelo. Si los enterraste,
+            Kylia descuenta ese abono gratis del plan (método MAPA).</div>
+        </div>
+        <div class="field" id="f-restos-wrap" hidden>
+          <label>¿Enterraste los restos de esa cosecha?</label>
+          <div class="pick" id="f-restos">
+            <button type="button" data-v="si">Sí, los incorporé</button>
+            <button type="button" data-v="no">No, los retiré</button>
+          </div>
+        </div>
       </div>
 
       <!-- Ubicación con mapa + SIGPAC -->
@@ -204,7 +227,7 @@
         const r = Math.random()*16|0, v = c === "x" ? r : (r&0x3|0x8); return v.toString(16); }));
 
   // Estado de la selección
-  const sel = { metodo:null, manejo:null, suelo:null, lat:null, lon:null,
+  const sel = { metodo:null, manejo:null, suelo:null, restos:null, lat:null, lon:null,
                 parcela:null, ciudad:null, superficie_m2:null, referencia:null, uso:null };
 
   // Chips de elección única (método / manejo / suelo)
@@ -217,6 +240,17 @@
   wirePick("f-metodo", "metodo");
   wirePick("f-manejo", "manejo");
   wirePick("f-suelo",  "suelo");
+  wirePick("f-restos", "restos");
+
+  // La pregunta por los restos solo tiene sentido si hay cultivo anterior.
+  $("f-cultivo-ant").addEventListener("change", (e) => {
+    const hay = !!e.target.value;
+    $("f-restos-wrap").hidden = !hay;
+    if (!hay) {
+      sel.restos = null;
+      document.querySelectorAll("#f-restos button").forEach(x => x.classList.remove("on"));
+    }
+  });
 
   // ── Mapa (Leaflet + ortofoto ESRI, sin API key) ──────────────────
   const map = L.map("map", { zoomControl: true }).setView([40.1, -3.7], 6); // centro de España
@@ -320,6 +354,9 @@
       metodo_riego: sel.metodo,
       manejo: sel.manejo,
       suelo: sel.suelo,
+      cultivo_anterior: $("f-cultivo-ant").value || null,
+      // Solo enviamos incorporación si hay cultivo anterior y el agricultor respondió.
+      restos_incorporados: ($("f-cultivo-ant").value && sel.restos) ? (sel.restos === "si") : null,
       lat: sel.lat, lon: sel.lon,
       ciudad: sel.ciudad || null,
       // Guardamos geometría + referencia SIGPAC + uso (todo el contexto oficial del

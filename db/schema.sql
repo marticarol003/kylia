@@ -126,6 +126,8 @@ create table mediciones (
   ndvi         numeric,
   ndmi         numeric,
   ndmi_stdev   numeric,
+  ndre         numeric,     -- red-edge (B08/B05): proxy de estado de nitrógeno foliar
+  ndre_stdev   numeric,
   suelo_0_7    numeric,
   suelo_7_28   numeric,
   suelo_28_100 numeric,

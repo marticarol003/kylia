@@ -160,10 +160,10 @@ async function medirParcela(token, lat, lon, geometry) {
 // ─── Refresco por lote (el puente que faltaba) ────────────────────────
 // Sentinel calculaba pero NADIE lo persistía → `mediciones` sin NDVI → el factor
 // de vigor del rendimiento (y la señal NDRE de nutrición) quedaban inertes. Este
-// modo recorre los pilotos con coordenadas y escribe su NDVI/NDMI en `mediciones`.
-// Lo dispara el cron sentinel-refresh (GitHub Actions). Protegido con SENTINEL_TOKEN
-// opcional (mismo patrón que AVISO_TOKEN). La tabla no tiene columna ndre hoy: se
-// persiste ndvi/ndmi; ndre queda como follow-up (necesita ALTER + señal de N).
+// modo recorre los pilotos con coordenadas y escribe su NDVI/NDMI/NDRE en
+// `mediciones`. Lo dispara el cron sentinel-refresh (GitHub Actions). Protegido con
+// SENTINEL_TOKEN opcional (mismo patrón que AVISO_TOKEN). El NDRE (red-edge, proxy de
+// N foliar) se persiste desde el ALTER de db/anadir-ndre-mediciones-2026-07-23.sql.
 async function refrescarMediciones(req, res) {
   if (process.env.SENTINEL_TOKEN) {
     const t = (req.query?.token || req.headers["x-sentinel-token"] || "").toString();
@@ -189,6 +189,7 @@ async function refrescarMediciones(req, res) {
       await supabaseInsert("mediciones", {
         usuario_id: u.id, fecha: m.fecha,
         ndvi: m.ndvi, ndmi: m.ndmi, ndmi_stdev: m.ndmiStdev,
+        ndre: m.ndre, ndre_stdev: m.ndreStdev,
         fuente: "sentinel-2",
       }, { upsert: true });
       escritos++;

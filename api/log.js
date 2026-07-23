@@ -31,6 +31,9 @@ const METODOS_RIEGO = new Set(["goteo", "aspersion", "surco", "manguera", "regad
 const FRANJAS       = new Set(["manana", "mediodia", "tarde", "noche"]);
 const MANEJOS       = new Set(["convencional", "ecologico"]);
 const SUELOS        = new Set(["arenoso", "franco", "arcilloso"]);
+// Cultivos anteriores válidos = los que el motor sabe traducir a N de residuos
+// (MAPA Tabla 23.3.1). Mismas claves que el <select> del onboarding.
+const CULTIVOS_ANT  = new Set(["lechuga", "espinaca", "brassica", "tomate", "pimiento", "berenjena", "calabacin", "cebolla"]);
 
 module.exports = async (req, res) => {
   if (!preludio(req, res, "POST")) return;
@@ -67,6 +70,8 @@ async function handleRegistroUsuario(req, res, body) {
     metodo_riego:         METODOS_RIEGO.has(body.metodo_riego) ? body.metodo_riego : null,
     manejo:               MANEJOS.has(body.manejo) ? body.manejo : null,
     suelo:                SUELOS.has(body.suelo) ? body.suelo : null,
+    cultivo_anterior:     CULTIVOS_ANT.has(body.cultivo_anterior) ? body.cultivo_anterior : null,
+    restos_incorporados:  body.restos_incorporados === undefined ? undefined : Boolean(body.restos_incorporados),
     fecha_plantacion:     dateOrNull(body.fecha_plantacion),
     caudal:               numOrNull(body.caudal),
     area_m2:              numOrNull(body.area_m2),

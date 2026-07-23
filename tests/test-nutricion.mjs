@@ -4,7 +4,8 @@
 // guías españolas (agroes.es, peldaño 2) y que el balance de masa cuadra.
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const { EXTRACCION, COLCHON_N_KG_HA, necesidadNutrientes } = require("../api/_motor-nutricion.js");
+const { EXTRACCION, COLCHON_N_KG_HA, N_RESIDUOS_KG_HA, FRACCION_DISPONIBLE_RESIDUOS,
+        creditoResiduosN, necesidadNutrientes } = require("../api/_motor-nutricion.js");
 
 let fallos = 0;
 function ok(cond, msg) {
@@ -84,6 +85,22 @@ const conCredito = necesidadNutrientes("tomate", 2, null,
 ok(conCredito.nutrientes.N.credito_residuos_kg === 20, "crédito de residuos se expone (20 kg/ha en 1 ha)");
 ok(conCredito.nutrientes.N.necesidad_kg === r1(EXTRACCION.tomate.N * 2 + COLCHON_N_KG_HA.tomate - 20),
    `N = extracción + colchón − crédito (${conCredito.nutrientes.N.necesidad_kg} kg)`);
+
+console.log("\n5) Crédito de residuos del cultivo anterior (MAPA Tabla 23.3.1 × 60%):");
+// Solo cuenta si los restos se incorporaron.
+ok(creditoResiduosN("tomate", true) === r1(N_RESIDUOS_KG_HA.tomate * FRACCION_DISPONIBLE_RESIDUOS),
+   `tomate incorporado = ${creditoResiduosN("tomate", true)} kg/ha (52 × 0,6)`);
+ok(creditoResiduosN("tomate", false) === 0, "restos retirados → crédito 0");
+ok(creditoResiduosN(null, true) === 0, "sin cultivo anterior → crédito 0");
+ok(creditoResiduosN("desconocido", true) === 0, "cultivo sin dato de residuos → crédito 0");
+ok(creditoResiduosN("brassica", true) > creditoResiduosN("lechuga", true),
+   "brassica deja más N residual que lechuga");
+// End-to-end: el helper alimenta el balance vía campo.js.
+const credCeb = creditoResiduosN("cebolla", true); // 30 × 0,6 = 18
+const planCeb = necesidadNutrientes("tomate", 2, null,
+  { area_m2: 10000, credito_residuos_n_kg_ha: credCeb });
+ok(planCeb.nutrientes.N.credito_residuos_kg === credCeb,
+   `crédito de cebolla previa fluye al balance (${credCeb} kg/ha)`);
 
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES" : `\n❌ ${fallos} FALLO(S)`);
 process.exit(fallos === 0 ? 0 : 1);

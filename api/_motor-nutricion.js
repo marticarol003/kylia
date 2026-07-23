@@ -65,7 +65,42 @@ const EXTRACCION = {
 const COLCHON_N_KG_HA = { tomate: 45, cebolla: 75, lechuga: 45 };
 const COLCHON_N_DEFECTO = 45;
 
+// N contenido en los residuos de cosecha, por CULTIVO ANTERIOR (kg N/ha).
+// Centro de los rangos oficiales de MAPA — Tabla 23.3.1, Parte II, pág. 184
+// ("N en residuos de cosecha por superficie"). Las claves son los ids de cultivo
+// que ofrece el onboarding (piloto/alta). No inventar: si añades un cultivo,
+// saca su valor de esa tabla.
+//   lechuga 15-30 · espinaca 20-50 · brassica (col 90-120 / coliflor 120-150 /
+//   brócoli 150-230) · tomate 45-60 · pimiento 110-160 · berenjena 100-160 ·
+//   calabacín 20-30 · cebolla 20-40
+const N_RESIDUOS_KG_HA = {
+  lechuga:   22,   // 15-30
+  espinaca:  35,   // 20-50
+  brassica: 140,   // centro de col/coliflor/brócoli (dejan mucho N residual)
+  tomate:    52,   // 45-60
+  pimiento: 135,   // 110-160
+  berenjena:130,   // 100-160
+  calabacin: 25,   // 20-30
+  cebolla:   30,   // 20-40
+};
+// Fracción del N de los residuos que se mineraliza y queda disponible para el
+// cultivo siguiente en 2-3 meses SI se incorporan al suelo. MAPA (Parte II, pág.
+// 186) da 40-80%; usamos el centro (60%). Sin incorporación → crédito 0.
+const FRACCION_DISPONIBLE_RESIDUOS = 0.60;
+
 function r1(x) { return Math.round((Number(x) || 0) * 10) / 10; }
+
+// Crédito de N (kg/ha) que aportan los residuos del cultivo anterior al balance.
+// Solo cuenta si los restos se INCORPORARON al suelo (MAPA lo condiciona); si se
+// retiraron/quemaron, o el cultivo anterior es desconocido, el crédito es 0.
+//   cultivoAnterior      : id de cultivo (clave de N_RESIDUOS_KG_HA) o null
+//   restosIncorporados   : true si el agricultor enterró los restos
+function creditoResiduosN(cultivoAnterior, restosIncorporados) {
+  if (!restosIncorporados) return 0;
+  const n = N_RESIDUOS_KG_HA[cultivoAnterior];
+  if (!(n > 0)) return 0;
+  return r1(n * FRACCION_DISPONIBLE_RESIDUOS);
+}
 
 // Necesidad estacional de abonado para un cultivo.
 //   cultivoId       : "tomate" | "cebolla" | "lechuga"
@@ -152,5 +187,8 @@ function necesidadNutrientes(cultivoId, rendimientoT, ofertaSuelo, opts = {}) {
 module.exports = {
   EXTRACCION,
   COLCHON_N_KG_HA,
+  N_RESIDUOS_KG_HA,
+  FRACCION_DISPONIBLE_RESIDUOS,
+  creditoResiduosN,
   necesidadNutrientes,
 };

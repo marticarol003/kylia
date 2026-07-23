@@ -20,13 +20,21 @@
 //    un cultivo recién plantado tiene NDVI bajo por pequeño, no por mal rinde → no
 //    se le penaliza (factor 1, se usa el rinde de referencia tal cual).
 
-// Rinde de referencia por cultivo (t/ha, producto fresco, aire libre). Centrales y
-// AFINABLES: pendientes de confirmar contra las tablas de rendimiento de la Guía
-// MAPA (Parte II) / estadística autonómica, igual que se hizo con la extracción.
+// Rinde de referencia por cultivo (t/ha, producto fresco, aire libre).
+// ✅ VALIDADOS contra la producción comercial de referencia de la Guía MAPA
+// (Parte II, Tabla 23.3.1, pág. 184) — 2026-07-23. Se adoptan los valores de MAPA
+// porque hacen el balance INTERNAMENTE CONSISTENTE: la extracción de N por hectárea
+// (coef. de _motor-nutricion.js × este rinde) cae justo en el centro del rango
+// oficial de absorción de N por superficie de esa misma tabla:
+//   tomate  3,0 kg/t × 60 = 180 kg/ha  (rango MAPA 150-210) ✅
+//   cebolla 2,3 kg/t × 65 = 149 kg/ha  (rango MAPA 140-160) ✅
+//   lechuga 2,5 kg/t × 35 =  87 kg/ha  (rango MAPA  80-100) ✅
+// (Los valores previos 70/45 descuadraban: tomate 70 → 210 kg/ha, tope del rango;
+//  cebolla 45 → 103 kg/ha, POR DEBAJO del rango → infraabonaba.)
 const RINDE_REF_T_HA = {
-  tomate:  70,  // tomate fresco al aire libre (rango amplio ~50-90 según manejo)
-  cebolla: 45,  // cebolla (bulbo/tierna); muy variable según tipo y momento de recolección
-  lechuga: 35,  // lechuga de hoja/pella, peso fresco
+  tomate:  60,  // MAPA producción comercial de referencia (tomate fresco al aire libre)
+  cebolla: 65,  // MAPA (cebolla bulbo); antes 45, infraestimaba la extracción de N
+  lechuga: 35,  // MAPA (lechuga de pella, peso fresco) — ya coincidía
 };
 
 const NDVI_SANO       = 0.80;  // canopy denso y sano → ancla del factor de vigor = 1,0

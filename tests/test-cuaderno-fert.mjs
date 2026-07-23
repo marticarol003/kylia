@@ -41,5 +41,27 @@ ok(cuadernoFertilizacion(necesidadNutrientes("mango", 1)).disponible === false,
    "cultivo desconocido → disponible:false");
 ok(cuadernoFertilizacion(null).disponible === false, "necesidad null → disponible:false");
 
+console.log("5) Fraccionamiento fondo/cobertera (riego tradicional, MAPA):");
+// necesidad con área para que haya kg de N > 0 en todos.
+const necTrad = necesidadNutrientes("tomate", 2, null, { area_m2: 10000 });
+const cuaTrad = cuadernoFertilizacion(necTrad, { metodo_riego: "aspersion" });
+ok(cuaTrad.fraccionamiento.modelo === "fondo_cobertera", "aspersión → modelo fondo_cobertera");
+const nTrad = cuaTrad.lineas.find(l => l.nutriente === "N");
+ok(nTrad.reparto.length === 2, "N se reparte en fondo + cobertera");
+ok(nTrad.reparto[0].pct === 30 && nTrad.reparto[1].pct === 70, "N 30% fondo / 70% cobertera");
+ok(Math.abs(nTrad.reparto[0].kg + nTrad.reparto[1].kg - nTrad.necesidad_kg) < 0.05,
+   "los tramos de N suman la necesidad");
+const pTrad = cuaTrad.lineas.find(l => l.nutriente === "P2O5");
+ok(pTrad.reparto.length === 1 && pTrad.reparto[0].pct === 100, "P₂O₅ 100% en fondo");
+
+console.log("6) Fraccionamiento en tercios (fertirrigación / goteo, MAPA):");
+const cuaGoteo = cuadernoFertilizacion(necTrad, { metodo_riego: "goteo" });
+ok(cuaGoteo.fraccionamiento.modelo === "fertirrigacion_tercios", "goteo → modelo tercios");
+const nGoteo = cuaGoteo.lineas.find(l => l.nutriente === "N");
+ok(nGoteo.reparto.length === 3, "N en 3 tercios del ciclo");
+ok(nGoteo.reparto.map(t => t.pct).join("/") === "25/55/20", "tercios 25/55/20");
+const kGoteo = cuaGoteo.lineas.find(l => l.nutriente === "K2O");
+ok(kGoteo.reparto.length === 3, "en goteo P y K también van fraccionados (no 100% fondo)");
+
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES" : `\n❌ ${fallos} FALLO(S)`);
 process.exit(fallos === 0 ? 0 : 1);

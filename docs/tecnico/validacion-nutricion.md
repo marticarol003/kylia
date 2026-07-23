@@ -37,6 +37,23 @@ Tablas 23.3.1 / 23.3.2 / 23.3.3 de la Guía MAPA (Parte II, hortícolas):
 rangos que `tests/test-nutricion.mjs` ya verificaba coinciden exactamente con los de
 MAPA, así que el motor estaba test-validado contra la fuente primaria sin saberlo.
 
+### 1b. Rindes de referencia — ✅ VALIDADOS (2026-07-23)
+
+`RINDE_REF_T_HA` (`_rendimiento.js`) es la cosecha esperada por defecto (t/ha) que,
+sin dato del agricultor, arranca la estimación de rendimiento y por tanto la
+extracción del plan de abonado. Se han alineado con la **producción comercial de
+referencia de MAPA** (misma Tabla 23.3.1), lo que hace el balance internamente
+consistente: extracción de N/ha = coef. × rinde cae en el centro del rango oficial.
+
+| Cultivo | Rinde anterior | Rinde MAPA (nuevo) | N/ha resultante | Rango MAPA N/ha |
+|---|---|---|---|---|
+| Tomate | 70 | **60** | 180 | 150–210 ✅ centro |
+| Cebolla | 45 | **65** | 149 | 140–160 ✅ centro |
+| Lechuga | 35 | **35** | 87 | 80–100 ✅ centro |
+
+El tomate a 70 daba 210 kg N/ha (tope del rango) y la cebolla a 45 daba 103 kg N/ha
+(**por debajo** del rango → infraabonaba). Ambos corregidos.
+
 ---
 
 ## 2. Estructura del balance — ✅ VALIDADA
@@ -103,10 +120,20 @@ términos que el motor aún no modela:
   gaseosas del N, y el colchón de "N mineral mínimo al final del cultivo" (30–60 kg
   N/ha en general; 60–90 en cebolla/espinaca/puerro/brócoli/coliflor).
 - **Términos que BAJAN la dosis** (créditos del suelo): N mineral inicial del suelo
-  (necesita análisis) y N de los residuos de la cosecha anterior (40–80 % disponible
-  en 2–3 meses si se incorporan).
+  (necesita análisis) y N de los residuos de la cosecha anterior. **El crédito de
+  residuos ya está implementado** (2026-07-23): el onboarding captura el cultivo
+  anterior y si se incorporaron los restos; el motor (`creditoResiduosN`) traduce el
+  cultivo a los kg N/ha de la **Tabla 23.3.1 de MAPA** (centro del rango) × **60 %**
+  (centro del 40–80 % que se mineraliza en 2–3 meses si se incorporan, MAPA Parte II
+  pág. 186). Sin incorporación o sin cultivo anterior → crédito 0.
 - **P₂O₅ y K₂O**: siguen sin oferta de suelo derivable de satélite (declarados).
-- **Sin fraccionamiento temporal** (fondo vs cobertera).
+- **Fraccionamiento temporal**: **ya implementado** (2026-07-23) en `_motor-cuaderno-fert.js`
+  según MAPA Parte II (pág. 189-190). Riego tradicional (surco/aspersión/manguera/
+  regadera): N fondo 30% + cobertera 70%, P₂O₅ y K₂O 100% en fondo. Fertirrigación
+  (goteo): cada nutriente en tercios del ciclo (≈25/55/20). El reparto viaja en cada
+  línea del plan (`reparto`) + un bloque `fraccionamiento` con el modelo. **Nota**: hoy
+  el plan solo vive en la respuesta de la API (`/api/campo?vista=cuaderno`); ningún
+  front lo pinta aún (la página del cuaderno solo muestra los abonados registrados).
 
 Estos términos se compensan en parte (unos suben, otros bajan), por eso el número del
 motor es un estimador central razonable — pero no es la dosis rigurosa de MAPA.
@@ -121,7 +148,10 @@ motor es un estimador central razonable — pero no es la dosis rigurosa de MAPA
 | Estructura del balance | ✅ Es el método oficial de MAPA |
 | Enfoque de N del suelo (SoilGrids) | ✅ Avalado por MAPA (Tabla 4.2) |
 | Coeficiente de mineralización | ✅ Recalibrado a la Tabla 4.2 (2026-07-16) |
-| Eficiencia / pérdidas / colchón N | ❌ No modelado (gap conocido) |
+| Colchón de N final (MAPA) | ✅ Implementado (30–60 / 60–90 kg/ha por cultivo) |
+| Crédito de residuos del cultivo anterior | ✅ Implementado (Tabla 23.3.1 × 60 %, 2026-07-23) |
+| Fraccionamiento fondo/cobertera | ✅ Implementado (MAPA pág. 189-190, 2026-07-23) |
+| Eficiencia / pérdidas gaseosas / lixiviación | ❌ No modelado (gap conocido) |
 | Oferta de suelo P/K | ❌ No derivable de satélite (declarado) |
 
 El motor es **sólido y defendible en su núcleo** (coeficientes + estructura = método

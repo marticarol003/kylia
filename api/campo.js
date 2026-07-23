@@ -15,7 +15,7 @@
 const { isConfigured, supabaseSelect, supabaseUpdate, preludio } = require("./_supabase.js");
 const { balanceHidrico, decisionRiego, presentarRiego, simularKylia, faseDelDia } = require("./_motor-riego.js");
 const { construirReveal } = require("./_reveal.js");
-const { necesidadNutrientes } = require("./_motor-nutricion.js");
+const { necesidadNutrientes, creditoResiduosN } = require("./_motor-nutricion.js");
 const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
 const { ofertaSuelo } = require("./_suelo-oferta.js");
 const { rendimientoEsperadoT } = require("./_rendimiento.js");
@@ -263,11 +263,17 @@ async function vistaCuaderno(req, res, u) {
     ? { N: oferta.N, P2O5: oferta.P2O5, K2O: oferta.K2O }
     : null;
 
+  // Crédito de residuos del cultivo anterior (MAPA): solo si el onboarding capturó
+  // el cultivo previo Y que se incorporaron los restos. Si no, queda en 0.
+  const creditoResiduos = creditoResiduosN(u.cultivo_anterior || null, !!u.restos_incorporados);
+
   const plan = cuadernoFertilizacion(
     // area_m2 activa los términos de N de MAPA (colchón final + crédito de residuos).
-    // El crédito de residuos entrará cuando el onboarding capture el cultivo anterior.
-    necesidadNutrientes(cultivo, rendT, ofertaMotor, { area_m2: u.area_m2 ?? null }),
-    { superficie_m2: u.area_m2 ?? null },
+    necesidadNutrientes(cultivo, rendT, ofertaMotor, {
+      area_m2: u.area_m2 ?? null,
+      credito_residuos_n_kg_ha: creditoResiduos,
+    }),
+    { superficie_m2: u.area_m2 ?? null, metodo_riego: u.metodo_riego || null },
   );
 
   return res.status(200).json({
