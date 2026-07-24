@@ -51,6 +51,11 @@
   .aviso { font-size:0.78rem; color:var(--slate-500); margin-top:14px; line-height:1.5; }
   .msg { text-align:center; color:var(--slate-500); padding:40px 20px; }
 
+  .plan-nota { font-size:0.82rem; color:var(--slate-700); margin-top:12px; line-height:1.5; }
+  .plan-list { list-style:none; margin-top:10px; display:grid; gap:7px; }
+  .plan-list li { font-size:0.84rem; color:var(--slate-700); padding-left:15px; position:relative; }
+  .plan-list li::before { content:"•"; position:absolute; left:0; color:var(--verde); font-weight:700; }
+
   @media print {
     body { background:#fff; padding:0; }
     .app { max-width:none; }
@@ -127,6 +132,50 @@
       <tbody>${filas}</tbody></table></div>`;
   }
 
+  const NUTRI = { N:"Nitrógeno (N)", P2O5:"Fósforo (P₂O₅)", K2O:"Potasio (K₂O)" };
+
+  // Plan de abonado que Kylia ya calcula (necesidad de nutrientes + coste + cómo
+  // repartirlo en el tiempo). El backend lo manda en d.plan; aquí lo pintamos.
+  function planAbonado(plan, rend){
+    if(!plan || !plan.disponible){
+      return `<p class="vacio">${esc((plan && plan.motivo) || "Aún no se puede calcular el plan (falta el cultivo o algún dato de la parcela).")}</p>`;
+    }
+    const filas = plan.lineas.map(l => `<tr>
+      <td>${NUTRI[l.nutriente]||esc(l.nutriente)}</td>
+      <td class="num">${n(l.necesidad_kg,1)} kg</td>
+      <td class="num">${n(l.precio_eur_kg,2)} €</td>
+      <td class="num">${n(l.coste_eur,2)} €</td>
+    </tr>`).join("");
+    const totalRow = `<tr class="total"><td colspan="3">Coste total estimado</td>
+      <td class="num">${n(plan.coste_total_eur,2)} €</td></tr>`;
+    const tabla = `<div class="tabla-wrap"><table>
+      <thead><tr><th>Nutriente</th><th class="num">Necesita</th><th class="num">Precio</th><th class="num">Coste</th></tr></thead>
+      <tbody>${filas}${totalRow}</tbody></table></div>`;
+
+    // Cómo y cuándo repartirlo (fraccionamiento fondo/cobertera o tercios, MAPA).
+    const repartos = plan.lineas.filter(l => l.reparto && l.reparto.length).map(l =>
+      `<li><strong>${NUTRI[l.nutriente]||esc(l.nutriente)}:</strong> ` +
+      l.reparto.map(t => `${t.pct}% ${esc(t.momento)} (${n(t.kg,1)} kg)`).join(" · ") + `</li>`
+    ).join("");
+    const fracc = plan.fraccionamiento ? `
+      <p class="plan-nota"><strong>Cómo repartirlo.</strong> ${esc(plan.fraccionamiento.nota)}</p>
+      ${repartos ? `<ul class="plan-list">${repartos}</ul>` : ""}` : "";
+
+    // Notas honestas: de dónde sale la cosecha esperada, si el plan es bruto/neto,
+    // y que los precios son de referencia.
+    const notas = [];
+    if(rend && rend.usado_t!=null){
+      const orig = rend.origen==="onboarding" ? "según tu dato de cosecha"
+                 : rend.origen==="estimado_satelite" ? "estimada por satélite" : "";
+      notas.push(`Calculado para una cosecha esperada de ${n(rend.usado_t,2)} t${orig?` (${orig})`:""}.`);
+    }
+    if(plan.nota) notas.push(plan.nota);
+    if(plan.precios_referencia) notas.push("Precios de referencia €/kg de nutriente (volátiles); se pueden ajustar con los tuyos.");
+    const notasHtml = notas.length ? `<p class="plan-nota">${esc(notas.join(" "))}</p>` : "";
+
+    return tabla + fracc + notasHtml;
+  }
+
   function pintar(d){
     const p = d.parcela || {};
     document.getElementById("sub").textContent =
@@ -146,7 +195,8 @@
       </div>
       <div class="card"><p class="label">💧 Riegos</p>${tablaRiegos(d.riegos||[], p.area_m2)}</div>
       <div class="card"><p class="label">🧪 Tratamientos fitosanitarios</p>${tablaTratamientos(d.tratamientos||[])}</div>
-      <div class="card"><p class="label">🌱 Fertilización</p>${tablaAbonados(d.abonados||[])}</div>
+      <div class="card"><p class="label">🌱 Fertilización — registrado</p>${tablaAbonados(d.abonados||[])}</div>
+      <div class="card"><p class="label">📋 Plan de abonado — recomendado</p>${planAbonado(d.plan, d.rendimiento)}</div>
       <button class="btn-print" onclick="window.print()">🖨️ Imprimir / guardar en PDF</button>
       <p class="aviso">Borrador generado desde tu diario de campo en Kylia. Es la base del cuaderno de
       explotación (RD 1051/2022): revisa los datos y complétalo con lo que tu técnico o cooperativa
