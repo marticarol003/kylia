@@ -14,7 +14,7 @@
 // Para test manual: GET /api/recordatorio-wizard?dry=1
 // (calcula y devuelve qué se enviaría, sin enviar nada).
 
-const { isConfigured, supabaseSelect } = require("./_supabase.js");
+const { isConfigured, supabaseSelect, exigeToken } = require("./_supabase.js");
 
 const APP_URL = "https://kylia.app/app";
 
@@ -81,13 +81,7 @@ async function yaRespondioHoy(email) {
 }
 
 module.exports = async (req, res) => {
-  if (process.env.RECORDATORIO_TOKEN) {
-    const token   = (req.query?.token || req.headers["x-recordatorio-token"] || "").toString();
-    const authHdr = (req.headers.authorization || "").toString();
-    if (token !== process.env.RECORDATORIO_TOKEN && authHdr !== `Bearer ${process.env.RECORDATORIO_TOKEN}`) {
-      return res.status(401).json({ error: "no autorizado" });
-    }
-  }
+  if (!exigeToken(req, res, "RECORDATORIO_TOKEN", "x-recordatorio-token")) return;
 
   const dry = String(req.query?.dry || "") === "1";
 

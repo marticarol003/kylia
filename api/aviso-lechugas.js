@@ -39,7 +39,7 @@
 //                      que RECORDATORIO_TOKEN en recordatorio-wizard).
 // Para test manual: GET /api/aviso-lechugas?fase=manana&dry=1
 
-const { isConfigured, supabaseSelect, supabaseDelete } = require("./_supabase.js");
+const { isConfigured, supabaseSelect, supabaseDelete, exigeToken } = require("./_supabase.js");
 const { laminaRiego } = require("./_motor-riego.js");
 const webpush = require("web-push");
 
@@ -220,10 +220,7 @@ async function enviarEmail({ to, subject, html }) {
 }
 
 module.exports = async (req, res) => {
-  if (process.env.AVISO_TOKEN) {
-    const token = (req.query?.token || req.headers["x-aviso-token"] || "").toString();
-    if (token !== process.env.AVISO_TOKEN) return res.status(401).json({ error: "no autorizado" });
-  }
+  if (!exigeToken(req, res, "AVISO_TOKEN", "x-aviso-token")) return;
 
   const fase = (req.query?.fase || "").toString();
   if (fase !== "manana" && fase !== "mediodia") {

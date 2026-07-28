@@ -15,9 +15,9 @@
 # CDSE_CLIENT_SECRET. Sin ellas el endpoint devuelve 502 y este job falla con
 # ruido (a propósito: es el recordatorio de que hay que configurarlas).
 #
-# Secret opcional SENTINEL_TOKEN (Settings → Secrets → Actions): si se define
-# aquí y en Vercel, el endpoint exige ?token=; sin definirlo, va abierto (mismo
-# criterio que aviso-lechugas).
+# Secret SENTINEL_TOKEN (Settings → Secrets → Actions) OBLIGATORIO: el endpoint
+# es fail-closed desde el 28-jul. Tiene que valer lo mismo aquí y en Vercel; si
+# falta, responde 503 y este job falla con ruido.
 
 name: sentinel-refresh
 
