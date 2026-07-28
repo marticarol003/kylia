@@ -1,7 +1,6 @@
 {
   "scripts": {
-    "test": "node tests/test-motor-riego.mjs && node tests/test-nutricion.mjs && node tests/test-cuaderno-fert.mjs",
-    "test:suelo": "node tests/test-suelo-oferta.mjs"
+    "test": "for f in tests/test-*.mjs; do echo \"── $f\"; node \"$f\" || exit 1; done"
   },
   "devDependencies": {
     "puppeteer": "^24.43.0"

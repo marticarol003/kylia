@@ -1,0 +1,28 @@
+# Los tests del motor, en cada push. Hasta ahora existían 6 ficheros de test y
+# no los corría nadie salvo a mano: un push que rompiera el balance FAO-56 o el
+# cuaderno de fertilización llegaba a producción sin fricción ninguna.
+#
+# No instala dependencias A PROPÓSITO: los tests solo tocan los módulos puros de
+# api/ (_motor-riego, _motor-nutricion, _motor-cuaderno-fert, _rendimiento,
+# _suelo-oferta y sentinel), que no importan nada de node_modules. Sin `npm ci`
+# el job baja de minuto y medio a ~15 s. Si algún día un test necesita web-push,
+# añadir: - run: npm ci --omit=dev
+
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Batería completa
+        run: npm test
