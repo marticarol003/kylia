@@ -18,7 +18,7 @@
 //
 // Usa el MISMO motor que la app (api/_motor-riego.js) para que no deriven.
 
-const { isConfigured, supabaseSelect, supabaseInsert, exigeToken } = require("./_supabase.js");
+const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js");
 const { balanceHidrico, decisionRiego, laminaRiego } = require("./_motor-riego.js");
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
@@ -121,8 +121,14 @@ async function yaCongelado(usuarioId, hoy) {
 }
 
 module.exports = async (req, res) => {
-  // Puerta del cron. Vercel manda Authorization: Bearer <CRON_SECRET>.
-  if (!exigeToken(req, res, "DIARIO_B_TOKEN", "x-diario-token")) return;
+  // Auth opcional (token del cron). Vercel manda Authorization: Bearer <CRON_SECRET>.
+  if (process.env.DIARIO_B_TOKEN) {
+    const token   = (req.query?.token || req.headers["x-diario-token"] || "").toString();
+    const authHdr = (req.headers.authorization || "").toString();
+    if (token !== process.env.DIARIO_B_TOKEN && authHdr !== `Bearer ${process.env.DIARIO_B_TOKEN}`) {
+      return res.status(401).json({ error: "no autorizado" });
+    }
+  }
 
   const dry = String(req.query?.dry || "") === "1" || process.env.DIARIO_B_LIVE !== "1";
   const hoy = hoyISO();

@@ -141,40 +141,8 @@ function preludio(req, res, metodo = "POST") {
   return true;
 }
 
-// Puerta de los endpoints de cron (avisos, Diario B, Sentinel, recordatorio).
-// FAIL-CLOSED: si la variable de entorno no está puesta, el endpoint NO se abre,
-// responde 503. Antes el patrón era el contrario —`if (process.env.X_TOKEN) {
-// comprobar }`— así que una variable sin definir dejaba el endpoint público:
-// cualquiera podía disparar /api/aviso-lechugas y mandarle WhatsApp/push/email
-// reales al agricultor, o /api/diario-b y congelar la decisión del día a la hora
-// que quisiera, que es el registro científico del piloto. Un typo en el nombre
-// de la variable ya no abre la puerta: la cierra, y el cron falla con ruido.
-//
-// Acepta el token por ?token=, por cabecera propia, o por Authorization: Bearer
-// (que es como lo manda el cron nativo de Vercel con CRON_SECRET). CRON_SECRET
-// vale como llave maestra para los crons de la propia plataforma.
-function exigeToken(req, res, nombreVar, cabecera = null) {
-  const esperado = (process.env[nombreVar] || process.env.CRON_SECRET || "").trim();
-  if (!esperado) {
-    console.error(`[auth] ${nombreVar} (ni CRON_SECRET) configurada: endpoint cerrado`);
-    res.status(503).json({ error: `${nombreVar} sin configurar en el servidor` });
-    return false;
-  }
-  const candidatos = [
-    (req.query?.token || "").toString(),
-    cabecera ? (req.headers[cabecera] || "").toString() : "",
-    (req.headers.authorization || "").toString().replace(/^Bearer\s+/i, ""),
-  ];
-  if (!candidatos.includes(esperado)) {
-    res.status(401).json({ error: "no autorizado" });
-    return false;
-  }
-  return true;
-}
-
 module.exports = {
   isConfigured,
-  exigeToken,
   supabaseInsert,
   supabaseUpdate,
   supabaseSelect,

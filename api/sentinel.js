@@ -1,4 +1,4 @@
-const { isConfigured, supabaseSelect, supabaseInsert, exigeToken } = require("./_supabase.js");
+const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js");
 
 const TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
@@ -165,7 +165,10 @@ async function medirParcela(token, lat, lon, geometry) {
 // SENTINEL_TOKEN opcional (mismo patrón que AVISO_TOKEN). El NDRE (red-edge, proxy de
 // N foliar) se persiste desde el ALTER de db/anadir-ndre-mediciones-2026-07-23.sql.
 async function refrescarMediciones(req, res) {
-  if (!exigeToken(req, res, "SENTINEL_TOKEN", "x-sentinel-token")) return;
+  if (process.env.SENTINEL_TOKEN) {
+    const t = (req.query?.token || req.headers["x-sentinel-token"] || "").toString();
+    if (t !== process.env.SENTINEL_TOKEN) return res.status(401).json({ error: "no autorizado" });
+  }
   if (!isConfigured()) return res.status(200).json({ ok: false, reason: "supabase_not_configured" });
 
   const cdseToken = await obtenerToken();
