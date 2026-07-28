@@ -58,6 +58,26 @@ ok(simTom.deficitFinal >= 0, `deficitFinal expuesto para el reveal honesto (${si
 const acumFinal = simTom.puntos[simTom.puntos.length - 1].acum_l_m2;
 ok(approx(acumFinal, simTom.total, 0.11), "total coincide con el último punto acumulado");
 
+console.log("── laminaRiego: la duración manda sobre la lámina congelada ──");
+ok(M.laminaRiego(45, 180, 5.4) === 16.2, "180 min a 5,4 mm/h → 16,2 L/m² (ignora el 45 guardado con el caudal viejo)");
+ok(M.laminaRiego(45, 180, 15) === 45,    "el mismo riego a 15 mm/h → 45 L/m² (así se guardó en su día)");
+ok(M.laminaRiego(20, null, 5.4) === 20,  "sin duración (cubos/regadera) → la lámina guardada tal cual");
+ok(M.laminaRiego(20, 60, null) === 20,   "sin caudal → la lámina guardada tal cual");
+ok(M.laminaRiego(20, 60, 0) === 20,      "caudal 0 no divide ni multiplica por cero: lámina guardada");
+ok(M.laminaRiego(null, null, 5.4) === null, "sin nada que aplicar → null (el balance lo lee como recarga completa)");
+ok(M.laminaRiego(45, 180, "5.4") === 16.2, "caudal como texto (PostgREST numeric) también cuenta");
+// El bug de 28-jul: cambiar el caudal del piloto tiene que mover el BALANCE, no
+// solo la lista de riegos. Con la lámina congelada el déficit no se enteraba.
+// (ventana corta a propósito: en una serie larga los dos déficits saturan en TAW
+// y la diferencia se perdería)
+const riegosDur = [["2026-06-05", 180], ["2026-06-07", 60]];
+const balPorCaudal = (caudal) => M.balanceHidrico(
+  serieSeca.slice(0, 10),
+  riegosDur.map(([date, min]) => ({ date, litros: M.laminaRiego(999, min, caudal) })),
+  { suelo: "franco", cultivoId: "lechuga", metodoRiego: "aspersion", fechaPlantacion: PLANT },
+).Dr;
+ok(balPorCaudal(5.4) > balPorCaudal(15), `afinar el caudal a la baja sube el déficit (${balPorCaudal(5.4).toFixed(1)} vs ${balPorCaudal(15).toFixed(1)} mm)`);
+
 console.log("── decisión: regla intacta ──");
 const bal = M.balanceHidrico(serieSeca.slice(0, 10), [], { suelo: "franco", cultivoId: "lechuga", metodoRiego: "aspersion", fechaPlantacion: PLANT });
 const dec = M.decisionRiego(bal);

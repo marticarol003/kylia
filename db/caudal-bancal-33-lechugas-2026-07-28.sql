@@ -1,0 +1,92 @@
+-- ─────────────────────────────────────────────────────────────────
+-- KYLIA · Caudal MEDIDO del bancal de las 33 lechugas (zona A, Sant Boi)
+--   15 mm/h (heredado, mal)  →  5,4 mm/h (medido con cubo)
+-- ─────────────────────────────────────────────────────────────────
+-- Pega este archivo entero en el SQL Editor de Supabase.
+--
+-- QUÉ ES: la zona A del ensayo de lechugas, el ÚNICO campo donde Kylia decide y
+-- el padre ejecuta. Su `caudal` (mm/h de aspersión) es el número del que cuelga
+-- todo: alimenta laminaMostrada → balanceHidrico (FAO-56) → la orden de riego
+-- diaria y el reveal. Estaba mal por herencia y aquí se corrige con una medida.
+-- Ver memoria: project_ensayo_lechugas_kylia_vs_padre.
+--
+-- ── DE DÓNDE VENÍA EL 15 (y por qué no valía aquí) ───────────────
+--   El 15 mm/h se midió con el truco del vaso el 12-jun-2026, pero en el CAMPO
+--   DE 440 m² del padre: 35 microaspersores para 440 m² = 12,6 m² por aspersor.
+--   Se copió al bancal de las 33 por ser "los mismos aspersores". Y lo son (misma
+--   ficha, 180 L/h), pero el aspersor no fija la lámina: la fija el MARCO que
+--   cada uno tiene que cubrir. En los 440 m² son 12,6 m² por cabeza; en la malla
+--   de estas lechugas son 22 m² de catálogo y más en la práctica. Mismo aspersor,
+--   la mitad de lámina.
+--
+-- ── LOS ASPERSORES DEL BANCAL (dato del usuario) ─────────────────
+--   • Los MISMOS microaspersores que el resto de las lechugas del padre y que el
+--     campo de 440 m²: ficha de 180 L/h, montados a 1,25 m de altura.
+--   • En el bancal hay DOS, en medio de las dos filas de lechugas.
+--
+-- ── LA MEDICIÓN (18-jul-2026, 10:31 h, fotos IMG_3838-3843) ──────
+--   • Cubo de obra colocado EN MEDIO de los dos aspersores que quedan entre las
+--     dos filas de lechugas, durante 1 h de riego.
+--   • Boca del cubo: Ø 28 cm, medido con cinta métrica de asa a asa y verificado
+--     sobre la foto calibrando con las marcas de 10 y 20 cm de la propia cinta
+--     (92,5 px/cm) → área de captación π × 0,14² = 0,0616 m².
+--     (El cubo mide además 29,5 cm de alto → ~14 L, coherente con un cubo de obra.)
+--   • El agua recogida se pasó a una botella de 1,5 L: nivel justo por debajo de
+--     la etiqueta → 0,33 L. Medido sobre la foto integrando la geometría de la
+--     botella (Ø cuerpo 9 cm, 5,9 cm de columna menos el hueco de la base
+--     pétalo); el Ø 9 cm se autovalida porque reproduce los 1,5 L nominales.
+--
+--       lámina recogida = 0,33 L / 0,0616 m² = 5,4 mm en 1 h  →  5,4 mm/h  ← BD
+--
+--   ⚠ MARGEN HONESTO: 4,6 - 6,3 mm/h. Lo domina la lectura del volumen en foto
+--     (±15%); el diámetro del cubo aporta ±7%. El extremo alto del margen cae
+--     justo en el 6,3 calculado para la zona B, que es tranquilizador.
+--
+-- ── EL 5,4 CUADRA CON LOS 180 L/h DE LA FICHA ────────────────────
+--   Dos aspersores de 180 L/h = 360 L/h cayendo sobre el bancal y su entorno.
+--   Para que en el punto medio se midan 5,4 mm/h (= 5,4 L/m²·h), esos 360 L/h
+--   tienen que estar repartidos sobre ≈ 360 / 5,4 = 67 m², o sea ~33 m² por
+--   aspersor → radio de mojado ≈ 3,2 m. Es exactamente el alcance normal de un
+--   microaspersor montado a 1,25 m de altura, y encaja con que el marco de
+--   catálogo sea 5,5 × 4 m (patrones que se solapan, no que se tocan justo).
+--   La medida no pide ninguna física rara: pide un aspersor corriente.
+--
+-- ── POR QUÉ ES CREÍBLE: TRES FUENTES QUE CONVERGEN ───────────────
+--     5,4 mm/h  ← ESTA medición con cubo (directa, en el punto)
+--     6,3 mm/h  ← fórmula del marco real de la zona B (180 ÷ 6,5×4,4), misma malla
+--     8,2 mm/h  ← diseño del fabricante (180 L/h ÷ marco 5,5×4 m = 22 m²)
+--      15 mm/h  ← campo de 440 m², OTRA densidad de aspersores. No aplica aquí.
+--   Las tres primeras son el mismo orden de magnitud y la cuarta es de otro campo.
+--
+-- ── QUÉ CAMBIA EN PRODUCCIÓN AL EJECUTAR ESTO ────────────────────
+--   Los riegos del bancal se apuntan por DURACIÓN, así que todo el histórico se
+--   recalcula solo (laminaMostrada, api/campo.js). Las 7,2 h regadas desde el
+--   18-jul dejan de contar como 108 mm brutos y pasan a contar 39 mm:
+--
+--     antes (15):   déficit hoy  7,9 mm → "vigilar"
+--     después (5,4): déficit hoy 22,3 mm → "REGAR HOY"
+--
+--   ⚠ Kylia va a pedir bastante más agua a partir de ahora. Si las lechugas NO
+--     muestran estrés al mediodía con 22 mm de déficit y un RAW de 9,9 mm, la
+--     explicación más probable es que al bancal le entran riegos que no se están
+--     apuntando (la malla es fija y riega a la vez para todo lo que haya en la
+--     pieza, no solo cuando Kylia lo pide). Eso hay que mirarlo antes de dar el
+--     déficit por bueno: contaminaría el ensayo tanto como el caudal malo.
+--
+-- ── PENDIENTE PARA CERRARLO DEL TODO ─────────────────────────────
+--   Un solo cubo mide UN punto, no la media del bancal. Antes de la cosecha,
+--   repetir con 3 cubos a la vez (junto a un aspersor, en medio de los dos, y en
+--   la punta del bancal), 1 h de reloj, y promediar. Los riegos están apuntados
+--   por duración → el día que se afine, el histórico entero se recalcula solo.
+
+-- ── El caudal medido ─────────────────────────────────────────────
+update usuarios
+   set caudal = 5.4                                   -- 0,33 L ÷ 0,0616 m² en 1 h
+ where id = 'd5475c3d-365b-47ff-b31e-fa659a8362fb';   -- 33 lechugas · aspersión
+
+-- ── Comprobar ────────────────────────────────────────────────────
+--   select id, nombre, area_m2, caudal, metodo_riego
+--     from usuarios where id = 'd5475c3d-365b-47ff-b31e-fa659a8362fb';
+--   → caudal = 5.4
+--   Y en la app: /campo debe pasar de "vigilar" a "regar hoy", y los riegos de
+--   la lista bajar (el del 18-jul de 45 → 16,2 L/m²).

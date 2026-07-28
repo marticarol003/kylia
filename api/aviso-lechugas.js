@@ -40,6 +40,7 @@
 // Para test manual: GET /api/aviso-lechugas?fase=manana&dry=1
 
 const { isConfigured, supabaseSelect, supabaseDelete } = require("./_supabase.js");
+const { laminaRiego } = require("./_motor-riego.js");
 const webpush = require("web-push");
 
 const USUARIO_ID = "d5475c3d-365b-47ff-b31e-fa659a8362fb"; // 33 lechugas · aspersión
@@ -133,7 +134,9 @@ function emailMediodia(data, riego) {
   const durTxt = riego?.duracion_min != null
     ? (riego.duracion_min < 60 ? `${riego.duracion_min} min` : `${Math.round(riego.duracion_min / 6) / 10} h`)
     : null;
-  const detalle = riego ? [durTxt, riego.cantidad_l_m2 != null ? `${riego.cantidad_l_m2} L/m²` : null].filter(Boolean).join(" · ") : null;
+  // L/m² del caudal de HOY, no el que se guardó el día del riego (laminaRiego).
+  const lm2 = riego ? laminaRiego(riego.cantidad_l_m2, riego.duracion_min ?? null, data.usuario?.caudal) : null;
+  const detalle = riego ? [durTxt, lm2 != null ? `${lm2} L/m²` : null].filter(Boolean).join(" · ") : null;
 
   if (h.regar && riego) return {
     subject: "✅ Kylia · riego hecho y registrado",

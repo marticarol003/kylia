@@ -13,7 +13,7 @@
 // aquí solo se leen las filas y se ensambla.
 
 const { isConfigured, supabaseSelect, supabaseUpdate, preludio } = require("./_supabase.js");
-const { balanceHidrico, decisionRiego, presentarRiego, simularKylia, faseDelDia } = require("./_motor-riego.js");
+const { balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia, faseDelDia } = require("./_motor-riego.js");
 const { construirReveal } = require("./_reveal.js");
 const { necesidadNutrientes, creditoResiduosN } = require("./_motor-nutricion.js");
 const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
@@ -28,17 +28,6 @@ function dia(f) { return f ? String(f).slice(0, 10) : null; }
 function diasDesde(fechaIso) {
   if (!fechaIso) return null;
   return Math.floor((Date.now() - new Date(`${fechaIso}T12:00:00Z`)) / 86400000);
-}
-
-// Lámina (L/m²) a MOSTRAR de un riego registrado. La duración es la fuente de
-// verdad: cuando el riego se apuntó por tiempo (aspersión/goteo) y conocemos el
-// caudal, la lámina = duración(min) × caudal(mm/h) / 60. Así la lista sigue al
-// caudal ACTUAL y no se queda desfasada si se afina con el truco del vaso
-// (mismo criterio que la comparativa, lm2DeRiego). Sin duración o sin caudal
-// (p. ej. regadera por cubos) → se usa la lámina guardada tal cual.
-function laminaMostrada(cantidadGuardada, duracionMin, caudal) {
-  if (duracionMin != null && caudal) return Math.round((caudal * duracionMin / 60) * 10) / 10;
-  return cantidadGuardada ?? null;
 }
 
 // Caché en memoria de series de clima (TTL 30 min). El panel /pilotos y el
@@ -76,7 +65,10 @@ async function vistaHoy(res, u) {
   const accs   = await supabaseSelect("acciones",
     `usuario_id=eq.${u.id}&tipo=eq.riego&select=id,fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.asc`);
   const riegos = (accs || []).filter(f => f.fecha_local)
-    .map(f => ({ id: f.id, date: f.fecha_local, litros: f.cantidad_l_m2 ?? null, duracion_min: f.duracion_min ?? null }));
+    .map(f => ({ id: f.id, date: f.fecha_local, duracion_min: f.duracion_min ?? null,
+                 // El cantidad_l_m2 guardado se congeló con el caudal del día del
+                 // riego; el balance tiene que ver la lámina del caudal de HOY.
+                 litros: laminaRiego(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal) }));
 
   const opts = { suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
                  metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion };
@@ -102,14 +94,11 @@ async function vistaHoy(res, u) {
     }
   }
 
-  const recientes = riegos.slice(-5).reverse().map(r => {
-    const l_m2 = laminaMostrada(r.litros, r.duracion_min, u.caudal);
-    return {
-      id: r.id, fecha: r.date, l_m2, duracion_min: r.duracion_min,
-      cubos: (u.capacidad_regadera && u.area_m2 && l_m2 != null)
-        ? Math.round((l_m2 * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
-    };
-  });
+  const recientes = riegos.slice(-5).reverse().map(r => ({
+    id: r.id, fecha: r.date, l_m2: r.litros, duracion_min: r.duracion_min,
+    cubos: (u.capacidad_regadera && u.area_m2 && r.litros != null)
+      ? Math.round((r.litros * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
+  }));
 
   // Desglose del "porqué de hoy": de dónde sale la decisión (para la tarjeta explicativa).
   const cultivoId = (u.cultivos || [])[0] || null;
@@ -157,7 +146,7 @@ async function vistaPerfil(res, u) {
       `usuario_id=eq.${u.id}&tipo=eq.aplicacion&select=id,fecha_local,producto_nombre,dosis,motivo&order=fecha_local.desc&limit=8`),
   ]);
   const recientes = (accs || []).filter(f => f.fecha_local).map(f => {
-    const l_m2 = laminaMostrada(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal);
+    const l_m2 = laminaRiego(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal);
     return {
       id: f.id, fecha: f.fecha_local, l_m2, duracion_min: f.duracion_min ?? null,
       cubos: (u.capacidad_regadera && u.area_m2 && l_m2 != null)
@@ -302,7 +291,7 @@ async function vistaCuaderno(req, res, u) {
     },
     riegos: (riegos || []).filter(r => r.fecha_local).map(r => ({
       fecha: r.fecha_local, duracion_min: r.duracion_min ?? null,
-      l_m2: laminaMostrada(r.cantidad_l_m2, r.duracion_min ?? null, u.caudal),
+      l_m2: laminaRiego(r.cantidad_l_m2, r.duracion_min ?? null, u.caudal),
       franja: r.franja_horaria || null,
     })),
     tratamientos: (trats || []).filter(t => t.fecha_local).map(t => ({
@@ -343,7 +332,7 @@ async function revealDeUsuario(u) {
   const tratKylia = (recs || []).filter(r => r.tipo === "tratamiento" || r.tipo === "nutricion")
     .map(r => ({ dia: dia(r.fecha) }));
   const riegosReales = (acciones || []).filter(a => a.tipo === "riego")
-    .map(a => ({ dia: dia(a.fecha_local), l_m2: laminaMostrada(a.cantidad_l_m2, a.duracion_min ?? null, u.caudal) }));
+    .map(a => ({ dia: dia(a.fecha_local), l_m2: laminaRiego(a.cantidad_l_m2, a.duracion_min ?? null, u.caudal) }));
   // Los abonados (motivo="abonado") NO son tratamientos fitosanitarios: van al
   // cuaderno de fertilización (vista=cuaderno), no a la dimensión de plagas.
   const tratReales = (acciones || [])
@@ -503,10 +492,11 @@ async function vistaComparativa(req, res, u) {
     caudalBajo = caudalAlto = caudalUnico;
   }
 
-  // L/m² de un riego bajo un caudal dado: duración × mm/h / 60. Sin duración
-  // (cantidad apuntada a mano) → el valor guardado, idéntico en ambos escenarios.
+  // L/m² de un riego bajo un caudal dado (misma regla que el resto: la duración
+  // manda). Sin duración (cantidad apuntada a mano) → el valor guardado, que es
+  // idéntico en ambos escenarios de la banda.
   const lm2DeRiego = (r, caudal) =>
-    r.duracion_min != null ? (caudal * r.duracion_min) / 60 : (r.cantidad_l_m2 ?? 0);
+    laminaRiego(r.cantidad_l_m2, r.duracion_min ?? null, caudal) ?? 0;
 
   const bajoPorDia = {}, altoPorDia = {};
   let nRiegosPadre = 0;

@@ -19,7 +19,7 @@
 // Usa el MISMO motor que la app (api/_motor-riego.js) para que no deriven.
 
 const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js");
-const { balanceHidrico, decisionRiego } = require("./_motor-riego.js");
+const { balanceHidrico, decisionRiego, laminaRiego } = require("./_motor-riego.js");
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
 
@@ -55,14 +55,19 @@ async function climaSerie(lat, lon, desde) {
   }));
 }
 
-async function riegosDe(usuarioId) {
+// Riegos del piloto para el balance. La lámina sale del caudal ACTUAL vía
+// laminaRiego (ver el motor): el cantidad_l_m2 guardado se congeló con el caudal
+// del día del riego, y los caudales se afinan (truco del vaso, geometría real de
+// la malla). Sin esto, afinar un caudal no movería las decisiones del Diario B.
+async function riegosDe(u) {
   const filas = await supabaseSelect(
     "acciones",
-    `usuario_id=eq.${usuarioId}&tipo=eq.riego&select=fecha_local,cantidad_l_m2&order=fecha_local.asc`
+    `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.asc`
   );
   return (filas || [])
     .filter(f => f.fecha_local)
-    .map(f => ({ date: f.fecha_local, litros: f.cantidad_l_m2 ?? null }));
+    .map(f => ({ date: f.fecha_local,
+                 litros: laminaRiego(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal) }));
 }
 
 // Materializa los riegos de un piloto de GOTEO AUTOMÁTICO de pauta fija.
@@ -153,7 +158,7 @@ module.exports = async (req, res) => {
       if (!dry && await yaCongelado(u.id, hoy)) { r.skip = "ya congelado hoy"; resultados.push(r); continue; }
 
       const serie  = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
-      const riegos = await riegosDe(u.id);
+      const riegos = await riegosDe(u);
       // Goteo automático de pauta fija: rellena los riegos que falten (nadie los
       // apunta) y súmalos al balance para que no se quede corto.
       const auto = await materializarGoteoAuto(u, riegos, hoy, dry);

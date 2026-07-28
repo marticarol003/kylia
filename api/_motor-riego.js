@@ -195,6 +195,20 @@ function presentarRiego(mmBruto, opts = {}) {
   return { unidad: "l_m2", valor: r0(mm), mm: r1(mm), texto: `${r0(mm)} L/m²` };
 }
 
+// Lámina (mm = L/m²) de un riego YA REGISTRADO — la inversa de presentarRiego.
+// La DURACIÓN es la fuente de verdad: si el riego se apuntó por tiempo
+// (aspersión/goteo) y conocemos el caudal, lámina = duración(min) × caudal / 60.
+// Así todo lo que consume riegos (lista, balance FAO-56, comparativa, Diario B)
+// sigue al caudal ACTUAL y no se queda clavado en el que hubiera el día del
+// riego: los caudales se afinan (truco del vaso, geometría real de la malla) y
+// el `cantidad_l_m2` que se guardó entonces se desfasa. Sin duración o sin
+// caudal (p. ej. regadera por cubos) → la lámina guardada tal cual.
+function laminaRiego(cantidadGuardada, duracionMin, caudalMmh) {
+  const caudal = Number(caudalMmh);
+  if (duracionMin != null && caudal > 0) return Math.round((caudal * duracionMin / 60) * 10) / 10;
+  return cantidadGuardada ?? null;
+}
+
 // Simula el manejo del riego "según Kylia" sobre una serie climática: cada día,
 // si el déficit acumulado alcanza el umbral RAW, riega la lámina BRUTA que
 // recomienda la regla (Dr/eficiencia) y repone el suelo; si no, no riega. Es la
@@ -233,5 +247,5 @@ function simularKylia(serie, opts = {}) {
 
 module.exports = {
   FAO_KC, SUELO_AWC, ZR_M, P_AGOTAMIENTO, PE_MIN_MM, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
-  kcDelDia, faseDelDia, zrDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego, simularKylia,
+  kcDelDia, faseDelDia, zrDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia,
 };

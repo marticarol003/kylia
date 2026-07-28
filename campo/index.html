@@ -462,11 +462,11 @@
   }
 
   // ── Pantalla "comparativa" ────────────────────────────────────
-  // Caudal del aspersor del padre, MEDIDO con el truco del vaso (12-jun): 3 cm de
-  // agua (= 30 mm) recogidos en 2 h → 15 mm/h. Sustituye a la banda estimada
-  // (35 microaspersores a 70–120 L/h) de antes. Una sola toma con cubo cónico:
-  // afinable con un recipiente recto y varias tomas, pero ya es dato medido.
-  const CAUDAL_MEDIDO = 15;
+  // El caudal sale de la BD del campo (usuarios.caudal), NO cableado aquí: el del
+  // padre está MEDIDO con el truco del vaso (12-jun, 3 cm = 30 mm en 2 h → 15 mm/h,
+  // que sustituyó a la banda estimada de 35 microaspersores a 70–120 L/h). Tenerlo
+  // en un solo sitio es lo que evita que el front se quede clavado en un número
+  // viejo cuando se afina el caudal, como pasó con el bancal de las 33 (28-jul).
 
   function chartSVG(serie, banda) {
     const W = 340, H = 200, padL = 6, padR = 6, padT = 16, padB = 26;
@@ -599,7 +599,7 @@
              ${e.aspersores} aspersores a ${e.lh_bajo}–${e.lh_alto} L/h
              (≈ ${e.caudal_bajo_mmh}–${e.caudal_alto_mmh} mm/h). Cuando lo midas con el truco del vaso,
              la banda colapsa a una línea.`
-          : `El caudal del aspersor está <b>medido</b> (${c.caudal_mmh || 15} mm/h, truco del vaso: 30 mm en 2 h).
+          : `El caudal del aspersor está <b>medido</b> (${c.caudal_mmh} mm/h, truco del vaso: 30 mm en 2 h).
              Es una sola toma con cubo cónico, así que puede afinarse con un recipiente recto y varias tomas.`}
       </p>`;
   }
@@ -607,8 +607,7 @@
   function cargarComparativa() {
     const box = document.getElementById("comparativa");
     box.innerHTML = `<div class="msg skel">Cargando comparativa…</div>`;
-    const qs = `&caudal=${CAUDAL_MEDIDO}`;
-    fetch(`/api/campo?vista=comparativa&usuario_id=${encodeURIComponent(CAMPOS.padre.id)}${qs}`)
+    fetch(`/api/campo?vista=comparativa&usuario_id=${encodeURIComponent(CAMPOS.padre.id)}`)
       .then(r => r.json()).then(pintarComparativa)
       .catch(e => { box.innerHTML = `<div class="msg">No se pudo conectar.<br><small>${e.message}</small></div>`; });
   }
