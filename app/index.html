@@ -2342,6 +2342,10 @@
     </div>
   </div>
 
+  <!-- Motor FAO-56: el MISMO fichero que hace require el servidor (api/_motor-riego.js
+       lo reexporta). Antes estaba duplicado dentro de este HTML y las dos copias
+       decidían distinto sobre los mismos datos. -->
+  <script src="/assets/js/motor-riego.js"></script>
   <script>
     // ─── Constantes ───────────────────────────────────────────────────────────
     const REFRESH_MS  = 30 * 60 * 1000;
@@ -2790,85 +2794,28 @@
     // Degradación elegante: sin fecha de plantación → Kc = 1 (ETc = ET₀, como el
     // comportamiento anterior); sin tipo de suelo → suelo franco por defecto.
 
-    // Kc por fase + longitudes de fase (días). Valores FAO-56 Tabla 12 (estándar
-    // internacional). Calibrar localmente con los datos del propio piloto y
-    // referencias catalanas (IRTA / Ruralcat).
-    // zr = [mín al trasplante, máx] (m) y p = fracción de agotamiento sin
-    // estrés, FAO-56 Tabla 22 (Zr_max: cota inferior del rango, conservador).
-    // ESPEJO de api/_motor-riego.js — mantener idénticos (deuda "unificar motor").
-    const FAO_KC = {
-      lechuga:   { ini: 0.70, med: 1.00, fin: 0.95, L: [20, 30, 15, 10], zr: [0.20, 0.30], p: 0.30 },
-      espinaca:  { ini: 0.70, med: 1.00, fin: 0.95, L: [20, 20, 15,  5], zr: [0.20, 0.30], p: 0.20 },
-      brassica:  { ini: 0.70, med: 1.05, fin: 0.95, L: [30, 35, 50, 15], zr: [0.20, 0.50], p: 0.45 },
-      tomate:    { ini: 0.60, med: 1.15, fin: 0.80, L: [30, 40, 45, 30], zr: [0.20, 0.70], p: 0.40 },
-      pimiento:  { ini: 0.60, med: 1.05, fin: 0.90, L: [30, 35, 40, 20], zr: [0.20, 0.50], p: 0.30 },
-      berenjena: { ini: 0.60, med: 1.05, fin: 0.90, L: [30, 40, 40, 20], zr: [0.20, 0.70], p: 0.45 },
-      calabacin: { ini: 0.50, med: 0.95, fin: 0.75, L: [25, 35, 25, 15], zr: [0.20, 0.60], p: 0.50 },
-      cebolla:   { ini: 0.75, med: 1.05, fin: 1.00, L: [15, 25, 20, 10], zr: [0.20, 0.30], p: 0.30 },
-    };
-    const SUELO_AWC = { arenoso: 0.08, franco: 0.15, arcilloso: 0.16 }; // θFC−θWP (m³/m³), FAO-56 Tabla 19
-    const SUELO_AWC_DEFAULT = 0.15;   // franco si no se conoce
-    const ZR_M          = 0.30;       // profundidad radicular (m) — fallback sin cultivo conocido
-    const P_AGOTAMIENTO = 0.45;       // fracción de agotamiento — fallback sin cultivo conocido
-    const PE_MIN_MM     = 2;          // lluvia diaria < 2 mm no infiltra (precipitación efectiva)
-    const EFIC_RIEGO    = { goteo: 0.90, aspersion: 0.75, manguera: 0.70, surco: 0.60, regadera: 0.85 };
-    const EFIC_DEFAULT  = 0.85;
-    const CAUDAL_DEFAULT_MMH = { goteo: 4, aspersion: 10, manguera: 20 }; // L/m²·h por defecto
+    // El motor FAO-56 (tablas Kc, TAW/RAW, balance, presentación) YA NO vive
+    // aquí: es assets/js/motor-riego.js, el MISMO fichero que hace require el
+    // servidor. Antes había dos copias y, aunque las tablas no habían derivado,
+    // la ventana del balance sí (ver calcularBalanceHidrico). Lo de abajo son
+    // solo adaptadores que le pasan al motor lo que la app guarda en `cfg`.
+    const MOTOR = window.KyliaMotor;
+    const { FAO_KC, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH, PE_MIN_MM,
+            kcDelDia, zrDelDia } = MOTOR;
 
     // Presenta la lámina bruta (L/m² = mm) en la unidad del sistema del agricultor.
-    // (Gemelo de presentarRiego en api/_motor-riego.js — ver deuda "unificar motor".)
     function fmtRiego(litrosBrutoMm) {
-      const mm = Math.max(0, Number(litrosBrutoMm) || 0);
-      const m  = cfg.metodoRiego;
-      if (m === "regadera") {
-        const a = Number(cfg.areaParcela), cap = Number(cfg.capacidadRegadera);
-        if (a > 0 && cap > 0) {
-          const litros = mm * a, n = litros / cap;
-          const nT = n >= 10 ? Math.round(n) : Math.round(n * 10) / 10;
-          return `${nT} regadera${nT === 1 ? "" : "s"} (${Math.round(litros)} L)`;
-        }
-        return `${Math.round(mm)} L/m²`;
-      }
-      const caudal = Number(cfg.caudal) || CAUDAL_DEFAULT_MMH[m];
-      if (caudal > 0) {
-        const min = Math.round((mm / caudal) * 60);
-        if (min >= 120) return `${(min / 60).toFixed(1).replace(".", ",")} h`;
-        return `${min} min`;
-      }
-      return `${Math.round(mm)} L/m²`;
+      return MOTOR.presentarRiego(litrosBrutoMm, {
+        metodoRiego:        cfg.metodoRiego,
+        caudalMmh:          cfg.caudal,
+        areaM2:             cfg.areaParcela,
+        capacidadRegaderaL: cfg.capacidadRegadera,
+      }).texto;
     }
 
-    // Kc del día según los días transcurridos desde la plantación (interpolación
-    // lineal por fases: inicial → desarrollo → media → final).
-    function kcDelDia(cultivoId, diasDesdePlantacion) {
-      const k = FAO_KC[cultivoId];
-      if (!k || diasDesdePlantacion == null) return 1; // fallback: ETc = ET₀
-      const [Li, Ld, Lm, Lf] = k.L;
-      const d = Math.max(0, diasDesdePlantacion);
-      if (d < Li)                return k.ini;
-      if (d < Li + Ld)           return k.ini + (k.med - k.ini) * (d - Li) / Ld;
-      if (d < Li + Ld + Lm)      return k.med;
-      if (d < Li + Ld + Lm + Lf) return k.med + (k.fin - k.med) * (d - Li - Ld - Lm) / Lf;
-      return k.fin;
-    }
-
-    // Profundidad radicular del día: crece de zr[0] a zr[1] durante
-    // inicial+desarrollo (FAO-56 §8.3). Espejo de zrDelDia del motor servidor.
-    function zrDelDia(cultivoId, dias) {
-      const k = FAO_KC[cultivoId];
-      if (!k || !k.zr || dias == null) return ZR_M;
-      const f = Math.min(1, Math.max(0, dias) / (k.L[0] + k.L[1]));
-      return k.zr[0] + (k.zr[1] - k.zr[0]) * f;
-    }
-
-    // Agua total (TAW) y fácilmente disponible (RAW), en mm, según suelo,
-    // cultivo y día del ciclo. Sin cultivo/día → fallbacks fijos (legacy).
+    // TAW/RAW del día. El motor pide el suelo por parámetro; aquí sale de `cfg`.
     function aguaSuelo(cultivoId = null, dias = null) {
-      const awc = SUELO_AWC[cfg.suelo] ?? SUELO_AWC_DEFAULT;
-      const zr  = zrDelDia(cultivoId, dias);
-      const p   = FAO_KC[cultivoId]?.p ?? P_AGOTAMIENTO;
-      const taw = 1000 * awc * zr;
-      return { taw, raw: p * taw, awc };
+      return MOTOR.aguaSuelo(cfg.suelo, cultivoId, dias);
     }
 
     function diasDesde(fechaIso, hasta) {
@@ -2885,43 +2832,28 @@
       if (!refDate) return null;
 
       const cultivoId = (cfg.cultivos || [])[0] || null;
-      const efic      = EFIC_RIEGO[cfg.metodoRiego] ?? EFIC_DEFAULT;
       const plant     = cfg.fechaPlantacion || null;
-      let { taw, raw } = aguaSuelo(cultivoId, diasDesde(plant, Date.now()));
+      const ahora     = Date.now();
 
-      // Ventana: desde el riego anterior al último (capta el déficit residual si
-      // ese riego se quedó corto); si solo hay uno, desde el último riego/imagen.
-      const anchor = riegos.length >= 2 ? riegos[riegos.length - 2].date : refDate;
-
-      // Riego neto (litros × eficiencia) por fecha. null = registro legacy sin
-      // cantidad → se asume recarga completa ese día.
-      const riegoNeto = {};
-      riegos.forEach(r => {
-        riegoNeto[r.date] = r.litros != null
-          ? (riegoNeto[r.date] || 0) + r.litros * efic
-          : null;
-      });
-
-      const serie = ultimoET0
-        .filter(({ date }) => date >= anchor)
+      // VENTANA: desde la plantación, igual que el servidor. Antes arrancaba en
+      // el penúltimo riego, lo que equivalía a dar el suelo por LLENO ese día:
+      // el déficit no podía acumularse de un riego al siguiente y un agricultor
+      // que se quedara corto de forma crónica no lo veía nunca. Medido sobre el
+      // mismo caso (lechuga, 40 días, riegos cortos): 10,0 mm de déficit por la
+      // ventana vieja contra 38,4 mm reales — "vigilar" en vez de "regar".
+      // Si la serie de clima no llega hasta la plantación, arranca donde llegue
+      // (el suelo se asume lleno ahí; misma limitación que el servidor).
+      const serie = [...ultimoET0]
+        .filter(({ date }) => !plant || date >= plant)
         .sort((a, b) => a.date.localeCompare(b.date));
 
-      const ahora = Date.now();
-      let Dr = 0, etcAcum = 0, et0Acum = 0, lluviaAcum = 0;
-      for (const dia of serie) {
-        const dias = diasDesde(plant, new Date(`${dia.date}T12:00:00`));
-        ({ taw, raw } = aguaSuelo(cultivoId, dias));  // la raíz crece día a día
-        if (dia.date in riegoNeto) {                 // recarga por riego del día
-          const r = riegoNeto[dia.date];
-          Dr = r === null ? 0 : Math.max(0, Dr - r);
-        }
-        const kc  = kcDelDia(cultivoId, dias);
-        const etc = kc * (dia.et0 ?? 0);
-        const pll = Math.max(0, dia.lluvia ?? 0);
-        const pe  = pll >= PE_MIN_MM ? pll : 0;      // lluvia efectiva: <2 mm no infiltra
-        Dr = Math.min(taw, Math.max(0, Dr + etc - pe));
-        etcAcum += etc; et0Acum += (dia.et0 ?? 0); lluviaAcum += pe;
-      }
+      const bal = MOTOR.balanceHidrico(serie, riegos, {
+        suelo:           cfg.suelo,
+        cultivoId,
+        metodoRiego:     cfg.metodoRiego,
+        fechaPlantacion: plant,
+      });
+      const { Dr, taw, raw, etcAcum, et0Acum, lluviaAcum } = bal;
 
       return {
         Dr, taw, raw,
@@ -3337,9 +3269,17 @@
     async function cargarET0() {
       try {
         const p   = puntoConsulta();
+        // La ventana llega hasta la PLANTACIÓN (tope 92 días, el máximo de
+        // past_days de open-meteo), igual que climaSerie del servidor. Estaba
+        // fija en 14 días: aunque el balance arrancara en la plantación, no
+        // había clima anterior y el déficit acumulado se perdía igual.
+        const diasPlant = cfg.fechaPlantacion
+          ? Math.floor((Date.now() - new Date(`${cfg.fechaPlantacion}T12:00:00`)) / 86400000) + 1
+          : 14;
+        const past = Math.min(92, Math.max(14, diasPlant));
         const url = `https://api.open-meteo.com/v1/forecast`
           + `?latitude=${p.lat.toFixed(5)}&longitude=${p.lon.toFixed(5)}`
-          + `&daily=et0_fao_evapotranspiration,precipitation_sum&past_days=14&forecast_days=0&timezone=auto`;
+          + `&daily=et0_fao_evapotranspiration,precipitation_sum&past_days=${past}&forecast_days=0&timezone=auto`;
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) return;
         const data  = await res.json();

@@ -78,6 +78,30 @@ const balPorCaudal = (caudal) => M.balanceHidrico(
 ).Dr;
 ok(balPorCaudal(5.4) > balPorCaudal(15), `afinar el caudal a la baja sube el déficit (${balPorCaudal(5.4).toFixed(1)} vs ${balPorCaudal(15).toFixed(1)} mm)`);
 
+console.log("── riegos del mismo día: el null no depende del orden ──");
+const optsDia = { suelo: "franco", cultivoId: "lechuga", metodoRiego: "aspersion", fechaPlantacion: PLANT };
+const serie3 = serieSeca.slice(0, 3);
+const drCon = (riegos) => M.balanceHidrico(serie3, riegos, optsDia).Dr;
+const d1 = "2026-06-02";
+ok(drCon([{ date: d1, litros: 20 }, { date: d1, litros: null }]) ===
+   drCon([{ date: d1, litros: null }, { date: d1, litros: 20 }]),
+   "mismo Dr leyendo el array en un orden o en el otro");
+ok(drCon([{ date: d1, litros: null }, { date: d1, litros: 20 }]) === drCon([{ date: d1, litros: null }]),
+   "el null (regó y no sabemos cuánto) manda: recarga completa");
+ok(drCon([{ date: d1, litros: 10 }, { date: d1, litros: 10 }]) === drCon([{ date: d1, litros: 20 }]),
+   "dos riegos cuantificados el mismo día siguen sumando");
+
+console.log("── presentarRiego: sesiones largas se parten en tandas ──");
+const corto = M.presentarRiego(9, { metodoRiego: "aspersion", caudalMmh: 15 });
+ok(corto.fraccionar === undefined && corto.texto === "36 min", `36 min no se fracciona (${corto.texto})`);
+const largo = M.presentarRiego(29.8, { metodoRiego: "aspersion", caudalMmh: 5.4 });
+ok(largo.valor === 331, `el caso real del bancal: 29,8 mm a 5,4 mm/h → 331 min (${largo.valor})`);
+ok(largo.fraccionar.sesiones === 3 && largo.fraccionar.min_por_sesion === 110,
+   `se parte en 3 tandas de 110 min (${JSON.stringify(largo.fraccionar)})`);
+ok(approx(largo.fraccionar.sesiones * largo.fraccionar.min_por_sesion, largo.valor, 3),
+   "las tandas suman los mismos minutos (misma agua, no menos)");
+ok(largo.mm === 29.8, "los mm de la decisión no cambian al fraccionar");
+
 console.log("── decisión: regla intacta ──");
 const bal = M.balanceHidrico(serieSeca.slice(0, 10), [], { suelo: "franco", cultivoId: "lechuga", metodoRiego: "aspersion", fechaPlantacion: PLANT });
 const dec = M.decisionRiego(bal);
