@@ -66,22 +66,37 @@ irr.idata = pd.DataFrame([[25.0, 1.0, 100.0] for _ in irr_days],
 od = Model(key(PLANT), key(dates[-1]), par, wth, irr=irr, roff=False)
 od.run(); od = od.odata.reset_index(drop=True)
 
-# ── Kylia (port fiel de calcularBalanceHidrico) ──
+# ── Kylia (port fiel de balanceHidrico, assets/js/motor-riego.js) ──
+# Dos cosas que el port NO reproducía y ahora sí (30-jul):
+#   · p ajustada por ETc (nota Tabla 22): pyfao56 la aplica de serie, Kylia
+#     también desde hoy → el umbral RAW varía día a día en los dos lados.
+#   · lluvia efectiva: Kylia ignora los días de < PE_MIN_MM (2 mm), pyfao56 no.
+#     Es una simplificación deliberada de Kylia y el port tiene que llevarla.
+PE_MIN_MM = 2.0
 Dr, kyl = 0.0, []
 for i in range(n):
     if i in irr_days: Dr = max(0, Dr - 25.0)
-    k = kc((dates[i]-PLANT).days); etc = k*et0[i]; pe = max(0, rain[i])
-    Dr = min(TAW, max(0, Dr + etc - pe)); kyl.append((k, etc, Dr))
+    k = kc((dates[i]-PLANT).days); etc = k*et0[i]
+    pe = rain[i] if rain[i] >= PE_MIN_MM else 0.0
+    p_adj = min(0.8, max(0.1, P + 0.04*(5.0 - etc)))     # = pyfao56 model.py
+    Dr = min(TAW, max(0, Dr + etc - pe))
+    kyl.append((k, etc, Dr, p_adj, p_adj*TAW))
 
 # ── Métricas ──
 m = min(len(od), n); A = lambda f: np.array([f(i) for i in range(m)])
 ky_kc, pf_kc   = A(lambda i: kyl[i][0]), A(lambda i: float(od.loc[i,'Kcm']))
 ky_etc, pf_etc = A(lambda i: kyl[i][1]), A(lambda i: float(od.loc[i,'ETcm']))
 ky_dr, pf_dr   = A(lambda i: kyl[i][2]), A(lambda i: float(od.loc[i,'Dr']))
+ky_p,  pf_p    = A(lambda i: kyl[i][3]), A(lambda i: float(od.loc[i,'p']))
+ky_raw, pf_raw = A(lambda i: kyl[i][4]), A(lambda i: float(od.loc[i,'RAW']))
 rmse = lambda a, b: float(np.sqrt(np.nanmean((a-b)**2)))
 mbe  = lambda a, b: float(np.nanmean(a-b))
-print(f"Periodo {dates[0]}→{dates[m-1]} ({m}d) · lechuga · franco · TAW {TAW:.0f} / RAW {RAW:.0f} mm")
+print(f"Periodo {dates[0]}→{dates[m-1]} ({m}d) · lechuga · franco · TAW {TAW:.0f} mm")
 print(f"RMSE(Kc)  = {rmse(ky_kc,pf_kc):.4f}")
 print(f"RMSE(ETc) = {rmse(ky_etc,pf_etc):.4f} mm/d   MBE = {mbe(ky_etc,pf_etc):+.4f}")
 print(f"RMSE(Dr)  = {rmse(ky_dr,pf_dr):.2f} mm       MBE = {mbe(ky_dr,pf_dr):+.2f} mm  (single vs dual)")
-print(f"Concordancia 'regar' (Dr>=RAW) = {((ky_dr>=RAW)==(pf_dr>=RAW)).mean()*100:.0f}%")
+print(f"RMSE(p)   = {rmse(ky_p,pf_p):.4f}            Kylia {ky_p.min():.2f}-{ky_p.max():.2f} · pyfao56 {pf_p.min():.2f}-{pf_p.max():.2f}")
+print(f"RMSE(RAW) = {rmse(ky_raw,pf_raw):.2f} mm       Kylia {ky_raw.min():.1f}-{ky_raw.max():.1f} · pyfao56 {pf_raw.min():.1f}-{pf_raw.max():.1f}")
+# Concordancia HONESTA: cada lado con SU propio umbral del día. Antes se usaba el
+# RAW fijo de Kylia para los dos, así que nunca se comparó el umbral de pyfao56.
+print(f"Concordancia 'regar' (cada uno con su RAW) = {((ky_dr>=ky_raw)==(pf_dr>=pf_raw)).mean()*100:.0f}%")

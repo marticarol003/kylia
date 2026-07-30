@@ -1,0 +1,96 @@
+-- ─────────────────────────────────────────────────────────────────
+-- KYLIA · Definición CERRADA del bancal de 33 lechugas (zona A, Sant Boi)
+--   pluviometría  15 → 11 mm/h      ·      área  2,6 → 5,0 m²
+-- ─────────────────────────────────────────────────────────────────
+-- Pega este archivo entero en el SQL Editor de Supabase. Solo hace un UPDATE de
+-- dos columnas; no toca `acciones` ni ninguna otra fila.
+--
+-- Cierra el vaivén del caudal (15 → 5,4 → 15 → 11) apoyándose por fin en la
+-- FICHA DEL EMISOR REAL y en la geometría medida, no en estimaciones.
+--
+-- ── EL EMISOR (identificado por el usuario, 29-jul) ──────────────
+--   Mini STER 360° toma directa, BOQUILLA ROSA (el color codifica el caudal).
+--     • ficha: 160 l/h a 2 bar · diámetro mojado 6,5 m · radio 3,25 m
+--     • montados a 1,25 m de altura
+--   CAUDAL DE TRABAJO USADO: 180 l/h, declarado por el TÉCNICO de riego del
+--   padre (no es el dato de ficha). Es coherente: la instalación trabaja por
+--   encima de 2 bar, y a más presión el emisor da más de los 160 nominales.
+--
+-- ── LA GEOMETRÍA (medida por el usuario, 30-jul) ─────────────────
+--   • 33 lechugas en 2 filas de 5 m, ~30 cm entre plantas.
+--   • 0,5 m entre filas → cada fila a 0,25 m de la línea de aspersores.
+--   • Los 2 aspersores en la línea central: 1,25 m · asp · 2,5 m · asp · 1,25 m.
+--
+-- ── LA PLUVIOMETRÍA: 11 mm/h (cálculo del usuario) ───────────────
+--   Cada aspersor reparte su caudal sobre su propio círculo, y donde los dos
+--   círculos se solapan la lámina se suma:
+--
+--     por aspersor:  180 / (π × 3,25²) = 180 / 33,18 = 5,42 mm/h
+--     los dos:       5,42 × 2          = 10,85       →  11 mm/h   ← BD
+--
+--   POR QUÉ EL FACTOR 2 (y no 1,80): el alcance de cada aspersor MEDIDO SOBRE
+--   LA LÍNEA DE LA FILA es √(3,25² − 0,25²) = 3,24 m, así que
+--       aspersor de x=1,25 → cubre x ∈ [−1,99 , 4,49]
+--       aspersor de x=3,75 → cubre x ∈ [ 0,51 , 6,99]
+--   Sobre los 5 m de fila el solape MEDIO es 1,80, porque los primeros y los
+--   últimos 0,51 m solo reciben un aspersor. Pero la cosecha se muestrea
+--   descartando los extremos (ver aviso abajo), así que la zona que Kylia
+--   gestiona Y que se va a pesar es la franja central de 4 m, donde el solape
+--   es exactamente 2. Para el ensayo, 2 es el número correcto.
+--
+--   CONTRASTES INDEPENDIENTES (los tres apuntan al mismo sitio):
+--     • Con los 160 l/h de ficha en vez de 180 saldría 9,6 mm/h → el 11 está en
+--       el extremo alto de una banda estrecha (9,6 - 10,9), no inventado.
+--     • La planta: con 12 días y 8,3 h regadas, por debajo de 10 mm/h el bancal
+--       iría a >12 mm de déficit sobre un umbral de 10 — con sed visible a
+--       mediodía. No la tiene.
+--     • Dividir por el círculo completo supone reparto uniforme; los emisores
+--       reales dan MÁS cerca del centro, y las filas están a 0,25 m del
+--       aspersor. O sea que 11 es conservador, no optimista.
+--
+--   ⚠ Entre 10 y 15 mm/h la decisión de HOY es idéntica (déficit 8 mm,
+--     "vigilar"). Este número ya no cambia lo que se hace: corrige el histórico
+--     y el reveal.
+--
+-- ── EL ÁREA: 5,0 m² por MARCO DE PLANTACIÓN ──────────────────────
+--     2 filas × 0,50 m (entre filas) × 5 m de largo = 5,0 m²
+--
+--   ⚠ NO ES ARBITRARIO: es el MISMO criterio con el que se calculó la zona B
+--     (7 filas × 0,40 m × 78 m = 218,4 m²). Las dos zonas tienen que medirse
+--     con la misma vara o la comparación de la cosecha miente.
+--     La huella física de las plantas (5 × 0,5 = 2,5 m²) también sería un
+--     criterio válido, pero entonces habría que recalcular la zona B a
+--     6 × 0,40 × 78 = 187,2 m². Si alguien cambia una, tiene que cambiar la otra.
+--     Con A a 2,5 y B a 218,4, los kg/m² de la zona A saldrían el DOBLE de lo
+--     real y el ensayo mentiría a favor de Kylia — el peor sentido posible.
+--
+--   El área NO afecta al balance hídrico (todo va en mm = L/m²). Solo afecta a
+--   los litros absolutos del informe y al rendimiento por m² de la cosecha.
+--
+-- ── ⚠ HALLAZGO PARA LA COSECHA (no perderlo) ────────────────────
+--   Los primeros y últimos 0,51 m de cada fila reciben UN solo aspersor, o sea
+--   la MITAD de agua que el centro. A 30 cm entre plantas son las ~2 primeras y
+--   ~2 últimas de cada fila: unas 8 lechugas de las 33 (24%) a media ración.
+--   → Al muestrear la cosecha, DESCARTARLAS y pesar solo el tramo central.
+--     Si no, la zona A sale artificialmente mal y el ensayo miente EN CONTRA de
+--     Kylia. (Encaja con la regla de descartar bordes que ya está en el checklist.)
+--
+-- ── NOTA SOBRE EL CAMPO DE 440 m² (para no volver a liarse) ──────
+--   Allí se midieron 15 mm/h con el truco del vaso, y es correcto: ese campo
+--   tiene 35 aspersores para 440 m² = 12,6 m² por cabeza, o sea 2,64 círculos
+--   por punto cuando el emisor está diseñado para 1,5. La malla está montada
+--   casi al doble de densa → SOBRE-RIEGO DE DISEÑO (no de decisión del padre).
+--   Por eso los 15 de ese campo NO se pueden trasladar a ningún otro sitio, que
+--   es el error del que arrancó todo este asunto el 18-jul.
+
+update usuarios
+   set caudal  = 11,     -- mm/h sobre la franja central de las filas
+       area_m2 = 5.0     -- marco: 2 filas × 0,50 m × 5 m (igual criterio que zona B)
+ where id = 'd5475c3d-365b-47ff-b31e-fa659a8362fb';
+
+-- ── Comprobar ────────────────────────────────────────────────────
+--   select nombre, area_m2, caudal, metodo_riego, fecha_plantacion
+--     from usuarios where id = 'd5475c3d-365b-47ff-b31e-fa659a8362fb';
+--   → caudal 11 · area_m2 5.0
+--   En /campo: el riego del 18-jul (180 min) pasa de 45 a 33 L/m², y la
+--   decisión de hoy sigue en "vigilar, déficit 8 mm".

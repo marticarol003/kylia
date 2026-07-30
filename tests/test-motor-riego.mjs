@@ -78,6 +78,27 @@ const balPorCaudal = (caudal) => M.balanceHidrico(
 ).Dr;
 ok(balPorCaudal(5.4) > balPorCaudal(15), `afinar el caudal a la baja sube el déficit (${balPorCaudal(5.4).toFixed(1)} vs ${balPorCaudal(15).toFixed(1)} mm)`);
 
+console.log("── p ajustada por demanda evaporativa (nota Tabla 22 FAO-56) ──");
+// Fórmula: p_adj = p_tabla + 0,04 × (5 − ETc), acotada a [0,1 ; 0,8].
+// Es la misma que aplica pyfao56 por defecto (model.py).
+const pDe = (etc) => M.aguaSuelo("franco", "lechuga", 100, etc).p;
+ok(approx(pDe(5), 0.30, 1e-9), "a ETc = 5 mm/día devuelve el valor de tabla intacto (lechuga 0,30)");
+ok(approx(pDe(3), 0.38, 1e-9), "a ETc = 3 (poca demanda) sube a 0,38 → aguanta más seco");
+ok(approx(pDe(8), 0.18, 1e-9), "a ETc = 8 (mucha demanda) baja a 0,18 → sufre antes");
+ok(pDe(30) === 0.1, "ETc absurdamente alta se acota en 0,1");
+ok(pDe(-30) === 0.8, "ETc absurdamente baja se acota en 0,8");
+ok(M.aguaSuelo("franco", "lechuga", 100).p === 0.30, "sin ETc → valor de tabla (compatible hacia atrás)");
+ok(approx(M.aguaSuelo("franco", "lechuga", 100, 3).raw / M.aguaSuelo("franco", "lechuga", 100).raw, 0.38 / 0.30, 0.01),
+   "el RAW escala con la p ajustada, el TAW no se toca");
+ok(M.aguaSuelo("franco", "lechuga", 100, 3).taw === M.aguaSuelo("franco", "lechuga", 100).taw,
+   "el TAW es idéntico con y sin ajuste (la p no toca el depósito, solo el umbral)");
+// End-to-end: con MUCHA demanda el umbral baja → se dispara el riego antes.
+const serieCalor = serieSeca.map(d => ({ ...d, et0: 9 }));
+const balCalor = M.balanceHidrico(serieCalor.slice(0, 3), [], { suelo: "franco", cultivoId: "lechuga", metodoRiego: "aspersion", fechaPlantacion: PLANT });
+const balSuave = M.balanceHidrico(serieSeca.slice(0, 3),  [], { suelo: "franco", cultivoId: "lechuga", metodoRiego: "aspersion", fechaPlantacion: PLANT });
+ok(balCalor.raw < balSuave.raw, `con ola de calor el umbral baja (${balCalor.raw.toFixed(1)} vs ${balSuave.raw.toFixed(1)} mm) → riega antes`);
+ok(approx(balCalor.taw, balSuave.taw, 0.01), "y el depósito (TAW) no cambia por el calor");
+
 console.log("── riegos del mismo día: el null no depende del orden ──");
 const optsDia = { suelo: "franco", cultivoId: "lechuga", metodoRiego: "aspersion", fechaPlantacion: PLANT };
 const serie3 = serieSeca.slice(0, 3);

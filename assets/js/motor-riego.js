@@ -93,12 +93,29 @@
   // Agua total (TAW) y fácilmente disponible (RAW), en mm, según textura, cultivo
   // y día del ciclo (la raíz crece → el depósito crece). Compatible hacia atrás:
   // sin cultivo/día usa los fallbacks fijos (ZR_M, P_AGOTAMIENTO).
-  function aguaSuelo(suelo, cultivoId = null, dias = null) {
+  //
+  // `etcMmDia` (opcional) activa el AJUSTE DE p POR DEMANDA EVAPORATIVA. La nota
+  // al pie de la Tabla 22 de FAO-56 dice que sus valores de p valen para
+  // ETc ≈ 5 mm/día y que hay que corregirlos:
+  //
+  //     p_adj = p_tabla + 0,04 × (5 − ETc)      acotado a [0,1 ; 0,8]
+  //
+  // La física: con mucha demanda evaporativa el suelo no consigue entregar a la
+  // raíz el caudal que la planta pide aunque le quede agua, así que el cultivo
+  // sufre ANTES (p baja). Con poca demanda aguanta más seco (p sube).
+  // Hasta el 30-jul Kylia usaba p constante, que es justo el modo NO por defecto
+  // de pyfao56 —nuestra referencia de validación, que aplica esta corrección de
+  // serie (`model.py`: io.p = sorted([0.1, io.pbase+0.04*(5.0-io.ETc), 0.8])[1])—.
+  // Ojo: p NO entra en la recursión del agotamiento, solo mueve el UMBRAL (RAW).
+  function aguaSuelo(suelo, cultivoId = null, dias = null, etcMmDia = null) {
     const awc = SUELO_AWC[suelo] ?? SUELO_AWC_DEFAULT;
     const zr  = zrDelDia(cultivoId, dias);
-    const p   = FAO_KC[cultivoId]?.p ?? P_AGOTAMIENTO;
+    let p     = FAO_KC[cultivoId]?.p ?? P_AGOTAMIENTO;
+    if (etcMmDia != null && Number.isFinite(Number(etcMmDia))) {
+      p = Math.min(0.8, Math.max(0.1, p + 0.04 * (5 - Number(etcMmDia))));
+    }
     const taw = 1000 * awc * zr;
-    return { taw, raw: p * taw, awc };
+    return { taw, raw: p * taw, awc, p };
   }
 
   function diasEntre(fechaIso, hasta) {
@@ -134,13 +151,14 @@
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     for (const dia of orden) {
       const dias = diasEntre(fechaPlantacion, new Date(`${dia.date}T12:00:00`));
-      ({ taw, raw } = aguaSuelo(suelo, cultivoId, dias));   // la raíz crece día a día
+      // ETc primero: el umbral (RAW) depende de ella por el ajuste de p.
+      const kc  = kcDelDia(cultivoId, dias);
+      const etc = kc * (dia.et0 ?? 0);
+      ({ taw, raw } = aguaSuelo(suelo, cultivoId, dias, etc));  // raíz creciente + p por ETc
       if (dia.date in riegoNeto) {
         const r = riegoNeto[dia.date];
         Dr = r === null ? 0 : Math.max(0, Dr - r);
       }
-      const kc  = kcDelDia(cultivoId, dias);
-      const etc = kc * (dia.et0 ?? 0);
       const pll = Math.max(0, dia.lluvia ?? 0);
       const pe  = pll >= PE_MIN_MM ? pll : 0;               // lluvia efectiva
       Dr = Math.min(taw, Math.max(0, Dr + etc - pe));
@@ -257,11 +275,12 @@
     const puntos = [];
     for (const dia of orden) {
       const dias = diasEntre(fechaPlantacion, new Date(`${dia.date}T12:00:00`));
-      ({ taw, raw } = aguaSuelo(suelo, cultivoId, dias));   // la raíz crece día a día
-      // Decisión de la mañana: con el déficit que arrastra de ayer (misma regla que decisionRiego).
-      if (Dr >= raw) { acum += Dr / efic; Dr = 0; }   // riego bruto = Dr/efic → repone Dr neto
+      // ETc primero: el umbral (RAW) depende de ella por el ajuste de p.
       const kc  = kcDelDia(cultivoId, dias);
       const etc = kc * (dia.et0 ?? 0);
+      ({ taw, raw } = aguaSuelo(suelo, cultivoId, dias, etc));  // raíz creciente + p por ETc
+      // Decisión de la mañana: con el déficit que arrastra de ayer (misma regla que decisionRiego).
+      if (Dr >= raw) { acum += Dr / efic; Dr = 0; }   // riego bruto = Dr/efic → repone Dr neto
       const pll = Math.max(0, dia.lluvia ?? 0);
       const pe  = pll >= PE_MIN_MM ? pll : 0;               // lluvia efectiva
       Dr = Math.min(taw, Math.max(0, Dr + etc - pe));
