@@ -81,18 +81,24 @@
 --     riegos de B se apuntan por DURACIÓN → el día que se mida, todas las
 --     láminas históricas se recalculan solas (laminaMostrada, api/campo.js).
 --
---   ✔ RESPALDADO POR LA MEDIDA DE LA ZONA A (28-jul): el cubo puesto entre los
---     dos aspersores del bancal de las 33 —misma malla, mismos aspersores— dio
---     5,4 mm/h medidos. El 6,3 calculado aquí queda justo por encima y dentro
---     del margen de esa medición (4,6-6,3), así que las dos vías se sostienen.
---     Ver db/caudal-bancal-33-lechugas-2026-07-28.sql.
+--   ⚠ EL RESPALDO DE LA ZONA A YA NO VALE (revisado 31-jul). Aquí se apoyaba el
+--     6,3 en los 5,4 mm/h que dio el cubo del bancal de las 33 el 28-jul. Ese
+--     5,4 quedó DESCARTADO: era una etapa del vaivén 15 → 5,4 → 15 → 11, y el
+--     30-jul el bancal se cerró en 11 mm/h con la geometría real (2 aspersores,
+--     180 L/h, radio 3,25 m). Ver db/definicion-bancal-33-lechugas-2026-07-30.sql.
+--     O sea que el 6,3 de aquí NO está contrastado contra ninguna medición
+--     vigente: es solo cálculo. Eso refuerza el punto de arriba — hay que
+--     medirlo con el vaso antes de la cosecha, no darlo por bueno.
+--     (Las dos cifras no son comparables sin más: 11 es sobre la franja de 5 m²
+--     del bancal y 6,3 sobre la malla B-C de la zona B, marcos distintos.)
 --
 --   ⚠ HISTORIAL DE ESTE NÚMERO (para que nadie lo lea a medias): pasó por
 --     15 → 10,4 → 9,9 → 6,3 mm/h. Cada cambio vino de un dato NUEVO del campo
 --     (misma ficha de aspersor → 12 por línea y no 12 en total → la malla real
 --     de 3 líneas con hinojo y filas vacías), no de cambiar de criterio.
 --     El 6,3 es el primero que sale de la fórmula estándar con la geometría
---     real, y el único contrastado contra una medición.
+--     real. Sigue SIN medición que lo contraste (ver arriba: el respaldo de la
+--     zona A se cayó al cerrarse el bancal en 11 mm/h el 30-jul).
 --   • Misma VARIEDAD, mismo terreno (franco, Sant Boi) y misma fecha de
 --     trasplante (2026-07-18) que las 33 → comparación pareada en el tiempo.
 --
