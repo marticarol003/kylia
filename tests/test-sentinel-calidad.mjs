@@ -19,9 +19,11 @@ function obs(from, ndviMean, sample, nodata) {
   return {
     interval: { from: `${from}T00:00:00Z` },
     outputs: {
-      ndvi: { bands: { B0: { stats: stats(ndviMean) } } },
-      ndmi: { bands: { B0: { stats: stats(0.1) } } },
-      ndre: { bands: { B0: { stats: stats(0.2) } } },
+      ndvi:  { bands: { B0: { stats: stats(ndviMean) } } },
+      ndmi:  { bands: { B0: { stats: stats(0.1) } } },
+      ndre:  { bands: { B0: { stats: stats(0.2) } } },
+      osavi: { bands: { B0: { stats: stats(0.44) } } },
+      cire:  { bands: { B0: { stats: stats(3.1) } } },
     },
   };
 }
@@ -51,6 +53,26 @@ ok(r4 && r4.validPixels === 2 && r4.fraccionValida === 0.5, "valid=2, fracción 
 console.log("5) Sin observaciones → null:");
 ok(pickLatestValid({ data: [] }) === null, "data vacío → null");
 ok(pickLatestValid({}) === null, "sin data → null");
+
+console.log("6) Índices corregidos (OSAVI + CIre) del mismo paso:");
+const r6 = pickLatestValid({ data: [obs("2026-07-19", 0.62, 10, 1)] });
+ok(r6 && r6.stats.osavi.mean === 0.44, "OSAVI se extrae del paso elegido");
+ok(r6 && r6.stats.cire.mean === 3.1,   "CIre se extrae del paso elegido");
+ok(r6 && r6.stats.ndvi.mean === 0.62,  "el NDVI sigue ahí (no lo sustituyen)");
+
+console.log("7) Un paso sin los índices nuevos no rompe (despliegue viejo):");
+const viejo = {
+  interval: { from: "2026-07-19T00:00:00Z" },
+  outputs: { ndvi: { bands: { B0: { stats: { mean: 0.7, stDev: 0.05, sampleCount: 10, noDataCount: 1 } } } } },
+};
+const r7 = pickLatestValid({ data: [viejo] });
+ok(r7 !== null,              "sigue siendo una observación válida");
+ok(r7 && r7.stats.osavi === null && r7.stats.cire === null, "OSAVI y CIre quedan a null, no undefined");
+ok(r7 && r7.validPixels === 9, "el guard de calidad sigue contando sobre el NDVI");
+
+console.log("8) El guard manda sobre el NDVI, no sobre los índices nuevos:");
+ok(pickLatestValid({ data: [obs("2026-07-20", 0.9, 1, 0)] }) === null,
+   "un paso con OSAVI/CIre buenos pero 1 píxel de NDVI se sigue descartando");
 
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES" : `\n❌ ${fallos} FALLO(S)`);
 process.exit(fallos === 0 ? 0 : 1);

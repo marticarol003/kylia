@@ -14,12 +14,35 @@ const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
 const MIN_PIXELES_VALIDOS = 2;
 const MIN_FRACCION_VALIDA = 0.5;
 
-// NDVI (B04/B08) + NDMI (B08/B11) + NDRE (B08/B05) + dataMask.
-// NDVI = vigor/biomasa; NDMI = agua en la hoja; NDRE = proxy de estado de
-// NITRÓGENO (el red-edge B05 es donde absorbe la clorofila, y el N foliar va
-// casi todo en clorofila). Señal RELATIVA: sin calibrar contra nitrato en
-// tejido es "más/menos verde", no kg — se reporta como tal (ver pilar de
-// fertilizantes). B05 es nativo a 20 m: en parcelas pequeñas, menos fiable.
+// Cinco índices de las MISMAS cuatro bandas (B04, B05, B08, B11) — añadir OSAVI
+// y CIre no cuesta ni una descarga más, solo dos líneas de aritmética por píxel.
+//
+//   NDVI  (B08/B04)      vigor/biomasa. El histórico y los umbrales de `estado`
+//                        van sobre él, así que se queda como estaba.
+//   NDMI  (B08/B11)      agua en la hoja. B11 es nativo a 20 m.
+//   NDRE  (B08/B05)      red-edge, proxy de N foliar. B05 nativo a 20 m.
+//   OSAVI (B08/B04, L)   NDVI CORREGIDO POR SUELO. Con la planta pequeña, el
+//                        NDVI mide sobre todo la tierra que se ve entre plantas
+//                        y lee vigor bajo aunque el cultivo esté perfecto.
+//                        OSAVI mete un término L=0,16 en el denominador que
+//                        cancela buena parte de esa señal del suelo (Rondeaux,
+//                        Steven & Baret 1996, optimizado justo para cultivo,
+//                        mejor que el SAVI clásico de L=0,5).
+//   CIre  (B08/B05 − 1)  clorofila en cubierta (Gitelson et al. 2003). Para
+//                        NITRÓGENO es mejor que el NDRE: es casi lineal con la
+//                        clorofila y NO satura donde el NDVI ya está plano.
+//
+// OJO con los rangos: NDVI/NDMI/NDRE/OSAVI van en [−1, 1], pero CIre es un
+// COCIENTE sin acotar (≈0 en suelo desnudo, 3-8 en cubierta densa). No se puede
+// meter en los mismos umbrales ni pintar con la misma escala de color.
+//
+// OSAVI y CIre se calculan y se guardan, pero NO tocan todavía lo que ve el
+// agricultor: `estado` sigue saliendo del NDVI. Cambiarlo exige recalibrar los
+// cortes (0,6 / 0,35), porque OSAVI da sistemáticamente MÁS BAJO que el NDVI
+// sobre la misma parcela — el +0,16 del denominador. Aplicarle los umbrales del
+// NDVI pintaría de "estrés" cultivos sanos. Primero hay que acumular serie de
+// los dos a la vez sobre las mismas parcelas; para eso se persisten.
+//
 // La Statistical API promedia los píxeles válidos dentro de la geometría,
 // de forma que cada parcela devuelve valores específicos, no genéricos.
 const EVALSCRIPT = `//VERSION=3
@@ -30,6 +53,8 @@ function setup() {
       { id: "ndvi",     bands: 1, sampleType: "FLOAT32" },
       { id: "ndmi",     bands: 1, sampleType: "FLOAT32" },
       { id: "ndre",     bands: 1, sampleType: "FLOAT32" },
+      { id: "osavi",    bands: 1, sampleType: "FLOAT32" },
+      { id: "cire",     bands: 1, sampleType: "FLOAT32" },
       { id: "dataMask", bands: 1 }
     ]
   };
@@ -39,13 +64,22 @@ function evaluatePixel(s) {
   // 8 nube media, 9 nube alta, 10 cirrus, 11 nieve/hielo
   var bad = [0, 1, 3, 8, 9, 10, 11];
   var validScl = bad.indexOf(s.SCL) === -1 ? 1 : 0;
-  var ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 1e-10);
-  var ndmi = (s.B08 - s.B11) / (s.B08 + s.B11 + 1e-10);
-  var ndre = (s.B08 - s.B05) / (s.B08 + s.B05 + 1e-10);
+  var ndvi  = (s.B08 - s.B04) / (s.B08 + s.B04 + 1e-10);
+  var ndmi  = (s.B08 - s.B11) / (s.B08 + s.B11 + 1e-10);
+  var ndre  = (s.B08 - s.B05) / (s.B08 + s.B05 + 1e-10);
+  // OSAVI: L = 0,16 (Rondeaux 1996). Sin el factor (1+L): es la forma que usan
+  // Sentinel Hub y la mayoría de la literatura agronómica.
+  var osavi = (s.B08 - s.B04) / (s.B08 + s.B04 + 0.16);
+  // CIre: el red-edge en el denominador. Sobre suelo desnudo B05 se acerca a
+  // cero y el cociente se dispara, así que se acota a 10 — por encima de ~8 ya
+  // no es cubierta agrícola, es un artefacto.
+  var cire  = Math.min(10, s.B08 / (s.B05 + 1e-6) - 1);
   return {
     ndvi:     [ndvi],
     ndmi:     [ndmi],
     ndre:     [ndre],
+    osavi:    [osavi],
+    cire:     [cire],
     dataMask: [s.dataMask * validScl]
   };
 }`;
@@ -68,22 +102,28 @@ function buildBounds(geometryParam, lat, lon) {
   };
 }
 
+// Índices que se leen de cada paso. Una lista en vez de una variable por índice:
+// añadir el siguiente es tocar aquí y nada más.
+const INDICES = ["ndvi", "ndmi", "ndre", "osavi", "cire"];
+
 function pickLatestValid(statsJson) {
   const items = (statsJson?.data || [])
     .map((d) => {
-      const statsNdvi = d?.outputs?.ndvi?.bands?.B0?.stats;
-      const statsNdmi = d?.outputs?.ndmi?.bands?.B0?.stats;
-      const statsNdre = d?.outputs?.ndre?.bands?.B0?.stats;
-      if (!statsNdvi) return null;
-      const sample = statsNdvi.sampleCount || 0;
-      const nodata = statsNdvi.noDataCount || 0;
+      const stats = {};
+      for (const id of INDICES) stats[id] = d?.outputs?.[id]?.bands?.B0?.stats || null;
+      // El NDVI manda: es el que decide si el paso vale. Los demás índices salen
+      // de las mismas bandas y la misma máscara, así que si falta alguno es que
+      // la petición no lo pidió (despliegue viejo) — se degrada a null, no rompe.
+      if (!stats.ndvi) return null;
+      const sample = stats.ndvi.sampleCount || 0;
+      const nodata = stats.ndvi.noDataCount || 0;
       const valid  = sample - nodata;
       const fraccion = sample > 0 ? valid / sample : 0;
       // Guard de calidad: descarta pasos casi todos enmascarados por nube.
       if (valid < MIN_PIXELES_VALIDOS || fraccion < MIN_FRACCION_VALIDA) return null;
-      if (typeof statsNdvi.mean !== "number" || Number.isNaN(statsNdvi.mean)) return null;
+      if (typeof stats.ndvi.mean !== "number" || Number.isNaN(stats.ndvi.mean)) return null;
       return {
-        from: d.interval.from, statsNdvi, statsNdmi, statsNdre,
+        from: d.interval.from, stats,
         validPixels: valid, fraccionValida: Math.round(fraccion * 100) / 100,
       };
     })
@@ -141,18 +181,24 @@ async function medirParcela(token, lat, lon, geometry) {
   const latest = pickLatestValid(await statsRes.json());
   if (!latest) return null;
 
-  const num = (x) => (typeof x === "number" && !Number.isNaN(x) ? x : null);
-  const ndvi = +latest.statsNdvi.mean.toFixed(3);
+  // Media y desviación de un índice, redondeadas, o null si ese índice no vino.
+  const r3  = (x) => (typeof x === "number" && !Number.isNaN(x) ? +x.toFixed(3) : null);
+  const med = (id) => (latest.stats[id] ? r3(latest.stats[id].mean)  : null);
+  const dev = (id) => (latest.stats[id] ? r3(latest.stats[id].stDev) : null);
+
+  const ndvi = med("ndvi");
   return {
     ndvi,
-    stdev:     num(latest.statsNdvi.stDev) != null ? +latest.statsNdvi.stDev.toFixed(3) : null,
-    ndmi:      latest.statsNdmi && num(latest.statsNdmi.mean)  != null ? +latest.statsNdmi.mean.toFixed(3)  : null,
-    ndmiStdev: latest.statsNdmi && num(latest.statsNdmi.stDev) != null ? +latest.statsNdmi.stDev.toFixed(3) : null,
-    ndre:      latest.statsNdre && num(latest.statsNdre.mean)  != null ? +latest.statsNdre.mean.toFixed(3)  : null,
-    ndreStdev: latest.statsNdre && num(latest.statsNdre.stDev) != null ? +latest.statsNdre.stDev.toFixed(3) : null,
-    fecha:     latest.from.slice(0, 10),
-    estado:    ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres",
-    pixeles:   latest.validPixels,
+    stdev:      dev("ndvi"),
+    ndmi:       med("ndmi"),  ndmiStdev:  dev("ndmi"),
+    ndre:       med("ndre"),  ndreStdev:  dev("ndre"),
+    osavi:      med("osavi"), osaviStdev: dev("osavi"),
+    cire:       med("cire"),  cireStdev:  dev("cire"),
+    fecha:      latest.from.slice(0, 10),
+    // `estado` sigue saliendo del NDVI a propósito: los cortes están calibrados
+    // sobre él y sobre su histórico. Ver la nota del EVALSCRIPT.
+    estado:     ndvi > 0.6 ? "buena" : ndvi > 0.35 ? "moderada" : "estres",
+    pixeles:    latest.validPixels,
     fraccion_valida: latest.fraccionValida,
   };
 }
@@ -188,8 +234,12 @@ async function refrescarMediciones(req, res) {
       if (!m) { sinDatos++; continue; }
       await supabaseInsert("mediciones", {
         usuario_id: u.id, fecha: m.fecha,
-        ndvi: m.ndvi, ndmi: m.ndmi, ndmi_stdev: m.ndmiStdev,
-        ndre: m.ndre, ndre_stdev: m.ndreStdev,
+        ndvi:  m.ndvi,  ndmi: m.ndmi, ndmi_stdev: m.ndmiStdev,
+        ndre:  m.ndre,  ndre_stdev:  m.ndreStdev,
+        // OSAVI/CIre aún no se enseñan; se acumulan para poder calibrarlos
+        // contra el NDVI sobre las mismas parcelas y los mismos días.
+        osavi: m.osavi, osavi_stdev: m.osaviStdev,
+        cire:  m.cire,  cire_stdev:  m.cireStdev,
         fuente: "sentinel-2",
       }, { upsert: true });
       escritos++;

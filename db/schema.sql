@@ -128,6 +128,12 @@ create table mediciones (
   ndmi_stdev   numeric,
   ndre         numeric,     -- red-edge (B08/B05): proxy de estado de nitrógeno foliar
   ndre_stdev   numeric,
+  osavi        numeric,     -- NDVI corregido por suelo (L=0,16): fiable con poca cubierta
+  osavi_stdev  numeric,
+  cire         numeric,     -- clorofila (B08/B05−1): proxy de N que NO satura.
+                            -- OJO: cociente SIN ACOTAR (~0 suelo, 3-8 cubierta densa, tope 10),
+                            -- no comparte rango [−1,1] con los índices de arriba
+  cire_stdev   numeric,
   suelo_0_7    numeric,
   suelo_7_28   numeric,
   suelo_28_100 numeric,
