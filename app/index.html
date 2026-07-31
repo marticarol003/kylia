@@ -1817,6 +1817,49 @@
       .fab-soporte { right: max(16px, calc(50vw - 414px)); }
     }
 
+    /* ── Zonas de cultivo (recintos de SIGPAC tocados en el mapa) ── */
+    .zonas-bloque { margin-top: 12px; }
+    .zonas-cabecera {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .zonas-titulo {
+      font-size: .72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted);
+    }
+    .zonas-cuenta { font-size: .78rem; color: var(--subtle); }
+    .zonas-lista { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+    .zona-item {
+      background: var(--bg); border: 1px solid var(--border);
+      border-left: 3px solid var(--low); border-radius: 10px; padding: 10px 12px;
+    }
+    .zona-fila1 {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .zona-sup { font-weight: 700; font-size: .92rem; color: var(--text); }
+    .zona-ref { font-size: .68rem; color: var(--subtle); font-variant-numeric: tabular-nums; }
+    .zona-quitar {
+      background: none; border: none; cursor: pointer; font-family: inherit;
+      color: var(--muted); font-size: 1.05rem; line-height: 1; padding: 2px 6px; border-radius: 6px;
+    }
+    .zona-quitar:hover { background: var(--border); color: var(--high); }
+    .zona-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .zona-campos select, .zona-campos input {
+      width: 100%; padding: 7px 9px; font-family: inherit; font-size: .84rem;
+      border: 1px solid var(--border); border-radius: 7px;
+      background: var(--card); color: var(--text);
+    }
+    /* El aviso de satélite NO es una alerta: la zona funciona igual, solo que
+       con modelo. Gris, nunca rojo. */
+    .zona-satelite {
+      display: inline-block; margin-top: 7px;
+      font-size: .68rem; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+    }
+    .zona-satelite.si { background: var(--low-bg); color: var(--low); }
+    .zona-satelite.no { background: var(--border); color: var(--subtle); }
+    .zona-nota { font-size: .7rem; color: var(--subtle); margin: 5px 0 0; line-height: 1.45; }
+
     /* ── Plan de abonado (motor de nutrición del servidor) ── */
     .abonado-card { padding: 16px; margin-bottom: 12px; }
     .abonado-cargando, .abonado-vacio {
@@ -1976,9 +2019,19 @@
       <div class="config-field">
         <label>Parcela agrícola</label>
         <p class="parcela-info" id="parcela-info">Toca tu campo en el mapa para cargar el contorno oficial de SIGPAC.</p>
-        <p class="config-hint">Si tienes varias parcelas, elige la más representativa. Por ahora Kylia monitoriza una sola por usuario.</p>
+        <p class="config-hint">Si trabajas varias parcelas, tócalas todas: aparecen marcadas en el mapa y cada una lleva su cultivo y su fecha. El riego y el abonado se calculan por separado para cada zona.</p>
         <div id="mapa-parcela"></div>
         <button class="btn-confirmar-parcela" id="btn-confirmar-parcela" type="button">&#10003; Confirmar parcela</button>
+
+        <!-- Zonas de cultivo: las parcelas de SIGPAC que el agricultor toca -->
+        <div class="zonas-bloque" id="zonas-bloque" hidden>
+          <div class="zonas-cabecera">
+            <span class="zonas-titulo">Tus zonas de cultivo</span>
+            <span class="zonas-cuenta" id="zonas-cuenta"></span>
+          </div>
+          <ul class="zonas-lista" id="zonas-lista"></ul>
+          <p class="config-hint" id="zonas-ayuda"></p>
+        </div>
       </div>
       <div class="config-field">
         <label>Tipo de manejo</label>
@@ -4598,6 +4651,193 @@
       );
     }
 
+    // ─── Zonas de cultivo ────────────────────────────────────────────────────
+    // Un agricultor con varios cultivos en la misma finca necesita separarlos:
+    // cada uno tiene su Kc, su fecha de plantación y su plan de abonado. La
+    // forma FÁCIL de delimitarlos no es dibujar polígonos en un móvil al sol,
+    // es tocar: SIGPAC ya tiene la finca partida en RECINTOS, que por definición
+    // son trozos de uso homogéneo, y son además la partición oficial que el
+    // agricultor declara en la PAC. Así que solo hay que pintárselos y que
+    // señale los suyos.
+    //
+    // /api/sigpac?vecinos=1 devuelve todos los del tile (ya se descargaban y se
+    // tiraban). El servidor marca cuáles son bastante grandes para el satélite;
+    // aquí no se decide nada de eso, solo se pinta lo que él dice.
+    const ZONAS_KEY = "kylia_zonas";
+    let recintosMapa = [];        // los del entorno, pintados como opción
+    let zonasSel     = new Map(); // referencia SIGPAC → zona elegida
+    let capaRecintos = null;
+
+    function loadZonas() {
+      try {
+        const raw = localStorage.getItem(ZONAS_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return new Map(arr.map(z => [z.referencia, z]));
+      } catch (_) { return new Map(); }
+    }
+    function saveZonas() {
+      localStorage.setItem(ZONAS_KEY, JSON.stringify([...zonasSel.values()]));
+    }
+
+    // Verde relleno = mía. Contorno claro = disponible, tócala.
+    function estiloRecinto(ref) {
+      return zonasSel.has(ref)
+        ? { color: "#15803d", weight: 2.5, fillOpacity: 0.35, fillColor: "#15803d" }
+        : { color: "#ffffff", weight: 1.2, fillOpacity: 0.06, fillColor: "#ffffff", dashArray: "4 3" };
+    }
+
+    function pintarRecintos() {
+      if (!mapaLeaflet) return;
+      if (capaRecintos) mapaLeaflet.removeLayer(capaRecintos);
+      if (!recintosMapa.length) { capaRecintos = null; return; }
+
+      capaRecintos = L.geoJSON(
+        recintosMapa.map(r => ({ type: "Feature", geometry: r.geometria, properties: { ref: r.referencia } })),
+        {
+          style: (f) => estiloRecinto(f.properties.ref),
+          onEachFeature: (f, capa) => {
+            capa.on("click", (ev) => {
+              // Si no se para, el click llega también al mapa y dispara la
+              // búsqueda de parcela suelta encima de la selección.
+              L.DomEvent.stopPropagation(ev);
+              toggleZona(f.properties.ref);
+            });
+          },
+        }
+      ).addTo(mapaLeaflet);
+    }
+
+    function toggleZona(ref) {
+      if (zonasSel.has(ref)) {
+        zonasSel.delete(ref);
+      } else {
+        const r = recintosMapa.find(x => x.referencia === ref);
+        if (!r) return;
+        zonasSel.set(ref, {
+          // Cada zona es una PARCELA en el servidor (una fila de `usuarios`) con
+          // su propio id; lo que las agrupa es el propietario_id común.
+          id: (crypto.randomUUID ? crypto.randomUUID()
+               : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+                   const n = Math.random() * 16 | 0;
+                   return (c === "x" ? n : (n & 0x3) | 0x8).toString(16);
+                 })),
+          referencia: r.referencia, superficie_m2: r.superficie_m2, uso: r.uso,
+          satelite: r.satelite, motivo_sin_satelite: r.motivo_sin_satelite,
+          geometria: r.geometria,
+          // El cultivo y la fecha los pone él; sin cultivo la zona no entra al
+          // plan de abonado (el motor de nutrición lo exige) y el Kc cae a 1.
+          cultivo: null, fechaPlantacion: null,
+        });
+      }
+      saveZonas();
+      if (capaRecintos) capaRecintos.setStyle((f) => estiloRecinto(f.properties.ref));
+      renderZonas();
+    }
+
+    function renderZonas() {
+      const bloque = document.getElementById("zonas-bloque");
+      const lista  = document.getElementById("zonas-lista");
+      const cuenta = document.getElementById("zonas-cuenta");
+      const ayuda  = document.getElementById("zonas-ayuda");
+      if (!bloque || !lista) return;
+
+      // El bloque solo aparece cuando hay algo que enseñar: al agricultor de una
+      // sola parcela no le cambia nada la pantalla.
+      if (!recintosMapa.length && !zonasSel.size) { bloque.hidden = true; return; }
+      bloque.hidden = false;
+
+      const zonas = [...zonasSel.values()];
+      const totalM2 = zonas.reduce((s, z) => s + (z.superficie_m2 || 0), 0);
+      cuenta.textContent = zonas.length
+        ? `${zonas.length} · ${totalM2.toLocaleString("es-ES")} m² en total`
+        : "";
+
+      if (!zonas.length) {
+        lista.innerHTML = "";
+        ayuda.textContent = recintosMapa.length
+          ? `Hay ${recintosMapa.length} parcelas de SIGPAC alrededor, marcadas en el mapa. Toca las que trabajes tú.`
+          : "";
+        return;
+      }
+
+      const opciones = (sel) => CULTIVOS.map(c =>
+        `<option value="${c.id}"${sel === c.id ? " selected" : ""}>${c.nombre}</option>`).join("");
+
+      lista.innerHTML = zonas.map(z => `
+        <li class="zona-item" data-ref="${esc(z.referencia)}">
+          <div class="zona-fila1">
+            <div>
+              <div class="zona-sup">${(z.superficie_m2 || 0).toLocaleString("es-ES")} m²</div>
+              <div class="zona-ref">SIGPAC ${esc(z.referencia || "—")}${z.uso ? " · " + esc(z.uso) : ""}</div>
+            </div>
+            <button type="button" class="zona-quitar" data-quitar="${esc(z.referencia)}"
+                    aria-label="Quitar esta zona">✕</button>
+          </div>
+          <div class="zona-campos">
+            <select data-campo="cultivo" data-ref="${esc(z.referencia)}" aria-label="Cultivo de la zona">
+              <option value="">¿Qué cultivo?</option>${opciones(z.cultivo)}
+            </select>
+            <input type="date" data-campo="fecha" data-ref="${esc(z.referencia)}"
+                   value="${z.fechaPlantacion || ""}" aria-label="Fecha de plantación">
+          </div>
+          <span class="zona-satelite ${z.satelite ? "si" : "no"}">
+            ${z.satelite ? "🛰 con satélite" : "sin satélite"}
+          </span>
+          ${z.satelite ? "" : `<p class="zona-nota">${esc(z.motivo_sin_satelite || "")}</p>`}
+        </li>`).join("");
+
+      ayuda.textContent = "Cada zona lleva su cultivo y su fecha: el riego y el abonado se calculan por separado para cada una.";
+    }
+
+    // Sube cada zona como una PARCELA propia (una fila de `usuarios`), todas con
+    // el propietario_id del agricultor. Así nada de lo que ya existe cambia:
+    // /api/campo, el Diario B, el reveal, el cuaderno y el cron del satélite
+    // siguen consultando fila a fila por usuario_id, sin saber qué es una zona.
+    //
+    // Hereda de la parcela principal lo que es de la FINCA (dónde está, qué suelo,
+    // qué sistema de riego y con qué caudal) y deja por zona lo que de verdad
+    // cambia entre cultivos: el cultivo, cuándo se plantó y cuánto mide.
+    // Sin cultivo no se sube: el motor de nutrición lo exige y el Kc caería a 1.
+    function sincronizarZonas(base) {
+      const dueno = window.kyliaSync?.userId;
+      if (!dueno) return;
+      for (const z of zonasSel.values()) {
+        if (!z.cultivo || !z.id) continue;
+        window.kyliaSync?.registroUsuario({
+          id:               z.id,
+          propietario_id:   dueno,
+          email:            localStorage.getItem("kylia_user_email") || null,
+          nombre:           `${base.nombre || "Zona"} · ${z.superficie_m2} m²`,
+          ciudad:           base.ciudad,
+          lat:              base.lat,
+          lon:              base.lon,
+          cultivos:         [z.cultivo],
+          parcela:          z.geometria,
+          area_m2:          z.superficie_m2,
+          fecha_plantacion: z.fechaPlantacion || null,
+          suelo:            base.suelo || null,
+          metodo_riego:     base.metodoRiego || null,
+          caudal:           base.caudal ?? null,
+          origen:           localStorage.getItem("kylia_origen"),
+        });
+      }
+    }
+
+    // Trae los recintos del entorno y los pinta. Falla en silencio: sin ellos la
+    // app sigue funcionando exactamente como antes (una parcela, tocar y confirmar).
+    async function cargarRecintos(lat, lon) {
+      try {
+        const res = await fetch(`/api/sigpac?lat=${lat}&lon=${lon}&vecinos=1`);
+        const d   = await res.json();
+        if (!Array.isArray(d.recintos)) return;
+        recintosMapa = d.recintos;
+        pintarRecintos();
+        renderZonas();
+      } catch (err) {
+        console.warn("[Kylia] no se pudieron cargar los recintos:", err.message);
+      }
+    }
+
     // Carga Leaflet bajo demanda (solo cuando se abre el panel de configuración).
     // Devuelve una promesa que resuelve cuando window.L ya está disponible.
     let leafletPromise = null;
@@ -4661,17 +4901,38 @@
 
       if (cfg.parcela) mostrarPoligono(cfg.parcela, false);
 
+      // Zonas ya elegidas + recintos del entorno para poder tocar más.
+      zonasSel = loadZonas();
+      cargarRecintos(cfg.lat, cfg.lon);
+
       mapaLeaflet.on("click", async (e) => {
         const infoEl = document.getElementById("parcela-info");
         const btnEl  = document.getElementById("btn-confirmar-parcela");
         infoEl.textContent = "Buscando parcela...";
 
         try {
-          const res  = await fetch(`/api/sigpac?lat=${e.latlng.lat}&lon=${e.latlng.lng}`);
+          const res  = await fetch(`/api/sigpac?lat=${e.latlng.lat}&lon=${e.latlng.lng}&vecinos=1`);
           const data = await res.json();
 
+          // Tocar lejos trae los recintos de ESA zona: una finca puede caer en
+          // otro tile, y el agricultor puede tener parcelas separadas.
+          if (Array.isArray(data.recintos) && data.recintos.length) {
+            const yaVistos = new Set(recintosMapa.map(r => r.referencia));
+            const nuevos   = data.recintos.filter(r => !yaVistos.has(r.referencia));
+            if (nuevos.length) {
+              recintosMapa = recintosMapa.concat(nuevos);
+              pintarRecintos();
+              renderZonas();
+            }
+          }
+
           if (!data.parcela) {
-            infoEl.textContent = "No se ha encontrado parcela aquí. Toca un terreno agrícola.";
+            // El servidor distingue "aquí no hay nada" de "aquí hay algo pero no
+            // es agrícola" (el caso periurbano: un recinto ZU de 22 km²). El
+            // segundo trae explicación, y decirla evita que el agricultor piense
+            // que la app no funciona.
+            infoEl.textContent = data.detalle
+              || "No se ha encontrado parcela aquí. Toca un terreno agrícola.";
             btnEl.classList.remove("visible");
             return;
           }
@@ -4684,6 +4945,25 @@
           infoEl.textContent = "Error al consultar SIGPAC. Inténtalo de nuevo.";
         }
       });
+
+      // Lista de zonas: quitar, y cultivo/fecha por zona. Delegación, porque la
+      // lista se repinta entera en cada cambio.
+      const listaZonas = document.getElementById("zonas-lista");
+      if (listaZonas) {
+        listaZonas.addEventListener("click", (ev) => {
+          const ref = ev.target?.dataset?.quitar;
+          if (ref) toggleZona(ref);
+        });
+        listaZonas.addEventListener("change", (ev) => {
+          const { campo, ref } = ev.target?.dataset || {};
+          if (!campo || !ref) return;
+          const z = zonasSel.get(ref);
+          if (!z) return;
+          if (campo === "cultivo") z.cultivo         = ev.target.value || null;
+          if (campo === "fecha")   z.fechaPlantacion = ev.target.value || null;
+          saveZonas();
+        });
+      }
 
       document.getElementById("btn-confirmar-parcela").addEventListener("click", () => {
         if (!parcelaPendiente) return;
@@ -4800,6 +5080,7 @@
             capacidad_regadera:   nuevoCfg.capacidadRegadera ?? null,
             origen:               localStorage.getItem("kylia_origen"),
           });
+          sincronizarZonas(nuevoCfg);
         } catch (_) {}
         await cargarDatos();
         cargarNDVI(true);

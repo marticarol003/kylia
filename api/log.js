@@ -27,6 +27,7 @@ const HANDLERS = {
   "push-sub":            handlePushSub,
 };
 
+const ES_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const METODOS_RIEGO = new Set(["goteo", "aspersion", "surco", "manguera", "regadera"]);
 const FRANJAS       = new Set(["manana", "mediodia", "tarde", "noche"]);
 const MANEJOS       = new Set(["convencional", "ecologico"]);
@@ -49,12 +50,19 @@ module.exports = async (req, res) => {
 // ─── registro-usuario ──────────────────────────────────────────────
 async function handleRegistroUsuario(req, res, body) {
   const id = (body.id || "").toString().trim();
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+  if (!ES_UUID.test(id)) {
     return res.status(400).json({ error: "id inválido (debe ser UUID)" });
   }
 
+  // Dueño de la parcela. Una fila de `usuarios` ES una parcela; varias filas con
+  // el mismo propietario_id son las zonas de cultivo de un mismo agricultor.
+  // Si no llega, la parcela es de sí misma — que es el caso de siempre y deja el
+  // comportamiento anterior intacto. Ver db/anadir-propietario-usuarios-2026-07-31.sql.
+  const propietario = (body.propietario_id || "").toString().trim();
+
   const fila = {
     id,
+    propietario_id: ES_UUID.test(propietario) ? propietario : id,
     email:        clean(body.email,        200)?.toLowerCase() || null,
     nombre:       clean(body.nombre,       120)                 || null,
     telefono:     clean(body.telefono,      40)                 || null,

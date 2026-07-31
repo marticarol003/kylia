@@ -24,6 +24,10 @@ drop table if exists usuarios            cascade;
 -- 1) Ficha del piloto / parcela
 create table usuarios (
   id            uuid        primary key,
+  -- Una fila = UNA PARCELA. propietario_id agrupa las parcelas de un mismo
+  -- agricultor (sus zonas de cultivo); una parcela sola se apunta a sí misma.
+  -- Ver db/anadir-propietario-usuarios-2026-07-31.sql para el porqué.
+  propietario_id uuid,
   email         text,
   nombre        text,
   telefono      text,
@@ -162,6 +166,7 @@ create index on jornadas            (usuario_id, fecha desc);
 create index on mediciones          (usuario_id, fecha desc);
 create index on eventos             (usuario_id, fecha desc);
 create index on usuarios            (fecha_alta desc);
+create index on usuarios            (propietario_id);   -- "las zonas de este agricultor"
 
 -- ─────────────────────────────────────────────────────────────────
 -- recomendaciones_log: SELLADA append-only (registro inalterable del reveal)
