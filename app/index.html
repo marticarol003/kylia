@@ -1844,6 +1844,27 @@
       color: var(--muted); font-size: 1.05rem; line-height: 1; padding: 2px 6px; border-radius: 6px;
     }
     .zona-quitar:hover { background: var(--border); color: var(--high); }
+    /* Una siembra = un cultivo ocupando parte del recinto. */
+    .siembra { padding-top: 8px; }
+    .siembra + .siembra { margin-top: 8px; border-top: 1px dashed var(--border); }
+    .siembra-area { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+    .siembra-area input {
+      flex: 1; padding: 7px 9px; font-family: inherit; font-size: .84rem;
+      border: 1px solid var(--border); border-radius: 7px;
+      background: var(--card); color: var(--text);
+    }
+    .siembra-unidad { font-size: .8rem; color: var(--muted); }
+    .siembra-quitar {
+      background: none; border: none; cursor: pointer; font-family: inherit;
+      color: var(--muted); font-size: .95rem; padding: 3px 6px; border-radius: 6px;
+    }
+    .siembra-quitar:hover { background: var(--border); color: var(--high); }
+    .siembra-anadir {
+      display: block; margin-top: 9px; margin-bottom: 4px;
+      padding: 0; background: none; border: none;
+      font-family: inherit; font-size: .78rem; font-weight: 600; color: var(--low);
+      cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+    }
     .zona-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .zona-campos select, .zona-campos input {
       width: 100%; padding: 7px 9px; font-family: inherit; font-size: .84rem;
@@ -2714,6 +2735,13 @@
       { id: "pimiento",  nombre: "Pimiento",        alertas: ["mosca_blanca", "arana_roja"] },
       { id: "berenjena", nombre: "Berenjena",       alertas: ["mosca_blanca", "arana_roja"] },
       { id: "calabacin", nombre: "Calabacín",       alertas: ["mosca_blanca"] },
+      // El motor lleva su curva de Kc afinada desde el 29-jun (cebolla tierna
+      // trasplantada, FAO-56 Tablas 11-12) y es uno de los pilotos —
+      // El Tros de l'Uri, en Palafolls— pero faltaba en esta lista, así que
+      // no había forma de elegirla en la app: se quedaba sin Kc por fase y
+      // sin plan de abonado. Solo mildiu (Peronospora destructor): del resto
+      // de plagas de cebolla, el trips es el que manda y no está modelado.
+      { id: "cebolla",   nombre: "Cebolla",         alertas: ["mildiu"] },
     ];
 
     // ─── Catálogo de productos fitosanitarios ─────────────────────────────────
@@ -4663,17 +4691,61 @@
     // /api/sigpac?vecinos=1 devuelve todos los del tile (ya se descargaban y se
     // tiraban). El servidor marca cuáles son bastante grandes para el satélite;
     // aquí no se decide nada de eso, solo se pinta lo que él dice.
+    //
+    // DENTRO DE UN RECINTO PUEDE HABER VARIOS CULTIVOS. Un recinto es homogéneo
+    // en USO declarado (TH huerta, TA tierra arable), no en cultivo: media
+    // parcela de lechuga y media de cebolla es un solo recinto. Por eso cada
+    // zona lleva una lista de SIEMBRAS.
+    //
+    // Y se reparten por SUPERFICIE, no dibujando, porque dibujar no aportaría
+    // nada: el motor de riego trabaja en mm (no ve geometría) y el de nutrición
+    // solo pide area_m2. La geometría la necesita ÚNICAMENTE el satélite — y una
+    // subzona es más pequeña que su recinto, así que prácticamente nunca va a
+    // llegar a las 0,5 ha. Repartir hectáreas a dedo en un móvil sería trabajo
+    // para el agricultor a cambio de cero precisión en la decisión.
     const ZONAS_KEY = "kylia_zonas";
     let recintosMapa = [];        // los del entorno, pintados como opción
     let zonasSel     = new Map(); // referencia SIGPAC → zona elegida
     let capaRecintos = null;
 
+    function uuidZona() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const n = Math.random() * 16 | 0;
+        return (c === "x" ? n : (n & 0x3) | 0x8).toString(16);
+      });
+    }
+
+    // Cada siembra es un cultivo ocupando un trozo del recinto. Es lo que acaba
+    // siendo una parcela en el servidor (una fila de `usuarios`).
+    function nuevaSiembra(areaM2) {
+      return { id: uuidZona(), cultivo: null, area_m2: areaM2 || null, fechaPlantacion: null };
+    }
+
     function loadZonas() {
       try {
         const raw = localStorage.getItem(ZONAS_KEY);
         const arr = raw ? JSON.parse(raw) : [];
-        return new Map(arr.map(z => [z.referencia, z]));
+        return new Map(arr.map((z) => {
+          // Zonas guardadas antes de que existieran las siembras: tenían un solo
+          // cultivo colgando de la zona. Se convierten a una siembra que ocupa
+          // el recinto entero.
+          if (!Array.isArray(z.siembras)) {
+            z.siembras = [{
+              id: z.id || uuidZona(), cultivo: z.cultivo || null,
+              area_m2: z.superficie_m2 || null, fechaPlantacion: z.fechaPlantacion || null,
+            }];
+            delete z.cultivo; delete z.fechaPlantacion; delete z.id;
+          }
+          return [z.referencia, z];
+        }));
       } catch (_) { return new Map(); }
+    }
+
+    // Superficie del recinto que aún no tiene cultivo asignado.
+    function m2Libres(z) {
+      const usado = (z.siembras || []).reduce((s, x) => s + (Number(x.area_m2) || 0), 0);
+      return Math.max(0, (z.superficie_m2 || 0) - usado);
     }
     function saveZonas() {
       localStorage.setItem(ZONAS_KEY, JSON.stringify([...zonasSel.values()]));
@@ -4714,19 +4786,12 @@
         const r = recintosMapa.find(x => x.referencia === ref);
         if (!r) return;
         zonasSel.set(ref, {
-          // Cada zona es una PARCELA en el servidor (una fila de `usuarios`) con
-          // su propio id; lo que las agrupa es el propietario_id común.
-          id: (crypto.randomUUID ? crypto.randomUUID()
-               : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
-                   const n = Math.random() * 16 | 0;
-                   return (c === "x" ? n : (n & 0x3) | 0x8).toString(16);
-                 })),
           referencia: r.referencia, superficie_m2: r.superficie_m2, uso: r.uso,
           satelite: r.satelite, motivo_sin_satelite: r.motivo_sin_satelite,
           geometria: r.geometria,
-          // El cultivo y la fecha los pone él; sin cultivo la zona no entra al
-          // plan de abonado (el motor de nutrición lo exige) y el Kc cae a 1.
-          cultivo: null, fechaPlantacion: null,
+          // Arranca con un cultivo ocupando el recinto entero, que es el caso
+          // corriente; si hay más de uno, él añade y reparte la superficie.
+          siembras: [nuevaSiembra(r.superficie_m2)],
         });
       }
       saveZonas();
@@ -4763,30 +4828,65 @@
       const opciones = (sel) => CULTIVOS.map(c =>
         `<option value="${c.id}"${sel === c.id ? " selected" : ""}>${c.nombre}</option>`).join("");
 
-      lista.innerHTML = zonas.map(z => `
-        <li class="zona-item" data-ref="${esc(z.referencia)}">
+      // Con más de un cultivo dentro, la medida del satélite es una MEZCLA de los
+      // dos y no sirve para decidir sobre ninguno: un NDVI promedio entre lechuga
+      // hecha y cebolla recién plantada no describe ni a una ni a otra. Así que el
+      // satélite se apaga para ese recinto y se dice por qué, en vez de enseñar un
+      // número que parece bueno y no lo es.
+      const estadoSatelite = (z) => {
+        if (z.siembras.length > 1) return { clase: "no", txt: "sin satélite",
+          nota: "Con varios cultivos en la misma parcela, la medida del satélite sale mezclada entre ellos y no describe a ninguno. El riego y el abonado se calculan igual, con el modelo." };
+        if (!z.satelite)           return { clase: "no", txt: "sin satélite", nota: z.motivo_sin_satelite || "" };
+        return { clase: "si", txt: "🛰 con satélite", nota: "" };
+      };
+
+      lista.innerHTML = zonas.map(z => {
+        const sat    = estadoSatelite(z);
+        const libres = m2Libres(z);
+        const ref    = esc(z.referencia);
+
+        const siembras = z.siembras.map((s, i) => `
+          <div class="siembra" data-siembra="${s.id}">
+            <div class="zona-campos">
+              <select data-campo="cultivo" data-ref="${ref}" data-siembra="${s.id}" aria-label="Cultivo">
+                <option value="">¿Qué cultivo?</option>${opciones(s.cultivo)}
+              </select>
+              <input type="date" data-campo="fecha" data-ref="${ref}" data-siembra="${s.id}"
+                     value="${s.fechaPlantacion || ""}" aria-label="Fecha de plantación">
+            </div>
+            <div class="siembra-area">
+              <input type="number" min="0" step="10" inputmode="numeric"
+                     data-campo="area" data-ref="${ref}" data-siembra="${s.id}"
+                     value="${s.area_m2 ?? ""}" aria-label="Superficie de este cultivo">
+              <span class="siembra-unidad">m²</span>
+              ${z.siembras.length > 1
+                ? `<button type="button" class="siembra-quitar" data-quitar-siembra="${s.id}"
+                           data-ref="${ref}" aria-label="Quitar este cultivo">✕</button>`
+                : ""}
+            </div>
+          </div>`).join("");
+
+        return `
+        <li class="zona-item" data-ref="${ref}">
           <div class="zona-fila1">
             <div>
               <div class="zona-sup">${(z.superficie_m2 || 0).toLocaleString("es-ES")} m²</div>
-              <div class="zona-ref">SIGPAC ${esc(z.referencia || "—")}${z.uso ? " · " + esc(z.uso) : ""}</div>
+              <div class="zona-ref">SIGPAC ${ref || "—"}${z.uso ? " · " + esc(z.uso) : ""}</div>
             </div>
-            <button type="button" class="zona-quitar" data-quitar="${esc(z.referencia)}"
+            <button type="button" class="zona-quitar" data-quitar="${ref}"
                     aria-label="Quitar esta zona">✕</button>
           </div>
-          <div class="zona-campos">
-            <select data-campo="cultivo" data-ref="${esc(z.referencia)}" aria-label="Cultivo de la zona">
-              <option value="">¿Qué cultivo?</option>${opciones(z.cultivo)}
-            </select>
-            <input type="date" data-campo="fecha" data-ref="${esc(z.referencia)}"
-                   value="${z.fechaPlantacion || ""}" aria-label="Fecha de plantación">
-          </div>
-          <span class="zona-satelite ${z.satelite ? "si" : "no"}">
-            ${z.satelite ? "🛰 con satélite" : "sin satélite"}
-          </span>
-          ${z.satelite ? "" : `<p class="zona-nota">${esc(z.motivo_sin_satelite || "")}</p>`}
-        </li>`).join("");
+          ${siembras}
+          <button type="button" class="siembra-anadir" data-anadir="${ref}">+ Otro cultivo aquí</button>
+          ${libres > 0 && z.siembras.length > 1
+            ? `<p class="zona-nota">Quedan ${libres.toLocaleString("es-ES")} m² sin asignar.</p>` : ""}
+          <span class="zona-satelite ${sat.clase}">${sat.txt}</span>
+          ${sat.nota ? `<p class="zona-nota">${esc(sat.nota)}</p>` : ""}
+        </li>`;
+      }).join("");
 
-      ayuda.textContent = "Cada zona lleva su cultivo y su fecha: el riego y el abonado se calculan por separado para cada una.";
+      ayuda.textContent = "Si en una parcela tienes más de un cultivo, añádelo y reparte los metros: "
+        + "cada uno lleva su riego y su abonado por separado.";
     }
 
     // Sube cada zona como una PARCELA propia (una fila de `usuarios`), todas con
@@ -4801,25 +4901,39 @@
     function sincronizarZonas(base) {
       const dueno = window.kyliaSync?.userId;
       if (!dueno) return;
+      const nombreCultivo = (id) => (CULTIVOS.find(c => c.id === id) || {}).nombre || id;
+
       for (const z of zonasSel.values()) {
-        if (!z.cultivo || !z.id) continue;
-        window.kyliaSync?.registroUsuario({
-          id:               z.id,
-          propietario_id:   dueno,
-          email:            localStorage.getItem("kylia_user_email") || null,
-          nombre:           `${base.nombre || "Zona"} · ${z.superficie_m2} m²`,
-          ciudad:           base.ciudad,
-          lat:              base.lat,
-          lon:              base.lon,
-          cultivos:         [z.cultivo],
-          parcela:          z.geometria,
-          area_m2:          z.superficie_m2,
-          fecha_plantacion: z.fechaPlantacion || null,
-          suelo:            base.suelo || null,
-          metodo_riego:     base.metodoRiego || null,
-          caudal:           base.caudal ?? null,
-          origen:           localStorage.getItem("kylia_origen"),
-        });
+        // Con un solo cultivo, la parcela ES el recinto y va con su contorno: el
+        // satélite puede medirla. Con varios, NO se manda geometría — si se
+        // mandara, el cron mediría el mismo polígono para cada cultivo y les
+        // atribuiría a todos el mismo NDVI mezclado.
+        const geometria = z.siembras.length === 1 ? z.geometria : null;
+
+        for (const s of z.siembras) {
+          // Sin cultivo no se sube: el motor de nutrición lo exige para el plan
+          // de abonado y el Kc caería a 1 (ETc = ET₀).
+          if (!s.cultivo || !s.id) continue;
+          window.kyliaSync?.registroUsuario({
+            id:               s.id,
+            propietario_id:   dueno,
+            email:            localStorage.getItem("kylia_user_email") || null,
+            nombre:           `${nombreCultivo(s.cultivo)} · ${(s.area_m2 || 0).toLocaleString("es-ES")} m²`,
+            ciudad:           base.ciudad,
+            lat:              base.lat,
+            lon:              base.lon,
+            cultivos:         [s.cultivo],
+            parcela:          geometria,
+            area_m2:          s.area_m2 ?? null,
+            fecha_plantacion: s.fechaPlantacion || null,
+            // De la finca: dónde está, qué suelo tiene y con qué riega. Lo que
+            // cambia entre cultivos (cuál, cuándo y cuántos metros) va arriba.
+            suelo:            base.suelo || null,
+            metodo_riego:     base.metodoRiego || null,
+            caudal:           base.caudal ?? null,
+            origen:           localStorage.getItem("kylia_origen"),
+          });
+        }
       }
     }
 
@@ -4951,17 +5065,38 @@
       const listaZonas = document.getElementById("zonas-lista");
       if (listaZonas) {
         listaZonas.addEventListener("click", (ev) => {
-          const ref = ev.target?.dataset?.quitar;
-          if (ref) toggleZona(ref);
+          const d = ev.target?.dataset || {};
+          if (d.quitar) return toggleZona(d.quitar);
+
+          if (d.anadir) {                       // otro cultivo en el mismo recinto
+            const z = zonasSel.get(d.anadir);
+            if (!z) return;
+            z.siembras.push(nuevaSiembra(m2Libres(z) || null));
+            saveZonas(); renderZonas();
+            return;
+          }
+          if (d.quitarSiembra) {
+            const z = zonasSel.get(d.ref);
+            if (!z || z.siembras.length <= 1) return;
+            z.siembras = z.siembras.filter(s => s.id !== d.quitarSiembra);
+            saveZonas(); renderZonas();
+          }
         });
         listaZonas.addEventListener("change", (ev) => {
-          const { campo, ref } = ev.target?.dataset || {};
-          if (!campo || !ref) return;
-          const z = zonasSel.get(ref);
-          if (!z) return;
-          if (campo === "cultivo") z.cultivo         = ev.target.value || null;
-          if (campo === "fecha")   z.fechaPlantacion = ev.target.value || null;
+          const { campo, ref, siembra } = ev.target?.dataset || {};
+          if (!campo || !ref || !siembra) return;
+          const s = zonasSel.get(ref)?.siembras.find(x => x.id === siembra);
+          if (!s) return;
+          if (campo === "cultivo") s.cultivo         = ev.target.value || null;
+          if (campo === "fecha")   s.fechaPlantacion = ev.target.value || null;
+          if (campo === "area") {
+            const v = parseFloat(ev.target.value);
+            s.area_m2 = Number.isFinite(v) && v > 0 ? Math.round(v) : null;
+          }
           saveZonas();
+          // La superficie mueve el "quedan X m² sin asignar" y el aviso del
+          // satélite, así que hay que repintar; el cultivo y la fecha no.
+          if (campo === "area") renderZonas();
         });
       }
 
