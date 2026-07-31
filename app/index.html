@@ -138,6 +138,11 @@
       --bg:         #f5f8f2;
       --text:       #1f2a1f;
       --muted:      #5a685a;
+      /* Un escalón por debajo de --muted, para lo accesorio: los "(opcional)" de
+         los campos y el detalle de las fichas. Se usaba en 6 sitios sin estar
+         definida, así que esos textos heredaban el color del padre y no llegaban
+         a apagarse — el "(opcional)" pesaba igual que su etiqueta. */
+      --subtle:     #7d8a7d;
       --card:       #ffffff;
       --border:     #dfe7d9;
       --high:       #b91c1c;
@@ -656,6 +661,9 @@
     .ind-badge.buena    { background: var(--low-bg);    color: var(--low); }
     .ind-badge.moderada { background: var(--medium-bg); color: var(--medium); }
     .ind-badge.estres   { background: var(--high-bg);   color: var(--high); }
+    /* "Sin dato" no es una alerta: gris, sin color de semáforo, para que no se
+       lea como un estado malo del cultivo. */
+    .ind-badge.sin-dato { background: var(--border); color: var(--subtle); font-weight: 600; }
     .ind-sub { font-size: 0.68rem; color: var(--muted); }
     .riego-registro {
       display: flex; align-items: center; justify-content: space-between;
@@ -1406,6 +1414,22 @@
       font-family: inherit;
       transition: transform 0.12s ease;
     }
+    /* Los dos botones flotantes tapaban contenido que se toca: "+ Nuevo riego"
+       queda justo debajo cuando esa fila llega abajo a la derecha. Se apartan
+       mientras se baja y vuelven al subir o al parar, así que nunca están
+       encima de lo que el agricultor va a pulsar. Sin quitar ninguna de las
+       dos vías de contacto. */
+    .fab-soporte {
+      transition: transform .22s ease, opacity .22s ease;
+    }
+    .fab-soporte.oculto {
+      transform: translateY(120%);
+      opacity: 0;
+      pointer-events: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .fab-soporte { transition: none; }
+    }
     .fab-btn:hover { transform: scale(1.06); }
     .fab-btn:focus-visible { outline: 2px solid var(--low); outline-offset: 3px; }
     .fab-btn-whatsapp {
@@ -1547,6 +1571,8 @@
     html[data-modo-kylia="piloto"] #card-parcela,
     html[data-modo-kylia="piloto"] #recomendaciones-container,
     html[data-modo-kylia="piloto"] #alertas-container,
+    html[data-modo-kylia="piloto"] #abonado-toggle,
+    html[data-modo-kylia="piloto"] #abonado-cuerpo,
     html[data-modo-kylia="piloto"] section.card[aria-label="Condiciones meteorológicas"],
     html[data-modo-kylia="piloto"] .faq-section { display: none !important; }
 
@@ -1762,6 +1788,65 @@
     .plagas-toggle-cta { font-size: .76rem; font-weight: 600; color: var(--low); white-space: nowrap; }
     .plagas-toggle.abierto .plagas-toggle-cta { color: var(--muted); }
     .plagas-cards .card-alerta { margin-bottom: 10px; }
+
+    /* ════════════════════════════════════════════════════════════
+       PANTALLAS GRANDES
+       La app nació solo para el móvil (max-width 480px y ni una media
+       query), así que en un portátil era una tira estrecha en medio de
+       un fondo vacío. Se abre en tablet y escritorio, que es donde la
+       miran el técnico de la cooperativa y el propio agricultor cuando
+       se sienta en casa. El móvil no cambia: todo esto entra a partir
+       de 720px.
+       ════════════════════════════════════════════════════════════ */
+    @media (min-width: 720px) {
+      .app { max-width: 680px; padding: 28px 20px 48px; }
+      .header h1 { font-size: 1.9rem; }
+      .card-hoy { padding: 28px 26px; }
+      .hoy-cifra { font-size: 3.2rem; }
+      .tile { min-height: 108px; padding: 16px; }
+      .fab-soporte { right: max(16px, calc(50vw - 324px)); }
+    }
+
+    @media (min-width: 900px) {
+      .app { max-width: 860px; }
+      /* Los cuatro indicadores en una sola fila: se leen de un vistazo,
+         que es lo que pide un cockpit cuando hay sitio. */
+      .cockpit-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      /* La FAQ es larga; en dos columnas deja de empujar el pie a la nada. */
+      .faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; align-items: start; }
+      .fab-soporte { right: max(16px, calc(50vw - 414px)); }
+    }
+
+    /* ── Plan de abonado (motor de nutrición del servidor) ── */
+    .abonado-card { padding: 16px; margin-bottom: 12px; }
+    .abonado-cargando, .abonado-vacio {
+      margin: 0; font-size: .88rem; color: var(--muted); line-height: 1.55;
+    }
+    .abonado-tabla { width: 100%; border-collapse: collapse; font-size: .86rem; }
+    .abonado-tabla th, .abonado-tabla td {
+      padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: left;
+    }
+    .abonado-tabla th {
+      font-size: .68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted);
+    }
+    .abonado-tabla td.num, .abonado-tabla th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .abonado-tabla tr.total td { font-weight: 700; border-bottom: none; padding-top: 10px; }
+    .abonado-nutri { font-weight: 600; color: var(--text); }
+    .abonado-reparto { list-style: none; padding: 0; margin: 10px 0 0; }
+    .abonado-reparto li {
+      font-size: .82rem; color: var(--text); line-height: 1.5;
+      padding: 7px 10px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 9px; margin-bottom: 5px;
+    }
+    .abonado-reparto strong { color: var(--text); }
+    .abonado-nota {
+      margin: 10px 0 0; font-size: .76rem; color: var(--muted); line-height: 1.5;
+    }
+    .abonado-bloque-titulo {
+      font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); margin: 14px 0 6px;
+    }
   </style>
 </head>
 <body>
@@ -2054,14 +2139,21 @@
     <!-- Alertas plagas -->
     <div id="alertas-container"></div>
 
+    <!-- Plan de abonado (motor de nutrición MAPA, calculado en servidor) -->
+    <button type="button" class="plagas-toggle" id="abonado-toggle" aria-expanded="false" aria-controls="abonado-cuerpo" hidden>
+      <span>🌱 Plan de abonado</span>
+      <span class="plagas-toggle-cta" id="abonado-toggle-cta">ver detalle ▾</span>
+    </button>
+    <div id="abonado-cuerpo" hidden></div>
 
     <!-- Preguntas frecuentes -->
     <section class="faq-section" aria-label="Preguntas frecuentes">
       <h2>Preguntas frecuentes</h2>
+      <div class="faq-grid">
 
       <details class="faq-item">
         <summary>¿Cómo decide la app si tengo que regar?</summary>
-        <div class="faq-body">Calcula el agua evaporada (ET₀) desde tu último riego usando datos de Open-Meteo. Si supera 30 mm sin reponer, marca "Regar hoy" en rojo. A 15 mm sugiere revisar. Toca "¿Por qué?" en la acción del día para ver el desglose.</div>
+        <div class="faq-body">Lleva la cuenta del agua de tu suelo desde que plantaste (método FAO-56). Cada día resta lo que gasta tu cultivo —la evaporación de Open-Meteo multiplicada por un coeficiente que cambia según la edad de la planta— y suma la lluvia que llega a calar y lo que tú riegas. Cuando lo que falta alcanza el agua que tu suelo puede dar sin que la planta sufra, te dice que riegues; a partir de tres cuartas partes de ese margen, que vigiles. Ese límite no es un número fijo: depende de tu tipo de suelo, del cultivo, de lo hondas que tenga ya las raíces y del calor que esté haciendo. Toca "¿Por qué?" en la acción del día para ver el desglose con tus números.</div>
       </details>
 
       <details class="faq-item">
@@ -2071,7 +2163,7 @@
 
       <details class="faq-item">
         <summary>¿Qué pasa si no riego cuando me lo dice?</summary>
-        <div class="faq-body">La app es una herramienta de apoyo, tú decides. Si el déficit supera los 30 mm sin lluvia, el cultivo entra en estrés hídrico y el verdor (NDVI) baja en la siguiente imagen de satélite. Si tienes humedad medible en suelo arcilloso, el margen es algo mayor.</div>
+        <div class="faq-body">La app es una herramienta de apoyo, tú decides. Pasado el límite de riego el cultivo empieza a pasar sed: cierra los estomas, deja de crecer y el verdor (NDVI) baja en la siguiente imagen de satélite. El margen que te queda depende de tu suelo — uno arcilloso aguanta bastante más que uno arenoso — y el déficit no se borra: si te quedas corto varios riegos seguidos se va acumulando, y eso es justo lo que la app lleva contado.</div>
       </details>
 
       <details class="faq-item">
@@ -2081,7 +2173,7 @@
 
       <details class="faq-item">
         <summary>¿Funciona con cualquier cultivo?</summary>
-        <div class="faq-body">Durante el piloto, las recomendaciones específicas (plagas y fertilizantes) están afinadas para hortícolas: lechuga, espinaca, col/coliflor, tomate, pimiento, berenjena y calabacín. Las medidas de satélite y meteo funcionan para cualquier cultivo.</div>
+        <div class="faq-body">El riego y el plan de abonado están calibrados para hortícolas: lechuga, espinaca, col/coliflor, tomate, pimiento, berenjena, calabacín y cebolla. Con cualquier otro cultivo la app sigue funcionando, pero calcula el gasto de agua sin ajustar por la edad de la planta ni por lo honda que tenga la raíz, así que la cifra es más aproximada; y no calcula abonado. Las medidas de satélite y meteo valen para cualquier cultivo.</div>
       </details>
 
       <details class="faq-item">
@@ -2103,6 +2195,7 @@
         <summary>¿Cuánto cuesta?</summary>
         <div class="faq-body">El piloto es gratuito. A cambio, te pedimos que nos cuentes lo que falla y qué echas en falta. Si la cooperativa o asesor termina contratando, tú sigues con acceso gratuito al plan personal durante toda la campaña 2026.</div>
       </details>
+      </div>
     </section>
 
     <!-- Footer -->
@@ -2779,6 +2872,12 @@
     let riegos      = [];    // [{ date: "2026-05-18", litros: 5|null }, ...] ordenado asc
     let ultimoRiego = null;  // string "2026-05-18" — derivado de riegos para retrocompat
     let ultimoNDVI  = null;  // { estado, ndvi, fecha } — para renderIndicadores
+    // Si el satélite ya se consultó (con o sin suerte). Sin esto, "no hay dato"
+    // y "aún cargando" se pintaban igual: el shimmer se quedaba girando para
+    // siempre. Y quedarse sin dato es lo NORMAL, no un fallo raro — Sentinel-2
+    // revisita cada ~5 días y el guard de calidad descarta los pasos nublados,
+    // así que el agricultor puede pasar una semana sin imagen despejada.
+    let sateliteConsultado = false;
     let ultimoMeteo    = null;  // { tempMax, humMax, lluvia, vientoMax } — para recomendaciones
     let ultimoPrevision = [];  // [{ nombreDia, tempMax, humMax, lluvia, vientoMax }] próximos 3 días
     let textoIA         = null; // análisis generado por Gemini
@@ -2818,6 +2917,24 @@
       return MOTOR.aguaSuelo(cfg.suelo, cultivoId, dias);
     }
 
+    // Los riegos con la lámina recalculada al caudal de HOY. El `litros` que se
+    // guardó en localStorage se congeló con el caudal que hubiera el día del
+    // riego, y los caudales se afinan (truco del vaso, geometría real de la
+    // malla): el bancal de las 33 pasó de 15 a 5,4 y acabó en 11 mm/h. El
+    // servidor lleva laminaRiego desde c928cf2 en los siete sitios donde lee
+    // riegos; la app se quedó pasando el valor congelado directo al balance.
+    // Sobre los MISMOS riegos eso daba 35,7 mm de déficit en la app contra 41,7
+    // en el servidor, y en el 19% de escenarios probados la decisión salía al
+    // revés: "todo en orden" en pantalla mientras el servidor mandaba regar 42
+    // L/m². Mismo motor, distinta entrada — que es como volvió a colarse la
+    // divergencia que se cerró el 28-jul. Un solo sitio para no repetirlo.
+    function riegosConLamina() {
+      return riegos.map(r => ({
+        ...r,
+        litros: MOTOR.laminaRiego(r.litros ?? null, r.duracion ?? null, cfg.caudal),
+      }));
+    }
+
     function diasDesde(fechaIso, hasta) {
       if (!fechaIso) return null;
       return Math.round((hasta - new Date(`${fechaIso}T12:00:00`)) / 86400000);
@@ -2827,8 +2944,9 @@
     // campos de compatibilidad usados por el resto de la UI (balanceTotal ≡ Dr).
     function calcularBalanceHidrico() {
       if (!ultimoET0 || !ultimoET0.length) return null;
-      const ultRiego = riegos[riegos.length - 1] || null;
-      const refDate  = ultRiego?.date || ultimoNDMI?.fecha;
+      const conLamina = riegosConLamina();
+      const ultRiego  = conLamina[conLamina.length - 1] || null;
+      const refDate   = ultRiego?.date || ultimoNDMI?.fecha;
       if (!refDate) return null;
 
       const cultivoId = (cfg.cultivos || [])[0] || null;
@@ -2847,7 +2965,7 @@
         .filter(({ date }) => !plant || date >= plant)
         .sort((a, b) => a.date.localeCompare(b.date));
 
-      const bal = MOTOR.balanceHidrico(serie, riegos, {
+      const bal = MOTOR.balanceHidrico(serie, conLamina, {
         suelo:           cfg.suelo,
         cultivoId,
         metodoRiego:     cfg.metodoRiego,
@@ -3122,9 +3240,14 @@
           let data = null;
           try { data = await res.json(); } catch (_) { data = null; }
 
-          if (!res.ok) return;
+          // Salidas sin dato: marcar el satélite como consultado y repintar, para
+          // que los tiles pasen del shimmer a un "sin dato" honesto en vez de
+          // fingir que siguen cargando.
+          if (!res.ok) { sateliteConsultado = true; renderIndicadores(); return; }
 
-          if (data.ndvi === null || data.ndvi === undefined) return;
+          if (data.ndvi === null || data.ndvi === undefined) {
+            sateliteConsultado = true; renderIndicadores(); return;
+          }
 
           entrada = {
             date:         hoy,
@@ -3139,11 +3262,13 @@
           history = saveNdviEntry(entrada);
         } catch (err) {
           console.error("Error contactando /api/sentinel:", err.message);
+          sateliteConsultado = true; renderIndicadores();
           return;
         } finally {
           if (btnRefreshParcela) btnRefreshParcela.disabled = false;
         }
       }
+      sateliteConsultado = true;
 
       // Determinar estado con riego registrado (igual que antes)
       let estadoMostrar = entrada.estado;
@@ -3406,8 +3531,13 @@
       const vigorSub = document.getElementById("ind-vigor-sub");
       if (vigorEl) {
         if (!ultimoNDVI) {
-          vigorEl.innerHTML = "&nbsp;"; vigorEl.className = "ind-badge skel";
-          if (vigorSub) vigorSub.textContent = "";
+          if (sateliteConsultado) {
+            vigorEl.textContent = "Sin dato"; vigorEl.className = "ind-badge sin-dato";
+            if (vigorSub) vigorSub.textContent = "sin imagen despejada";
+          } else {
+            vigorEl.innerHTML = "&nbsp;"; vigorEl.className = "ind-badge skel";
+            if (vigorSub) vigorSub.textContent = "";
+          }
         } else {
           const map = { buena: ["Muy bueno","buena"], moderada: ["Normal","moderada"], estres: ["Bajo","estres"], recuperacion: ["Recuperando","moderada"] };
           const [txt, cls] = map[ultimoNDVI.estado] || [ultimoNDVI.estado, ""];
@@ -3421,8 +3551,13 @@
       const aguaSub = document.getElementById("ind-agua-sub");
       if (aguaEl) {
         if (!ultimoNDMI) {
-          aguaEl.innerHTML = "&nbsp;"; aguaEl.className = "ind-badge skel";
-          if (aguaSub) aguaSub.textContent = "";
+          if (sateliteConsultado) {
+            aguaEl.textContent = "Sin dato"; aguaEl.className = "ind-badge sin-dato";
+            if (aguaSub) aguaSub.textContent = "sin imagen despejada";
+          } else {
+            aguaEl.innerHTML = "&nbsp;"; aguaEl.className = "ind-badge skel";
+            if (aguaSub) aguaSub.textContent = "";
+          }
         } else {
           let txt, cls, sub;
           const balance = calcularBalanceHidrico();
@@ -3468,7 +3603,8 @@
       if (!el) return;
       if (ultimoRiego) {
         const dias = Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000));
-        const litros = riegos[riegos.length - 1]?.litros;
+        const conLamina = riegosConLamina();
+        const litros = conLamina[conLamina.length - 1]?.litros;
         const litrosTxt = litros != null ? ` · ${litros} L/m²` : "";
         el.innerHTML =
           `<span class="riego-etiqueta">Último riego: hace ${dias} día${dias !== 1 ? "s" : ""}${litrosTxt}</span>`
@@ -3485,7 +3621,7 @@
       if (!card || !lista) return;
       if (!riegos.length) { card.hidden = true; return; }
       card.hidden = false;
-      const ultimos = [...riegos].reverse(); // TODOS, más reciente primero
+      const ultimos = riegosConLamina().reverse(); // TODOS, más reciente primero
       const count = document.getElementById("historial-riegos-count");
       if (count) count.textContent = ` (${ultimos.length})`;
       lista.innerHTML = "";
@@ -4296,6 +4432,97 @@
     function renderAlertaRiego() { /* replaced by renderHoy */ }
 
     // ─── Carga de datos ───────────────────────────────────────────────────────
+    // ─── Plan de abonado ──────────────────────────────────────────────────────
+    // El pilar de fertilizantes NO se calcula en el navegador y no debe: necesita
+    // la oferta de nutrientes del suelo (SoilGrids, cacheada en la fila del
+    // usuario), el rinde esperado por NDVI y el crédito de residuos del cultivo
+    // anterior. Todo eso vive en el servidor (_motor-nutricion.js + _motor-
+    // cuaderno-fert.js, método MAPA), así que la app pide el plan ya hecho a
+    // /api/campo?vista=cuaderno en vez de tener una segunda versión aquí — que es
+    // justo el error que se pagó con el motor de riego.
+    //
+    // La heurística vieja de nutrición se retiró por no estar validada (se
+    // disparaba con NDVI<0.5, que es vigor, no nitrógeno) y desde entonces el
+    // agricultor no veía NADA de abonado en /app aunque el motor bueno existiera.
+    const NUTRI_NOMBRE = { N: "Nitrógeno (N)", P2O5: "Fósforo (P₂O₅)", K2O: "Potasio (K₂O)" };
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    function nDec(v, d) {
+      return Number(v ?? 0).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
+    }
+
+    function pintarPlanAbonado(plan, rend) {
+      // Sin plan no se inventa uno: el motor dice por qué no puede calcularlo
+      // (falta cultivo, o rinde esperado) y eso es lo que se enseña.
+      if (!plan || !plan.disponible) {
+        return `<section class="card abonado-card"><p class="abonado-vacio">${
+          esc((plan && plan.motivo) || "Aún no se puede calcular el plan: falta el cultivo o algún dato de la parcela.")
+        }</p></section>`;
+      }
+
+      const filas = plan.lineas.map(l => `<tr>
+        <td class="abonado-nutri">${NUTRI_NOMBRE[l.nutriente] || esc(l.nutriente)}</td>
+        <td class="num">${nDec(l.necesidad_kg, 1)} kg</td>
+        <td class="num">${nDec(l.coste_eur, 2)} €</td>
+      </tr>`).join("");
+
+      const reparto = plan.lineas.filter(l => l.reparto && l.reparto.length).map(l =>
+        `<li><strong>${NUTRI_NOMBRE[l.nutriente] || esc(l.nutriente)}:</strong> ` +
+        l.reparto.map(t => `${t.pct}% ${esc(t.momento)} (${nDec(t.kg, 1)} kg)`).join(" · ") + `</li>`
+      ).join("");
+
+      // Notas honestas: de dónde sale la cosecha esperada, si el plan va sobre
+      // extracción bruta o neta, y que los precios son de referencia.
+      const notas = [];
+      if (rend && rend.usado_t != null) {
+        const origen = rend.origen === "onboarding" ? "según tu dato de cosecha"
+                     : rend.origen === "estimado_satelite" ? "estimada por satélite" : "";
+        notas.push(`Calculado para una cosecha esperada de ${nDec(rend.usado_t, 2)} t${origen ? ` (${origen})` : ""}.`);
+      }
+      if (plan.nota) notas.push(plan.nota);
+      if (plan.precios_referencia) notas.push("Precios de referencia €/kg de nutriente (volátiles); se pueden ajustar con los tuyos.");
+
+      return `<section class="card abonado-card">
+        <table class="abonado-tabla">
+          <thead><tr><th>Nutriente</th><th class="num">Necesita</th><th class="num">Coste</th></tr></thead>
+          <tbody>${filas}
+            <tr class="total"><td colspan="2">Coste total estimado</td>
+            <td class="num">${nDec(plan.coste_total_eur, 2)} €</td></tr></tbody>
+        </table>
+        ${reparto ? `<p class="abonado-bloque-titulo">Cómo repartirlo</p>
+          <p class="abonado-nota">${esc(plan.fraccionamiento?.nota || "")}</p>
+          <ul class="abonado-reparto">${reparto}</ul>` : ""}
+        ${notas.length ? `<p class="abonado-nota">${esc(notas.join(" "))}</p>` : ""}
+      </section>`;
+    }
+
+    async function cargarPlanAbonado() {
+      const toggle = document.getElementById("abonado-toggle");
+      const cuerpo = document.getElementById("abonado-cuerpo");
+      if (!toggle || !cuerpo) return;
+      // El piloto silencioso no ve recomendaciones (sesgaría el ensayo).
+      if (window.kyliaSync?.esPiloto) return;
+
+      const uid = window.kyliaSync?.userId;
+      if (!uid) return;
+
+      try {
+        const res = await fetch(`/api/campo?vista=cuaderno&usuario_id=${encodeURIComponent(uid)}`,
+                                { cache: "no-store" });
+        if (!res.ok) return;                      // sin plan, la tarjeta no aparece
+        const d = await res.json();
+        if (!d || d.ok === false) return;
+
+        cuerpo.innerHTML = pintarPlanAbonado(d.plan, d.rendimiento);
+        toggle.hidden = false;
+      } catch (err) {
+        console.warn("[Kylia] no se pudo cargar el plan de abonado:", err.message);
+      }
+    }
+
     async function cargarDatos() {
       document.getElementById("btn-refresh").disabled = true;
       setStatus("Cargando...");
@@ -5007,11 +5234,22 @@
       cargarNDVI();
       cargarHumedadSuelo();
       cargarET0();
+      cargarPlanAbonado();
       setInterval(cargarDatos, REFRESH_MS);
       setInterval(cargarNDVI, 6 * 60 * 60 * 1000);       // cada 6h (Sentinel-2 revisita ~5 días)
       setInterval(cargarHumedadSuelo, 60 * 60 * 1000);   // cada hora (Open-Meteo es horario)
       setInterval(cargarET0, 6 * 60 * 60 * 1000);        // cada 6h (ET₀ diaria, cambia poco)
       document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
+
+      // Plan de abonado: plegado por defecto, como la vigilancia de plagas.
+      document.getElementById("abonado-toggle").addEventListener("click", (e) => {
+        const cuerpo = document.getElementById("abonado-cuerpo");
+        const abierto = cuerpo.hidden;
+        cuerpo.hidden = !abierto;
+        e.currentTarget.classList.toggle("abierto", abierto);
+        e.currentTarget.setAttribute("aria-expanded", String(abierto));
+        document.getElementById("abonado-toggle-cta").textContent = abierto ? "ocultar ▴" : "ver detalle ▾";
+      });
       document.getElementById("btn-refresh-parcela").addEventListener("click", () => {
         cargarNDVI(true);
         cargarHumedadSuelo();
@@ -5178,6 +5416,28 @@
           row.setAttribute("aria-expanded", String(!abierto));
         });
       });
+
+      // ─── FAB que se aparta al bajar ───────────────────────────────────────
+      // Bajando se esconde (deja libre lo que hay debajo, p.ej. "+ Nuevo
+      // riego"); subiendo o al parar vuelve. Cerca del final del scroll se
+      // queda quieto para no parpadear con el rebote del móvil.
+      (function () {
+        const fabs = document.querySelector(".fab-soporte");
+        if (!fabs) return;
+        let ultimoY = window.scrollY;
+        let quieto;
+        window.addEventListener("scroll", () => {
+          const y = window.scrollY;
+          const finDePagina = y + window.innerHeight > document.body.scrollHeight - 80;
+          if (!finDePagina) {
+            if (y > ultimoY + 8)      fabs.classList.add("oculto");
+            else if (y < ultimoY - 8) fabs.classList.remove("oculto");
+          }
+          ultimoY = y;
+          clearTimeout(quieto);
+          quieto = setTimeout(() => fabs.classList.remove("oculto"), 700);
+        }, { passive: true });
+      })();
 
       // ─── Soporte WhatsApp ─────────────────────────────────────────────────
       // Número del fundador para soporte directo durante el piloto
