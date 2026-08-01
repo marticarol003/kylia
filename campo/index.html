@@ -313,6 +313,27 @@
       return;
     }
     USUARIO = data.usuario || {};
+
+    // Parcela cosechada: el piloto está cerrado. No hay déficit ni umbral que
+    // enseñar (el servidor ya no los calcula), así que se pinta el cierre en vez
+    // de una tarjeta con "undefined mm".
+    if (data.cosechado) {
+      const u0 = USUARIO;
+      root.innerHTML = `
+        <h1>${campoActual().titulo}</h1>
+        <div class="sub">${u0.ciudad || ""}${u0.cultivo ? " · " + u0.cultivo : ""}</div>
+        <div class="estado baja">
+          <span class="tag">Cosechado</span>
+          <div class="titular">Piloto cerrado</div>
+          <div class="porque">Se cosechó el <b>${fmtFecha(data.fecha_cosecha)}</b>.
+            Sin cultivo no hay riego que calcular, y el informe del piloto ya cuenta
+            el ciclo completo.</div>
+        </div>
+        <button class="btn" onclick="irA('comparativa')">Ver el informe →</button>`;
+      document.getElementById("registro").style.display = "none";
+      return;
+    }
+
     const h = data.hoy, u = USUARIO, n = NIVEL[h.nivel] || NIVEL.baja;
     const titular = h.nivel === "alta" && h.presentacion ? `Riega ~${h.presentacion.texto}` : n.titular;
 

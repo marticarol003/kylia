@@ -24,6 +24,17 @@ const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
 const ES_UUID = /^[0-9a-f-]{36}$/i;
 
 function hoyISO() { return new Date().toISOString().slice(0, 10); }
+
+// Último día que cuenta para este piloto: el de la cosecha si ya pasó, si no hoy.
+// Todo lo que mira "hasta cuándo" tiene que pasar por aquí — el contrafactual
+// incluido. Contar días DESPUÉS de arrancar el cultivo mete en la comparación
+// jornadas en las que Kylia "recomendaba regar" y el agricultor lógicamente no
+// regaba, y eso diluye el ahorro que se publica.
+function ultimoDiaDe(u) {
+  const hoy     = hoyISO();
+  const cosecha = u && u.fecha_cosecha ? String(u.fecha_cosecha).slice(0, 10) : null;
+  return cosecha && cosecha < hoy ? cosecha : hoy;
+}
 function dia(f) { return f ? String(f).slice(0, 10) : null; }
 function diasDesde(fechaIso) {
   if (!fechaIso) return null;
@@ -60,7 +71,25 @@ async function climaSerie(lat, lon, desde) {
 async function vistaHoy(res, u) {
   if (u.lat == null || u.lon == null) return res.status(200).json({ ok: false, error: "sin coordenadas" });
 
-  const hoy    = hoyISO();
+  const hoy = hoyISO();
+
+  // Parcela cosechada: no hay cultivo al que regar. Sin esto, /campo le seguía
+  // diciendo "riega hoy" al campo de 440 m² un mes después de arrancarlo — el
+  // balance FAO-56 no sabe de cosechas, sigue acumulando déficit sobre tierra
+  // vacía y la orden crece sola cada día.
+  const cosecha = u.fecha_cosecha ? String(u.fecha_cosecha).slice(0, 10) : null;
+  if (cosecha && cosecha < hoy) {
+    return res.status(200).json({
+      ok: true, vista: "hoy",
+      usuario: { ciudad: u.ciudad, cultivo: (u.cultivos || [])[0] || null,
+                 area_m2: u.area_m2, metodo_riego: u.metodo_riego, caudal: u.caudal },
+      cosechado: true, fecha_cosecha: cosecha,
+      hoy: { fecha: hoy, nivel: "baja", regar: false,
+             texto: `Cosechado el ${cosecha}. Sin cultivo, no hay riego que calcular.` },
+      proximo: null, riegos_recientes: [],
+    });
+  }
+
   const serie  = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
   const accs   = await supabaseSelect("acciones",
     `usuario_id=eq.${u.id}&tipo=eq.riego&select=id,fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.asc`);
@@ -316,8 +345,16 @@ async function revealDeUsuario(u) {
   // Kylia congeló sin tener aún el riego real cargado) SIN tocar el log, que es
   // append-only por diseño. Si no está fijado, cuenta todo el historial.
   const desde   = u.piloto_inicio ? String(u.piloto_inicio).slice(0, 10) : null;
-  const fRec    = desde ? `&fecha=gte.${desde}T00:00:00Z` : "";
-  const fAcc    = desde ? `&fecha_local=gte.${desde}` : "";
+  // Y FINAL: el día de la cosecha. Sin este tope la ventana se cerraba en el
+  // último día con decisión congelada, o sea "hoy", así que el reveal seguía
+  // contando días DESPUÉS de arrancar el cultivo — días en los que Kylia
+  // "recomendaba regar" y el agricultor lógicamente no regaba. Eso diluye el
+  // ahorro: el campo de 440 m² publicaba ~20% cuando el rango honesto es 20-30%.
+  const hasta   = u.fecha_cosecha ? String(u.fecha_cosecha).slice(0, 10) : null;
+  const fRec    = (desde ? `&fecha=gte.${desde}T00:00:00Z` : "")
+                + (hasta ? `&fecha=lte.${hasta}T23:59:59Z` : "");
+  const fAcc    = (desde ? `&fecha_local=gte.${desde}` : "")
+                + (hasta ? `&fecha_local=lte.${hasta}` : "");
 
   const [recs, acciones, jornadas] = await Promise.all([
     supabaseSelect("recomendaciones_log",
@@ -350,8 +387,9 @@ async function revealDeUsuario(u) {
   if (u.lat != null && u.lon != null) {
     try {
       const serie  = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
-      const idxHoy = serie.findIndex(s => s.date === hoyISO());
-      const hasta  = serie.slice(0, (idxHoy >= 0 ? idxHoy : serie.length - 1) + 1);
+      const corte  = ultimoDiaDe(u);                     // cosecha si ya pasó, si no hoy
+      const idxFin = serie.findIndex(s => s.date === corte);
+      const hasta  = serie.slice(0, (idxFin >= 0 ? idxFin : serie.length - 1) + 1);
       const dias   = desde ? hasta.filter(d => d.date >= desde) : hasta;
       if (dias.length) {
         const sim = simularKylia(dias, {
@@ -442,7 +480,6 @@ async function vistaComparativa(req, res, u) {
   const r1    = x => Math.round(x * 10) / 10;
   const numOr = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
 
-  const hoy   = hoyISO();
   const serie = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
   const [riegos, aplics] = await Promise.all([
     supabaseSelect("acciones",
@@ -461,9 +498,11 @@ async function vistaComparativa(req, res, u) {
     ? new Date(new Date(`${plant}T12:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10)
     : null;
 
-  // Solo días pasados/hoy (sin pronóstico) y desde el inicio de la comparación.
-  const idxHoy = serie.findIndex(s => s.date === hoy);
-  const hasta  = serie.slice(0, (idxHoy >= 0 ? idxHoy : serie.length - 1) + 1);
+  // Solo días pasados (sin pronóstico), desde el inicio de la comparación y
+  // hasta la cosecha si ya se cosechó.
+  const corte  = ultimoDiaDe(u);
+  const idxFin = serie.findIndex(s => s.date === corte);
+  const hasta  = serie.slice(0, (idxFin >= 0 ? idxFin : serie.length - 1) + 1);
   const dias   = inicio ? hasta.filter(d => d.date >= inicio) : hasta;
 
   // 🟢 Kylia: contrafactual sobre el campo del padre (Dr arranca en 0 = suelo lleno tras el asentamiento).

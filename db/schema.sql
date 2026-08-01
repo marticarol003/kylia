@@ -43,6 +43,8 @@ create table usuarios (
   suelo                 text,                                  -- 'arenoso','franco','arcilloso' → AWC FAO-56
   fecha_plantacion      date,                                  -- día 0 de la fenología (Kc, raíz)
   piloto_inicio         date,                                  -- arranque limpio del contrafactual del reveal
+  fecha_cosecha         date,                                  -- cierra el piloto: diario-b deja de congelar y el reveal
+                                                               -- corta su ventana aquí (NULL = piloto en marcha)
   caudal                numeric,                               -- pluviometría del emisor (mm/h = L/m²·h)
   area_m2               numeric,                               -- superficie: escala mm↔litros y regaderas
   capacidad_regadera    numeric,                               -- litros por regadera (riego manual)

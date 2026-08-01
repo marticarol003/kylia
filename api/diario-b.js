@@ -90,8 +90,14 @@ async function materializarGoteoAuto(u, riegosExistentes, hoy, dry) {
   const lamina = Math.round((min / 60) * caudal * 10) / 10;   // L/m² por riego
   const yaHay  = new Set((riegosExistentes || []).map(r => r.date));
 
+  // Nadie riega una parcela cosechada: la pauta fija se corta ahí. Si no, el
+  // cron seguiría inventando riegos en `acciones` sobre tierra vacía y el
+  // contrafactual del reveal los contaría como agua realmente aplicada.
+  const cosecha = u.fecha_cosecha ? String(u.fecha_cosecha).slice(0, 10) : null;
+  const tope    = cosecha && cosecha < hoy ? cosecha : hoy;
+
   const nuevos = [];
-  for (let d = desde; d <= hoy; d = sumarDias(d, cada)) {
+  for (let d = desde; d <= tope; d = sumarDias(d, cada)) {
     if (!yaHay.has(d)) nuevos.push(d);
   }
   if (!nuevos.length) return [];
@@ -155,6 +161,19 @@ module.exports = async (req, res) => {
   for (const u of pilotos) {
     const r = { usuario_id: u.id, ciudad: u.ciudad || null };
     try {
+      // COSECHADO = piloto cerrado. Sin esto, el cron seguía congelando cada
+      // mañana una decisión de riego para una parcela VACÍA: el campo de 440 m²
+      // se cosechó el 30-jul y siguió acumulando filas diciendo que había que
+      // regar una tierra donde ya no había nada. Y `recomendaciones_log` es de
+      // donde lee el reveal, así que cada día ensuciaba un poco más el informe
+      // —y es append-only, o sea que limpiar después cuesta desactivar el
+      // trigger. Mejor no escribirlas.
+      const cosecha = u.fecha_cosecha ? String(u.fecha_cosecha).slice(0, 10) : null;
+      if (cosecha && cosecha < hoy) {
+        r.skip = `cosechado el ${cosecha}`;
+        resultados.push(r);
+        continue;
+      }
       if (!dry && await yaCongelado(u.id, hoy)) { r.skip = "ya congelado hoy"; resultados.push(r); continue; }
 
       const serie  = await climaSerie(u.lat, u.lon, u.fecha_plantacion);

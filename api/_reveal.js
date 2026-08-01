@@ -426,7 +426,12 @@ function construirReveal(datos, opts = {}) {
       cultivo: (u.cultivos || [])[0] || null,
       metodo_riego: u.metodo_riego || null,
       fecha_plantacion: u.fecha_plantacion || null,
+      fecha_cosecha: u.fecha_cosecha || null,
     },
+    // Un informe de piloto CERRADO (ciclo completo, de plantación a cosecha) no
+    // vale lo mismo que una foto a mitad de campaña: el primero es defendible,
+    // el segundo es un avance. Se declara en vez de dejarlo a interpretación.
+    cerrado: !!u.fecha_cosecha,
     periodo,
     dimensiones: { horas, agua, tratamientos: trat, coste },
     avisos,
