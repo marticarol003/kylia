@@ -1865,6 +1865,27 @@
       font-family: inherit; font-size: .78rem; font-weight: 600; color: var(--low);
       cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
     }
+    /* Partir la parcela: solo aparece en fincas donde de verdad compensa. */
+    .siembra-partir {
+      display: block; width: 100%; margin-top: 8px; padding: 8px 10px;
+      background: var(--card); border: 1px solid var(--low); border-radius: 8px;
+      font-family: inherit; font-size: .8rem; font-weight: 600; color: var(--low);
+      cursor: pointer; text-align: center;
+    }
+    .siembra-partir:hover { background: var(--low-bg); }
+    .corte-aviso {
+      margin: 8px 0 0; padding: 9px 11px;
+      background: var(--medium-bg); border: 1px solid var(--medium); border-radius: 8px;
+      font-size: .78rem; color: var(--medium); line-height: 1.45;
+    }
+    .corte-cancelar {
+      background: none; border: none; padding: 0; margin-left: 4px;
+      font-family: inherit; font-size: .78rem; color: var(--medium);
+      cursor: pointer; text-decoration: underline;
+    }
+    .corte-error {
+      margin: 8px 0 0; font-size: .76rem; color: var(--high); line-height: 1.45;
+    }
     .zona-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .zona-campos select, .zona-campos input {
       width: 100%; padding: 7px 9px; font-family: inherit; font-size: .84rem;
@@ -2513,6 +2534,9 @@
        lo reexporta). Antes estaba duplicado dentro de este HTML y las dos copias
        decidían distinto sobre los mismos datos. -->
   <script src="/assets/js/motor-riego.js"></script>
+  <!-- Partir un recinto por una recta, para separar cultivos en fincas grandes.
+       Núcleo puro compartido con los tests (tests/test-geo-parcela.mjs). -->
+  <script src="/assets/js/geo-parcela.js"></script>
   <script>
     // ─── Constantes ───────────────────────────────────────────────────────────
     const REFRESH_MS  = 30 * 60 * 1000;
@@ -4747,15 +4771,106 @@
       const usado = (z.siembras || []).reduce((s, x) => s + (Number(x.area_m2) || 0), 0);
       return Math.max(0, (z.superficie_m2 || 0) - usado);
     }
+
+    // ── Partir un recinto en dos (solo cuando compensa) ───────────────────────
+    // En una parcela pequeña, separar cultivos es repartir metros y ya está: la
+    // geometría solo la usa el satélite y ninguna mitad llegaría al umbral.
+    // En una finca GRANDE es al revés — 5 ha partidas en 3 + 2 dejan las dos
+    // partes muy por encima, y cada una puede tener SU PROPIA medida. Ahí sí
+    // vale la pena marcar por dónde va la separación.
+    let umbralSateliteM2 = 5000;   // lo confirma el servidor al traer los recintos
+    let corteEnCurso     = null;   // { ref, puntos:[[lon,lat]…], capa }
+
+    function partesSeguiranConSatelite(z) {
+      // Aproximación para decidir si OFRECER el corte: si ni partiéndola por la
+      // mitad exacta llegan al umbral, cortar no le da satélite a nadie y solo
+      // sería trabajo. El estado real de cada parte se calcula tras el corte.
+      return (z.superficie_m2 || 0) / 2 >= umbralSateliteM2;
+    }
+    function zonaPuedePartirse(z) {
+      return z.siembras.length === 2 && !!z.geometria && partesSeguiranConSatelite(z);
+    }
+
+    function iniciarCorte(ref) {
+      const z = zonasSel.get(ref);
+      if (!z || !mapaLeaflet) return;
+      cancelarCorte();
+      corteEnCurso = { ref, puntos: [], capa: L.layerGroup().addTo(mapaLeaflet) };
+      // Centrar en la parcela: si no se ve entera, marcar la línea es imposible.
+      try {
+        const capa = L.geoJSON({ type: "Feature", geometry: z.geometria });
+        mapaLeaflet.fitBounds(capa.getBounds(), { padding: [24, 24] });
+      } catch (_) { /* si falla, se queda donde esté */ }
+      renderZonas();
+    }
+
+    function cancelarCorte() {
+      if (corteEnCurso?.capa) mapaLeaflet.removeLayer(corteEnCurso.capa);
+      corteEnCurso = null;
+    }
+
+    // Tira el reparto dibujado: los trozos dejan de tener contorno propio y la
+    // zona vuelve a ser un recinto entero con varios cultivos dentro.
+    function olvidarCorte(z) {
+      if (!z || !z.partida) return;
+      z.partida = false;
+      z.siembras.forEach(s => { delete s.geometria; });
+    }
+
+    // Cada toque en modo corte. Con dos puntos, parte y reparte.
+    function puntoDeCorte(latlng) {
+      if (!corteEnCurso) return false;
+      const z = zonasSel.get(corteEnCurso.ref);
+      if (!z) { cancelarCorte(); return true; }
+
+      corteEnCurso.puntos.push([latlng.lng, latlng.lat]);
+      L.circleMarker(latlng, { radius: 6, color: "#b45309", fillColor: "#f59e0b", fillOpacity: 1, weight: 2 })
+        .addTo(corteEnCurso.capa);
+
+      if (corteEnCurso.puntos.length < 2) { renderZonas(); return true; }
+
+      const [p1, p2] = corteEnCurso.puntos;
+      const res = KyliaGeo.partirPorLinea(z.geometria, p1, p2,
+                                          { superficieOficialM2: z.superficie_m2 });
+      if (!res.ok) {
+        // No se inventa un reparto: se dice qué ha pasado y se vuelve a empezar.
+        z.errorCorte = res.motivo === "corte_multiple"
+          ? "Esa línea cruza la parcela varias veces (tiene forma irregular). Prueba en otra dirección."
+          : res.motivo === "no_cruza"
+            ? "Esa línea no cruza la parcela. Marca dos puntos a un lado y otro."
+            : "No se ha podido partir por ahí. Prueba en otra dirección.";
+        cancelarCorte();
+        saveZonas(); renderZonas();
+        return true;
+      }
+
+      // La parte mayor va al primer cultivo, que es como lo tiene en la cabeza.
+      z.siembras.forEach((s, i) => {
+        const parte = res.partes[i];
+        if (!parte) return;
+        s.area_m2   = parte.area_m2;
+        s.geometria = parte.geometria;
+      });
+      z.errorCorte = null;
+      z.partida    = true;
+      cancelarCorte();
+      saveZonas();
+      pintarRecintos();
+      renderZonas();
+      return true;
+    }
     function saveZonas() {
       localStorage.setItem(ZONAS_KEY, JSON.stringify([...zonasSel.values()]));
     }
 
-    // Verde relleno = mía. Contorno claro = disponible, tócala.
-    function estiloRecinto(ref) {
-      return zonasSel.has(ref)
-        ? { color: "#15803d", weight: 2.5, fillOpacity: 0.35, fillColor: "#15803d" }
-        : { color: "#ffffff", weight: 1.2, fillOpacity: 0.06, fillColor: "#ffffff", dashArray: "4 3" };
+    // Verde relleno = mía. Contorno claro = disponible, tócala. Los dos trozos de
+    // una parcela partida van en verde y ámbar, para que se vea la separación.
+    function estiloRecinto(ref, parte) {
+      if (!zonasSel.has(ref)) {
+        return { color: "#ffffff", weight: 1.2, fillOpacity: 0.06, fillColor: "#ffffff", dashArray: "4 3" };
+      }
+      const c = parte === 1 ? "#b45309" : "#15803d";
+      return { color: c, weight: 2.5, fillOpacity: 0.35, fillColor: c };
     }
 
     function pintarRecintos() {
@@ -4763,15 +4878,36 @@
       if (capaRecintos) mapaLeaflet.removeLayer(capaRecintos);
       if (!recintosMapa.length) { capaRecintos = null; return; }
 
+      // Si una zona está partida, se pintan sus TROZOS en vez del recinto entero:
+      // el agricultor tiene que ver por dónde quedó la separación que marcó.
+      const partidas = [];
+      for (const z of zonasSel.values()) {
+        if (!z.partida) continue;
+        z.siembras.forEach((s, i) => {
+          if (s.geometria) partidas.push({ ref: z.referencia, geometria: s.geometria, parte: i });
+        });
+      }
+      const refsPartidas = new Set(partidas.map(p => p.ref));
+
       capaRecintos = L.geoJSON(
-        recintosMapa.map(r => ({ type: "Feature", geometry: r.geometria, properties: { ref: r.referencia } })),
+        recintosMapa
+          .filter(r => !refsPartidas.has(r.referencia))
+          .map(r => ({ type: "Feature", geometry: r.geometria, properties: { ref: r.referencia } }))
+          .concat(partidas.map(p => ({
+            type: "Feature", geometry: p.geometria, properties: { ref: p.ref, parte: p.parte },
+          }))),
         {
-          style: (f) => estiloRecinto(f.properties.ref),
+          style: (f) => estiloRecinto(f.properties.ref, f.properties.parte),
           onEachFeature: (f, capa) => {
             capa.on("click", (ev) => {
               // Si no se para, el click llega también al mapa y dispara la
               // búsqueda de parcela suelta encima de la selección.
               L.DomEvent.stopPropagation(ev);
+              // Marcando una separación, el toque es un punto de la línea —
+              // y casi siempre cae DENTRO de la parcela, o sea sobre este
+              // polígono. Sin esto, el toque la seleccionaba como zona nueva
+              // en vez de cortar, y el corte no llegaba a hacerse nunca.
+              if (corteEnCurso) { puntoDeCorte(ev.latlng); return; }
               toggleZona(f.properties.ref);
             });
           },
@@ -4795,7 +4931,7 @@
         });
       }
       saveZonas();
-      if (capaRecintos) capaRecintos.setStyle((f) => estiloRecinto(f.properties.ref));
+      if (capaRecintos) capaRecintos.setStyle((f) => estiloRecinto(f.properties.ref, f.properties.parte));
       renderZonas();
     }
 
@@ -4834,16 +4970,38 @@
       // satélite se apaga para ese recinto y se dice por qué, en vez de enseñar un
       // número que parece bueno y no lo es.
       const estadoSatelite = (z) => {
-        if (z.siembras.length > 1) return { clase: "no", txt: "sin satélite",
-          nota: "Con varios cultivos en la misma parcela, la medida del satélite sale mezclada entre ellos y no describe a ninguno. El riego y el abonado se calculan igual, con el modelo." };
-        if (!z.satelite)           return { clase: "no", txt: "sin satélite", nota: z.motivo_sin_satelite || "" };
-        return { clase: "si", txt: "🛰 con satélite", nota: "" };
+        if (z.siembras.length === 1) {
+          return z.satelite
+            ? { clase: "si", txt: "🛰 con satélite", nota: "" }
+            : { clase: "no", txt: "sin satélite", nota: z.motivo_sin_satelite || "" };
+        }
+        // Partida: cada trozo tiene su contorno, así que el satélite puede medir
+        // cada cultivo por separado — siempre que el trozo dé la talla.
+        if (z.partida) {
+          const conSat = z.siembras.filter(s => (s.area_m2 || 0) >= umbralSateliteM2).length;
+          if (conSat === z.siembras.length)
+            return { clase: "si", txt: "🛰 con satélite en cada parte", nota: "" };
+          if (conSat === 0)
+            return { clase: "no", txt: "sin satélite",
+                     nota: "Los dos trozos se quedan por debajo de los "
+                         + `${umbralSateliteM2.toLocaleString("es-ES")} m² que necesita el satélite. `
+                         + "El riego y el abonado se calculan igual, con el modelo." };
+          return { clase: "si", txt: "🛰 satélite solo en la parte grande",
+                   nota: "El trozo pequeño se queda por debajo del tamaño que necesita el satélite; va con el modelo." };
+        }
+        return { clase: "no", txt: "sin satélite",
+          nota: "Con varios cultivos en la misma parcela, la medida del satélite sale mezclada entre ellos y no describe a ninguno. "
+              + (partesSeguiranConSatelite(z)
+                  ? "Marca por dónde van separados y cada uno tendrá la suya."
+                  : "El riego y el abonado se calculan igual, con el modelo.") };
       };
 
       lista.innerHTML = zonas.map(z => {
-        const sat    = estadoSatelite(z);
-        const libres = m2Libres(z);
-        const ref    = esc(z.referencia);
+        const sat        = estadoSatelite(z);
+        const libres     = m2Libres(z);
+        const ref        = esc(z.referencia);
+        const cortando   = corteEnCurso?.ref === z.referencia;
+        const puedePartir = zonaPuedePartirse(z);
 
         const siembras = z.siembras.map((s, i) => `
           <div class="siembra" data-siembra="${s.id}">
@@ -4878,7 +5036,17 @@
           </div>
           ${siembras}
           <button type="button" class="siembra-anadir" data-anadir="${ref}">+ Otro cultivo aquí</button>
-          ${libres > 0 && z.siembras.length > 1
+          ${cortando
+            ? `<p class="corte-aviso">Toca <strong>dos puntos</strong> en el mapa marcando por dónde van separados
+                 los cultivos${z.siembras.length ? "" : ""}. ${corteEnCurso.puntos.length}/2 marcados.
+                 <button type="button" class="corte-cancelar" data-cancelar-corte="1">cancelar</button></p>`
+            : puedePartir
+              ? `<button type="button" class="siembra-partir" data-partir="${ref}">
+                   ${z.partida ? "↻ Volver a marcar la separación" : "✎ Marcar por dónde van separados"}
+                 </button>`
+              : ""}
+          ${z.errorCorte ? `<p class="corte-error">${esc(z.errorCorte)}</p>` : ""}
+          ${libres > 0 && z.siembras.length > 1 && !z.partida
             ? `<p class="zona-nota">Quedan ${libres.toLocaleString("es-ES")} m² sin asignar.</p>` : ""}
           <span class="zona-satelite ${sat.clase}">${sat.txt}</span>
           ${sat.nota ? `<p class="zona-nota">${esc(sat.nota)}</p>` : ""}
@@ -4904,11 +5072,13 @@
       const nombreCultivo = (id) => (CULTIVOS.find(c => c.id === id) || {}).nombre || id;
 
       for (const z of zonasSel.values()) {
-        // Con un solo cultivo, la parcela ES el recinto y va con su contorno: el
-        // satélite puede medirla. Con varios, NO se manda geometría — si se
-        // mandara, el cron mediría el mismo polígono para cada cultivo y les
-        // atribuiría a todos el mismo NDVI mezclado.
-        const geometria = z.siembras.length === 1 ? z.geometria : null;
+        // Con un solo cultivo, la parcela ES el recinto y va con su contorno.
+        // Con varios SIN partir, NO se manda geometría: si se mandara, el cron
+        // mediría el mismo polígono para cada cultivo y les atribuiría a todos
+        // el mismo NDVI mezclado. Si el agricultor marcó la separación, cada
+        // siembra lleva SU trozo y el satélite mide cada cultivo aparte — que es
+        // el sentido de haber hecho el corte.
+        const geomZona = z.siembras.length === 1 ? z.geometria : null;
 
         for (const s of z.siembras) {
           // Sin cultivo no se sube: el motor de nutrición lo exige para el plan
@@ -4923,7 +5093,7 @@
             lat:              base.lat,
             lon:              base.lon,
             cultivos:         [s.cultivo],
-            parcela:          geometria,
+            parcela:          s.geometria || geomZona,
             area_m2:          s.area_m2 ?? null,
             fecha_plantacion: s.fechaPlantacion || null,
             // De la finca: dónde está, qué suelo tiene y con qué riega. Lo que
@@ -4944,6 +5114,7 @@
         const res = await fetch(`/api/sigpac?lat=${lat}&lon=${lon}&vecinos=1`);
         const d   = await res.json();
         if (!Array.isArray(d.recintos)) return;
+        if (Number.isFinite(d.umbral_satelite_m2)) umbralSateliteM2 = d.umbral_satelite_m2;
         recintosMapa = d.recintos;
         pintarRecintos();
         renderZonas();
@@ -5020,6 +5191,9 @@
       cargarRecintos(cfg.lat, cfg.lon);
 
       mapaLeaflet.on("click", async (e) => {
+        // En modo corte el toque marca la línea, no busca parcela.
+        if (puntoDeCorte(e.latlng)) return;
+
         const infoEl = document.getElementById("parcela-info");
         const btnEl  = document.getElementById("btn-confirmar-parcela");
         infoEl.textContent = "Buscando parcela...";
@@ -5075,11 +5249,14 @@
             saveZonas(); renderZonas();
             return;
           }
+          if (d.partir)        return iniciarCorte(d.partir);
+          if (d.cancelarCorte) { cancelarCorte(); renderZonas(); return; }
           if (d.quitarSiembra) {
             const z = zonasSel.get(d.ref);
             if (!z || z.siembras.length <= 1) return;
             z.siembras = z.siembras.filter(s => s.id !== d.quitarSiembra);
-            saveZonas(); renderZonas();
+            olvidarCorte(z);            // el reparto dibujado ya no describe esto
+            saveZonas(); pintarRecintos(); renderZonas();
           }
         });
         listaZonas.addEventListener("change", (ev) => {
@@ -5092,6 +5269,11 @@
           if (campo === "area") {
             const v = parseFloat(ev.target.value);
             s.area_m2 = Number.isFinite(v) && v > 0 ? Math.round(v) : null;
+            // Si teclea otra superficie, la línea que marcó deja de describir el
+            // reparto. Mantener los contornos sería enseñar un dibujo que ya no
+            // cuadra con los metros — y el satélite mediría trozos equivocados.
+            olvidarCorte(zonasSel.get(ref));
+            pintarRecintos();
           }
           saveZonas();
           // La superficie mueve el "quedan X m² sin asignar" y el aviso del

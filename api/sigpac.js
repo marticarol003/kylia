@@ -1,4 +1,4 @@
-const { aplicaSatelite, motivoSinSatelite } = require("./_satelite.js");
+const { aplicaSatelite, motivoSinSatelite, SUP_MIN_SATELITE_M2 } = require("./_satelite.js");
 
 // Usos SIGPAC que son cultivo. Se dejan fuera los que nunca son una zona de
 // cultivo del agricultor y solo ensucian el mapa: CA camino, ZU zona urbana,
@@ -141,8 +141,14 @@ module.exports = async (req, res) => {
           .sort((a, b) => b.superficie_m2 - a.superficie_m2)
       : null;
 
+    // El umbral viaja al cliente para que pueda decir, tras partir una parcela,
+    // si cada trozo sigue siendo medible por satélite — sin tener que llevar
+    // dentro el criterio, que sigue viviendo solo en _satelite.js.
     const conVecinos = (extra) => res.status(200).json(
-      recintos ? { ...extra, recintos, recintos_total_tile: geojson.features.length } : extra
+      recintos
+        ? { ...extra, recintos, recintos_total_tile: geojson.features.length,
+            umbral_satelite_m2: SUP_MIN_SATELITE_M2 }
+        : extra
     );
 
     const [mx, my] = wgs84ToMercator(lon, lat);
