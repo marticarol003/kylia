@@ -1817,6 +1817,26 @@
       .fab-soporte { right: max(16px, calc(50vw - 414px)); }
     }
 
+    /* ── Selector de zona (pantalla principal) ── */
+    .zonas-tabs {
+      display: flex; gap: 6px; margin-bottom: 14px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+    .zonas-tabs::-webkit-scrollbar { display: none; }
+    .zona-tab {
+      flex: 0 0 auto; padding: 8px 14px; border-radius: 999px;
+      border: 1px solid var(--tile-bd); background: var(--card);
+      font-family: inherit; font-size: .8rem; font-weight: 600; color: var(--muted);
+      cursor: pointer; white-space: nowrap;
+      transition: background .12s, color .12s, border-color .12s;
+    }
+    .zona-tab[aria-selected="true"] {
+      background: var(--text); color: #fff; border-color: var(--text);
+    }
+    .zona-tab:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+
     /* ── Zonas de cultivo (recintos de SIGPAC tocados en el mapa) ── */
     .zonas-bloque { margin-top: 12px; }
     .zonas-cabecera {
@@ -2034,6 +2054,9 @@
       </div>
       <button class="btn-config" id="btn-config" aria-label="Abrir configuración">&#9881;</button>
     </div>
+
+    <!-- Selector de zona: solo aparece si el agricultor tiene más de una -->
+    <div class="zonas-tabs" id="zonas-tabs" role="tablist" aria-label="Tus zonas de cultivo" hidden></div>
 
     <!-- Banner de bienvenida primer uso (se inserta dinámicamente) -->
     <div id="welcome-banner" class="welcome-banner" hidden>
@@ -2589,8 +2612,6 @@
     }
 
     // ─── Config (localStorage) ────────────────────────────────────────────────
-    let cfg = loadConfig();
-
     function loadConfig() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -2599,9 +2620,97 @@
       return { ...DEFAULTS };
     }
 
+    // ─── Zona activa ─────────────────────────────────────────────────────────
+    // El agricultor puede tener varias zonas de cultivo (ver el bloque de zonas
+    // del panel de configuración). Cada una tiene SU cultivo, SU fecha de
+    // plantación y SU superficie, así que su riego y su abonado son distintos.
+    //
+    // En vez de enseñar N cockpits o de enseñar solo el primero, se elige una y
+    // `cfg` pasa a ser la config EFECTIVA de esa zona. Así todo lo que ya
+    // funcionaba —el balance FAO-56, los tiles, el satélite, el plan de
+    // abonado— sigue leyendo `cfg` sin enterarse de que existen las zonas.
+    //
+    // Lo que es de la FINCA (dónde está, qué suelo, qué riego y qué caudal) no
+    // cambia al saltar de zona; lo que es del CULTIVO, sí.
+    const ZONA_ACTIVA_KEY = "kylia_zona_activa";
+
+    let cfgFinca   = loadConfig();                                  // lo persistido
+    let zonaActiva = localStorage.getItem(ZONA_ACTIVA_KEY) || null; // id de siembra, o null = principal
+    let cfg        = configEfectiva();                              // lo que lee toda la app
+
+    function zonasGuardadas() {
+      try { return JSON.parse(localStorage.getItem("kylia_zonas")) || []; } catch (_) { return []; }
+    }
+
+    // Las parcelas entre las que se puede saltar: la principal y cada siembra
+    // con cultivo puesto (sin cultivo no hay nada que calcular).
+    function parcelasDisponibles() {
+      const lista = [{
+        id: null, etiqueta: "Parcela principal",
+        cultivo: (cfgFinca.cultivos || [])[0] || null,
+        area_m2: cfgFinca.areaParcela, fechaPlantacion: cfgFinca.fechaPlantacion,
+        geometria: cfgFinca.parcela,
+      }];
+      for (const z of zonasGuardadas()) {
+        const solaEnElRecinto = (z.siembras || []).length === 1;
+        for (const s of (z.siembras || [])) {
+          if (!s.cultivo || !s.id) continue;
+          lista.push({
+            id: s.id,
+            etiqueta: `${nombreCultivo(s.cultivo)} · ${(s.area_m2 || 0).toLocaleString("es-ES")} m²`,
+            cultivo: s.cultivo, area_m2: s.area_m2, fechaPlantacion: s.fechaPlantacion,
+            // El contorno propio si la zona se partió; el del recinto entero si
+            // ese cultivo lo ocupa solo; ninguno si comparte recinto sin partir
+            // (ahí la medida del satélite saldría mezclada, ver renderZonas).
+            geometria: s.geometria || (solaEnElRecinto ? z.geometria : null),
+          });
+        }
+      }
+      return lista;
+    }
+
+    // Ojo: esto se llama en el arranque, antes de que `const CULTIVOS` esté
+    // inicializada (zona muerta temporal). Con un `const`, hasta `typeof` lanza,
+    // así que hace falta el try. Sin él, la app no levantaba.
+    function nombreCultivo(id) {
+      try {
+        const c = CULTIVOS.find(x => x.id === id);
+        if (c) return c.nombre;
+      } catch (_) { /* aún no hay tabla de cultivos: se usa el id */ }
+      return id ? id.charAt(0).toUpperCase() + id.slice(1) : "Cultivo";
+    }
+
+    function parcelaActiva() {
+      const lista = parcelasDisponibles();
+      return lista.find(p => p.id === zonaActiva) || lista[0];
+    }
+
+    function configEfectiva() {
+      const p = parcelaActiva();
+      if (!p || p.id === null) return { ...cfgFinca };
+      return {
+        ...cfgFinca,
+        cultivos:        p.cultivo ? [p.cultivo] : [],
+        fechaPlantacion: p.fechaPlantacion || null,
+        areaParcela:     p.area_m2 ?? null,
+        parcela:         p.geometria || null,
+      };
+    }
+
+    // El id con el que esta parcela existe en el servidor: el de la zona, o el
+    // del propio usuario para la principal. Los riegos y el plan de abonado
+    // tienen que ir contra el suyo, no todos contra el mismo.
+    function idParcelaActiva() {
+      return zonaActiva || window.kyliaSync?.userId || null;
+    }
+
+    // saveConfig guarda SIEMPRE la config de la finca. Si guardara la efectiva,
+    // el cultivo de la zona que estuviera abierta se colaría como cultivo de la
+    // parcela principal y se perdería el de verdad.
     function saveConfig(newCfg) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newCfg));
-      cfg = newCfg;
+      cfgFinca = newCfg;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cfgFinca));
+      cfg = configEfectiva();
     }
 
     // ─── Modelos de riesgo ────────────────────────────────────────────────────
@@ -2885,7 +2994,57 @@
         weekday: "long", day: "numeric", month: "long",
       });
       const sub = document.getElementById("subtitle");
-      sub.textContent = `${cfg.ciudad} · ${fecha}`;
+      const p   = parcelaActiva();
+      // Con varias zonas, el subtítulo dice cuál se está mirando: si no, el
+      // agricultor ve un riego y no sabe de qué trozo de su finca es.
+      const deZona = (parcelasDisponibles().length > 1 && p && p.id)
+        ? ` · ${p.etiqueta}` : "";
+      sub.textContent = `${cfg.ciudad} · ${fecha}${deZona}`;
+      renderZonasTabs();
+    }
+
+    // ─── Selector de zona en la pantalla principal ───────────────────────────
+    // Aparece solo si hay más de una parcela. Cambiar de pestaña cambia la
+    // config efectiva y recalcula todo: el riego de hoy, los tiles, el satélite
+    // y el plan de abonado, cada uno con el cultivo y la superficie de esa zona.
+    function renderZonasTabs() {
+      const cont = document.getElementById("zonas-tabs");
+      if (!cont) return;
+      const lista = parcelasDisponibles();
+      if (lista.length < 2) { cont.hidden = true; cont.innerHTML = ""; return; }
+      cont.hidden = false;
+      cont.innerHTML = lista.map(p => `
+        <button type="button" class="zona-tab" role="tab"
+                aria-selected="${(p.id || null) === zonaActiva}"
+                data-zona="${p.id || ""}">${esc(p.etiqueta)}</button>`).join("");
+    }
+
+    function cambiarZona(id) {
+      const nuevo = id || null;
+      if (nuevo === zonaActiva) return;
+      zonaActiva = nuevo;
+      if (nuevo) localStorage.setItem(ZONA_ACTIVA_KEY, nuevo);
+      else       localStorage.removeItem(ZONA_ACTIVA_KEY);
+
+      cfg = configEfectiva();
+      // Los riegos son de la parcela, así que se recargan de su propia lista.
+      riegos      = loadRiegos();
+      ultimoRiego = riegos.length ? riegos[riegos.length - 1].date : null;
+      // El NDVI se cachea por coordenadas/contorno, así que al cambiar de zona
+      // hay que volver a pedirlo: el de la anterior no describe a esta.
+      ultimoNDVI  = null;
+      ultimoNDMI  = null;
+      sateliteConsultado = false;
+
+      actualizarHeader();
+      renderRiegoRegistro();
+      renderHistorialRiegos();
+      renderIndicadores();
+      renderRecomendaciones();
+      cargarNDVI(true);
+      cargarET0();
+      cargarPlanAbonado();
+      window.kyliaTrack?.("zona-cambiada", { zona: nuevo ? "secundaria" : "principal" });
     }
 
     // ─── Renderizado dinámico de alertas ──────────────────────────────────────
@@ -3098,16 +3257,24 @@
     // Migración suave desde `kylia_ultimo_riego` (string, sin litros) a
     // `kylia_riegos` (array). Si el usuario ya tenía un registro previo, se
     // conserva como entrada sin cantidad.
-    const RIEGOS_KEY = "kylia_riegos";
+    // Los riegos van POR PARCELA. Si compartieran lista, el balance de una zona
+    // contaría el agua echada en otra y el déficit saldría inventado — que es
+    // exactamente el tipo de error que ya costó caro con la lámina.
+    function riegosKey() {
+      return zonaActiva ? `kylia_riegos_${zonaActiva}` : "kylia_riegos";
+    }
     function loadRiegos() {
       try {
-        const raw = localStorage.getItem(RIEGOS_KEY);
+        const raw = localStorage.getItem(riegosKey());
         if (raw) return JSON.parse(raw);
       } catch (_) { /* ignorar JSON inválido */ }
+      // La migración desde `kylia_ultimo_riego` solo aplica a la parcela
+      // principal: es de cuando no había zonas.
+      if (zonaActiva) return [];
       const legacy = localStorage.getItem("kylia_ultimo_riego");
       if (legacy) {
         const arr = [{ date: legacy, litros: null }];
-        localStorage.setItem(RIEGOS_KEY, JSON.stringify(arr));
+        localStorage.setItem(riegosKey(), JSON.stringify(arr));
         localStorage.removeItem("kylia_ultimo_riego");
         return arr;
       }
@@ -3115,7 +3282,7 @@
     }
     function saveRiegos(arr) {
       riegos = arr.slice().sort((a, b) => a.date.localeCompare(b.date));
-      localStorage.setItem(RIEGOS_KEY, JSON.stringify(riegos));
+      localStorage.setItem(riegosKey(), JSON.stringify(riegos));
       ultimoRiego = riegos.length ? riegos[riegos.length - 1].date : null;
     }
     function addRiego(date, litros, opciones = {}) {
@@ -3128,6 +3295,10 @@
       // Sincronizar en background con Supabase
       try {
         window.kyliaSync?.accion({
+          // Cada zona es su propia parcela en el servidor: el riego tiene que
+          // ir contra SU id, no contra el del usuario. (kyliaSync.accion pone
+          // usuario_id por defecto y el payload lo sobrescribe.)
+          usuario_id:     idParcelaActiva(),
           tipo:           "riego",
           fecha_local:    date,
           cantidad_l_m2:  litrosN,
@@ -4611,7 +4782,9 @@
       // El piloto silencioso no ve recomendaciones (sesgaría el ensayo).
       if (window.kyliaSync?.esPiloto) return;
 
-      const uid = window.kyliaSync?.userId;
+      // El plan es de la parcela que se está mirando: cada zona tiene su
+      // cultivo, su superficie y por tanto sus kg.
+      const uid = idParcelaActiva();
       if (!uid) return;
 
       try {
@@ -5069,8 +5242,6 @@
     function sincronizarZonas(base) {
       const dueno = window.kyliaSync?.userId;
       if (!dueno) return;
-      const nombreCultivo = (id) => (CULTIVOS.find(c => c.id === id) || {}).nombre || id;
-
       for (const z of zonasSel.values()) {
         // Con un solo cultivo, la parcela ES el recinto y va con su contorno.
         // Con varios SIN partir, NO se manda geometría: si se mandara, el cron
@@ -5284,8 +5455,9 @@
 
       document.getElementById("btn-confirmar-parcela").addEventListener("click", () => {
         if (!parcelaPendiente) return;
-        cfg = { ...cfg, parcela: parcelaPendiente };
-        saveConfig(cfg);
+        // Sobre cfgFinca, no sobre cfg: el contorno confirmado es el de la
+        // parcela principal, y cfg puede estar mostrando otra zona.
+        saveConfig({ ...cfgFinca, parcela: parcelaPendiente });
         parcelaPendiente = null;
         document.getElementById("btn-confirmar-parcela").classList.remove("visible");
         document.getElementById("parcela-info").textContent =
@@ -5413,7 +5585,8 @@
       function inicializarCultivos() {
         const grid = document.getElementById("cultivos-grid");
         grid.innerHTML = "";
-        const seleccionado = (cfg.cultivos || [])[0] || null;
+        // De la finca, no de la zona activa (ver la nota de más abajo).
+        const seleccionado = (cfgFinca.cultivos || [])[0] || null;
         CULTIVOS.forEach((cultivo) => {
           const btn = document.createElement("button");
           const activo = cultivo.id === seleccionado;
@@ -5503,12 +5676,16 @@
         document.querySelectorAll("#suelo-grid .btn-cultivo").forEach(btn => {
           btn.classList.toggle("activo", btn.dataset.suelo === cfg.suelo);
         });
+        // Estos tres son de la PARCELA PRINCIPAL, no de la zona que se esté
+        // mirando: el panel configura la finca. Si leyeran `cfg` con una zona
+        // activa, al guardar se llevarían su cultivo y su superficie al sitio
+        // de la principal y se perderían los de verdad.
         const fp = document.getElementById("input-fecha-plantacion");
-        if (fp) fp.value = cfg.fechaPlantacion || "";
+        if (fp) fp.value = cfgFinca.fechaPlantacion || "";
         const setNum = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v != null ? v : ""); };
-        setNum("input-caudal",              cfg.caudal);
-        setNum("input-area",                cfg.areaParcela);
-        setNum("input-capacidad-regadera",  cfg.capacidadRegadera);
+        setNum("input-caudal",              cfgFinca.caudal);
+        setNum("input-area",                cfgFinca.areaParcela);
+        setNum("input-capacidad-regadera",  cfgFinca.capacidadRegadera);
         actualizarBotonAreaParcela();
       }
       // Single-select del grid de tipo de suelo
@@ -5552,7 +5729,7 @@
         const manejo = obtenerManejoSeleccionado();
 
         if (!ciudad) {
-          await guardarYActualizar({ ...cfg, nombre, cultivos: cultivosSeleccionados, cultivosSecundarios, metodoRiego, manejo });
+          await guardarYActualizar({ ...cfgFinca, nombre, cultivos: cultivosSeleccionados, cultivosSecundarios, metodoRiego, manejo });
           return;
         }
 
@@ -5569,7 +5746,7 @@
           }
 
           const lugar = data.results[0];
-          await guardarYActualizar({ ...cfg, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
+          await guardarYActualizar({ ...cfgFinca, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
         } catch (_) {
           setFeedback("Error de conexión. Inténtalo de nuevo.", true);
         } finally {
@@ -5602,9 +5779,9 @@
               const data = await res.json();
               const ciudad = data.city || data.locality || data.principalSubdivision || "Ubicación GPS";
 
-              await guardarYActualizar({ ...cfg, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
+              await guardarYActualizar({ ...cfgFinca, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
             } catch (_) {
-              await guardarYActualizar({ ...cfg, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
+              await guardarYActualizar({ ...cfgFinca, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
             } finally {
               btnGps.disabled = false;
             }
@@ -5838,6 +6015,12 @@
       setInterval(cargarHumedadSuelo, 60 * 60 * 1000);   // cada hora (Open-Meteo es horario)
       setInterval(cargarET0, 6 * 60 * 60 * 1000);        // cada 6h (ET₀ diaria, cambia poco)
       document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
+
+      // Selector de zona (delegación: las pestañas se repintan al guardar).
+      document.getElementById("zonas-tabs").addEventListener("click", (e) => {
+        const t = e.target.closest?.("[data-zona]");
+        if (t) cambiarZona(t.dataset.zona || null);
+      });
 
       // Plan de abonado: plegado por defecto, como la vigilancia de plagas.
       document.getElementById("abonado-toggle").addEventListener("click", (e) => {
