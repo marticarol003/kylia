@@ -412,6 +412,21 @@ function construirReveal(datos, opts = {}) {
 
   // Avisos: lo que el informe NO puede afirmar todavía (transparencia).
   const avisos = [];
+  // Límite de método que afecta a TODO informe de agua, y que juega a favor: el
+  // contrafactual usa el mismo balance de Kc único que el motor, y ese balance
+  // agota la zona radicular más rápido que el Kc dual del estándar (medido sobre
+  // 60 ventanas: +8,1 mm de sesgo en verano, y en 88% de las discrepancias Kylia
+  // riega ANTES que pyfao56, no después). O sea que la Kylia simulada se atribuye
+  // MÁS riegos de los que un FAO-56 dual dispararía → el ahorro sale por lo bajo.
+  // Ver docs/tecnico/motor-de-decision.md §3.4.
+  if (agua.disponible) {
+    avisos.push(
+      "Método: el contrafactual usa el balance de Kc único de Kylia, que agota el " +
+      "suelo más rápido que el Kc dual de FAO-56 (validado sobre 60 ventanas). " +
+      "La Kylia simulada se atribuye por tanto más riegos de los que el estándar " +
+      "dispararía: el ahorro calculado es un mínimo, no un máximo."
+    );
+  }
   if (!horas.disponible) avisos.push("Dimensión 'horas en decidir': sin captura de tiempo, solo proxy de fuentes.");
   if (trat.sin_contrafactual) avisos.push("Dimensión 'tratamientos': el Diario B solo congela riego; sin contrafactual de plagas.");
   if (periodo && periodo.cobertura_pct != null && periodo.cobertura_pct < 90) {

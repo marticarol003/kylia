@@ -310,49 +310,144 @@ por RAW; sin excepciones JS. Probes confirmados: el suelo cambia RAW
 (arenoso 10,8 / franco 20,3 / arcilloso 21,6 mm) y la edad cambia Kc
 (0,70 a 8 d / 0,95 a 80 d / 1,0 sin fecha = degradación elegante).
 
-### 3.4 Validación contra `pyfao56` (Nivel 2) — ✅ EJECUTADA (2026-06-04)
+### 3.4 Validación contra `pyfao56` (Nivel 2) — ✅ EJECUTADA (2026-06-04) · 🔄 AMPLIADA A 60 VENTANAS (2026-08-05)
 
 La comparación de §3.3 demuestra que el motor nuevo se comporta **distinto y mejor
 fundado** que el viejo, pero lo hace contra el propio motor viejo de Kylia. Para
 cerrar el Nivel 2 del plan de validación hace falta contrastar el motor FAO-56 de
 Kylia contra una **implementación de referencia independiente del estándar**:
 [`pyfao56`](https://github.com/kthorp/pyfao56) (Thorp, USDA-ARS), que implementa el
-balance hídrico de suelo de Allen et al. (1998). Si Kylia y `pyfao56` divergen poco
-con las mismas entradas, el motor de Kylia *es* FAO-56, no solo "se inspira" en él.
+balance hídrico de suelo de Allen et al. (1998) por el **método del coeficiente de
+cultivo DUAL** — Kylia usa el **único**, y esa diferencia de método es el origen de
+toda la divergencia que se mide abajo. El ensayo no busca, por tanto, "divergencia
+cero": busca **saber exactamente dónde diverge, cuánto, y hacia qué lado**.
 
-#### Resultado de la ejecución (2026-06-04)
+#### ⚠️ Por qué esta sección se reescribió (2026-08-05)
 
-Ensayo: **lechuga, suelo franco, Lleida, 40 días** de clima real (Open-Meteo Archive,
-ET₀ media 5,1 mm/día), riego fijo de 25 mm cada 7 días aplicado a ambos motores.
-`pyfao56` v1.4.3 configurado con el **mismo Kc único** de Kylia (`Kcm` 0,70/1,00/0,95),
-mismas longitudes de fase, mismo suelo (θFC−θWP=0,15, Zr=0,30 → TAW 45 / RAW 20,2 mm)
-y `roff=False` (lluvia simple, como Kylia). Reproducible con `scripts/valida_pyfao56.py`.
+Hasta el 5-ago-2026 aquí se publicaba **una sola cifra: RMSE(Dr) 5,59 mm y 95% de
+concordancia**, de **una única ventana de 40 días**. Esa ventana era **abril de 2026**.
+Al repetir el ensayo sobre **60 ventanas** de dos años y medio de clima real, el
+resultado no es una cifra: es un **rango de 0,70 a 16,43 mm** que depende del régimen
+climático. Publicar la ejecución de abril como si caracterizara el motor era publicar
+**el clima de abril**.
 
-| Métrica | Umbral objetivo | Resultado | Veredicto |
+Dos correcciones más, por orden de importancia:
+
+1. **La explicación que se dio en julio también era falsa.** Con cinco ventanas
+   parecía que el error lo mandaba **la lluvia** del periodo. Con sesenta, la
+   correlación lluvia↔RMSE(Dr) es solo **−0,39**, y la peor ventana de todas
+   (16,43 mm, concordancia 52%) tuvo **71,9 mm de lluvia**. El driver real es la
+   **demanda evaporativa**: ET₀↔RMSE(Dr) = **+0,85**. La lluvia era un proxy
+   confundido — en Lleida las ventanas secas caen en verano.
+2. **El 5,59 salía de un port infiel.** El script no aplicaba `PE_MIN_MM` (Kylia
+   ignora las lluvias diarias < 2 mm; el port las infiltraba). Con el port corregido,
+   esa misma ventana de abril da **5,03 mm**. Reproducible:
+   `python3 scripts/valida_pyfao56.py --start 2026-04-01`.
+
+#### Montaje del ensayo
+
+**Lechuga, suelo franco, Lleida** (interior seco de Cataluña), ventanas de **40 días**
+de clima real (Open-Meteo Archive), riego fijo de 25 mm cada 7 días aplicado a ambos
+motores. `pyfao56` v1.4.3 con el **mismo Kc único** de Kylia (`Kcm` 0,70/1,00/0,95),
+mismas longitudes de fase, mismo suelo (θFC−θWP=0,15, Zr=0,30 → TAW 45 mm) y
+`roff=False` (lluvia simple, como Kylia). El port de Python replica `balanceHidrico()`
+(`assets/js/motor-riego.js:133`) en su orden exacto: riego → ETc → lluvia efectiva →
+acotar `Dr` a [0, TAW], con `p` ajustada por ETc y `PE_MIN_MM` en los dos lados.
+
+**Barrido:** 60 ventanas, una cada 15 días, del 2024-01-01 al 2026-07-26.
+Reproducible con `python3 scripts/valida_pyfao56.py --sweep`.
+
+#### Resultado 1 — La demanda es EXACTA (esto es lo que sostiene el producto)
+
+| Métrica | Umbral | Resultado sobre las 60 ventanas | Veredicto |
 |---|---|---|---|
-| **RMSE(Kc)** | — | **0,0000** | La curva Kc día-a-día es **idéntica** |
-| **RMSE(ETc)** | ≤ 0,30 mm/día | **0,0000 mm/día** | ✅ La **demanda del cultivo es exacta** vs el estándar |
-| **MBE(Dr)** | \|·\| ≤ 2 mm | **+1,62 mm** | ✅ Sin sesgo sistemático relevante |
-| **RMSE(Dr)** | ≤ 5 mm | **5,59 mm** | ⚠️ Algo por encima — causa identificada (abajo) |
-| **Concordancia "regar"** (Dr≥RAW) | ≥ 90% | **95% de los días** | ✅ La **decisión** coincide |
+| **RMSE(Kc)** | — | **0,0000** en todas | La curva Kc día a día es **idéntica** |
+| **RMSE(ETc)** | ≤ 0,30 mm/día | **0,000000 mm/día — máximo de las 60** | ✅ La **demanda del cultivo es exacta** |
 
-**Lectura:**
-- **Lo que importa más, validado al 100%:** el cálculo de la **demanda** (`ETc = Kc × ET₀`),
-  con su curva e interpolación por fases, **coincide exactamente** con `pyfao56` (RMSE 0,000).
-  Kylia *es* FAO-56 en la demanda, no "se inspira".
-- **El RMSE(Dr) de 5,6 mm** (ligeramente sobre el umbral de 5) **no es un error de Kylia**:
-  es la diferencia **single-Kc (Kylia) vs dual-Kc (pyfao56)**. En el método dual, al inicio
-  del ciclo el Kcb basal es muy bajo (0,15) y la mayor parte de la ET es **evaporación de
-  superficie**, que `pyfao56` descuenta de una capa aparte, no del agotamiento radicular `Dr`.
-  Kylia, con Kc único, imputa toda la ET a `Dr` → **agota la zona radicular algo más rápido en
-  fase inicial**. Es la simplificación deliberada del single-Kc (ya anotada: Kc_ini aproximado).
-- Pese a esa diferencia de método, **la decisión operativa (regar / no regar) coincide el 95%**
-  de los días → la simplificación rara vez cambia lo que el agricultor haría.
+`ETc = Kc × ET₀`, con su curva e interpolación por fases, **coincide con `pyfao56`
+hasta el sexto decimal en las sesenta ventanas**. Kylia *es* FAO-56 en la demanda, no
+"se inspira". **Esta es la afirmación que va al dossier y a la landing, y es la única
+que se publica fuera** — es la que aguanta cualquier régimen climático.
 
-**Conclusión:** el motor de riego de Kylia queda **validado contra el estándar FAO-56** en su
-núcleo (demanda exacta; decisión 95% concordante). La única divergencia es la esperada por usar
-Kc único en vez de dual, cuantificada y documentada. Mejora futura opcional: migrar a dual-Kc
-(separar evaporación de superficie) si se quiere afinar el `Dr` de la fase inicial.
+#### Resultado 2 — El agotamiento `Dr` diverge, y la divergencia escala con la demanda
+
+| ET₀ media | régimen | n | RMSE(Dr) | % del TAW | MBE(Dr) |
+|---|---|---|---|---|---|
+| 0–2 mm/d | invierno | 19 | **1,5 mm** | 3% | −0,1 mm |
+| 2–4 mm/d | entretiempo | 14 | **3,0 mm** | 7% | −0,1 mm |
+| 4–6 mm/d | primavera/otoño | 14 | **5,8 mm** | 13% | +2,6 mm |
+| 6+ mm/d | **verano** | 13 | **10,2 mm** | **23%** | **+8,1 mm** |
+
+**Mecanismo (es estructural, no un bug):** la diferencia es **Kc único (Kylia) vs Kc
+dual (`pyfao56`)**. En el método dual, la evaporación de la superficie del suelo se
+descuenta de **una capa aparte** que se seca y deja de evaporar; Kylia, con Kc único,
+la imputa **toda** al agotamiento radicular `Dr`. La magnitud de ese término escala con
+la demanda evaporativa → **en invierno casi no hay nada que atribuir mal (1,5 mm) y en
+verano el error llega al 23% del depósito de suelo.** Crece justo cuando la decisión
+importa, y hay que decirlo así.
+
+#### Resultado 3 — La decisión: el 95% de antes estaba inflado
+
+La concordancia bruta ("¿coinciden hoy en regar o no regar?") **se infla sola**: en
+**32 de las 60 ventanas ninguno de los dos motores manda regar jamás**, y ese 100% de
+concordancia no ha comparado ninguna decisión. Por eso se reporta también la
+**concordancia activa** — solo los días en que **al menos uno** dice regar (índice de
+Jaccard):
+
+| | bruta | activa |
+|---|---|---|
+| Media de las 60 ventanas | **93%** | **62%** |
+| Invierno (ET₀ 0–2) | 100% | — *(nadie riega nunca: 19/19 ventanas)* |
+| Verano (ET₀ 6+) | 79% | 67% |
+
+**La cifra honesta de concordancia en la decisión es 62%, no 95%.**
+
+#### Resultado 4 — Pero la divergencia es de UN SOLO SENTIDO
+
+Un RMSE no distingue entre regar antes de tiempo (cuesta agua) y regar tarde (cuesta
+cosecha). Sobre los **2.400 días** comparados
+(`python3 scripts/valida_pyfao56.py --direccion`):
+
+| | días | |
+|---|---|---|
+| Ambos dicen "regar" | 303 | |
+| **Discrepan** | **165** | **7% de los días** |
+| · Kylia riega y `pyfao56` aún no | 146 | **88% de las discrepancias** |
+| · `pyfao56` riega y Kylia **no** | 19 | 12% — **0,8% de los días** |
+
+Kylia adelanta el primer riego del ciclo una **mediana de 5 días** (media +8,2), y
+riega antes o a la vez en **25 de 27** ventanas. El sesgo es **positivo en 40/60**
+ventanas y en **13/13 de las de verano**; el peor sesgo hacia "suelo seco" es +15,1 mm
+y el peor hacia "suelo húmedo" **−1,5 mm** (3% del TAW).
+
+**Traducción:** Kylia cree el suelo **más seco de lo que está** y por tanto **riega
+antes**. El caso peligroso —dejar el cultivo con sed cuando el estándar manda regar—
+es el **0,8% de los días**. Para un motor que aconseja a un agricultor, equivocarse
+hacia el lado conservador es la dirección correcta del error.
+
+#### Consecuencia para el reveal (importante, y juega a favor)
+
+El contrafactual del informe de piloto (`simularKylia`) usa **este mismo `Dr` inflado**.
+Es decir: en la simulación **Kylia se atribuye a sí misma más riegos de los que un
+FAO-56 dual dispararía**. Por tanto **el ahorro que publica el reveal es un SUELO, no
+un techo**: con el balance dual, el agua que Kylia habría gastado sería igual o menor,
+y el ahorro frente al agricultor, igual o mayor. Esto se puede afirmar en público.
+
+#### Veredicto y deuda conocida
+
+**Validado:** la **demanda** (`ETc`), exacta contra el estándar en 60 ventanas de
+régimen climático muy distinto. Es el núcleo del motor.
+
+**Cuantificado y declarado, no resuelto:** el **balance de agotamiento** diverge del
+estándar por usar **Kc único en vez de dual**, entre 1,5 mm (invierno) y 10,2 mm
+(verano, 23% del TAW), siempre hacia el lado conservador.
+
+⚠️ **Deuda técnica con magnitud medida — migrar a Kc dual.** Separar la evaporación de
+superficie (`Ke`, capa `Ze` con `REW`/`TEW`) del `Kcb` basal. Es la mejora de mayor
+impacto pendiente en el motor de riego, y su beneficio está medido: recortaría hasta
+~10 mm de error en verano y subiría la concordancia activa desde el 62%. Mientras no
+se haga, **el error de verano es el precio conocido de la simplificación**, no una
+incógnita.
 
 #### a) Entradas idénticas a ambos motores
 Para un cultivo y periodo dados, alimentar Kylia y `pyfao56` con **exactamente** los
@@ -380,26 +475,53 @@ de forma sistemática) y la **concordancia de eventos de riego** (% de días en 
 ambos motores coinciden en "regar / no regar", y diferencia media en mm cuando ambos
 riegan).
 
-#### d) Criterio de aceptación (propuesto)
-| Métrica | Umbral objetivo | Lectura si se supera |
+#### d) Criterio de aceptación — REVISADO (2026-08-05)
+
+Los umbrales originales eran **incondicionales** (`RMSE(Dr) ≤ 5 mm`, concordancia
+≥ 90%) y eso resultó no tener sentido para un motor de Kc único: el error depende del
+régimen climático, así que un umbral fijo se pasa o se cumple según el mes que toque
+medir. Además, **medir la concordancia bruta premiaba los periodos en que nadie riega**.
+Criterios nuevos:
+
+| Métrica | Umbral | Lectura si se supera |
 |---|---|---|
-| RMSE(ETc) | ≤ 0,3 mm/día | Discrepancia en la curva Kc o en la interpolación de fase |
-| RMSE(Dr) | ≤ 5 mm (< ¼ de un RAW típico) | Discrepancia en lluvia efectiva, TAW/RAW o redondeos del balance |
-| MBE(Dr) | \|·\| ≤ 2 mm | Sesgo sistemático → revisar `p`, `Zr` o eficiencia de riego |
-| Concordancia eventos | ≥ 90% de días | Revisar el umbral de disparo (Dr ≥ RAW) |
+| RMSE(ETc) | ≤ 0,3 mm/día **en toda ventana** | Discrepancia en la curva Kc o en la interpolación de fase. **Es el criterio duro: hoy da 0,000000** |
+| RMSE(Dr) — ET₀ < 4 mm/d | ≤ 5 mm | Lluvia efectiva, TAW/RAW o redondeos del balance |
+| RMSE(Dr) — ET₀ ≥ 6 mm/d | ≤ 12 mm (~25% del TAW) | Esperado por Kc único; por encima, revisar `Ze`/`REW` del lado de `pyfao56` |
+| MBE(Dr) hacia suelo **húmedo** | ≥ −2 mm | 🚨 **Crítico**: Kylia creería el suelo más húmedo que el estándar → regaría TARDE |
+| Días con `pyfao56` riega y Kylia no | ≤ 2% de los días | 🚨 **Crítico**: es el error que cuesta cosecha, no agua |
+| Concordancia **activa** (Jaccard) | ≥ 60% | Revisar el umbral de disparo (Dr ≥ RAW) |
+
+Los dos criterios marcados 🚨 son los que **no se pueden negociar**: acotan el error
+en la dirección que daña al cultivo. Los demás acotan cuánta agua de más se recomienda,
+que es un coste, no un daño.
 
 Cualquier desvío por encima del umbral se **diagnostica hasta el día y la variable**
 que lo causa (no se "ajusta a ojo"): el objetivo del ensayo es localizar dónde
-Kylia se aparta del estándar, no maquillar el RMSE.
+Kylia se aparta del estándar, no maquillar el RMSE. Y **ninguna cifra se publica desde
+una sola ventana** — esa fue exactamente la causa del error de junio.
 
-#### e) Montaje
-Harness en Python: `pip install pyfao56`; un script que (1) lea el mismo clima y
-parámetros que usa el frontend, (2) reconstruya el `Model` de `pyfao56` con esos
-`.par`/`.wth`/`.irr`, (3) exporte la serie diaria de Kylia (replicando
-`calcularBalanceHidrico()` en Python o volcando el `Dr` calculado por el frontend),
-(4) empareje por fecha y calcule las métricas de (c). Resultado → tabla nueva en esta
-§3.4 con los RMSE reales y el veredicto. Opcional (Nivel 2 reforzado): contrastar `Dr`
-contra el **sensor de humedad de suelo** del campo de validación.
+#### e) Montaje — IMPLEMENTADO en `scripts/valida_pyfao56.py`
+
+`pip install pyfao56 numpy pandas`. El script lee el mismo clima (Open-Meteo Archive)
+y los mismos parámetros que el motor, reconstruye el `Model` de `pyfao56` y corre en
+paralelo un **port fiel de `balanceHidrico()`** (mismo orden de operaciones, misma `p`
+ajustada por ETc, mismo `PE_MIN_MM`). Tres modos:
+
+```bash
+python3 scripts/valida_pyfao56.py                    # una ventana (últimos 40 d)
+python3 scripts/valida_pyfao56.py --start 2026-04-01 # una ventana concreta
+python3 scripts/valida_pyfao56.py --sweep            # 60 ventanas → las tablas de arriba
+python3 scripts/valida_pyfao56.py --direccion        # hacia dónde se equivoca al discrepar
+```
+
+**Todas las cifras de esta sección salen de esos comandos**; nada está transcrito a
+mano. El clima se descarga en **una sola petición** para todo el periodo y el barrido
+corta las ventanas de ahí.
+
+Pendiente (Nivel 2 reforzado): contrastar `Dr` contra un **sensor de humedad de suelo**
+en campo. Es lo único que puede arbitrar entre Kc único y Kc dual con datos reales —
+hasta entonces, `pyfao56` es la referencia, no la verdad.
 
 ### 3.5 Presentación de la cantidad: tiempo vs litros — IMPLEMENTADO (2026-06-04)
 

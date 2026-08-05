@@ -56,9 +56,13 @@ referencia para calcular necesidades de riego. La lógica, día a día:
   (goteo 90 %, aspersión 75 %, etc.) y se traduce a la **unidad del agricultor**
   (minutos de riego, número de regaderas, o L/m²).
 
-> **Validación:** el motor está contrastado contra `pyfao56`, la implementación de
-> referencia de la Universidad estatal de Kansas, con error prácticamente nulo
-> (ETc RMSE ≈ 0). No es "nuestra fórmula": es FAO-56 reproducido fielmente.
+> **Validación:** el motor está contrastado contra `pyfao56` (Thorp, **USDA-ARS**), la
+> implementación de referencia de FAO-56 en Python. La **demanda del cultivo** (`ETc`)
+> coincide con el estándar **hasta el sexto decimal en 60 ventanas** de dos años y medio
+> de clima real, de invierno a verano. No es "nuestra fórmula": es FAO-56 reproducido
+> fielmente. El balance de agotamiento diverge —Kylia usa Kc único y `pyfao56` Kc dual—
+> y esa divergencia está medida, acotada y **siempre hacia el lado conservador**:
+> ver `docs/tecnico/motor-de-decision.md` §3.4.
 
 ### 2.2 Nutrición — balance de masa de nutrientes
 

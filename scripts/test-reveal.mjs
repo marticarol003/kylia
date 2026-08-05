@@ -86,6 +86,11 @@ eq(h.datos.mezcla_fuentes.experiencia, 1, "1 día por experiencia");
 console.log("\nAvisos de transparencia");
 ok(r.avisos.length >= 2, "incluye avisos de lo que aún no puede medir");
 ok(r.periodo && r.periodo.cobertura_pct != null, "reporta cobertura del registro");
+// El límite de método del Kc único tiene que viajar CON el informe: es de donde
+// el informe científico saca su sección de limitaciones, y es lo que convierte el
+// ahorro en un mínimo defendible en vez de una cifra sin acotar (§3.4 del doc).
+ok(r.avisos.some(a => /Kc único/.test(a) && /mínimo/.test(a)),
+   "declara que el ahorro es un mínimo por el balance de Kc único");
 
 // ── Escenario 2: sin decisiones congeladas todavía ──
 console.log("\nEscenario 2: piloto sin Diario B activo aún");
