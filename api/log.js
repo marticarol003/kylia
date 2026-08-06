@@ -230,6 +230,13 @@ async function handlePautaGoteo(req, res, body) {
   if (body.riego_auto_desde !== undefined)     patch.riego_auto_desde     = dateOrNull(body.riego_auto_desde);
   if (body.riego_auto_cada_dias !== undefined) patch.riego_auto_cada_dias = intOrNull(body.riego_auto_cada_dias);
   if (body.riego_auto_min !== undefined)       patch.riego_auto_min       = intOrNull(body.riego_auto_min);
+  // Pauta semanal de calendario (ISO 1=lunes … 7=domingo). Se limpia con [].
+  if (body.riego_auto_dias_semana !== undefined) {
+    patch.riego_auto_dias_semana = Array.isArray(body.riego_auto_dias_semana)
+      ? [...new Set(body.riego_auto_dias_semana.map(Number)
+          .filter(n => Number.isInteger(n) && n >= 1 && n <= 7))].sort((a, b) => a - b)
+      : null;
+  }
   if (body.caudal !== undefined)               patch.caudal               = numOrNull(body.caudal);
   if (!Object.keys(patch).length) return res.status(400).json({ error: "nada que actualizar" });
 
@@ -250,6 +257,7 @@ async function handlePautaGoteo(req, res, body) {
       pauta: {
         riego_auto: u.riego_auto, riego_auto_desde: u.riego_auto_desde,
         riego_auto_cada_dias: u.riego_auto_cada_dias, riego_auto_min: u.riego_auto_min,
+        riego_auto_dias_semana: u.riego_auto_dias_semana ?? null,
         caudal: u.caudal,
       },
     });

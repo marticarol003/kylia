@@ -70,13 +70,53 @@ async function riegosDe(u) {
                  litros: laminaRiego(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal) }));
 }
 
-// Materializa los riegos de un piloto de GOTEO AUTOMÁTICO de pauta fija.
-// El goteo riega solo (cada N días, M min) y nadie lo apunta en la app; sin
-// esas filas en `acciones`, el balance creería el cultivo sin regar y dispararía
-// la recomendación. Aquí generamos las que falten desde la fecha ancla hasta hoy
-// (idempotente: salta los días que ya tienen un riego registrado) y las devolvemos
-// para incluirlas en el balance de ESTA corrida. Autocurativo: si un día se cayó,
-// la siguiente corrida lo rellena. En dry-run calcula pero no escribe.
+// Día de la semana ISO de un 'YYYY-MM-DD': 1 = lunes … 7 = domingo.
+function diaSemanaISO(diaStr) {
+  const d = new Date(`${diaStr}T12:00:00Z`).getUTCDay();   // 0 = domingo
+  return d === 0 ? 7 : d;
+}
+
+const NOMBRE_DIA = ["", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+
+// Qué días cubre una pauta fija entre `desde` y `tope` (ambos incluidos), quitando
+// los que ya tienen riego apuntado. Pura (sin red ni BD) para poder testearla.
+// Dos formas de expresar la pauta, excluyentes:
+//   • diasSemana [1,4] → "todos los lunes y jueves"  (pauta semanal de calendario)
+//   • cada N           → "cada N días desde el ancla" (programador de goteo)
+// La semanal manda si viene, porque un patrón lun+jue es 3-4-3-4 días y no cabe
+// en un intervalo fijo.
+function fechasDePauta({ desde, tope, cada, diasSemana }, yaRegistradas) {
+  const yaHay  = new Set(yaRegistradas || []);
+  const semana = new Set((Array.isArray(diasSemana) ? diasSemana : [])
+    .map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 7));
+  const nuevos = [];
+
+  if (semana.size) {
+    for (let d = desde; d <= tope; d = sumarDias(d, 1)) {
+      if (semana.has(diaSemanaISO(d)) && !yaHay.has(d)) nuevos.push(d);
+    }
+  } else if (cada > 0) {
+    for (let d = desde; d <= tope; d = sumarDias(d, cada)) {
+      if (!yaHay.has(d)) nuevos.push(d);
+    }
+  }
+  return nuevos;
+}
+
+// Materializa los riegos de un piloto de PAUTA FIJA. Dos casos:
+//   • goteo automático: el programador riega solo (cada N días, M min);
+//   • pauta semanal de calendario: el agricultor riega siempre los mismos días
+//     de la semana (la cebolleta de El Tros de l'Uri: lunes y jueves, 2 h).
+// En ambos, nadie lo apunta en la app; sin esas filas en `acciones`, el balance
+// creería el cultivo sin regar y dispararía la recomendación. Aquí generamos las
+// que falten desde la fecha ancla hasta hoy (idempotente: salta los días que ya
+// tienen un riego registrado) y las devolvemos para incluirlas en el balance de
+// ESTA corrida. Autocurativo: si un día se cayó, la siguiente corrida lo rellena.
+// En dry-run calcula pero no escribe.
+//
+// ⚠️ Esto ESCRIBE agua que nadie ha confirmado. Si el agricultor se salta un día,
+// la fila se crea igual y el reveal la contará como aplicada. Solo se activa por
+// parcela (riego_auto), y solo con la pauta declarada por su dueño.
 //
 // Lámina por riego = min/60 × caudal (mm/h = L/m²·h), igual que el cuaderno.
 async function materializarGoteoAuto(u, riegosExistentes, hoy, dry) {
@@ -85,10 +125,15 @@ async function materializarGoteoAuto(u, riegosExistentes, hoy, dry) {
   const min    = Number(u.riego_auto_min);
   const caudal = Number(u.caudal);
   const desde  = u.riego_auto_desde ? String(u.riego_auto_desde).slice(0, 10) : null;
-  if (!desde || !(cada > 0) || !(min > 0) || !(caudal > 0)) return [];
+  // Se sanea aquí (no solo dentro de fechasDePauta) porque el nombre del día
+  // también va a las notas: un 0 o un 9 en la columna pondría "undefined".
+  const semana = (Array.isArray(u.riego_auto_dias_semana) ? u.riego_auto_dias_semana : [])
+    .map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 7).sort((a, b) => a - b);
+  if (!desde || !(min > 0) || !(caudal > 0)) return [];
+  if (!semana.length && !(cada > 0)) return [];
 
-  const lamina = Math.round((min / 60) * caudal * 10) / 10;   // L/m² por riego
-  const yaHay  = new Set((riegosExistentes || []).map(r => r.date));
+  const lamina     = Math.round((min / 60) * caudal * 10) / 10;   // L/m² por riego
+  const yaApuntados = (riegosExistentes || []).map(r => r.date);
 
   // Nadie riega una parcela cosechada: la pauta fija se corta ahí. Si no, el
   // cron seguiría inventando riegos en `acciones` sobre tierra vacía y el
@@ -96,11 +141,12 @@ async function materializarGoteoAuto(u, riegosExistentes, hoy, dry) {
   const cosecha = u.fecha_cosecha ? String(u.fecha_cosecha).slice(0, 10) : null;
   const tope    = cosecha && cosecha < hoy ? cosecha : hoy;
 
-  const nuevos = [];
-  for (let d = desde; d <= tope; d = sumarDias(d, cada)) {
-    if (!yaHay.has(d)) nuevos.push(d);
-  }
+  const nuevos = fechasDePauta({ desde, tope, cada, diasSemana: semana }, yaApuntados);
   if (!nuevos.length) return [];
+
+  const comoEs = semana.length
+    ? `pauta semanal ${semana.map(n => NOMBRE_DIA[n]).join("+")}`
+    : `pauta fija cada ${cada} d`;
 
   if (!dry) {
     await supabaseInsert("acciones", nuevos.map(date => ({
@@ -109,9 +155,11 @@ async function materializarGoteoAuto(u, riegosExistentes, hoy, dry) {
       tipo:           "riego",
       cantidad_l_m2:  lamina,
       duracion_min:   min,
-      franja_horaria: "manana",
-      motivo:         "goteo-auto",
-      notas:          `pauta fija ${min} min · ${caudal} mm/h (sintetizado por diario-b)`,
+      // El goteo automático arranca de madrugada; en la pauta semanal el riego
+      // lo abre una persona y no sabemos cuándo → null antes que inventarlo.
+      franja_horaria: semana.length ? null : "manana",
+      motivo:         "goteo-auto",   // marca "sintetizado, no confirmado" (el nombre viene del goteo, que fue el primer caso)
+      notas:          `${comoEs} · ${min} min · ${caudal} mm/h (sintetizado por diario-b)`,
     })));
   }
   return nuevos.map(date => ({ date, litros: lamina }));
@@ -236,3 +284,7 @@ module.exports = async (req, res) => {
   }
   return res.status(200).json({ ok: true, dry, fecha: hoy, n: pilotos.length, resultados });
 };
+
+// Expuesto para los tests (tests/test-pauta-semanal.mjs): es la pieza pura que
+// decide QUÉ días riega una pauta fija, sin red ni base de datos.
+module.exports.fechasDePauta = fechasDePauta;

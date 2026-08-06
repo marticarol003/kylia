@@ -444,7 +444,8 @@ async function vistaPilotos(req, res) {
         // del goteo automático (editable vía recurso pauta-goteo de /api/log).
         caudal: u.caudal ?? null,
         pauta: u.riego_auto
-          ? { min: u.riego_auto_min ?? null, cada_dias: u.riego_auto_cada_dias ?? null, desde: u.riego_auto_desde ?? null }
+          ? { min: u.riego_auto_min ?? null, cada_dias: u.riego_auto_cada_dias ?? null,
+              dias_semana: u.riego_auto_dias_semana ?? null, desde: u.riego_auto_desde ?? null }
           : null,
         agua: a.disponible
           ? { disponible: true, aplicada_l_m2: a.aplicada_l_m2, recomendada_l_m2: a.recomendada_l_m2,

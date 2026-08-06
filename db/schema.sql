@@ -48,9 +48,10 @@ create table usuarios (
   caudal                numeric,                               -- pluviometría del emisor (mm/h = L/m²·h)
   area_m2               numeric,                               -- superficie: escala mm↔litros y regaderas
   capacidad_regadera    numeric,                               -- litros por regadera (riego manual)
-  riego_auto            boolean     default false,             -- goteo de pauta fija (lo sintetiza diario-b)
+  riego_auto            boolean     default false,             -- riego de pauta fija (lo sintetiza diario-b)
   riego_auto_min        int,                                   -- minutos por riego automático
   riego_auto_cada_dias  int,                                   -- cada cuántos días riega el automático
+  riego_auto_dias_semana smallint[],                           -- o días fijos de la semana, ISO 1=lun…7=dom (manda sobre cada_dias)
   riego_auto_desde      date,                                  -- fecha ancla de la pauta
   piloto_sombra         boolean     not null default false,    -- true → Kylia calla, diario-b congela
   suelo_oferta          jsonb,                                 -- caché de ofertaSuelo() (SoilGrids); NULL = sin calcular
