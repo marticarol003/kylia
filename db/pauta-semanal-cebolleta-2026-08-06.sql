@@ -28,9 +28,12 @@
 --           and fecha_local = 'YYYY-MM-DD' and motivo = 'goteo-auto';
 --
 -- Lámina: 120 min × 15 mm/h ÷ 60 = 30 L/m² por riego (mismo cálculo que el
--- cuaderno). El caudal 15 mm/h sigue siendo PROVISIONAL (heredado del campo del
--- padre, truco del vaso 12-jun); si se mide bien, cambia `caudal` y las láminas
--- se recalculan solas — el motor las deriva de duracion_min × caudal.
+-- cuaderno). El caudal 15 mm/h sigue siendo PROVISIONAL: sale del truco del vaso
+-- EN ESTE CAMPO (1-jul), que dio una banda de 10-15 mm/h. Que coincida con el del
+-- campo del padre es casualidad — son instalaciones distintas y sin relación
+-- (precisado por el usuario el 6-ago); este número no se hereda de allí ni se
+-- mueve si allí se remide. Si se afina aquí, cambia `caudal` y las láminas se
+-- recalculan solas — el motor las deriva de duracion_min × caudal.
 
 -- ── 1) La columna de la pauta semanal (ISO: 1=lunes … 7=domingo) ──
 alter table usuarios add column if not exists riego_auto_dias_semana smallint[];
