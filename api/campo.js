@@ -108,7 +108,10 @@ async function vistaHoy(res, u) {
   const corte  = idxHoy >= 0 ? idxHoy : serie.length - 1;
 
   const balHoy  = balanceHidrico(serie.slice(0, corte + 1), riegos, opts);
-  const decHoy  = decisionRiego(balHoy);
+  // Los días POSTERIORES a hoy de la misma serie son el pronóstico. El balance
+  // corta en hoy (arriba); esto solo ajusta la cantidad por la lluvia que viene,
+  // para no llenar el depósito y que el agua de mañana se pierda. Ver decisionRiego.
+  const decHoy  = decisionRiego(balHoy, { lluviaPrevista: serie.slice(corte + 1) });
   const presHoy = decHoy.nivel === "alta" ? presentarRiego(decHoy.cantidad_l_m2, presOpts) : null;
   const climaHoy = serie[corte] || {};
 

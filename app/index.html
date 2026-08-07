@@ -3685,7 +3685,14 @@
         const past = Math.min(92, Math.max(14, diasPlant));
         const url = `https://api.open-meteo.com/v1/forecast`
           + `?latitude=${p.lat.toFixed(5)}&longitude=${p.lon.toFixed(5)}`
-          + `&daily=et0_fao_evapotranspiration,precipitation_sum&past_days=${past}&forecast_days=0&timezone=auto`;
+        // forecast_days=1 = HOY incluido. Con 0, open-meteo cierra la serie AYER y
+        // el balance se dejaba un día entero de ETc: ~5 mm en agosto sobre un umbral
+        // de 13. La app enseñaba menos déficit que el servidor (que sí lo incluye) y
+        // podía decir "vigilar" donde /campo decía "regar" — el mismo desajuste que
+        // se cazó el 31-jul por otra causa. No se piden más días: nada en la app
+        // consume el pronóstico, y meterlo aquí lo colaría en los acumuladores de
+        // ET₀ "desde el último riego" (que suman todo lo que haya en la serie).
+          + `&daily=et0_fao_evapotranspiration,precipitation_sum&past_days=${past}&forecast_days=1&timezone=auto`;
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) return;
         const data  = await res.json();

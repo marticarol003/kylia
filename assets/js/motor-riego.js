@@ -43,6 +43,7 @@
                                     // (precipitación efectiva, criterio conservador FAO-56 cap. 8)
   const EFIC_RIEGO    = { goteo: 0.90, aspersion: 0.75, manguera: 0.70, surco: 0.60, regadera: 0.85 };
   const EFIC_DEFAULT  = 0.85;
+  const VENTANA_PRONOSTICO_DIAS = 2;  // 48 h: lo único que un modelo acierta con la lluvia de verano
 
   // Pluviometría/caudal por defecto del sistema (mm/hora = L/m² por hora), para
   // convertir la lámina a minutos cuando el agricultor no declara el suyo.
@@ -178,15 +179,50 @@
   //   Dr ≥ RAW        → regar (alta), cantidad bruta = Dr/eficiencia
   //   0.75·RAW ≤ Dr   → vigilar (media)
   //   Dr < 0.75·RAW   → todo en orden (baja)
-  function decisionRiego(bal) {
-    const { Dr, raw, efic } = bal;
+  function decisionRiego(bal, opts = {}) {
+    const { Dr, raw, taw, efic } = bal;
     const r0 = (x) => Math.round(x);
+
+    // Lluvia efectiva PREVISTA en la ventana corta. Mismo criterio que el balance
+    // (por debajo de PE_MIN_MM no infiltra), aplicado día a día.
+    //
+    // Por qué 48 h y no la semana: la regla actual llena el depósito hasta arriba
+    // y, si mañana llueve, el sobrante se pierde por debajo de la raíz llevándose
+    // nitrógeno (se ve en el propio balance: Dr = min(taw, …) recorta el exceso).
+    // Mirar adelante lo evita. Pero el error es ASIMÉTRICO: retrasar un riego por
+    // una lluvia que no cae se corrige mañana; regar de menos en agosto con el
+    // suelo en el umbral, no. Y la tormenta de verano a 4-5 días es justo la peor
+    // previsión que da un modelo. De ahí la ventana corta y las dos guardas de
+    // abajo. No se usa la ET₀ prevista para regar de MÁS: eso sería adelantar
+    // agua sobre un pronóstico, y FAO-56 ya lo recoge el día que el calor llega.
+    const prevista = (opts.lluviaPrevista || [])
+      .slice(0, VENTANA_PRONOSTICO_DIAS)
+      .reduce((s, d) => {
+        const mm = Math.max(0, Number(d && d.lluvia) || 0);
+        return s + (mm >= PE_MIN_MM ? mm : 0);
+      }, 0);
+
     if (Dr >= raw) {
-      const bruto = Math.round((Dr / efic) * 10) / 10;
+      // Guarda: con el suelo casi vacío no se apuesta a un pronóstico. Ahí el
+      // coste de equivocarse es el cultivo, no unos litros.
+      const puedeFiarse = prevista > 0 && Dr < 0.9 * taw;
+
+      if (puedeFiarse && prevista >= Dr) {
+        return {
+          nivel: "media", cantidad_l_m2: null, lluvia_prevista_mm: Math.round(prevista * 10) / 10,
+          texto: `Esperar a la lluvia · se prevén ${r0(prevista)} mm en 48 h y cubren el déficit de ${r0(Dr)} mm`,
+        };
+      }
+
+      const neto  = puedeFiarse ? Dr - prevista : Dr;
+      const bruto = Math.round((neto / efic) * 10) / 10;
       return {
         nivel: "alta",
         cantidad_l_m2: bruto,
-        texto: `Regar hoy ~${r0(bruto)} L/m² · déficit ${r0(Dr)} mm ≥ umbral ${r0(raw)}`,
+        lluvia_prevista_mm: puedeFiarse ? Math.round(prevista * 10) / 10 : 0,
+        texto: puedeFiarse
+          ? `Regar hoy ~${r0(bruto)} L/m² · déficit ${r0(Dr)} mm − ${r0(prevista)} mm de lluvia prevista`
+          : `Regar hoy ~${r0(bruto)} L/m² · déficit ${r0(Dr)} mm ≥ umbral ${r0(raw)}`,
       };
     }
     if (Dr >= 0.75 * raw) {
@@ -295,6 +331,7 @@
 
   return {
     FAO_KC, SUELO_AWC, ZR_M, P_AGOTAMIENTO, PE_MIN_MM, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
+    VENTANA_PRONOSTICO_DIAS,
     kcDelDia, faseDelDia, zrDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia,
   };
 
