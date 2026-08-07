@@ -54,35 +54,37 @@ ok(/~6\b/.test(p), "las semanas que quedan hasta cosechar (decide si el N orgán
 ok(/España/.test(p), "el mercado donde tiene que poder comprarlo");
 
 console.log("── parseo defensivo de la respuesta ──");
-const conRuido = [{ type: "text", text: 'Claro, aquí tienes:\n```json\n{"recomendado":{"producto":"Harina de sangre"}}\n```' }];
+// Con el grounding de Google activo no se puede pedir salida JSON a la API, así
+// que el JSON se pide en el prompt y llega envuelto en lo que el modelo quiera.
+const conRuido = [{ text: 'Claro, aquí tienes:\n```json\n{"recomendado":{"producto":"Harina de sangre"}}\n```' }];
 ok(M.extraerJSON(conRuido)?.recomendado?.producto === "Harina de sangre", "saca el JSON aunque venga envuelto en markdown y preámbulo");
-ok(M.extraerJSON([{ type: "text", text: "no encontré nada" }]) === null, "sin JSON → null (no revienta)");
-ok(M.extraerJSON([{ type: "text", text: "{roto" }]) === null, "JSON roto → null (no revienta)");
+ok(M.extraerJSON([{ text: "no encontré nada" }]) === null, "sin JSON → null (no revienta)");
+ok(M.extraerJSON([{ text: "{roto" }]) === null, "JSON roto → null (no revienta)");
+ok(M.extraerJSON([{}, { text: null }]) === null, "partes sin texto → null (no revienta)");
 ok(M.extraerJSON([]) === null && M.extraerJSON(null) === null, "contenido vacío o nulo → null");
 
-console.log("── las citas salen de lo que Claude leyó de verdad ──");
-const contenido = [
-  { type: "text", text: "…", citations: [
-    { url: "https://tienda.example/harina", title: "Harina de sangre 1 kg" },
-    { url: "https://tienda.example/harina", title: "duplicado" },
-  ] },
-  { type: "text", text: "…", citations: [{ url: "https://otra.example/ficha", title: "Ficha técnica" }] },
-];
-const c = M.citas(contenido);
+console.log("── las citas salen de las páginas que la búsqueda visitó ──");
+const meta = { groundingChunks: [
+  { web: { uri: "https://tienda.example/harina", title: "Harina de sangre 1 kg" } },
+  { web: { uri: "https://tienda.example/harina", title: "duplicado" } },
+  { web: { uri: "https://otra.example/ficha", title: "Ficha técnica" } },
+  { retrievedContext: { uri: "no-es-web" } },
+] };
+const c = M.citas(meta);
 ok(c.length === 2, `dos fuentes distintas, sin duplicar la misma URL (${c.length})`);
 ok(c[0].url === "https://tienda.example/harina", "conserva la URL para que el agricultor la abra");
-ok(M.citas([{ type: "text", text: "sin citas" }]).length === 0, "sin citas → lista vacía, no undefined");
+ok(M.citas({}).length === 0 && M.citas(null).length === 0, "sin grounding → lista vacía, no undefined");
 
 console.log("── guardas de coste y de encaje en la infraestructura ──");
 const src = readFileSync(join(RAIZ, "api", "_ia-producto-fertilizante.js"), "utf8");
-ok(/max_uses:\s*MAX_USES/.test(src) && /MAX_USES\s*=\s*\d+/.test(src),
-   "las búsquedas van con tope duro (web search se factura por búsqueda)");
-ok(/response_inclusion:\s*"excluded"/.test(src),
-   "el contenido crudo de las búsquedas no vuelve al cliente (recorta tokens de salida)");
+ok(/google_search/.test(src) && /generativelanguage/.test(src),
+   "busca con el grounding de Google (5.000 consultas/mes gratis), no con un buscador de pago");
+ok(!/api\.anthropic\.com/.test(src),
+   "no queda ningún resto del motor de pago que se usó en la primera versión");
 ok(/cacheado: true/.test(src) && /CACHE_DIAS/.test(src),
-   "hay caché: la misma necesidad no se paga dos veces");
-ok(/stop_reason === "refusal"/.test(src),
-   "un rechazo del modelo llega como 200 y se detecta (si no, parecería un fallo de formato)");
+   "hay caché: la misma búsqueda no se repite mientras el plan no cambie");
+ok(/finishReason === "SAFETY"/.test(src),
+   "un bloqueo por filtros llega como 200 y se detecta (si no, parecería un fallo de formato)");
 ok(/obsoleto: true/.test(src),
    "si la búsqueda falla se devuelve la caché vieja MARCADA como vieja, no una pantalla en blanco");
 
@@ -96,6 +98,22 @@ ok(vercel.functions?.["api/ia.js"]?.maxDuration >= 60,
 
 const schemaSql = readFileSync(join(RAIZ, "db", "anadir-producto-fert-2026-08-07.sql"), "utf8");
 ok(/producto_fert jsonb/.test(schemaSql), "la migración crea la columna de caché");
+
+console.log("── conectado a la pantalla de abonado ──");
+const app = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+ok(/tipo=producto-fertilizante/.test(app), "la app llama al endpoint");
+ok(/id="btn-comprar"/.test(app) && /addEventListener\("click", \(\) => buscarQueComprar/.test(app),
+   "va detrás de un botón: la búsqueda se lanza cuando el agricultor la pide, no en cada pintado");
+ok(/cobertera/i.test(app.slice(app.indexOf("function botonComprar"), app.indexOf("function pintarCompra"))),
+   "coge el tramo de cobertera del plan (los gramos que de verdad hay que comprar ahora)");
+ok(/certificación sin confirmar/.test(app),
+   "si la certificación ecológica no consta, se dice — no se da por buena");
+ok(/Descartados y por qué/.test(app),
+   "enseña lo descartado y por qué (es la mitad del valor: qué NO comprar)");
+ok(/orientativos — compruébalos antes de comprar/.test(app),
+   "el precio se enseña con fecha y con el aviso de comprobarlo");
+ok(/No se ha podido refrescar hoy/.test(app),
+   "un dato viejo se marca como viejo en pantalla, no se enseña como fresco");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

@@ -1950,6 +1950,24 @@
       border: 1px solid var(--border); border-radius: 9px; margin-bottom: 5px;
     }
     .abonado-reparto strong { color: var(--text); }
+    .btn-comprar { display:block; width:100%; margin-top:14px; padding:11px 14px; border:1px solid var(--verde,#013A27);
+      background:transparent; color:var(--verde,#013A27); border-radius:10px; font:inherit; font-weight:600; cursor:pointer; }
+    .btn-comprar small { display:block; font-weight:400; opacity:.7; margin-top:2px; }
+    .btn-comprar:disabled { opacity:.5; cursor:default; }
+    .compra { margin-top:14px; padding-top:14px; border-top:1px solid #e6e6e6; }
+    .compra-titulo { font-weight:700; font-size:1.05rem; margin:0 0 6px; }
+    .compra-cifras { display:flex; flex-wrap:wrap; gap:6px 10px; margin:0 0 8px; font-size:.86rem; }
+    .compra-cifras span { background:#f2f5f2; border-radius:6px; padding:2px 8px; }
+    .compra-eco { background:#e7f3ea !important; }
+    .compra-eco.no { background:#fdeaea !important; }
+    .compra-eco.duda { background:#fdf4e3 !important; }
+    .compra-por-que, .compra-aplicar { font-size:.86rem; color:#3d4a3d; margin:0 0 8px; }
+    .compra-avisos { font-size:.84rem; color:#7a5c22; background:#fdf4e3; border-radius:8px; padding:8px 8px 8px 24px; margin:0 0 10px; }
+    .compra-bloque { font-weight:600; font-size:.82rem; text-transform:uppercase; letter-spacing:.04em; color:#5a685a; margin:12px 0 4px; }
+    .compra-lista { font-size:.86rem; margin:0 0 6px; padding-left:20px; }
+    .compra-lista li { margin-bottom:6px; }
+    .compra-fuente { font-size:.76rem; color:#5a685a; margin-top:10px; }
+    .compra-cargando { font-size:.88rem; color:#5a685a; margin-top:12px; }
     .abonado-nota {
       margin: 10px 0 0; font-size: .76rem; color: var(--muted); line-height: 1.5;
     }
@@ -4794,7 +4812,90 @@
           <p class="abonado-nota">${esc(plan.fraccionamiento?.nota || "")}</p>
           <ul class="abonado-reparto">${reparto}</ul>` : ""}
         ${notas.length ? `<p class="abonado-nota">${esc(notas.join(" "))}</p>` : ""}
+        ${botonComprar(plan)}
+        <div id="abonado-compra"></div>
       </section>`;
+    }
+
+    // ── Qué comprar ──────────────────────────────────────────────────────────
+    // El plan dice los gramos; esto dice el producto. Va detrás de un botón a
+    // propósito: la búsqueda sale a Google en vivo y tarda, así que se lanza
+    // cuando el agricultor la pide, no en cada pintado. La respuesta se cachea
+    // en el servidor con la necesidad como clave — repetir el clic con el mismo
+    // plan devuelve lo guardado sin volver a buscar.
+    function botonComprar(plan) {
+      const linea = (plan.lineas || []).find(l => l.nutriente === "N" && l.necesidad_kg > 0);
+      if (!linea) return "";
+      const tramo = (linea.reparto || []).find(t => /cobertera/i.test(t.momento)) || linea.reparto?.[0];
+      if (!tramo || !(tramo.kg > 0)) return "";
+      return `<button class="btn-comprar" id="btn-comprar"
+        data-gramos="${Math.round(tramo.kg * 1000)}" data-momento="${esc(tramo.momento)}">
+        ¿Qué compro para esto? <small>${fmtAbono(tramo.kg)} de N · ${esc(tramo.momento)}</small></button>`;
+    }
+
+    function pintarCompra(d) {
+      const r = d.recomendado || {};
+      const eco = r.certificado_eco === true ? '<span class="compra-eco">apto ecológico</span>'
+                : r.certificado_eco === false ? '<span class="compra-eco no">no consta como ecológico</span>'
+                : '<span class="compra-eco duda">certificación sin confirmar</span>';
+      const alt = (d.alternativas || []).slice(0, 3).map(a =>
+        `<li><strong>${esc(a.producto || "")}</strong>${a.pct_nutriente ? ` · ${a.pct_nutriente}% N` : ""}${
+          a.eur_kg_nutriente ? ` · ${nDec(a.eur_kg_nutriente, 0)} €/kg de N` : ""}${
+          a.url ? ` · <a href="${esc(a.url)}" target="_blank" rel="noopener">ficha</a>` : ""}
+          ${a.por_que ? `<br><span class="compra-por-que">${esc(a.por_que)}</span>` : ""}</li>`).join("");
+      // Los descartados son la mitad del valor: dicen por qué NO comprar lo que
+      // sale primero al buscar.
+      const desc = (d.descartados || []).slice(0, 3).map(x =>
+        `<li><strong>${esc(x.producto || "")}</strong> — ${esc(x.motivo || "")}</li>`).join("");
+      const fuentes = (d.citas || []).slice(0, 6).map(f =>
+        `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.titulo)}</a>`).join(" · ");
+
+      return `<div class="compra">
+        <p class="compra-titulo">${esc(r.producto || "Sin recomendación")}</p>
+        <p class="compra-cifras">
+          ${r.pct_nutriente ? `<span>${r.pct_nutriente}% N</span>` : ""}
+          ${r.producto_necesario_g ? `<span><strong>pesa ${nDec(r.producto_necesario_g, 0)} g</strong></span>` : ""}
+          ${r.envase ? `<span>${esc(r.envase)}${r.precio_eur ? ` · ${nDec(r.precio_eur, 2)} €` : ""}</span>` : ""}
+          ${r.eur_kg_nutriente ? `<span>${nDec(r.eur_kg_nutriente, 0)} €/kg de N</span>` : ""}
+          ${eco}
+        </p>
+        ${r.por_que ? `<p class="compra-por-que">${esc(r.por_que)}</p>` : ""}
+        ${d.como_aplicarlo ? `<p class="compra-aplicar"><strong>Cómo aplicarlo:</strong> ${esc(d.como_aplicarlo)}</p>` : ""}
+        ${(d.avisos || []).length ? `<ul class="compra-avisos">${
+          d.avisos.filter(Boolean).map(a => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
+        ${alt ? `<p class="compra-bloque">Alternativas</p><ul class="compra-lista">${alt}</ul>` : ""}
+        ${desc ? `<p class="compra-bloque">Descartados y por qué</p><ul class="compra-lista">${desc}</ul>` : ""}
+        <p class="compra-fuente">Precios de ${esc(d.consultado || "?")}, orientativos — compruébalos antes de comprar.${
+          d.obsoleto ? " <strong>No se ha podido refrescar hoy.</strong>" : ""}${
+          fuentes ? `<br>Fuentes: ${fuentes}` : ""}</p>
+      </div>`;
+    }
+
+    async function buscarQueComprar(btn) {
+      const caja = document.getElementById("abonado-compra");
+      const uid  = idParcelaActiva();
+      if (!caja || !uid) return;
+      btn.disabled = true;
+      caja.innerHTML = `<p class="compra-cargando">Buscando en tiendas españolas… (tarda unos segundos)</p>`;
+      try {
+        const res = await fetch("/api/ia?tipo=producto-fertilizante", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            usuario_id: uid,
+            nutriente: "N",
+            gramos: Number(btn.dataset.gramos),
+            momento: btn.dataset.momento,
+          }),
+        });
+        const d = await res.json();
+        if (!d.ok) throw new Error(d.reason || d.error || "sin respuesta");
+        caja.innerHTML = pintarCompra(d);
+        btn.remove();
+      } catch (err) {
+        caja.innerHTML = `<p class="compra-cargando">No se ha podido buscar ahora mismo (${esc(err.message)}). Inténtalo más tarde.</p>`;
+        btn.disabled = false;
+      }
     }
 
     async function cargarPlanAbonado() {
@@ -4817,6 +4918,8 @@
         if (!d || d.ok === false) return;
 
         cuerpo.innerHTML = pintarPlanAbonado(d.plan, d.rendimiento);
+        const btnComprar = document.getElementById("btn-comprar");
+        if (btnComprar) btnComprar.addEventListener("click", () => buscarQueComprar(btnComprar));
         toggle.hidden = false;
       } catch (err) {
         console.warn("[Kylia] no se pudo cargar el plan de abonado:", err.message);

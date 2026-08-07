@@ -8,13 +8,13 @@
 -- precio y cuánto pesar de él. Eso no cabe en una tabla cableada —los precios se
 -- mueven, los envases cambian y en ecológico el catálogo es otro—, así que
 -- `/api/ia?tipo=producto-fertilizante` lo busca en la web en el momento
--- (Claude + web search) con el contexto agronómico de la parcela delante.
+-- (Gemini + grounding de Google Search, gratis hasta 5.000 consultas/mes) con el contexto agronómico de la parcela delante.
 --
 -- POR QUÉ SE CACHEA, si la gracia era que fuese en vivo: porque cada consulta
--- CUESTA (web search se factura a $10 / 1.000 búsquedas, más los tokens de lo
--- que se lea) y TARDA (bastante más que los 10 s por defecto de Vercel; por eso
--- vercel.json sube api/ia.js a maxDuration 60). Repetir la misma búsqueda en
--- cada pintado de pantalla sería pagar dos veces por la misma respuesta. La
+-- TARDA (bastante más que los 10 s por defecto de Vercel; por eso vercel.json
+-- sube api/ia.js a maxDuration 60) y porque el grounding de Google es gratis
+-- hasta 5.000 consultas al mes, no infinito. Repetir la misma búsqueda en cada
+-- pintado de pantalla sería gastar dos veces por la misma respuesta. La
 -- clave de caché incluye la necesidad calculada (nutriente, gramos, momento,
 -- cultivo, manejo, método de riego): mientras el plan no cambie, no se vuelve a
 -- buscar; en cuanto cambie, se busca solo. "Tiempo real" es que el dato sale de

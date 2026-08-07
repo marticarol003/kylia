@@ -6,9 +6,9 @@
 // qué producto real comprar, a qué precio y cuánto pesar de él.
 //
 // Ese salto no se puede dar con una tabla cableada: los precios se mueven, los
-// envases cambian y en ecológico el catálogo es otro. Aquí se resuelve pidiendo
-// a Claude que BUSQUE EN LA WEB en el momento (server-side web search) y elija,
-// con el contexto agronómico de la parcela delante.
+// envases cambian y en ecológico el catálogo es otro. Aquí se resuelve BUSCANDO
+// EN GOOGLE en el momento y eligiendo con el contexto agronómico de la parcela
+// delante.
 //
 // Por qué esto no es un buscador de precios: la decisión no es "el más barato".
 // Se comprobó a mano el 2026-08-07 con la cobertera del bancal de lechugas, y el
@@ -21,21 +21,25 @@
 // etiqueta, el N orgánico tiene que mineralizar a tiempo, y el €/kg de nutriente
 // se calcula, no se estima.
 //
-// ⚠️ COSTE Y LATENCIA (por lo que esto va cacheado, no se llama en cada pintado):
-//   · web search = $10 / 1.000 búsquedas → ~$0,05 por consulta con max_uses 5,
-//     + los tokens de lo que se lea. Una parcela pide esto 1-2 veces por campaña.
-//   · una búsqueda + razonamiento tarda bastante más que los 10 s por defecto de
-//     Vercel; de ahí maxDuration 60 en vercel.json. Si aun así no llega, se
-//     devuelve la caché anterior antes que nada.
+// MOTOR: Gemini con grounding de Google Search — es literalmente "una búsqueda
+// de Google en tiempo real", y es GRATIS al volumen de Kylia: 5.000 consultas
+// con grounding al mes sin coste, sobre la GEMINI_API_KEY que ya está en
+// producción. La primera versión de esto (commit 09647cd) usaba Claude + web
+// search, que cuesta $10/1.000 búsquedas; se cambió el 7-ago por el equivalente
+// gratuito. Lo que NO cambió es el criterio: el prompt de abajo es el mismo, y
+// es donde está el valor (ver las tres reglas).
+//
+// ⚠️ LATENCIA (por lo que esto va cacheado, no se llama en cada pintado): buscar
+// y razonar tarda más que los 10 s por defecto de Vercel; de ahí maxDuration 60
+// en vercel.json. Si aun así no llega, se devuelve la caché anterior marcada.
 // La caché vive en usuarios.producto_fert (jsonb) y la clave incluye la
 // necesidad: mientras el plan no cambie, no se vuelve a buscar. "Tiempo real" es
 // que el dato sale de una búsqueda viva, no que se repita la búsqueda por gusto.
 
 const { isConfigured, supabaseSelect, supabaseUpdate, parseBody, preludio } = require("./_supabase.js");
 
-const API_URL   = "https://api.anthropic.com/v1/messages";
-const MODEL     = "claude-opus-5";
-const MAX_USES  = 5;      // tope duro de búsquedas por consulta (coste acotado)
+const API_BASE  = "https://generativelanguage.googleapis.com/v1beta/models";
+const MODEL     = "gemini-2.5-flash";   // mismo modelo que el resto de /api/ia
 const CACHE_DIAS = 30;    // por debajo de esto no se vuelve a buscar aunque coincida la clave
 
 const NUTRIENTE_NOMBRE = { N: "nitrógeno (N)", P2O5: "fósforo (P₂O₅)", K2O: "potasio (K₂O)" };
@@ -85,24 +89,25 @@ function promptUsuario(ctx) {
   ].filter(Boolean).join("\n");
 }
 
-// Saca el JSON del último bloque de texto. No se usa output_config.format a
-// propósito: las citas de web search van en los bloques de texto y esa
-// combinación no está garantizada; parsear es más barato que un 400 en producción.
-function extraerJSON(content) {
-  const texto = (content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
+// Saca el JSON de las partes de texto de la respuesta. No se pide salida
+// estructurada a la API porque con el grounding de Google activo no se puede
+// (responseMimeType json y google_search son excluyentes): se pide en el prompt
+// y se extrae aquí, tolerando preámbulo y vallas de markdown.
+function extraerJSON(partes) {
+  const texto = (partes || []).map(p => p?.text).filter(t => typeof t === "string").join("\n");
   const i = texto.indexOf("{"), j = texto.lastIndexOf("}");
   if (i < 0 || j <= i) return null;
   try { return JSON.parse(texto.slice(i, j + 1)); } catch (_) { return null; }
 }
 
-// Las URLs que Claude citó de verdad. Se devuelven aparte de las que él liste en
-// `fuentes`, para que el front pueda enseñar la procedencia sin fiarse del JSON.
-function citas(content) {
+// Las páginas que la búsqueda visitó DE VERDAD (groundingChunks del grounding de
+// Google). Se devuelven aparte de las que el modelo liste en `fuentes`, para que
+// el front pueda enseñar la procedencia sin fiarse de lo que diga el JSON.
+function citas(groundingMetadata) {
   const vistas = new Map();
-  for (const b of content || []) {
-    for (const c of b.citations || []) {
-      if (c.url && !vistas.has(c.url)) vistas.set(c.url, { titulo: c.title || c.url, url: c.url });
-    }
+  for (const chunk of groundingMetadata?.groundingChunks || []) {
+    const w = chunk?.web;
+    if (w?.uri && !vistas.has(w.uri)) vistas.set(w.uri, { titulo: w.title || w.uri, url: w.uri });
   }
   return [...vistas.values()].slice(0, 12);
 }
@@ -114,52 +119,44 @@ function claveDe(ctx) {
 }
 
 async function buscarProducto(ctx, apiKey) {
-  const res = await fetch(API_URL, {
+  const url = `${API_BASE}/${MODEL}:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 6000,
-      // effort medio: la tarea es elegir bien entre lo que devuelve la búsqueda,
-      // no razonar en profundidad, y en Vercel el reloj corre.
-      output_config: { effort: "medium" },
-      system: SISTEMA,
-      messages: [{ role: "user", content: promptUsuario(ctx) }],
-      tools: [{
-        type: "web_search_20260318",
-        name: "web_search",
-        max_uses: MAX_USES,
-        // El contenido crudo de las búsquedas no vuelve al cliente: aquí solo
-        // interesa el JSON final y las citas. Recorta tokens de salida.
-        response_inclusion: "excluded",
-        user_location: { type: "approximate", country: "ES" },
-      }],
+      systemInstruction: { parts: [{ text: SISTEMA }] },
+      contents: [{ role: "user", parts: [{ text: promptUsuario(ctx) }] }],
+      // La búsqueda de Google, que es la pieza nueva. Va sola: con grounding
+      // activo NO se puede pedir responseMimeType json (la API lo rechaza), por
+      // eso el JSON se pide en el prompt y se extrae a mano más abajo.
+      tools: [{ google_search: {} }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 4000 },
     }),
   });
 
   if (!res.ok) {
     const detalle = await res.text().catch(() => "");
-    throw new Error(`anthropic ${res.status}: ${detalle.slice(0, 300)}`);
+    throw new Error(`gemini ${res.status}: ${detalle.slice(0, 300)}`);
   }
-  const msg = await res.json();
+  const data = await res.json();
 
-  // Un rechazo de los clasificadores llega como 200 con stop_reason refusal y
-  // content vacío: sin esta guarda, extraerJSON devolvería null y parecería un
-  // fallo de formato.
-  if (msg.stop_reason === "refusal") throw new Error("la consulta fue rechazada por el modelo");
+  const cand = data?.candidates?.[0];
+  // Un bloqueo por filtros llega como 200 sin partes de texto: sin esta guarda
+  // parecería un fallo de formato y no se vería el motivo real.
+  if (!cand || cand.finishReason === "SAFETY" || cand.finishReason === "PROHIBITED_CONTENT") {
+    throw new Error(`la consulta fue bloqueada (${cand?.finishReason || "sin candidato"})`);
+  }
 
-  const plan = extraerJSON(msg.content);
+  const plan = extraerJSON(cand.content?.parts);
   if (!plan) throw new Error("respuesta sin JSON parseable");
 
+  const meta = cand.groundingMetadata;
   return {
     ...plan,
-    citas: citas(msg.content),
-    busquedas: msg.usage?.server_tool_use?.web_search_requests ?? null,
-    modelo: msg.model || MODEL,
+    citas: citas(meta),
+    busquedas: (meta?.webSearchQueries || []).length || null,
+    consultas: meta?.webSearchQueries || [],
+    modelo: MODEL,
   };
 }
 
@@ -175,8 +172,8 @@ module.exports = async (req, res) => {
   if (!/^[0-9a-f-]{36}$/i.test(usuario_id)) return res.status(400).json({ error: "usuario_id inválido" });
   if (!(gramos > 0)) return res.status(400).json({ error: "gramos debe ser > 0 (lo da el plan de abonado)" });
 
-  const apiKey = (process.env.ANTHROPIC_API_KEY || "").trim();
-  if (!apiKey) return res.status(200).json({ ok: false, reason: "anthropic_no_configurada" });
+  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey) return res.status(200).json({ ok: false, reason: "gemini_no_configurada" });
   if (!isConfigured()) return res.status(200).json({ ok: false, reason: "supabase_not_configured" });
 
   let u;
