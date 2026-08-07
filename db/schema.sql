@@ -55,6 +55,7 @@ create table usuarios (
   riego_auto_desde      date,                                  -- fecha ancla de la pauta
   piloto_sombra         boolean     not null default false,    -- true → Kylia calla, diario-b congela
   suelo_oferta          jsonb,                                 -- caché de ofertaSuelo() (SoilGrids); NULL = sin calcular
+  producto_fert         jsonb,                                 -- caché de qué fertilizante comprar (búsqueda web en vivo); lleva `clave` y `consultado`
   origen                text,
   preferencias          jsonb       default '{}'::jsonb,
   ua                    text,

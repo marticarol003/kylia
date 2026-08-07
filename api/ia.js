@@ -10,11 +10,18 @@
 //   POST /api/ia?tipo=recomendacion          ← antes /api/recomendacion
 //   POST /api/ia?tipo=recomendaciones-texto  ← antes /api/recomendaciones-texto
 //   POST /api/ia?tipo=sugerencia-producto    ← antes /api/sugerencia-producto
+//   POST /api/ia?tipo=producto-fertilizante  ← nuevo (no gasta slot de función)
+//
+// OJO con el reparto de modelos: los tres primeros van a Gemini y eligen dentro
+// de un catálogo curado. `producto-fertilizante` es distinto — sale a buscar al
+// mercado en vivo con Claude + web search, así que cuesta dinero por consulta y
+// tarda; por eso cachea. Ver la cabecera de _ia-producto-fertilizante.js.
 
 const HANDLERS = {
   "recomendacion":         require("./_ia-recomendacion.js"),
   "recomendaciones-texto": require("./_ia-recomendaciones-texto.js"),
   "sugerencia-producto":   require("./_ia-sugerencia-producto.js"),
+  "producto-fertilizante": require("./_ia-producto-fertilizante.js"),
 };
 
 module.exports = async (req, res) => {
