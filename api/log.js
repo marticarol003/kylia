@@ -7,15 +7,18 @@
 //
 // Recursos soportados:
 //   registro-usuario, acciones, observaciones, jornadas,
-//   mediciones, recomendaciones-log, eventos
+//   mediciones, recomendaciones-log, eventos, acceso
 
 const {
   isConfigured, supabaseInsert, supabaseUpdate, supabaseSelect, supabaseDelete,
   parseBody, preludio,
 } = require("./_supabase.js");
 
+const ACCESO = require("./_acceso.js");
+
 const HANDLERS = {
   "registro-usuario":    handleRegistroUsuario,
+  "acceso":              handleAcceso,
   "acciones":            handleAcciones,
   "borrar-accion":       handleBorrarAccion,
   "observaciones":       handleObservaciones,
@@ -114,6 +117,28 @@ async function handleRegistroUsuario(req, res, body) {
   } catch (err) {
     console.error("[registro-usuario] error:", err.message);
     return res.status(500).json({ ok: false, error: "no se pudo guardar" });
+  }
+}
+
+// ─── acceso (enlace por correo: la parcela es de la persona) ───────
+// Dos acciones: "pedir" manda el enlace, "canjear" lo cambia por el
+// propietario_id y sus zonas. La lógica y el porqué de cada guarda de seguridad
+// están en _acceso.js; aquí solo se enruta.
+async function handleAcceso(req, res, body) {
+  if (!isConfigured()) {
+    return res.status(200).json({ ok: false, reason: "supabase_not_configured" });
+  }
+  const accion = (body.accion || "").toString();
+  const ip = (req.headers["x-forwarded-for"] || "").toString().split(",")[0].trim() || null;
+
+  try {
+    const r = accion === "pedir"   ? await ACCESO.pedir(body, ip)
+            : accion === "canjear" ? await ACCESO.canjear(body)
+            : { estado: 400, cuerpo: { error: "accion debe ser 'pedir' o 'canjear'" } };
+    return res.status(r.estado).json(r.cuerpo);
+  } catch (err) {
+    console.error("[acceso] error:", err.message);
+    return res.status(500).json({ ok: false, error: "no se pudo procesar el acceso" });
   }
 }
 
