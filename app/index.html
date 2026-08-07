@@ -4742,6 +4742,16 @@
       return Number(v ?? 0).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
     }
 
+    // Cantidad de abono en la unidad que el agricultor puede PESAR. En un bancal
+    // de 5 m² el plan entero son decenas de gramos: enseñarlo en kg con un decimal
+    // lo convertía en "0,1 kg" (72% de más que los 57,5 g reales) y el P₂O₅ en un
+    // "0 kg" que no existe. Por debajo de 1 kg se habla en gramos.
+    function fmtAbono(kg) {
+      const v = Number(kg ?? 0);
+      if (v > 0 && v < 1) return `${nDec(v * 1000, v * 1000 < 10 ? 1 : 0)} g`;
+      return `${nDec(v, 1)} kg`;
+    }
+
     function pintarPlanAbonado(plan, rend) {
       // Sin plan no se inventa uno: el motor dice por qué no puede calcularlo
       // (falta cultivo, o rinde esperado) y eso es lo que se enseña.
@@ -4753,13 +4763,13 @@
 
       const filas = plan.lineas.map(l => `<tr>
         <td class="abonado-nutri">${NUTRI_NOMBRE[l.nutriente] || esc(l.nutriente)}</td>
-        <td class="num">${nDec(l.necesidad_kg, 1)} kg</td>
+        <td class="num">${fmtAbono(l.necesidad_kg)}</td>
         <td class="num">${nDec(l.coste_eur, 2)} €</td>
       </tr>`).join("");
 
       const reparto = plan.lineas.filter(l => l.reparto && l.reparto.length).map(l =>
         `<li><strong>${NUTRI_NOMBRE[l.nutriente] || esc(l.nutriente)}:</strong> ` +
-        l.reparto.map(t => `${t.pct}% ${esc(t.momento)} (${nDec(t.kg, 1)} kg)`).join(" · ") + `</li>`
+        l.reparto.map(t => `${t.pct}% ${esc(t.momento)} (${fmtAbono(t.kg)})`).join(" · ") + `</li>`
       ).join("");
 
       // Notas honestas: de dónde sale la cosecha esperada, si el plan va sobre

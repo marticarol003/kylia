@@ -45,6 +45,10 @@ const FRACCION_TRADICIONAL = {
 };
 
 function r2(x) { return Math.round((Number(x) || 0) * 100) / 100; }
+// Los kg de un tramo del reparto llegan a gramos: con r2, la cobertera del bancal
+// de 5 m² (40 g) se redondeaba a 0,04 kg y el fondo (17 g) a 0,02 — cerca del
+// error de la propia báscula. Ver r1 en _motor-nutricion.js.
+function r3(x) { return Math.round((Number(x) || 0) * 1000) / 1000; }
 
 // Reparte los kg de un nutriente en los momentos de aplicación según el método
 // de riego. Devuelve [] si no hay nada que repartir (kg 0).
@@ -53,7 +57,7 @@ function repartoNutriente(nutriente, kg, metodoRiego) {
   const tramos = metodoRiego === "goteo"
     ? FRACCION_FERTIRRIGACION
     : FRACCION_TRADICIONAL[nutriente];
-  return tramos.map(t => ({ momento: t.momento, pct: Math.round(t.pct * 100), kg: r2(kg * t.pct) }));
+  return tramos.map(t => ({ momento: t.momento, pct: Math.round(t.pct * 100), kg: r3(kg * t.pct) }));
 }
 
 // Genera el coste y las líneas del cuaderno de fertilización.

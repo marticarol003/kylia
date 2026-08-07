@@ -88,7 +88,14 @@ const N_RESIDUOS_KG_HA = {
 // 186) da 40-80%; usamos el centro (60%). Sin incorporación → crédito 0.
 const FRACCION_DISPONIBLE_RESIDUOS = 0.60;
 
-function r1(x) { return Math.round((Number(x) || 0) * 10) / 10; }
+// 3 decimales de kg = gramos. Estaba en 1 decimal y en una parcela pequeña eso
+// es más grueso que la dosis entera: en el bancal de 5 m² TODOS los sumandos del
+// balance salían 0 (extracción 45 g, colchón 22,5 g, oferta 10 g) y solo
+// sobrevivía el total redondeado a 0,1 kg — 100 g contra los 57,5 g reales, un
+// 72% de más. El P₂O₅ desaparecía del plan directamente (20 g → "0 kg"). El
+// redondeo de PRESENTACIÓN va en el front (gramos por debajo de 1 kg); aquí se
+// guarda el número.
+function r1(x) { return Math.round((Number(x) || 0) * 1000) / 1000; }
 
 // Crédito de N (kg/ha) que aportan los residuos del cultivo anterior al balance.
 // Solo cuenta si los restos se INCORPORARON al suelo (MAPA lo condiciona); si se

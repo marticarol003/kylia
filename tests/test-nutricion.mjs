@@ -102,5 +102,23 @@ const planCeb = necesidadNutrientes("tomate", 2, null,
 ok(planCeb.nutrientes.N.credito_residuos_kg === credCeb,
    `crédito de cebolla previa fluye al balance (${credCeb} kg/ha)`);
 
+console.log("\n6) Parcelas pequeñas: el plan tiene que llegar al GRAMO:");
+// El bancal de 33 lechugas son 5 m². Con el redondeo a 0,1 kg, TODOS los sumandos
+// del balance salían 0 y solo sobrevivía el total: 0,1 kg = 100 g contra 57,5 g
+// reales (72% de más), y el P₂O₅ desaparecía como "0 kg". Sobre eso no se puede
+// montar un ensayo de fertilizantes: el tratamiento no sería la dosis calculada.
+const bancal = necesidadNutrientes("lechuga", 0.018, { N: 0.01 }, { area_m2: 5 });
+const gN = bancal.nutrientes.N;
+ok(Math.abs(gN.necesidad_kg - 0.058) < 0.0005,
+   `5 m²: N = 58 g, no "0,1 kg" (${(gN.necesidad_kg * 1000).toFixed(1)} g)`);
+ok(gN.extraccion_kg > 0,     `la extracción deja de ser 0 (${(gN.extraccion_kg * 1000).toFixed(1)} g)`);
+ok(gN.colchon_final_kg > 0,  `y el colchón de MAPA también (${(gN.colchon_final_kg * 1000).toFixed(1)} g)`);
+ok(bancal.nutrientes.P2O5.necesidad_kg > 0,
+   `el P₂O₅ existe: ${(bancal.nutrientes.P2O5.necesidad_kg * 1000).toFixed(1)} g (antes "0 kg")`);
+// Y en parcelas grandes no cambia nada de lo que ya se publicaba.
+const hectarea = necesidadNutrientes("tomate", 60, null, { area_m2: 10000 });
+ok(Math.abs(hectarea.nutrientes.N.extraccion_kg - 180) < 0.01,
+   `1 ha de tomate sigue dando 180 kg de N (${hectarea.nutrientes.N.extraccion_kg})`);
+
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES" : `\n❌ ${fallos} FALLO(S)`);
 process.exit(fallos === 0 ? 0 : 1);
