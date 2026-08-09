@@ -130,7 +130,17 @@ async function buscarProducto(ctx, apiKey) {
       // activo NO se puede pedir responseMimeType json (la API lo rechaza), por
       // eso el JSON se pide en el prompt y se extrae a mano más abajo.
       tools: [{ google_search: {} }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 4000 },
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 8000,
+        // thinkingBudget 0 como en el resto de /api/ia, y no por ahorrar: en
+        // Gemini 2.5 los tokens de pensamiento SE DESCUENTAN de maxOutputTokens.
+        // Con el presupuesto por defecto, el razonamiento se comía la respuesta
+        // entera y volvía un candidato sin texto — que desde fuera se ve
+        // exactamente igual que "el modelo no supo contestar". Aquí la búsqueda
+        // hace el trabajo duro; lo que queda es extraer y multiplicar.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     }),
   });
 
@@ -148,7 +158,14 @@ async function buscarProducto(ctx, apiKey) {
   }
 
   const plan = extraerJSON(cand.content?.parts);
-  if (!plan) throw new Error("respuesta sin JSON parseable");
+  if (!plan) {
+    // Un "no vino JSON" a secas no se puede diagnosticar desde fuera: puede ser
+    // que el modelo respondiera en prosa, que se quedara sin presupuesto de
+    // salida (MAX_TOKENS) o que no devolviera nada. El motivo va en el error.
+    const crudo = (cand.content?.parts || []).map(x => x?.text).filter(Boolean).join(" ").slice(0, 200);
+    throw new Error(`respuesta sin JSON (${cand.finishReason || "sin finishReason"})` +
+                    (crudo ? `: "${crudo}…"` : " y sin texto"));
+  }
 
   const meta = cand.groundingMetadata;
   return {
