@@ -64,6 +64,7 @@ REGLAS DURAS:
 - Certificación ecológica: fíate solo de lo que diga la ficha del producto ("apto para agricultura ecológica", CAAE, Ecocert...). Si no lo dice, marca certificado_eco: null; no lo supongas por el nombre.
 - Avisa si el envase mínimo es mucho mayor que lo que necesita (en huerto pequeño es lo normal y conviene decirlo).
 - Habla en español de agricultor, sin marketing.
+- NO COPIES texto literal de las fichas ni de las tiendas: resume con tus palabras. Lo único que se transcribe tal cual son los datos duros —nombre comercial, %, kg del envase, precio, URL—; todo lo demás lo escribes tú. (Si transcribes párrafos enteros, el sistema corta la respuesta y el agricultor se queda sin nada.)
 
 Responde SOLO con un objeto JSON, sin markdown ni texto alrededor, con esta forma:
 {"recomendado":{"producto":"","fabricante":"","forma":"solido|liquido|polvo_soluble","pct_nutriente":0,"envase":"","precio_eur":0,"eur_kg_nutriente":0,"producto_necesario_g":0,"certificado_eco":true,"url":"","por_que":""},
@@ -131,7 +132,11 @@ async function buscarProducto(ctx, apiKey) {
       // eso el JSON se pide en el prompt y se extrae a mano más abajo.
       tools: [{ google_search: {} }],
       generationConfig: {
-        temperature: 0.2,
+        // 0,7 y no 0,2: con temperatura muy baja el modelo tiende a reproducir
+        // literalmente lo que acaba de leer, y el filtro de recitación de Gemini
+        // corta la respuesta entera (finishReason RECITATION) — se vio en
+        // producción el 9-ago. Aquí no queremos literalidad, queremos criterio.
+        temperature: 0.7,
         maxOutputTokens: 8000,
         // thinkingBudget 0 como en el resto de /api/ia, y no por ahorrar: en
         // Gemini 2.5 los tokens de pensamiento SE DESCUENTAN de maxOutputTokens.

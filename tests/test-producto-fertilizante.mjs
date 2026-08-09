@@ -43,6 +43,8 @@ ok(/mineraliza/i.test(S), "regla 2: en ecológico, el N tiene que mineralizar a 
 ok(/€\/kg DE NUTRIENTE SE CALCULA/i.test(S), "regla 3: el €/kg de nutriente se calcula, no se estima");
 ok(/No inventes NUNCA/i.test(S) && /precio/i.test(S), "prohibición explícita de inventar producto, precio o certificación");
 ok(/certificado_eco: null|no lo supongas/i.test(S), "no supone la certificación ecológica por el nombre del producto");
+ok(/NO COPIES texto literal/i.test(S),
+   "prohíbe transcribir las fichas: el filtro de recitación de Gemini corta la respuesta entera si lo hace");
 
 console.log("── el prompt del usuario lleva las variables que deciden ──");
 const p = M.promptUsuario(BANCAL);
