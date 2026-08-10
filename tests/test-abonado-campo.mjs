@@ -20,34 +20,34 @@ const campoApi  = leer("api", "campo.js");
 const sql       = leer("db", "ensayo-fertilizantes-bancal-2026-08-10.sql");
 
 console.log("── la cuenta que convierte nitrógeno en producto ──");
-// Se reproduce aquí la misma aritmética que hace la tarjeta, con los datos
-// reales del bancal: 41 g de N de cobertera, 15 de 33 plantas tratadas, en dos
-// aplicaciones, con un producto al 15% de riqueza.
-const gN = 41, tratadas = 15, total = 33, veces = 2, pct = 15;
-const gNapl = Math.round(gN * (tratadas / total));
-const gNvez = Math.round(gNapl / veces * 10) / 10;
+// La aritmética real del bancal: 41 g de N de cobertera para las 33 plantas, en
+// dos aplicaciones, con un producto al 15% de riqueza.
+const gN = 41, veces = 2, pct = 15;
+const gNvez = Math.round(gN / veces * 10) / 10;
 const gProd = Math.round(gNvez / (pct / 100));
-ok(gNapl === 19, `la dosis va solo a la parte tratada: ${gNapl} g de N de los ${gN} del bancal`);
-ok(gNvez === 9.5, `repartida en ${veces} aplicaciones: ${gNvez} g por vez`);
-ok(gProd === 63, `y al 15% de riqueza son ${gProd} g de producto que pesar`);
+ok(gNvez === 20.5, `la cobertera repartida en ${veces} aplicaciones: ${gNvez} g de N por vez`);
+ok(gProd === 137, `y al 15% de riqueza son ${gProd} g de producto que pesar`);
 // El motivo de llevar un decimal: redondear a entero arrastra al producto.
-ok(Math.round(Math.round(gNapl / veces) / (pct / 100)) - gProd >= 4,
-   "con gramos enteros la dosis se iría 4 g arriba, un 7% en un bancal de 5 m²");
+ok(Math.abs(Math.round(Math.round(gN / veces) / (pct / 100)) - gProd) >= 3,
+   "con gramos enteros de N la dosis se desviaría 3 g o más de producto");
 
-console.log("── un ensayo no puede acabar siendo media dosis para todos ──");
+console.log("── la dosis solo se parte si el ensayo parte la parcela ──");
+// El ensayo del bancal NO la parte: es manejo completo contra la zona B del
+// padre (decisión del consejo del 24-jul). Un diseño partido que se colara aquí
+// dejaría media parcela sin abonar sin que nadie lo hubiera decidido.
 const pintar = campoHtml.slice(campoHtml.indexOf("function pintarAbonado"), campoHtml.indexOf("async function enviar"));
-ok(/e\.plantas_tratadas \/ e\.plantas_total/.test(pintar),
-   "con ensayo declarado, la dosis se escala a la fracción tratada");
-ok(/: 1;/.test(pintar), "y sin ensayo va entera al bancal, como debe");
-ok(/sin producto/.test(pintar),
-   "el control se riega con la MISMA agua y sin producto (si no, se mide agua otra vez)");
-ok(/plantas_control/.test(pintar), "y se dice cuántas son, para que no haya duda de qué lado es cuál");
+ok(/e && e\.plantas_tratadas && e\.plantas_total \? e\.plantas_tratadas \/ e\.plantas_total : 1/.test(pintar),
+   "sin plantas_tratadas la dosis va ENTERA a la parcela; solo se escala si el ensayo la parte");
+ok(/e\?\.plantas_control/.test(pintar),
+   "y la línea del 'otro lado sin producto' solo sale si de verdad hay un control declarado");
+ok(/plantas_tratadas \|\| e\?\.plantas_total/.test(pintar),
+   "el reparto por planta usa las tratadas si las hay y si no todas");
 
 console.log("── lo que hay que apuntar sale en pantalla, no en un papel aparte ──");
-ok(/más pequeñas o más pálidas/.test(pintar),
-   "se pide el dato que distingue 'al suelo le faltaba N' de 'le sobraba'");
-ok(/su sitio/.test(pintar) && /su peso/.test(pintar),
-   "y la posición y el peso planta a planta, que es de donde sale la medida");
+ok(/e\.apuntar/.test(pintar),
+   "el qué apuntar viene declarado con el ensayo, no cableado en el front");
+ok(/e\.comparacion/.test(pintar),
+   "y contra qué se compara, para que no se confunda con un ensayo controlado");
 
 console.log("── nada se calcula en el navegador ──");
 ok(/vista=cuaderno/.test(campoHtml), "los números vienen del servidor");
@@ -65,9 +65,12 @@ ok(/cargarAbonado\(\);/.test(pintar), "y la tarjeta se refresca sola tras apunta
 console.log("── la declaración del ensayo no pisa otras preferencias ──");
 ok(/coalesce\(preferencias, '\{\}'::jsonb\) \|\|/.test(sql),
    "el SQL FUSIONA el jsonb en vez de reemplazarlo");
-ok(/plantas_buffer',   3/.test(sql), "las 3 de separación están declaradas");
-ok(/COTA INFERIOR/.test(sql),
-   "y queda escrito que lo que mide es una cota inferior, no una medida");
+ok(/manejo-completo/.test(sql),
+   "el ensayo declarado es el de MANEJO COMPLETO contra la zona B, el que decidió el consejo");
+ok(/NO VALIDA EL MOTOR DE FERTILIZANTES/.test(sql),
+   "y queda escrito que esto NO valida el motor: sin control sin nitrógeno no se puede");
+ok(/plantas_borde/.test(sql),
+   "las ~8 plantas de borde a descartar están declaradas (media ración de agua)");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

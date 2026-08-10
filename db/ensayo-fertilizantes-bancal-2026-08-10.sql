@@ -1,52 +1,47 @@
 -- ─────────────────────────────────────────────────────────────────
--- KYLIA · Declarar el ensayo de fertilizantes del bancal · 2026-08-10
+-- KYLIA · El ensayo del bancal es A vs B, no una partición · 2026-08-10
 -- ─────────────────────────────────────────────────────────────────
 -- Pega este archivo entero en el SQL Editor de Supabase. Es idempotente.
 --
--- QUÉ HACE: le dice a /campo que las 33 lechugas llevan un ensayo, para que la
--- tarjeta de abonado reparta la dosis SOLO entre las plantas tratadas y recuerde
--- qué hay que apuntar al cortar. Sin esto, /campo daría la dosis del bancal
--- entero y el "control" acabaría recibiendo media dosis — con lo que el ensayo
--- dejaría de medir nada.
+-- CORRIGE una versión anterior de este mismo fichero que declaraba un ensayo
+-- PARTIDO (15 tratadas + 3 de separación + 15 control sin nitrógeno). Ese diseño
+-- estaba mal por dos motivos:
 --
--- EL DISEÑO, y por qué es así:
---   · 15 tratadas + 3 de separación + 15 control. La separación no se pesa: a 25
---     cm y con aspersión el nitrógeno migra al vecino, y sin ese colchón los dos
---     brazos se contaminan.
---   · Dos brazos y no tres. Con 33 plantas, tres brazos de 11 solo detectarían
---     diferencias del 35-40%, y la respuesta de la lechuga al N por encima de lo
---     suficiente es plana: saldría "sin diferencia" y no se habría aprendido nada.
---     Con 15 contra 15 se detecta del orden del 20-25%.
+--   1. Contradice la decisión del consejo del 2026-07-24, unánime: comparar el
+--      MANEJO COMPLETO (riego + abonado juntos) contra la zona B del padre, sin
+--      aislar el fertilizante. En lechuga el N y el agua van físicamente de la
+--      mano, y 33 plantas contiguas son UNA unidad experimental, no dos.
+--   2. No aguanta su propia aritmética: la definición del bancal manda descartar
+--      las ~2 primeras y ~2 últimas de cada fila (≈8 de las 33) porque reciben
+--      media ración de agua. Partiendo en dos quedarían ~11-12 plantas por brazo,
+--      no 15.
 --
--- QUÉ VALIDA DE VERDAD, que es más estrecho de lo que parece: el término de
--- OFERTA DEL SUELO, que es el único del motor que sale de un prior de satélite y
--- no de un coeficiente publicado. Las plantas sin abonar solo pueden haber sacado
--- el nitrógeno del suelo, así que su peso lo mide:
---     N que aportó el suelo ≈ kg de lechuga del control × 2,5 kg N/t
--- (2,5 es el coeficiente de extracción de la lechuga, ya validado contra MAPA).
--- Hoy Kylia estima 20 kg N/ha para este bancal; el control dirá si se queda corto.
+-- QUÉ QUEDA DECLARADO: el ensayo real. Las 33 llevan la dosis de Kylia y se
+-- comparan con la zona B (218,4 m², ~3.100 lechugas, misma variedad, mismo suelo
+-- y misma fecha de trasplante), que el padre lleva a su manera.
 --
--- ⚠️ ES UNA COTA INFERIOR, no una medida: la planta coge lo que necesita hasta
---    donde haya. Por eso hay que apuntar TAMBIÉN si el control se ve más pequeño
---    o más pálido — es lo único que distingue "al suelo le faltaba" de "le
---    sobraba". Sin ese dato, los pesos solos no lo dicen.
+-- ⚠️ ESTO NO VALIDA EL MOTOR DE FERTILIZANTES, y no debe presentarse así. Sin un
+--    control sin nitrógeno no hay forma de saber cuánto puso el suelo, y la zona
+--    B no sirve de control porque el padre le echa NPK y difiere en todo lo demás.
+--    Es un VISTAZO DE CAMPO lado a lado del manejo completo. La palabra
+--    "validado" se reserva para el agua y FAO-56.
 --
--- NO valida la dosis (haría falta un tercer brazo), ni las pérdidas, ni el P y el
--- K. Suelo limpio se toma como supuesto declarado: sin cultivo anterior y sin
--- restos incorporados, que es además lo que el motor asume por defecto.
+-- ⚠️ Y RECUERDA que el agua de A y B salió LA MISMA (38,9 vs 41,0 mm) al corregir
+--    el caudal: lo que se compara aquí es sobre todo el abonado y el criterio,
+--    no el ahorro de agua.
 
 update usuarios
    set preferencias = coalesce(preferencias, '{}'::jsonb) || jsonb_build_object(
      'ensayo', jsonb_build_object(
-       'tipo',             'fertilizante-N',
-       'plantas_total',    33,
-       'plantas_tratadas', 15,
-       'plantas_control',  15,
-       'plantas_buffer',   3,
-       'aplicaciones',     2,
-       'litros_agua',      7.5,
-       'desde',            '2026-08-10',
-       'nota',             'Solo las 15 marcadas llevan abono. Las 3 del medio no se pesan: hacen de separación para que el nitrógeno no pase de un lado al otro.'
+       'tipo',            'manejo-completo',
+       'comparacion',     'zona B del padre (218,4 m², misma variedad, mismo suelo, mismo trasplante)',
+       'plantas_total',   33,
+       'plantas_borde',   8,
+       'aplicaciones',    2,
+       'litros_agua',     16.5,
+       'desde',           '2026-08-10',
+       'nota',            'Las 33 llevan la dosis de Kylia. Lo que se compara es el manejo completo contra las lechugas que tu padre lleva a su manera.',
+       'apuntar',         'Al cortar: kg totales y nº de piezas, peso por pieza, y foto fechada de las hojas (clorosis = falta de N; borde quemado = riego irregular). Descarta las ~2 primeras y ~2 últimas de cada fila: reciben media ración de agua. El mismo criterio hay que aplicarlo en la zona B.'
      ))
  where id = 'd5475c3d-365b-47ff-b31e-fa659a8362fb';
 

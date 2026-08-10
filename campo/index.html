@@ -529,9 +529,9 @@
 
     const gN    = Math.round(tramo.kg * 1000);
     const e     = d.ensayo;                       // null si esta parcela no lleva ensayo
-    // Con ensayo, la dosis va SOLO a la parte tratada: repartirla entera entre
-    // todas las plantas convertiría el control en un tratamiento a media dosis y
-    // el ensayo dejaría de medir nada.
+    // Solo se escala la dosis si el ensayo PARTE la parcela (plantas_tratadas).
+    // El ensayo del bancal no la parte —es manejo completo contra la zona B del
+    // padre, decisión del consejo del 24-jul— así que la dosis va entera.
     const frac  = e && e.plantas_tratadas && e.plantas_total ? e.plantas_tratadas / e.plantas_total : 1;
     const gNapl = Math.round(gN * frac);
     const veces = (e && e.aplicaciones) || 1;
@@ -544,8 +544,8 @@
     const gProd = pct > 0 ? Math.round(gNvez / (pct / 100)) : null;
 
     const hechos = (d.abonados || []).length;
-    const agua   = e?.litros_agua || 7.5;
-    const plantas = e?.plantas_tratadas || null;
+    const agua    = e?.litros_agua || null;
+    const plantas = e?.plantas_tratadas || e?.plantas_total || null;
 
     caja.innerHTML = `
       <div class="ab-cab">
@@ -560,14 +560,17 @@
         d.producto.certificado_eco === false ? " <b>Ojo: no consta como ecológico.</b>" :
         " Certificación sin confirmar."}</p>` : ""}
       <ol class="ab-pasos">
-        <li>Disuélvelo en <b>${agua} L</b> de agua.</li>
-        ${plantas ? `<li>Echa <b>${Math.round(agua / plantas * 100) / 100} L por planta</b> en las <b>${plantas} marcadas</b>, removiendo entre planta y planta.</li>`
-                  : `<li>Repártelo por igual con la regadera.</li>`}
-        ${e ? `<li>Las <b>${e.plantas_control} del otro lado</b> se riegan igual, con la misma agua, <b>sin producto</b>.</li>` : ""}
+        ${agua ? `<li>Disuélvelo en <b>${agua} L</b> de agua.</li>` : `<li>Disuélvelo en agua para poder repartirlo.</li>`}
+        ${agua && plantas
+          ? `<li>Echa <b>${Math.round(agua / plantas * 100) / 100} L por planta</b> en las <b>${plantas}</b>, removiendo entre planta y planta.</li>`
+          : `<li>Repártelo por igual con la regadera, removiendo mientras echas.</li>`}
+        ${e?.plantas_control
+          ? `<li>Las <b>${e.plantas_control} del otro lado</b> se riegan igual, con la misma agua, <b>sin producto</b>.</li>` : ""}
       </ol>
       ${e ? `<div class="ab-ensayo">
         <b>Es un ensayo.</b> ${e.nota || ""}
-        <div class="ab-apuntar">Al cortar hay que apuntar, planta a planta: <b>su sitio</b>, <b>su peso</b> y si las del lado sin abonar <b>se ven más pequeñas o más pálidas</b>. Ese último dato es el que distingue “al suelo le faltaba nitrógeno” de “le sobraba”.</div>
+        ${e.comparacion ? `<div class="ab-apuntar">Se compara contra la <b>${e.comparacion}</b>.</div>` : ""}
+        ${e.apuntar ? `<div class="ab-apuntar">${e.apuntar}</div>` : ""}
       </div>` : ""}
       <button class="btn" id="ab-hecho">Ya lo he echado</button>
       ${hechos ? `<p class="ab-hechos">Llevas ${hechos} abonado${hechos > 1 ? "s" : ""} apuntado${hechos > 1 ? "s" : ""}.</p>` : ""}
