@@ -38,6 +38,30 @@ ok(/config_app: foto/.test(handler) && (handler.match(/patch|config_app/g) || []
 ok(/propietario no encontrado/.test(handler),
    "si el propietario no existe lo dice, en vez de tragarse el guardado en silencio");
 
+console.log("── registro-usuario no puede borrar lo que no le mandas ──");
+// El agujero que abrió esto: cada campo ausente se convertía en null explícito y
+// el upsert lo escribía. El gate del email manda {email, nombre} y nada más, así
+// que escribir tu correo borraba lat, lon, cultivos, contorno, superficie, caudal
+// y suelo. Este test existe para que no vuelva: basta con que alguien añada un
+// campo nuevo y se olvide de siViene.
+const registro = log.slice(log.indexOf("async function handleRegistroUsuario"),
+                           log.indexOf("// ─── acceso (enlace por correo"));
+const fila = registro.slice(registro.indexOf("const fila = {"), registro.indexOf("console.log(\"[registro-usuario]\""));
+const campos = [...fila.matchAll(/^\s{4}(\w+):/gm)].map(m => m[1]);
+// id y propietario_id identifican la fila; ua sale de la cabecera, no del cuerpo.
+const debenSerCondicionales = campos.filter(c => !["id", "propietario_id", "ua"].includes(c));
+const sinGuarda = debenSerCondicionales.filter(c => {
+  const linea = fila.split("\n").find(l => l.trim().startsWith(c + ":"));
+  const bloque = fila.slice(fila.indexOf(c + ":"), fila.indexOf(c + ":") + 300);
+  return !/siViene\(/.test(bloque.split("\n").slice(0, 3).join("\n"));
+});
+ok(debenSerCondicionales.length >= 15,
+   `se revisan los ${debenSerCondicionales.length} campos que vienen del cuerpo`);
+ok(sinGuarda.length === 0,
+   `todos pasan por siViene(), o sea que un campo ausente NO se escribe${sinGuarda.length ? ": faltan " + sinGuarda.join(", ") : ""}`);
+ok(/clave in body/.test(registro),
+   "el criterio es si la CLAVE viene, no si el valor es nulo: un null explícito sigue borrando");
+
 console.log("── bajar tampoco ──");
 const iife = app.slice(app.indexOf("function tieneConfigLocal"), app.indexOf("kyliaTrack: ahora va"));
 ok(/if \(tieneConfigLocal\(\)\) return;/.test(iife),
