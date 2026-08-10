@@ -117,5 +117,26 @@ ok(/orientativos — compruébalos antes de comprar/.test(app),
 ok(/No se ha podido refrescar hoy/.test(app),
    "un dato viejo se marca como viejo en pantalla, no se enseña como fresco");
 
+console.log("── y la app explica de dónde sale cada gramo ──");
+// Una recomendación que no se puede discutir es una orden. El desglose del
+// balance ya viajaba desde el motor; lo que faltaba era enseñarlo CON SU FUENTE.
+const pq = app.slice(app.indexOf("function porQueAbonado"), app.indexOf("function pintarPlanAbonado"));
+ok(/<details class="pq-det">/.test(app) && /¿Por qué esta cantidad y este producto\?/.test(app),
+   "va en un desplegable dentro del plan de abonado, como el ¿Por qué? del riego");
+ok(/des\.extraccion_kg/.test(pq) && /des\.aporte_suelo_kg/.test(pq) && /des\.colchon_final_kg/.test(pq),
+   "enseña los sumandos del balance: extracción, colchón de MAPA y lo que pone el suelo");
+ok(/Tabla 4\.2 de MAPA sobre SoilGrids/.test(pq),
+   "y de dónde sale cada uno, incluido el término que es un prior de satélite");
+ok(/es un prior, no una analítica de tu parcela/.test(pq),
+   "declara que la materia orgánica es estimada y que es el eslabón más flojo");
+ok(/suelo limpio es un supuesto declarado/.test(pq),
+   "y que el suelo limpio es un supuesto, no un cero medido");
+ok(/Descartados, y por qué/.test(pq),
+   "del producto enseña los descartados con su motivo, no solo el elegido");
+ok(/pr\.fuentes/.test(pq) && /pr\.consultado/.test(pq),
+   "con las fuentes y la fecha de consulta");
+ok(/Toca “¿Qué compro para esto\?”/.test(pq),
+   "si aún no se ha buscado producto, lo dice en vez de dejar el hueco en blanco");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

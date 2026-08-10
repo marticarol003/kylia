@@ -2081,6 +2081,24 @@
     .compra-lista li { margin-bottom:6px; }
     .compra-fuente { font-size:.76rem; color:#5a685a; margin-top:10px; }
     .compra-cargando { font-size:.88rem; color:#5a685a; margin-top:12px; }
+    .pq-det { margin-top: 12px; border-top: 1px solid #e6e6e6; padding-top: 10px; }
+    .pq-det summary { cursor: pointer; font-size: .86rem; color: var(--verde, #013A27); font-weight: 600; }
+    .pq-cuerpo { margin-top: 10px; }
+    .pq-tit { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+              color: var(--muted, #5a685a); margin: 14px 0 6px; }
+    .pq-tit:first-child { margin-top: 0; }
+    .pq-lista { list-style: none; padding: 0; margin: 0; }
+    .pq-lista li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+                   padding: 7px 0; border-bottom: 1px solid #f1f5f1; font-size: .88rem; }
+    .pq-lista b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .pq-lista small { grid-column: 1 / -1; color: var(--muted, #5a685a); font-size: .76rem; line-height: 1.4; }
+    .pq-cuenta { font-size: .88rem; margin: 0 0 8px; }
+    .pq-txt { font-size: .86rem; color: #3d4a3d; line-height: 1.5; margin: 0 0 8px; }
+    .pq-sub { font-size: .8rem; font-weight: 600; color: #3d4a3d; margin: 10px 0 4px; }
+    .pq-desc { font-size: .84rem; line-height: 1.45; margin: 0 0 8px; padding-left: 18px; }
+    .pq-desc li { margin-bottom: 4px; }
+    .pq-fuentes { font-size: .76rem; color: var(--muted, #5a685a); line-height: 1.5; margin: 0; }
+    .pq-pie { font-size: .74rem; color: var(--muted, #5a685a); line-height: 1.5; margin: 12px 0 0; }
     .sin-precio { color: var(--muted, #5a685a); font-size: .82rem; }
     .abonado-nota {
       margin: 10px 0 0; font-size: .76rem; color: var(--muted); line-height: 1.5;
@@ -4919,7 +4937,62 @@
       return `${nDec(v, 1)} kg`;
     }
 
-    function pintarPlanAbonado(plan, rend) {
+    // ─── El porqué del abonado ───────────────────────────────────────────────
+    // Hermano del "¿Por qué?" del riego. El desglose del balance ya viaja en cada
+    // línea del plan (ver desglose en _motor-cuaderno-fert.js); aquí se enseña con
+    // SU FUENTE, que es lo que separa una recomendación de una orden: para poder
+    // discutir un número hay que poder ver de dónde sale.
+    function porQueAbonado(d) {
+      const N   = (d.plan?.lineas || []).find(l => l.nutriente === "N");
+      if (!N) return "";
+      const des = N.desglose || {};
+      const r   = d.rendimiento || {};
+      const obs = d.suelo?.observado || {};
+      const pr  = d.producto;
+      const g   = kg => kg == null ? null : Math.round(kg * 1000);
+
+      const cobertera = (N.reparto || []).find(t => /cobertera/i.test(t.momento));
+      const origen = r.origen === "onboarding" ? "tu dato de cosecha"
+                   : r.origen === "estimado_satelite" ? "rinde de referencia, afinable por satélite"
+                   : "estimación";
+
+      const fila = (txt, val, fuente) => `<li><span>${esc(txt)}</span><b>${val}</b>${
+        fuente ? `<small>${esc(fuente)}</small>` : ""}</li>`;
+
+      return `
+        <p class="pq-tit">De dónde sale la cantidad</p>
+        <ul class="pq-lista">
+          ${fila("Cosecha que se espera", r.usado_t != null ? `${nDec(r.usado_t * 1000, 0)} kg` : "—", origen)}
+          ${fila("Lo que se lleva el cultivo", `${g(des.extraccion_kg) ?? "—"} g de N`,
+                 "MAPA · extracción por tonelada cosechada")}
+          ${des.colchon_final_kg ? fila("Reserva que hay que dejar a cosecha", `+${g(des.colchon_final_kg)} g`,
+                 "MAPA · para que el cultivo no acabe con hambre de N justo al llenar") : ""}
+          ${fila("Lo que pone el suelo", `−${g(des.aporte_suelo_kg) ?? "—"} g`,
+                 `mineralización de la materia orgánica${obs.materia_organica_pct
+                   ? ` (${obs.materia_organica_pct}% de MO, suelo ${obs.textura || "franco"})` : ""} · Tabla 4.2 de MAPA sobre SoilGrids`)}
+          ${fila("Del cultivo anterior", `−${g(des.credito_residuos_kg) ?? 0} g`,
+                 des.credito_residuos_kg ? "MAPA · N que liberan los restos incorporados"
+                                         : "no hay: se parte de suelo limpio")}
+          ${fila("Necesita en todo el ciclo", `${fmtAbono(N.necesidad_kg)}`, "")}
+          ${cobertera ? fila("De eso, en cobertera", fmtAbono(cobertera.kg),
+                 d.plan?.fraccionamiento?.nota || "MAPA · reparto fondo/cobertera") : ""}
+        </ul>
+        ${pr ? `
+          <p class="pq-tit">De dónde sale el producto</p>
+          ${pr.pct_nutriente ? `<p class="pq-cuenta">Al ${pr.pct_nutriente}% de riqueza, cada gramo de nitrógeno son ${
+            nDec(1 / (pr.pct_nutriente / 100), 1)} g de <b>${esc(pr.nombre)}</b>${
+            pr.eur_kg_nutriente ? ` · ${nDec(pr.eur_kg_nutriente, 0)} €/kg de N` : ""}.</p>` : ""}
+          ${pr.por_que ? `<p class="pq-txt">${esc(pr.por_que)}</p>` : ""}
+          ${(pr.descartados || []).length ? `<p class="pq-sub">Descartados, y por qué</p>
+            <ul class="pq-desc">${pr.descartados.map(x =>
+              `<li><b>${esc(x.producto || "")}</b> — ${esc(x.motivo || "")}</li>`).join("")}</ul>` : ""}
+          ${(pr.fuentes || []).length ? `<p class="pq-fuentes">Buscado el ${esc(pr.consultado || "—")} en: ${
+            pr.fuentes.map(f => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.titulo)}</a>`).join(" · ")}</p>` : ""}
+        ` : `<p class="pq-txt">Aún no se ha buscado el producto en el mercado, así que la cantidad va en gramos de nutriente. Toca “¿Qué compro para esto?”.</p>`}
+        <p class="pq-pie">Los coeficientes salen de la Guía de fertilización racional de MAPA. La materia orgánica del suelo la estima SoilGrids por coordenada: <b>es un prior, no una analítica de tu parcela</b>, y es el término más flojo de todo este cálculo. El suelo limpio es un supuesto declarado, no un cero medido.</p>`;
+    }
+
+    function pintarPlanAbonado(plan, rend, datos) {
       // Sin plan no se inventa uno: el motor dice por qué no puede calcularlo
       // (falta cultivo, o rinde esperado) y eso es lo que se enseña.
       if (!plan || !plan.disponible) {
@@ -4964,6 +5037,10 @@
           <p class="abonado-nota">${esc(plan.fraccionamiento?.nota || "")}</p>
           <ul class="abonado-reparto">${reparto}</ul>` : ""}
         ${notas.length ? `<p class="abonado-nota">${esc(notas.join(" "))}</p>` : ""}
+        ${datos ? `<details class="pq-det">
+          <summary>¿Por qué esta cantidad y este producto?</summary>
+          <div class="pq-cuerpo">${porQueAbonado(datos)}</div>
+        </details>` : ""}
         ${botonComprar(plan)}
         <div id="abonado-compra"></div>
       </section>`;
@@ -5069,7 +5146,7 @@
         const d = await res.json();
         if (!d || d.ok === false) return;
 
-        cuerpo.innerHTML = pintarPlanAbonado(d.plan, d.rendimiento);
+        cuerpo.innerHTML = pintarPlanAbonado(d.plan, d.rendimiento, d);
         const btnComprar = document.getElementById("btn-comprar");
         if (btnComprar) btnComprar.addEventListener("click", () => buscarQueComprar(btnComprar));
         toggle.hidden = false;
