@@ -165,6 +165,21 @@
            z-index:99; }
   #toast.show { transform:translateX(-50%) translateY(0); }
   #toast.err { background:var(--rojo); }
+  /* ── Abonado: del plan de Kylia al gesto de pesar ── */
+  #abonado { text-align: left; }
+  .ab-cab { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .ab-tag { font-size: .72rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .06em; color: #013A27; }
+  .ab-sub { font-size: .78rem; color: #64748b; }
+  .ab-cifra { font-size: 1.2rem; line-height: 1.35; margin: 4px 0 6px; }
+  .ab-por { font-size: .86rem; color: #334155; margin: 0 0 10px; }
+  .ab-pasos { margin: 0 0 12px; padding-left: 20px; font-size: .92rem; line-height: 1.5; }
+  .ab-pasos li { margin-bottom: 5px; }
+  .ab-ensayo { background: #eef4ef; border-radius: 10px; padding: 10px 12px;
+               font-size: .86rem; line-height: 1.45; margin-bottom: 12px; }
+  .ab-apuntar { margin-top: 6px; color: #3d4a3d; }
+  .ab-hechos { font-size: .82rem; color: #64748b; margin: 8px 0 0; }
+  .ab-fuente { font-size: .74rem; color: #64748b; margin: 6px 0 0; }
 </style>
 </head>
 <body>
@@ -182,6 +197,8 @@
     <div id="root"><div class="msg skel">Calculando el riego de hoy…</div></div>
 
     <!-- Cuaderno de campo (oculto hasta que carga el usuario) -->
+    <div class="card" id="abonado" style="display:none"></div>
+
     <div class="card" id="registro" style="display:none">
       <div class="label">Registrar lo de hoy</div>
       <div class="tabs">
@@ -483,6 +500,98 @@
       .then(r => r.json()).then(pintarHoy)
       .catch(e => { document.getElementById("root").innerHTML =
         `<div class="msg">No se pudo conectar.<br><small>${e.message}</small></div>`; });
+    cargarAbonado();
+  }
+
+  // ── Abonado: del plan al gesto ────────────────────────────────
+  // El plan de Kylia habla en GRAMOS DE NUTRIENTE y el que está en el campo pesa
+  // GRAMOS DE PRODUCTO. Aquí se cierra ese salto: los gramos de la cobertera, el
+  // producto que salió de la búsqueda de mercado con su %N, y la cuenta hecha.
+  // Nada de esto se calcula en el navegador — todo viene de /api/campo?vista=
+  // cuaderno, para que no pueda desviarse de lo que dice el servidor.
+  function cargarAbonado() {
+    const caja = document.getElementById("abonado");
+    if (!caja) return;
+    caja.style.display = "none";
+    fetch(`/api/campo?vista=cuaderno&usuario_id=${encodeURIComponent(campoActual().id)}`)
+      .then(r => r.json()).then(d => { if (d && d.ok) pintarAbonado(d); })
+      .catch(() => { /* sin abonado la página sigue sirviendo para el riego */ });
+  }
+
+  function pintarAbonado(d) {
+    const caja = document.getElementById("abonado");
+    const plan = d.plan;
+    if (!plan || !plan.disponible) return;
+
+    const lineaN = (plan.lineas || []).find(l => l.nutriente === "N" && l.necesidad_kg > 0);
+    const tramo  = lineaN && (lineaN.reparto || []).find(t => /cobertera/i.test(t.momento));
+    if (!tramo || !(tramo.kg > 0)) return;
+
+    const gN    = Math.round(tramo.kg * 1000);
+    const e     = d.ensayo;                       // null si esta parcela no lleva ensayo
+    // Con ensayo, la dosis va SOLO a la parte tratada: repartirla entera entre
+    // todas las plantas convertiría el control en un tratamiento a media dosis y
+    // el ensayo dejaría de medir nada.
+    const frac  = e && e.plantas_tratadas && e.plantas_total ? e.plantas_tratadas / e.plantas_total : 1;
+    const gNapl = Math.round(gN * frac);
+    const veces = (e && e.aplicaciones) || 1;
+    // Un decimal, no entero: la cobertera del ensayo son 9,5 g de N por vez, y
+    // redondear a 10 arrastra 4 g de más al producto. En un bancal de 5 m² eso
+    // es un 7% de la dosis.
+    const gNvez = Math.round(gNapl / veces * 10) / 10;
+
+    const pct   = d.producto?.pct_nutriente;
+    const gProd = pct > 0 ? Math.round(gNvez / (pct / 100)) : null;
+
+    const hechos = (d.abonados || []).length;
+    const agua   = e?.litros_agua || 7.5;
+    const plantas = e?.plantas_tratadas || null;
+
+    caja.innerHTML = `
+      <div class="ab-cab">
+        <span class="ab-tag">Abonado</span>
+        <span class="ab-sub">${d.parcela?.manejo === "ecologico" ? "ecológico" : "convencional"} · cobertera</span>
+      </div>
+      <div class="ab-cifra">${gProd != null
+        ? `Pesa <b>${gProd} g</b> de ${d.producto.nombre}`
+        : `Aporta <b>${gNvez} g</b> de nitrógeno`}</div>
+      ${gProd != null ? `<p class="ab-por">Son ${gNvez} g de nitrógeno al ${pct}% de riqueza.${
+        d.producto.certificado_eco === true ? " Apto para ecológico." :
+        d.producto.certificado_eco === false ? " <b>Ojo: no consta como ecológico.</b>" :
+        " Certificación sin confirmar."}</p>` : ""}
+      <ol class="ab-pasos">
+        <li>Disuélvelo en <b>${agua} L</b> de agua.</li>
+        ${plantas ? `<li>Echa <b>${Math.round(agua / plantas * 100) / 100} L por planta</b> en las <b>${plantas} marcadas</b>, removiendo entre planta y planta.</li>`
+                  : `<li>Repártelo por igual con la regadera.</li>`}
+        ${e ? `<li>Las <b>${e.plantas_control} del otro lado</b> se riegan igual, con la misma agua, <b>sin producto</b>.</li>` : ""}
+      </ol>
+      ${e ? `<div class="ab-ensayo">
+        <b>Es un ensayo.</b> ${e.nota || ""}
+        <div class="ab-apuntar">Al cortar hay que apuntar, planta a planta: <b>su sitio</b>, <b>su peso</b> y si las del lado sin abonar <b>se ven más pequeñas o más pálidas</b>. Ese último dato es el que distingue “al suelo le faltaba nitrógeno” de “le sobraba”.</div>
+      </div>` : ""}
+      <button class="btn" id="ab-hecho">Ya lo he echado</button>
+      ${hechos ? `<p class="ab-hechos">Llevas ${hechos} abonado${hechos > 1 ? "s" : ""} apuntado${hechos > 1 ? "s" : ""}.</p>` : ""}
+      <p class="ab-fuente">Del plan de Kylia${d.producto?.consultado ? ` · producto y precio consultados el ${d.producto.consultado}` : ""}.</p>`;
+
+    caja.style.display = "block";
+    document.getElementById("ab-hecho").addEventListener("click", async (ev) => {
+      ev.target.disabled = true;
+      try {
+        await enviar("acciones", {
+          tipo: "aplicacion", motivo: "abonado",
+          producto_nombre: d.producto?.nombre || "abono nitrogenado",
+          dosis: gProd != null ? `${gProd} g` : `${gNvez} g de N`,
+          notas: e ? `cobertera del ensayo · ${e.plantas_tratadas} plantas tratadas` : "cobertera",
+        });
+        toast("Abonado apuntado");
+        cargarAbonado();          // repinta el "llevas N abonados apuntados"
+      } catch (err) {
+        // enviar() lanza si el servidor no guardó. Sin este catch, el botón se
+        // quedaba deshabilitado y el agricultor creía que había quedado apuntado.
+        toast(err.message || "No se pudo apuntar", true);
+        ev.target.disabled = false;
+      }
+    });
   }
 
   // ── Pantalla "comparativa" ────────────────────────────────────

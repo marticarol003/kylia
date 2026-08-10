@@ -341,6 +341,21 @@ async function vistaCuaderno(req, res, u) {
       area_m2: u.area_m2 ?? null, metodo_riego: u.metodo_riego || null,
       manejo: u.manejo || null, fecha_plantacion: u.fecha_plantacion || null,
     },
+    // El plan dice GRAMOS DE NUTRIENTE; el agricultor pesa GRAMOS DE PRODUCTO.
+    // El puente es la búsqueda de mercado ya cacheada (su %N), así que viaja
+    // aquí para que /campo pueda decir "pesa 63 g de esto" sin buscar otra vez.
+    producto: u.producto_fert?.recomendado
+      ? {
+          nombre: u.producto_fert.recomendado.producto || null,
+          pct_nutriente: u.producto_fert.recomendado.pct_nutriente ?? null,
+          certificado_eco: u.producto_fert.recomendado.certificado_eco ?? null,
+          url: u.producto_fert.recomendado.url || null,
+          consultado: u.producto_fert.consultado || null,
+        }
+      : null,
+    // Ensayo declarado sobre esta parcela, si lo hay: parte la dosis entre las
+    // plantas tratadas y recuerda qué hay que apuntar. Ver preferencias.ensayo.
+    ensayo: (u.preferencias && u.preferencias.ensayo) || null,
     // Rendimiento con el que se calcula el plan y de dónde sale (onboarding manda;
     // si no, estimación por satélite declarada como peldaño 1, no un B1 calibrado).
     rendimiento: {
