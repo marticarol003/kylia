@@ -319,7 +319,10 @@ async function vistaCuaderno(req, res, u) {
       area_m2: u.area_m2 ?? null,
       credito_residuos_n_kg_ha: creditoResiduos,
     }),
-    { superficie_m2: u.area_m2 ?? null, metodo_riego: u.metodo_riego || null },
+    // El manejo elige la tabla de precios: en ecológico el mismo nitrógeno
+    // cuesta ~20 veces más, y hasta ahora se le enseñaba el precio de la urea.
+    { superficie_m2: u.area_m2 ?? null, metodo_riego: u.metodo_riego || null,
+      manejo: u.manejo || null },
   );
 
   return res.status(200).json({

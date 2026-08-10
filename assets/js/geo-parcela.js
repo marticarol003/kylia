@@ -166,5 +166,114 @@
     return { ok: true, partes, superficie_oficial_usada: escala !== 1 };
   }
 
-  return { areaM2, anilloExterior, partirPorLinea, R_TIERRA };
+  // ── Editar el contorno vértice a vértice ────────────────────────────────
+  // SIGPAC da el recinto oficial, pero un cultivo casi nunca ocupa el recinto
+  // entero ni tiene su forma: en una misma finca hay varios cultivos y varios
+  // riegos. Esto permite ajustar el contorno de cada uno arrastrando sus
+  // esquinas.
+  //
+  // La superficie que sale de aquí no es decorativa: escala los kg del plan de
+  // abonado y los litros totales. Por eso el que manda es `esSimple`.
+
+  function polDe(ring) {
+    return { type: "Polygon", coordinates: [cerrar(ring)] };
+  }
+
+  // ¿Se cruzan dos segmentos? Orientaciones opuestas a cada lado = cruce.
+  function orientacion(a, b, c) {
+    const v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    return v > 1e-14 ? 1 : v < -1e-14 ? -1 : 0;
+  }
+  function seCruzan(p1, p2, p3, p4) {
+    const d1 = orientacion(p3, p4, p1), d2 = orientacion(p3, p4, p2);
+    const d3 = orientacion(p1, p2, p3), d4 = orientacion(p1, p2, p4);
+    return d1 !== d2 && d3 !== d4;   // el caso colineal no se persigue: no cambia el área
+  }
+
+  // Un polígono con un lazo (una "pajarita") tiene un área que NO es la del
+  // terreno: la fórmula suma un trozo en negativo. Como esa cifra acaba en los
+  // kg de abono y en los litros, arrastrar un vértice hasta cruzar un lado tiene
+  // que RECHAZARSE, no corregirse por detrás. Sin esto el error es invisible:
+  // el mapa se ve raro un segundo y el número queda mal para siempre.
+  function esSimple(ring) {
+    if (!ring || ring.length < 3) return false;
+    const n = ring.length;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        // Lados contiguos comparten vértice: se saltan, igual que el par
+        // primero-último, que también es contiguo por el cierre.
+        if (j === i || j === i + 1 || (i === 0 && j === n - 1)) continue;
+        if (seCruzan(ring[i], ring[(i + 1) % n], ring[j], ring[(j + 1) % n])) return false;
+      }
+    }
+    return true;
+  }
+
+  // Mueve un vértice. Devuelve {ok:false} si el resultado se cruza consigo mismo
+  // — el que llama debe dejar el vértice donde estaba.
+  function moverVertice(geometry, indice, destino) {
+    const ring = anilloExterior(geometry);
+    if (!ring || indice < 0 || indice >= ring.length) return { ok: false, motivo: "indice" };
+    const nuevo = ring.slice();
+    nuevo[indice] = [Number(destino[0]), Number(destino[1])];
+    if (!esSimple(nuevo)) return { ok: false, motivo: "se_cruza" };
+    return { ok: true, geometria: polDe(nuevo), area_m2: Math.round(areaM2(nuevo)) };
+  }
+
+  // Añade un vértice partiendo el lado `indiceLado` por su punto medio. Es lo
+  // que convierte "cuatro esquinas" en un contorno que puede seguir la forma
+  // real de un bancal.
+  function insertarVertice(geometry, indiceLado) {
+    const ring = anilloExterior(geometry);
+    if (!ring || indiceLado < 0 || indiceLado >= ring.length) return { ok: false, motivo: "indice" };
+    const a = ring[indiceLado], b = ring[(indiceLado + 1) % ring.length];
+    const nuevo = ring.slice();
+    nuevo.splice(indiceLado + 1, 0, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]);
+    return { ok: true, geometria: polDe(nuevo), area_m2: Math.round(areaM2(nuevo)), indice: indiceLado + 1 };
+  }
+
+  // Quita un vértice. Por debajo de 3 no hay polígono que valga.
+  function quitarVertice(geometry, indice) {
+    const ring = anilloExterior(geometry);
+    if (!ring || indice < 0 || indice >= ring.length) return { ok: false, motivo: "indice" };
+    if (ring.length <= 3) return { ok: false, motivo: "minimo_3" };
+    const nuevo = ring.slice();
+    nuevo.splice(indice, 1);
+    if (!esSimple(nuevo)) return { ok: false, motivo: "se_cruza" };
+    return { ok: true, geometria: polDe(nuevo), area_m2: Math.round(areaM2(nuevo)) };
+  }
+
+  // Punto de partida para un cultivo que aún no tiene contorno: un rectángulo
+  // de la superficie que se le ha asignado, centrado en el recinto. El
+  // agricultor arrastra las esquinas desde ahí en vez de dibujar de cero.
+  function rectanguloCentrado(geometryRecinto, areaObjetivoM2) {
+    const ring = anilloExterior(geometryRecinto);
+    if (!ring || !(areaObjetivoM2 > 0)) return null;
+
+    const lat = ring.reduce((s, p) => s + p[1], 0) / ring.length;
+    const lon = ring.reduce((s, p) => s + p[0], 0) / ring.length;
+    const { aPlano, aGrados } = proyector(lat);
+
+    // Proporción del recinto, para que el rectángulo nazca con su forma en vez
+    // de cuadrado: encaja mejor en un bancal alargado y hay menos que arrastrar.
+    const plano = ring.map(aPlano);
+    const ancho = Math.max(...plano.map(p => p[0])) - Math.min(...plano.map(p => p[0]));
+    const alto  = Math.max(...plano.map(p => p[1])) - Math.min(...plano.map(p => p[1]));
+    const razon = ancho > 0 && alto > 0 ? ancho / alto : 1;
+
+    const ladoY = Math.sqrt(areaObjetivoM2 / razon);
+    const ladoX = areaObjetivoM2 / ladoY;
+    const c = aPlano([lon, lat]);
+    const esquinas = [
+      [c[0] - ladoX / 2, c[1] - ladoY / 2],
+      [c[0] + ladoX / 2, c[1] - ladoY / 2],
+      [c[0] + ladoX / 2, c[1] + ladoY / 2],
+      [c[0] - ladoX / 2, c[1] + ladoY / 2],
+    ].map(aGrados);
+
+    return { geometria: polDe(esquinas), area_m2: Math.round(areaM2(esquinas)) };
+  }
+
+  return { areaM2, anilloExterior, partirPorLinea, R_TIERRA,
+           esSimple, moverVertice, insertarVertice, quitarVertice, rectanguloCentrado };
 });

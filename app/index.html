@@ -952,6 +952,22 @@
       margin-top: 4px;
       margin-bottom: 0;
     }
+    .otro-movil { margin-top: 22px; padding-top: 18px; border-top: 1px solid #e6e6e6; }
+    .config-bloque-titulo {
+      font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); margin: 0 0 6px;
+    }
+    .otro-movil-fila { display: flex; gap: 8px; margin-top: 10px; }
+    .otro-movil-fila input {
+      flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1px solid #d5ddd5;
+      border-radius: 9px; font: inherit;
+    }
+    .btn-otro-movil {
+      flex: 0 0 auto; padding: 10px 16px; border: 1px solid var(--verde, #013A27);
+      background: transparent; color: var(--verde, #013A27); border-radius: 9px;
+      font: inherit; font-weight: 600; cursor: pointer;
+    }
+    .btn-otro-movil:disabled { opacity: .5; cursor: default; }
     .config-hint {
       font-size: 0.82rem;
       color: var(--muted);
@@ -1900,6 +1916,26 @@
     }
 
     /* ── Selector de zona (pantalla principal) ── */
+    .vertice-mas {
+      background: #fff; color: #013A27; border: 2px solid #013A27; border-radius: 50%;
+      font-weight: 700; line-height: 18px; text-align: center; cursor: pointer;
+    }
+    .siembra-contorno {
+      margin-top: 8px; width: 100%; padding: 7px 10px; border: 1px dashed #9db39d;
+      background: transparent; color: #3d4a3d; border-radius: 8px;
+      font: inherit; font-size: .84rem; cursor: pointer;
+    }
+    .contorno-barra {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-top: 8px; padding: 8px 10px; background: #eef4ef; border-radius: 9px;
+    }
+    .contorno-barra strong { font-variant-numeric: tabular-nums; }
+    .contorno-barra button {
+      border: 1px solid #013A27; background: transparent; color: #013A27;
+      border-radius: 8px; padding: 5px 10px; font: inherit; font-size: .84rem; cursor: pointer;
+    }
+    .contorno-barra button.primario { background: #013A27; color: #fff; }
+    .contorno-ayuda { font-size: .78rem; color: #5a685a; width: 100%; margin: 0; }
     .zonas-tabs {
       display: flex; gap: 6px; margin-bottom: 14px;
       overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -2045,6 +2081,7 @@
     .compra-lista li { margin-bottom:6px; }
     .compra-fuente { font-size:.76rem; color:#5a685a; margin-top:10px; }
     .compra-cargando { font-size:.88rem; color:#5a685a; margin-top:12px; }
+    .sin-precio { color: var(--muted, #5a685a); font-size: .82rem; }
     .abonado-nota {
       margin: 10px 0 0; font-size: .76rem; color: var(--muted); line-height: 1.5;
     }
@@ -2262,6 +2299,18 @@
       <div class="config-actions">
         <button class="btn-save" id="btn-save-config">Guardar</button>
         <span class="config-feedback" id="config-feedback" aria-live="polite"></span>
+      </div>
+
+      <!-- Entrar desde otro dispositivo. Hasta ahora la parcela pertenecía al
+           móvil (un id de localStorage); con esto pertenece a la persona. -->
+      <div class="otro-movil">
+        <p class="config-bloque-titulo">Usar Kylia en otro móvil</p>
+        <p class="config-hint">Te mandamos un enlace al correo. Ábrelo desde el otro móvil, el ordenador o la tablet y verás tu campo tal y como lo tienes aquí — la finca, las zonas y los cultivos.</p>
+        <div class="otro-movil-fila">
+          <input type="email" id="otro-movil-email" placeholder="tu@correo.es" autocomplete="email" inputmode="email">
+          <button type="button" class="btn-otro-movil" id="btn-otro-movil">Enviar enlace</button>
+        </div>
+        <p class="config-feedback" id="otro-movil-feedback" aria-live="polite"></p>
       </div>
     </div>
 
@@ -4882,7 +4931,7 @@
       const filas = plan.lineas.map(l => `<tr>
         <td class="abonado-nutri">${NUTRI_NOMBRE[l.nutriente] || esc(l.nutriente)}</td>
         <td class="num">${fmtAbono(l.necesidad_kg)}</td>
-        <td class="num">${nDec(l.coste_eur, 2)} €</td>
+        <td class="num">${l.coste_eur == null ? "<span class=\"sin-precio\">sin precio</span>" : `${nDec(l.coste_eur, 2)} €`}</td>
       </tr>`).join("");
 
       const reparto = plan.lineas.filter(l => l.reparto && l.reparto.length).map(l =>
@@ -4899,13 +4948,16 @@
         notas.push(`Calculado para una cosecha esperada de ${nDec(rend.usado_t, 2)} t${origen ? ` (${origen})` : ""}.`);
       }
       if (plan.nota) notas.push(plan.nota);
-      if (plan.precios_referencia) notas.push("Precios de referencia €/kg de nutriente (volátiles); se pueden ajustar con los tuyos.");
+      if (plan.validacion) notas.push(plan.validacion);
+      // Un total al que le falta una línea no es el coste del plan. Decirlo, o
+      // alguien presupuesta con un número incompleto.
+      if (plan.coste_parcial) notas.push("El total solo suma las líneas con precio conocido.");
 
       return `<section class="card abonado-card">
         <table class="abonado-tabla">
           <thead><tr><th>Nutriente</th><th class="num">Necesita</th><th class="num">Coste</th></tr></thead>
           <tbody>${filas}
-            <tr class="total"><td colspan="2">Coste total estimado</td>
+            <tr class="total"><td colspan="2">Coste total estimado${plan.coste_parcial ? " (parcial)" : ""}</td>
             <td class="num">${nDec(plan.coste_total_eur, 2)} €</td></tr></tbody>
         </table>
         ${reparto ? `<p class="abonado-bloque-titulo">Cómo repartirlo</p>
@@ -5185,6 +5237,129 @@
       // sería trabajo. El estado real de cada parte se calcula tras el corte.
       return (z.superficie_m2 || 0) / 2 >= umbralSateliteM2;
     }
+    // ── Ajustar el contorno de un cultivo arrastrando sus esquinas ──────────
+    // SIGPAC da el recinto oficial, pero el cultivo casi nunca lo ocupa entero
+    // ni tiene su forma. Aquí el agricultor lo ajusta a mano: se parte de un
+    // rectángulo con los metros que ya tenía asignados y se arrastran las
+    // esquinas hasta que encaje.
+    //
+    // La superficie se recalcula en cada arrastre y es la que manda: escala los
+    // kg del abonado y los litros. Por eso un arrastre que cruce un lado se
+    // RECHAZA y el vértice vuelve donde estaba — ver esSimple en geo-parcela.js.
+    let contornoEnCurso = null;   // { ref, siembraId, geometria, area_m2, capa }
+
+    function iniciarContorno(ref, siembraId) {
+      const z = zonasSel.get(ref);
+      const s = z?.siembras?.find(x => x.id === siembraId);
+      if (!z || !s || !mapaLeaflet) return;
+      cancelarCorte();
+      cancelarContorno();
+
+      // De dónde sale el contorno inicial, por orden: el suyo si ya lo tenía, un
+      // rectángulo con sus metros dentro del recinto, o el recinto entero.
+      let geom = s.geometria || null;
+      if (!geom && z.geometria && s.area_m2 > 0) {
+        geom = KyliaGeo.rectanguloCentrado(z.geometria, s.area_m2)?.geometria || null;
+      }
+      if (!geom) geom = z.geometria;
+      if (!geom) return;
+
+      contornoEnCurso = {
+        ref, siembraId, geometria: geom,
+        area_m2: Math.round(KyliaGeo.areaM2(KyliaGeo.anilloExterior(geom))),
+        capa: L.layerGroup().addTo(mapaLeaflet),
+      };
+      pintarContorno(true);
+      renderZonas();
+    }
+
+    function cancelarContorno() {
+      if (contornoEnCurso?.capa) mapaLeaflet.removeLayer(contornoEnCurso.capa);
+      contornoEnCurso = null;
+    }
+
+    function pintarContorno(centrar) {
+      const c = contornoEnCurso;
+      if (!c) return;
+      c.capa.clearLayers();
+
+      const anillo = KyliaGeo.anilloExterior(c.geometria);
+      L.geoJSON({ type: "Feature", geometry: c.geometria },
+                { style: { color: "#013A27", weight: 2, fillOpacity: 0.15 } }).addTo(c.capa);
+
+      // Una esquina arrastrable por vértice.
+      anillo.forEach(([lon, lat], i) => {
+        const m = L.circleMarker([lat, lon], {
+          radius: 9, color: "#013A27", fillColor: "#fff", fillOpacity: 1, weight: 3,
+        }).addTo(c.capa);
+        // circleMarker no arrastra por sí solo: se sigue el puntero a mano.
+        m.on("mousedown touchstart", (ev) => {
+          L.DomEvent.stop(ev);
+          mapaLeaflet.dragging.disable();
+          const mover = (e2) => {
+            const ll = e2.latlng || mapaLeaflet.mouseEventToLatLng(e2.originalEvent?.touches?.[0] || e2.originalEvent);
+            if (!ll) return;
+            const r = KyliaGeo.moverVertice(c.geometria, i, [ll.lng, ll.lat]);
+            // Si el arrastre cruzaría un lado, no se aplica: el vértice se queda
+            // donde estaba y el agricultor ve que no le deja.
+            if (!r.ok) return;
+            c.geometria = r.geometria; c.area_m2 = r.area_m2;
+            pintarContorno(false);
+          };
+          const soltar = () => {
+            mapaLeaflet.off("mousemove", mover); mapaLeaflet.off("mouseup", soltar);
+            mapaLeaflet.off("touchmove", mover); mapaLeaflet.off("touchend", soltar);
+            mapaLeaflet.dragging.enable();
+            renderZonas();          // refresca los metros del panel
+          };
+          mapaLeaflet.on("mousemove", mover); mapaLeaflet.on("mouseup", soltar);
+          mapaLeaflet.on("touchmove", mover); mapaLeaflet.on("touchend", soltar);
+        });
+        // Doble toque en una esquina: se quita (si quedan más de tres).
+        m.on("dblclick", (ev) => {
+          L.DomEvent.stop(ev);
+          const r = KyliaGeo.quitarVertice(c.geometria, i);
+          if (!r.ok) return;
+          c.geometria = r.geometria; c.area_m2 = r.area_m2;
+          pintarContorno(false); renderZonas();
+        });
+      });
+
+      // Un "+" en mitad de cada lado para añadir esquinas: es lo que convierte
+      // cuatro esquinas en un contorno que sigue la forma real del bancal.
+      anillo.forEach(([lon, lat], i) => {
+        const [lon2, lat2] = anillo[(i + 1) % anillo.length];
+        L.marker([(lat + lat2) / 2, (lon + lon2) / 2], {
+          icon: L.divIcon({ className: "vertice-mas", html: "+", iconSize: [22, 22] }),
+        }).addTo(c.capa).on("click", (ev) => {
+          L.DomEvent.stop(ev);
+          const r = KyliaGeo.insertarVertice(c.geometria, i);
+          if (!r.ok) return;
+          c.geometria = r.geometria; c.area_m2 = r.area_m2;
+          pintarContorno(false); renderZonas();
+        });
+      });
+
+      if (centrar) {
+        try { mapaLeaflet.fitBounds(L.geoJSON(c.geometria).getBounds(), { padding: [30, 30] }); }
+        catch (_) { /* si falla, se queda donde esté */ }
+      }
+    }
+
+    // Guardar: el contorno y SU SUPERFICIE pasan a ser los del cultivo. A partir
+    // de aquí mandan en el riego (litros totales), en el abonado (los kg escalan
+    // con el área) y en el satélite (que mide dentro de ese contorno).
+    function guardarContorno() {
+      const c = contornoEnCurso;
+      if (!c) return;
+      const z = zonasSel.get(c.ref);
+      const s = z?.siembras?.find(x => x.id === c.siembraId);
+      if (s) { s.geometria = c.geometria; s.area_m2 = c.area_m2; }
+      cancelarContorno();
+      saveZonas();
+      renderZonas();
+    }
+
     function zonaPuedePartirse(z) {
       return z.siembras.length === 2 && !!z.geometria && partesSeguiranConSatelite(z);
     }
@@ -5421,6 +5596,17 @@
                            data-ref="${ref}" aria-label="Quitar este cultivo">✕</button>`
                 : ""}
             </div>
+            ${contornoEnCurso && contornoEnCurso.siembraId === s.id
+              ? `<div class="contorno-barra">
+                   <strong>${contornoEnCurso.area_m2.toLocaleString("es-ES")} m²</strong>
+                   <button type="button" class="primario" data-guardar-contorno="1">Guardar contorno</button>
+                   <button type="button" data-cancelar-contorno="1">Cancelar</button>
+                   <p class="contorno-ayuda">Arrastra las esquinas para que encaje con el cultivo. Toca un <strong>+</strong> para añadir una esquina y haz doble toque en una para quitarla. Si un arrastre cruzaría un lado, no te dejará: el contorno se retorcería y la superficie saldría mal.</p>
+                 </div>`
+              : (s.cultivo && (s.geometria || z.geometria)
+                  ? `<button type="button" class="siembra-contorno" data-contorno="${s.id}" data-ref="${ref}">${
+                       s.geometria ? "Ajustar contorno" : "Dibujar su contorno"}</button>`
+                  : "")}
           </div>`).join("");
 
         return `
@@ -5648,6 +5834,9 @@
           }
           if (d.partir)        return iniciarCorte(d.partir);
           if (d.cancelarCorte) { cancelarCorte(); renderZonas(); return; }
+          if (d.contorno)          return iniciarContorno(d.ref, d.contorno);
+          if (d.guardarContorno)   return guardarContorno();
+          if (d.cancelarContorno)  { cancelarContorno(); renderZonas(); return; }
           if (d.quitarSiembra) {
             const z = zonasSel.get(d.ref);
             if (!z || z.siembras.length <= 1) return;
@@ -5678,6 +5867,50 @@
           if (campo === "area") renderZonas();
         });
       }
+
+      // ── Usar Kylia en otro móvil ─────────────────────────────────────────
+      // Pide el enlace por correo. El servidor busca la persona POR EMAIL, así
+      // que si este agricultor todavía no tiene correo en su ficha hay que
+      // guardarlo antes — si no, pedir el enlace no encontraría a nadie y la
+      // respuesta (idéntica siempre, a propósito) no lo diría.
+      (function () {
+        const campo = document.getElementById("otro-movil-email");
+        const boton = document.getElementById("btn-otro-movil");
+        const aviso = document.getElementById("otro-movil-feedback");
+        if (!campo || !boton) return;
+
+        campo.value = localStorage.getItem("kylia_user_email") || "";
+
+        boton.addEventListener("click", async () => {
+          const email = campo.value.trim().toLowerCase();
+          if (!/^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(email)) {
+            aviso.textContent = "Escribe un correo válido.";
+            return;
+          }
+          boton.disabled = true;
+          aviso.textContent = "Enviando…";
+          try {
+            // Guardar el correo en la ficha. Va solo, sin más campos: el
+            // handler ya no toca lo que no le mandas, así que esto no puede
+            // llevarse por delante la parcela.
+            if (localStorage.getItem("kylia_user_email") !== email) {
+              localStorage.setItem("kylia_user_email", email);
+              await window.kyliaSync?.registroUsuario({ email });
+            }
+            await fetch("/api/log", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ recurso: "acceso", accion: "pedir", email }),
+            });
+            // El servidor responde lo mismo exista o no el correo, para no
+            // decirle a nadie quién es cliente. Aquí se dice igual de neutro.
+            aviso.textContent = "Si ese correo tiene un campo en Kylia, el enlace ya va de camino. Caduca en 15 minutos.";
+          } catch (_) {
+            aviso.textContent = "No se ha podido enviar ahora mismo. Inténtalo en un momento.";
+          } finally {
+            boton.disabled = false;
+          }
+        });
+      })();
 
       document.getElementById("btn-confirmar-parcela").addEventListener("click", () => {
         if (!parcelaPendiente) return;

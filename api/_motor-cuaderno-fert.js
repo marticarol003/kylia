@@ -15,13 +15,32 @@
 //   quitamos por lioso): el plan es a nivel de NUTRIENTE, que es lo que exige el
 //   cuaderno y lo que el balance puede sostener con honestidad.
 
-// €/kg de nutriente. Derivados de productos comunes en España (~2025):
+// €/kg de nutriente, A GRANEL. Derivados de productos comunes en España (~2025):
 //   N    → urea 46% / nitrato amónico cálcico 27%   (~1,1-1,4 €/kg N)
 //   P2O5 → superfosfato triple 46%                   (~1,2-1,6 €/kg P2O5)
 //   K2O  → sulfato / cloruro potásico 50-60%         (~0,7-1,3 €/kg K2O)
 // MARCADOS PARA ACTUALIZAR (precios muy volátiles: N +46%, P +77%, K +23% desde
 // la crisis energética). El agricultor puede pasar los suyos en opts.precios.
-const PRECIO_REF_EUR_KG = { N: 1.2, P2O5: 1.4, K2O: 0.9 };
+const PRECIO_REF_CONVENCIONAL = { N: 1.2, P2O5: 1.4, K2O: 0.9 };
+
+// El MISMO nitrógeno en ecológico cuesta otro orden de magnitud, y hasta ahora
+// el plan le enseñaba a un agricultor ecológico el precio del producto que NO
+// puede usar. Medido el 2026-08-09 sobre listados reales españoles:
+//   · harina de sangre 15% N, saco de 25 kg a 95,90 €  → 25,6 €/kg de N
+//   · la misma harina en envase de 1 kg a 19,90 €      → 132,7 €/kg de N
+//   · guano 8% N                                       → 124,9 €/kg de N
+// Se toma el precio A GRANEL (26) para que sea comparable con la tabla de
+// arriba, que también es a granel. Quien compre en envase de 1 kg —un huerto
+// pequeño, que es justo quien no puede con un saco de 25— paga unas 5 veces
+// más; eso lo avisa la búsqueda de producto real, que sí ve el envase.
+//
+// P₂O₅ y K₂O van a null A PROPÓSITO: no se han medido en ecológico y aquí no se
+// inventa un número. Una línea sin precio se enseña sin coste y el total se
+// declara PARCIAL, que es la verdad. Ver _ia-producto-fertilizante.js.
+const PRECIO_REF_ECOLOGICO = { N: 26, P2O5: null, K2O: null };
+
+// Compatibilidad: había código y tests apuntando al nombre viejo.
+const PRECIO_REF_EUR_KG = PRECIO_REF_CONVENCIONAL;
 
 // Reparto temporal del abonado (fraccionamiento) — MAPA Parte II, pág. 189-190.
 // Fraccionar aumenta la eficiencia del fertilizante al acompasar el aporte con la
@@ -77,7 +96,9 @@ function cuadernoFertilizacion(necesidad, opts = {}) {
     };
   }
 
-  const precios = { ...PRECIO_REF_EUR_KG, ...(opts.precios || {}) };
+  // El manejo elige la tabla: al ecológico no le sirve el precio de la urea.
+  const esEco   = opts.manejo === "ecologico";
+  const precios = { ...(esEco ? PRECIO_REF_ECOLOGICO : PRECIO_REF_CONVENCIONAL), ...(opts.precios || {}) };
   const usaReferencia = !opts.precios;
 
   const metodoRiego = opts.metodo_riego || null;
@@ -86,11 +107,14 @@ function cuadernoFertilizacion(necesidad, opts = {}) {
   const lineas = [];
   let costeTotal = 0;
   for (const n of ["N", "P2O5", "K2O"]) {
-    const kg    = Number(necesidad.nutrientes[n].necesidad_kg) || 0;
-    const coste = r2(kg * precios[n]);
-    costeTotal += coste;
+    const kg     = Number(necesidad.nutrientes[n].necesidad_kg) || 0;
+    // Sin precio conocido para ese nutriente no se inventa uno: la línea va sin
+    // coste y el total queda declarado como parcial más abajo.
+    const precio = precios[n] == null ? null : Number(precios[n]);
+    const coste  = precio == null ? null : r2(kg * precio);
+    if (coste != null) costeTotal += coste;
     lineas.push({
-      nutriente: n, necesidad_kg: kg, precio_eur_kg: precios[n], coste_eur: coste,
+      nutriente: n, necesidad_kg: kg, precio_eur_kg: precio, coste_eur: coste,
       // Reparto temporal (fondo/cobertera o tercios), MAPA Parte II.
       reparto: repartoNutriente(n, kg, metodoRiego),
     });
@@ -113,12 +137,19 @@ function cuadernoFertilizacion(necesidad, opts = {}) {
           "veces evitando el final del ciclo); P₂O₅ y K₂O al 100% en fondo, antes de plantar.",
     },
     coste_total_eur: r2(costeTotal),
+    // Si algún nutriente se ha quedado sin precio, el total NO es el coste del
+    // plan: es el de las líneas que sí se pudieron valorar. Decirlo evita que
+    // alguien presupueste con un número que le falta un trozo.
+    coste_parcial: lineas.some(l => l.necesidad_kg > 0 && l.coste_eur == null),
+    manejo: opts.manejo || null,
     precios_referencia: usaReferencia,
     nota: necesidad.oferta_conocida
       ? "Plan sobre necesidad neta (extracción del cultivo − aporte del suelo)."
       : "Sin analítica de suelo: plan sobre extracción bruta (sobrestima el abono). " +
         "Añade una analítica para ajustar y bajar el coste.",
-    validacion: "Precios de referencia €/kg de nutriente, volátiles y editables; marcados para actualizar.",
+    validacion: opts.manejo === "ecologico"
+      ? "Precios de referencia en ECOLÓGICO y a granel (N medido sobre listados reales; P₂O₅ y K₂O sin medir, por eso van sin coste). En envase pequeño se paga unas 5 veces más."
+      : "Precios de referencia €/kg de nutriente en convencional y a granel, volátiles y editables; marcados para actualizar.",
   };
 }
 

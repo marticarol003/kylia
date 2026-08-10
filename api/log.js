@@ -64,33 +64,45 @@ async function handleRegistroUsuario(req, res, body) {
   // comportamiento anterior intacto. Ver db/anadir-propietario-usuarios-2026-07-31.sql.
   const propietario = (body.propietario_id || "").toString().trim();
 
+  // Solo se toca lo que VIENE en el cuerpo. Antes cada campo ausente se
+  // convertía en null explícito y el upsert lo escribía: una llamada parcial
+  // —el gate del email manda {email, nombre} y nada más— borraba lat, lon,
+  // cultivos, contorno, superficie, caudal y suelo de golpe. Con el móvil nuevo
+  // restaurando la configuración del servidor, ese gate salta justo después de
+  // restaurar, así que el agujero estaba abierto de par en par.
+  //
+  // Un null EXPLÍCITO en el cuerpo sigue significando "bórralo": lo que cambia
+  // es solo el campo que no viene. (Ya se hacía así con restos_incorporados y
+  // piloto_sombra; ahora vale para todos.)
+  const siViene = (clave, valor) => (clave in body ? valor : undefined);
+
   const fila = {
     id,
     propietario_id: ES_UUID.test(propietario) ? propietario : id,
-    email:        clean(body.email,        200)?.toLowerCase() || null,
-    nombre:       clean(body.nombre,       120)                 || null,
-    telefono:     clean(body.telefono,      40)                 || null,
-    lat:          numOrNull(body.lat),
-    lon:          numOrNull(body.lon),
-    ciudad:       clean(body.ciudad,       160)                 || null,
-    cultivos:             Array.isArray(body.cultivos)
+    email:        siViene("email",    clean(body.email, 200)?.toLowerCase() || null),
+    nombre:       siViene("nombre",   clean(body.nombre, 120)               || null),
+    telefono:     siViene("telefono", clean(body.telefono, 40)              || null),
+    lat:          siViene("lat",      numOrNull(body.lat)),
+    lon:          siViene("lon",      numOrNull(body.lon)),
+    ciudad:       siViene("ciudad",   clean(body.ciudad, 160)               || null),
+    cultivos:             siViene("cultivos", Array.isArray(body.cultivos)
                             ? body.cultivos.map(c => String(c).slice(0, 60)).slice(0, 20)
-                            : [],
-    cultivos_secundarios: clean(body.cultivos_secundarios, 200),
-    parcela:              body.parcela && typeof body.parcela === "object" ? body.parcela : null,
-    tarifa_agua:          numOrNull(body.tarifa_agua),
-    metodo_riego:         METODOS_RIEGO.has(body.metodo_riego) ? body.metodo_riego : null,
-    manejo:               MANEJOS.has(body.manejo) ? body.manejo : null,
-    suelo:                SUELOS.has(body.suelo) ? body.suelo : null,
-    cultivo_anterior:     CULTIVOS_ANT.has(body.cultivo_anterior) ? body.cultivo_anterior : null,
-    restos_incorporados:  body.restos_incorporados === undefined ? undefined : Boolean(body.restos_incorporados),
-    fecha_plantacion:     dateOrNull(body.fecha_plantacion),
-    caudal:               numOrNull(body.caudal),
-    area_m2:              numOrNull(body.area_m2),
-    capacidad_regadera:   numOrNull(body.capacidad_regadera),
-    origen:               clean(body.origen,       120)                 || null,
-    piloto_sombra:        body.piloto_sombra === undefined ? undefined : Boolean(body.piloto_sombra),
-    preferencias: body.preferencias && typeof body.preferencias === "object" ? body.preferencias : {},
+                            : []),
+    cultivos_secundarios: siViene("cultivos_secundarios", clean(body.cultivos_secundarios, 200)),
+    parcela:              siViene("parcela", body.parcela && typeof body.parcela === "object" ? body.parcela : null),
+    tarifa_agua:          siViene("tarifa_agua",   numOrNull(body.tarifa_agua)),
+    metodo_riego:         siViene("metodo_riego",  METODOS_RIEGO.has(body.metodo_riego) ? body.metodo_riego : null),
+    manejo:               siViene("manejo",        MANEJOS.has(body.manejo) ? body.manejo : null),
+    suelo:                siViene("suelo",         SUELOS.has(body.suelo) ? body.suelo : null),
+    cultivo_anterior:     siViene("cultivo_anterior", CULTIVOS_ANT.has(body.cultivo_anterior) ? body.cultivo_anterior : null),
+    restos_incorporados:  siViene("restos_incorporados", Boolean(body.restos_incorporados)),
+    fecha_plantacion:     siViene("fecha_plantacion",    dateOrNull(body.fecha_plantacion)),
+    caudal:               siViene("caudal",              numOrNull(body.caudal)),
+    area_m2:              siViene("area_m2",             numOrNull(body.area_m2)),
+    capacidad_regadera:   siViene("capacidad_regadera",  numOrNull(body.capacidad_regadera)),
+    origen:               siViene("origen",              clean(body.origen, 120) || null),
+    piloto_sombra:        siViene("piloto_sombra",       Boolean(body.piloto_sombra)),
+    preferencias:         siViene("preferencias", body.preferencias && typeof body.preferencias === "object" ? body.preferencias : {}),
     ua:           clean(req.headers["user-agent"], 400)         || null,
   };
 
