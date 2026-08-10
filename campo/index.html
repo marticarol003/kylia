@@ -180,6 +180,27 @@
   .ab-apuntar { margin-top: 6px; color: #3d4a3d; }
   .ab-hechos { font-size: .82rem; color: #64748b; margin: 8px 0 0; }
   .ab-fuente { font-size: .74rem; color: #64748b; margin: 6px 0 0; }
+  .ab-porque-btn { display:block; width:100%; margin-top:8px; padding:8px; border:none;
+                   background:none; color:#013A27; font:inherit; font-size:.86rem;
+                   text-decoration:underline; cursor:pointer; }
+  .ab-porque { margin-top:10px; padding-top:12px; border-top:1px solid #e2e8f0; text-align:left; }
+  .pq-tit { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+            color:#013A27; margin:14px 0 6px; }
+  .pq-tit:first-child { margin-top:0; }
+  .pq-lista { list-style:none; padding:0; margin:0 0 4px; }
+  .pq-lista li { display:grid; grid-template-columns:1fr auto; gap:2px 10px;
+                 padding:6px 0; border-bottom:1px solid #f1f5f1; font-size:.88rem; }
+  .pq-lista b { font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .pq-lista small { grid-column:1 / -1; color:#64748b; font-size:.76rem; line-height:1.35; }
+  .pq-cuenta { font-size:.9rem; margin:0 0 8px; }
+  .pq-txt { font-size:.86rem; color:#334155; line-height:1.5; margin:0 0 8px; }
+  .pq-sub { font-size:.8rem; font-weight:600; color:#3d4a3d; margin:10px 0 4px; }
+  .pq-desc { font-size:.84rem; line-height:1.45; margin:0 0 8px; padding-left:18px; color:#334155; }
+  .pq-desc li { margin-bottom:4px; }
+  .pq-avisos { font-size:.82rem; background:#fdf4e3; border-radius:8px; padding:8px 8px 8px 22px;
+               margin:0 0 8px; color:#7a5c22; }
+  .pq-fuentes { font-size:.74rem; color:#64748b; line-height:1.5; margin:0; }
+  .pq-pie { font-size:.72rem; color:#64748b; line-height:1.5; margin:12px 0 0; }
 </style>
 </head>
 <body>
@@ -518,6 +539,57 @@
       .catch(() => { /* sin abonado la página sigue sirviendo para el riego */ });
   }
 
+  // El "¿por qué?" del abonado, hermano del que ya existe para el riego. Cada
+  // línea lleva SU FUENTE, porque es lo que separa una recomendación de un
+  // número: el agricultor tiene que poder discutirla, no solo obedecerla.
+  const g = kg => kg == null ? null : Math.round(kg * 1000);
+  function porQueAbonado(d, gN, gNvez, gProd) {
+    const N   = (d.plan.lineas || []).find(l => l.nutriente === "N") || {};
+    const des = N.desglose || {};
+    const r   = d.rendimiento || {};
+    const suelo = d.suelo || {};
+    const pr  = d.producto;
+
+    const origenRinde = r.origen === "onboarding" ? "tu dato de cosecha"
+                      : r.origen === "estimado_satelite" ? "rinde de referencia afinable por satélite"
+                      : "estimación";
+
+    const fila = (txt, val, fuente) => `<li><span>${txt}</span><b>${val}</b>${
+      fuente ? `<small>${fuente}</small>` : ""}</li>`;
+
+    const cantidad = `
+      <p class="pq-tit">Por qué esta cantidad</p>
+      <ul class="pq-lista">
+        ${fila("Cosecha que se espera", `${r.usado_t != null ? (r.usado_t * 1000).toFixed(0) : "—"} kg`, origenRinde)}
+        ${fila("Lo que se lleva el cultivo", `${g(des.extraccion_kg) ?? "—"} g de N`, "MAPA · extracción de la lechuga, 2,5 kg de N por tonelada")}
+        ${des.colchon_final_kg ? fila("Reserva que hay que dejar a cosecha", `+${g(des.colchon_final_kg)} g`, "MAPA · 45 kg/ha, para que no acabe con hambre de N") : ""}
+        ${fila("Lo que pone el suelo", `−${g(des.aporte_suelo_kg) ?? "—"} g`,
+               `mineralización de la materia orgánica${suelo.observado?.materia_organica_pct
+                 ? ` (${suelo.observado.materia_organica_pct}% de MO, suelo ${suelo.observado.textura || "franco"})` : ""} · Tabla 4.2 de MAPA sobre SoilGrids`)}
+        ${fila("Del cultivo anterior", `−${g(des.credito_residuos_kg) ?? 0} g`,
+               des.credito_residuos_kg ? "MAPA · N que liberan los restos incorporados" : "no hay: se parte de suelo limpio")}
+        ${fila("<b>Necesita en todo el ciclo</b>", `${g(N.necesidad_kg)} g de N`, "")}
+        ${fila("De eso, en cobertera", `${gN} g`, "MAPA · 30% en fondo y 70% en cobertera")}
+        ${fila("Repartido en 2 veces", `${gNvez} g por vez`, "fraccionar acompasa el aporte con lo que la planta absorbe")}
+      </ul>`;
+
+    const producto = pr ? `
+      <p class="pq-tit">Por qué este producto</p>
+      ${gProd != null ? `<p class="pq-cuenta">${gNvez} g de N ÷ ${pr.pct_nutriente}% de riqueza = <b>${gProd} g</b> de ${pr.nombre}${
+        pr.eur_kg_nutriente ? ` · ${Math.round(pr.eur_kg_nutriente)} €/kg de N` : ""}</p>` : ""}
+      ${pr.por_que ? `<p class="pq-txt">${pr.por_que}</p>` : ""}
+      ${(pr.descartados || []).length ? `<p class="pq-sub">Descartados, y por qué</p>
+        <ul class="pq-desc">${pr.descartados.map(x =>
+          `<li><b>${x.producto || ""}</b> — ${x.motivo || ""}</li>`).join("")}</ul>` : ""}
+      ${(pr.avisos || []).length ? `<ul class="pq-avisos">${pr.avisos.map(a => `<li>${a}</li>`).join("")}</ul>` : ""}
+      ${(pr.fuentes || []).length ? `<p class="pq-fuentes">Buscado el ${pr.consultado || "—"} en: ${
+        pr.fuentes.map(f => `<a href="${f.url}" target="_blank" rel="noopener">${f.titulo}</a>`).join(" · ")}</p>` : ""}`
+      : `<p class="pq-txt">Todavía no se ha buscado el producto en el mercado, así que la cantidad va en gramos de nitrógeno.</p>`;
+
+    return cantidad + producto +
+      `<p class="pq-pie">Los precios y los productos se consultan en tiendas españolas y son orientativos: compruébalos antes de comprar. Los coeficientes salen de la Guía de fertilización racional de MAPA; la materia orgánica del suelo, de SoilGrids — es una estimación por coordenada, no una analítica de tu parcela.</p>`;
+  }
+
   function pintarAbonado(d) {
     const caja = document.getElementById("abonado");
     const plan = d.plan;
@@ -573,10 +645,19 @@
         ${e.apuntar ? `<div class="ab-apuntar">${e.apuntar}</div>` : ""}
       </div>` : ""}
       <button class="btn" id="ab-hecho">Ya lo he echado</button>
+      <button type="button" class="ab-porque-btn" id="ab-porque-btn">¿Por qué esto?</button>
+      <div class="ab-porque" id="ab-porque" hidden>${porQueAbonado(d, gN, gNvez, gProd)}</div>
       ${hechos ? `<p class="ab-hechos">Llevas ${hechos} abonado${hechos > 1 ? "s" : ""} apuntado${hechos > 1 ? "s" : ""}.</p>` : ""}
       <p class="ab-fuente">Del plan de Kylia${d.producto?.consultado ? ` · producto y precio consultados el ${d.producto.consultado}` : ""}.</p>`;
 
     caja.style.display = "block";
+    const btnPq = document.getElementById("ab-porque-btn");
+    btnPq.addEventListener("click", () => {
+      const caja2 = document.getElementById("ab-porque");
+      caja2.hidden = !caja2.hidden;
+      btnPq.textContent = caja2.hidden ? "¿Por qué esto?" : "Ocultar";
+    });
+
     document.getElementById("ab-hecho").addEventListener("click", async (ev) => {
       ev.target.disabled = true;
       try {

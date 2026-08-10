@@ -62,6 +62,38 @@ console.log("── apuntar el abonado es un toque ──");
 ok(/motivo: "abonado"/.test(pintar), "queda registrado como abonado en el cuaderno");
 ok(/cargarAbonado\(\);/.test(pintar), "y la tarjeta se refresca sola tras apuntarlo");
 
+console.log("── el porqué: cada cifra con su fuente ──");
+// Una recomendación que no se puede discutir es una orden. El desglose del
+// balance se calculaba y se TIRABA: llegaba "58 g" y punto.
+const fert = leer("api", "_motor-cuaderno-fert.js");
+ok(/desglose: \{/.test(fert) && /extraccion_kg:\s+necesidad/.test(fert),
+   "el motor pasa los sumandos del balance a cada línea del plan, en vez de tirarlos");
+const pq = campoHtml.slice(campoHtml.indexOf("function porQueAbonado"), campoHtml.indexOf("function pintarAbonado"));
+for (const [txt, que] of [
+  ["Lo que se lleva el cultivo", "la extracción del cultivo"],
+  ["Reserva que hay que dejar", "el colchón final de MAPA"],
+  ["Lo que pone el suelo", "el aporte del suelo"],
+  ["Del cultivo anterior", "el crédito de residuos"],
+  ["en cobertera", "el reparto fondo/cobertera"],
+]) ok(pq.includes(txt), `se explica ${que}`);
+ok(/Tabla 4\.2 de MAPA sobre SoilGrids/.test(pq),
+   "y de dónde sale el término más flojo: la Tabla 4.2 aplicada sobre un prior de satélite");
+ok(/suelo limpio/.test(pq),
+   "el supuesto de suelo limpio se declara como supuesto, no se esconde en un 0");
+ok(/no es una analítica de tu parcela/.test(pq) || /no una analítica de tu parcela/.test(pq),
+   "y se dice que la materia orgánica es estimada, no medida en su tierra");
+
+console.log("── el porqué del producto ──");
+ok(/÷ \$\{pr\.pct_nutriente\}% de riqueza/.test(pq),
+   "la cuenta que convierte gramos de N en gramos de producto se enseña, no se oculta");
+ok(/Descartados, y por qué/.test(pq),
+   "y los descartados con su motivo: es lo que dice por qué NO es lo que sale primero al buscar");
+ok(/target="_blank"/.test(pq) && /pr\.consultado/.test(pq),
+   "con las fuentes reales y la fecha, para poder comprobarlo antes de comprar");
+const api = leer("api", "campo.js");
+ok(/descartados: \(u\.producto_fert\.descartados/.test(api),
+   "el razonamiento viaja desde el servidor, no se reconstruye en el navegador");
+
 console.log("── la declaración del ensayo no pisa otras preferencias ──");
 ok(/coalesce\(preferencias, '\{\}'::jsonb\) \|\|/.test(sql),
    "el SQL FUSIONA el jsonb en vez de reemplazarlo");

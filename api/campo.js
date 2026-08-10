@@ -351,6 +351,14 @@ async function vistaCuaderno(req, res, u) {
           certificado_eco: u.producto_fert.recomendado.certificado_eco ?? null,
           url: u.producto_fert.recomendado.url || null,
           consultado: u.producto_fert.consultado || null,
+          // El razonamiento viaja con la recomendación. Los DESCARTADOS son la
+          // mitad del valor: dicen por qué no es lo que sale primero al buscar.
+          por_que: u.producto_fert.recomendado.por_que || null,
+          eur_kg_nutriente: u.producto_fert.recomendado.eur_kg_nutriente ?? null,
+          descartados: (u.producto_fert.descartados || []).slice(0, 4),
+          alternativas: (u.producto_fert.alternativas || []).slice(0, 3),
+          avisos: (u.producto_fert.avisos || []).filter(Boolean).slice(0, 3),
+          fuentes: (u.producto_fert.citas || []).slice(0, 6),
         }
       : null,
     // Ensayo declarado sobre esta parcela, si lo hay: parte la dosis entre las

@@ -117,6 +117,16 @@ function cuadernoFertilizacion(necesidad, opts = {}) {
       nutriente: n, necesidad_kg: kg, precio_eur_kg: precio, coste_eur: coste,
       // Reparto temporal (fondo/cobertera o tercios), MAPA Parte II.
       reparto: repartoNutriente(n, kg, metodoRiego),
+      // Los sumandos que dan ese kg. Se calculaban y se tiraban, así que la
+      // cifra llegaba al agricultor sin poder explicarse: "58 g" y punto. Con
+      // esto la pantalla puede enseñar de dónde sale cada término y de qué
+      // fuente — que es la diferencia entre un número y una recomendación.
+      desglose: {
+        extraccion_kg:       necesidad.nutrientes[n].extraccion_kg ?? null,
+        colchon_final_kg:    necesidad.nutrientes[n].colchon_final_kg ?? null,
+        aporte_suelo_kg:     necesidad.nutrientes[n].aporte_suelo_kg ?? null,
+        credito_residuos_kg: necesidad.nutrientes[n].credito_residuos_kg ?? null,
+      },
     });
   }
 
