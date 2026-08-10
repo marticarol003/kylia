@@ -32,6 +32,19 @@ const HANDLERS = {
 };
 
 const ES_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const NUTRIENTES = ["N", "P2O5", "K2O"];
+
+// {N: 0.041, ...} en KILOS de nutriente. Devuelve null si no hay nada válido:
+// null significa "no se sabe cuánto se aportó" y el plan no descuenta.
+function nutrientesOrNull(v) {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const out = {};
+  for (const n of NUTRIENTES) {
+    const x = Number(v[n]);
+    if (Number.isFinite(x) && x >= 0) out[n] = x;
+  }
+  return Object.keys(out).length ? out : null;
+}
 const METODOS_RIEGO = new Set(["goteo", "aspersion", "surco", "manguera", "regadera"]);
 const FRANJAS       = new Set(["manana", "mediodia", "tarde", "noche"]);
 const MANEJOS       = new Set(["convencional", "ecologico"]);
@@ -234,6 +247,11 @@ async function handleAcciones(req, res, body) {
     motivo:               clean(body.motivo,           40),
     coste_estimado_eur:   numOrNull(body.coste_estimado_eur),
     notas:                clean(body.notas,           500),
+    // Nutriente REALMENTE aportado, en kg, para que el plan pueda descontarlo.
+    // Solo se acepta lo que se entiende: un número >= 0 por nutriente conocido.
+    // Lo que no se entienda no se guarda — un número inventado aquí sale del
+    // plan como abono de menos, que es peor que no descontar nada.
+    nutrientes:           nutrientesOrNull(body.nutrientes),
   };
 
   console.log("[acciones]", JSON.stringify({ usuario_id, tipo, cantidad: fila.cantidad_l_m2, producto: fila.producto_nombre }));

@@ -71,11 +71,22 @@ function r3(x) { return Math.round((Number(x) || 0) * 1000) / 1000; }
 
 // Reparte los kg de un nutriente en los momentos de aplicación según el método
 // de riego. Devuelve [] si no hay nada que repartir (kg 0).
-function repartoNutriente(nutriente, kg, metodoRiego) {
+function repartoNutriente(nutriente, kg, metodoRiego, opts = {}) {
   if (!(kg > 0)) return [];
-  const tramos = metodoRiego === "goteo"
+  let tramos = metodoRiego === "goteo"
     ? FRACCION_FERTIRRIGACION
     : FRACCION_TRADICIONAL[nutriente];
+
+  // Con abono ya echado, el fondo (antes de plantar) es agua pasada: no se puede
+  // volver atrás a aplicarlo. Lo pendiente se reparte entre los momentos que
+  // QUEDAN, renormalizando; si no quedaba ninguno, va todo en cobertera.
+  if (opts.fondoHecho) {
+    const quedan = tramos.filter(t => !/fondo/i.test(t.momento));
+    const suma = quedan.reduce((s, t) => s + t.pct, 0);
+    tramos = quedan.length && suma > 0
+      ? quedan.map(t => ({ ...t, pct: t.pct / suma }))
+      : [{ momento: "cobertera (en cultivo)", pct: 1 }];
+  }
   return tramos.map(t => ({ momento: t.momento, pct: Math.round(t.pct * 100), kg: r3(kg * t.pct) }));
 }
 
@@ -106,17 +117,32 @@ function cuadernoFertilizacion(necesidad, opts = {}) {
 
   const lineas = [];
   let costeTotal = 0;
+  // Lo que YA se ha echado en este ciclo, en kg de nutriente. Sin esto el plan
+  // pide la necesidad entera aunque el abonado de fondo esté hecho — en 5 m² es
+  // un despiste, en hectáreas es sobrefertilizar por diseño.
+  const yaAplicado = (opts.ya_aplicado && typeof opts.ya_aplicado === "object") ? opts.ya_aplicado : {};
+
   for (const n of ["N", "P2O5", "K2O"]) {
     const kg     = Number(necesidad.nutrientes[n].necesidad_kg) || 0;
     // Sin precio conocido para ese nutriente no se inventa uno: la línea va sin
     // coste y el total queda declarado como parcial más abajo.
+    const puesto    = Math.max(0, Number(yaAplicado[n]) || 0);
+    // Lo que queda por echar. Nunca negativo: si se pasó, el plan dice 0 y el
+    // exceso se declara aparte — un "necesita −20 g" no se puede ejecutar.
+    const pendiente = r3(Math.max(0, kg - puesto));
+    const exceso    = puesto > kg ? r3(puesto - kg) : 0;
+
     const precio = precios[n] == null ? null : Number(precios[n]);
-    const coste  = precio == null ? null : r2(kg * precio);
+    // El coste es el de lo que FALTA, no el de la necesidad total: lo ya echado
+    // ya está pagado.
+    const coste  = precio == null ? null : r2(pendiente * precio);
     if (coste != null) costeTotal += coste;
     lineas.push({
       nutriente: n, necesidad_kg: kg, precio_eur_kg: precio, coste_eur: coste,
-      // Reparto temporal (fondo/cobertera o tercios), MAPA Parte II.
-      reparto: repartoNutriente(n, kg, metodoRiego),
+      ya_aplicado_kg: puesto, pendiente_kg: pendiente, exceso_kg: exceso,
+      // El reparto se hace sobre lo PENDIENTE: si el fondo ya está echado, lo
+      // que queda es cobertera, y ofrecer otra vez el fondo sería doblarlo.
+      reparto: repartoNutriente(n, pendiente, metodoRiego, { fondoHecho: puesto > 0 }),
       // Los sumandos que dan ese kg. Se calculaban y se tiraban, así que la
       // cifra llegaba al agricultor sin poder explicarse: "58 g" y punto. Con
       // esto la pantalla puede enseñar de dónde sale cada término y de qué
@@ -150,7 +176,11 @@ function cuadernoFertilizacion(necesidad, opts = {}) {
     // Si algún nutriente se ha quedado sin precio, el total NO es el coste del
     // plan: es el de las líneas que sí se pudieron valorar. Decirlo evita que
     // alguien presupueste con un número que le falta un trozo.
-    coste_parcial: lineas.some(l => l.necesidad_kg > 0 && l.coste_eur == null),
+    coste_parcial: lineas.some(l => l.pendiente_kg > 0 && l.coste_eur == null),
+    // ¿Se ha descontado algo? La pantalla tiene que poder decirlo: un plan que
+    // ha bajado porque ya abonaste no es lo mismo que un plan que pide poco.
+    hay_aplicado: lineas.some(l => l.ya_aplicado_kg > 0),
+    hay_exceso:   lineas.some(l => l.exceso_kg > 0),
     manejo: opts.manejo || null,
     precios_referencia: usaReferencia,
     nota: necesidad.oferta_conocida

@@ -109,6 +109,7 @@ create table acciones (
   plazo_seguridad_dias int,
   fue_otro             boolean default false,
   motivo               text,                            -- 'abonado','goteo-auto', o NULL (riego manual)
+  nutrientes           jsonb,                           -- kg de nutriente aportados: {"N":..,"P2O5":..,"K2O":..}; NULL = no se sabe y el plan no descuenta
   coste_estimado_eur   numeric,
   notas                text
 );

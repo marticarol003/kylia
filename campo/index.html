@@ -569,6 +569,9 @@
         ${fila("Del cultivo anterior", `−${g(des.credito_residuos_kg) ?? 0} g`,
                des.credito_residuos_kg ? "MAPA · N que liberan los restos incorporados" : "no hay: se parte de suelo limpio")}
         ${fila("<b>Necesita en todo el ciclo</b>", `${g(N.necesidad_kg)} g de N`, "")}
+        ${N.ya_aplicado_kg > 0 ? fila("Ya echado en este ciclo", `−${g(N.ya_aplicado_kg)} g`,
+              "de los abonados apuntados, incluido el de fondo antes de plantar") : ""}
+        ${N.ya_aplicado_kg > 0 ? fila("<b>Le queda por echar</b>", `${g(N.pendiente_kg)} g`, "") : ""}
         ${fila("De eso, en cobertera", `${gN} g`, "MAPA · 30% en fondo y 70% en cobertera")}
         ${fila("Repartido en 2 veces", `${gNvez} g por vez`, "fraccionar acompasa el aporte con lo que la planta absorbe")}
       </ul>`;

@@ -2099,6 +2099,7 @@
     .pq-desc li { margin-bottom: 4px; }
     .pq-fuentes { font-size: .76rem; color: var(--muted, #5a685a); line-height: 1.5; margin: 0; }
     .pq-pie { font-size: .74rem; color: var(--muted, #5a685a); line-height: 1.5; margin: 12px 0 0; }
+    .ya-echado { display:block; font-weight:400; color: var(--muted, #5a685a); font-size:.74rem; }
     .sin-precio { color: var(--muted, #5a685a); font-size: .82rem; }
     .abonado-nota {
       margin: 10px 0 0; font-size: .76rem; color: var(--muted); line-height: 1.5;
@@ -4974,6 +4975,11 @@
                  des.credito_residuos_kg ? "MAPA · N que liberan los restos incorporados"
                                          : "no hay: se parte de suelo limpio")}
           ${fila("Necesita en todo el ciclo", `${fmtAbono(N.necesidad_kg)}`, "")}
+          ${N.ya_aplicado_kg > 0
+            ? fila("Ya echado en este ciclo", `−${fmtAbono(N.ya_aplicado_kg)}`,
+                   "de los abonados apuntados, incluido el de fondo antes de plantar")
+            : ""}
+          ${N.ya_aplicado_kg > 0 ? fila("<b>Le queda por echar</b>", fmtAbono(N.pendiente_kg), "") : ""}
           ${cobertera ? fila("De eso, en cobertera", fmtAbono(cobertera.kg),
                  d.plan?.fraccionamiento?.nota || "MAPA · reparto fondo/cobertera") : ""}
         </ul>
@@ -5003,7 +5009,8 @@
 
       const filas = plan.lineas.map(l => `<tr>
         <td class="abonado-nutri">${NUTRI_NOMBRE[l.nutriente] || esc(l.nutriente)}</td>
-        <td class="num">${fmtAbono(l.necesidad_kg)}</td>
+        <td class="num">${fmtAbono(l.pendiente_kg ?? l.necesidad_kg)}${
+          l.ya_aplicado_kg > 0 ? `<small class="ya-echado">de ${fmtAbono(l.necesidad_kg)}</small>` : ""}</td>
         <td class="num">${l.coste_eur == null ? "<span class=\"sin-precio\">sin precio</span>" : `${nDec(l.coste_eur, 2)} €`}</td>
       </tr>`).join("");
 
@@ -5025,10 +5032,14 @@
       // Un total al que le falta una línea no es el coste del plan. Decirlo, o
       // alguien presupuesta con un número incompleto.
       if (plan.coste_parcial) notas.push("El total solo suma las líneas con precio conocido.");
+      // Un plan que baja porque ya abonaste no es lo mismo que un plan que pide
+      // poco. Sin decirlo, el agricultor no sabe cuál de las dos cosas está viendo.
+      if (plan.hay_aplicado) notas.push("Ya se ha descontado el abono que tienes apuntado en este ciclo: lo de arriba es lo que QUEDA por echar.");
+      if (plan.hay_exceso)   notas.push("Con lo ya aplicado se ha cubierto la necesidad de algún nutriente; ese no hace falta volver a echarlo.");
 
       return `<section class="card abonado-card">
         <table class="abonado-tabla">
-          <thead><tr><th>Nutriente</th><th class="num">Necesita</th><th class="num">Coste</th></tr></thead>
+          <thead><tr><th>Nutriente</th><th class="num">${plan.hay_aplicado ? "Le queda" : "Necesita"}</th><th class="num">Coste</th></tr></thead>
           <tbody>${filas}
             <tr class="total"><td colspan="2">Coste total estimado${plan.coste_parcial ? " (parcial)" : ""}</td>
             <td class="num">${nDec(plan.coste_total_eur, 2)} €</td></tr></tbody>

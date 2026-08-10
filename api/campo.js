@@ -273,13 +273,44 @@ async function ultimoNdvi(usuarioId) {
 //   2. El PLAN (opcional): necesidad de nutrientes + coste €, SOLO si llega el
 //      rendimiento esperado (?rend_t= toneladas). Sin rendimiento no se estima:
 //      el motor devuelve disponible:false con su motivo, y así se muestra.
+// Kilos de nutriente ya aportados EN ESTE CICLO, para que el plan no vuelva a
+// pedirlos. La ventana arranca 45 días antes de la plantación a propósito: el
+// abonado de FONDO se echa antes de plantar, así que una ventana que empezara el
+// día 0 se lo dejaría fuera — que es exactamente el caso que destapó esto (el
+// Labinor del bancal, aplicado antes de las 33 lechugas).
+//
+// Solo cuenta lo que trae `nutrientes` con números. Un abonado apuntado sin esa
+// cifra NO descuenta nada: la `dosis` es texto libre ("2 sacos", "un puñado") y
+// deducir kilos de ahí sería adivinar un número que entra en un balance. Pedir
+// de más es recuperable; descontar de menos, no.
+function yaAplicadoEnCiclo(abonados, fechaPlantacion) {
+  const total = { N: 0, P2O5: 0, K2O: 0 };
+  if (!Array.isArray(abonados) || !abonados.length) return total;
+
+  const desde = fechaPlantacion
+    ? new Date(`${String(fechaPlantacion).slice(0, 10)}T12:00:00Z`).getTime() - 45 * 86400000
+    : null;
+
+  for (const a of abonados) {
+    if (!a.nutrientes || typeof a.nutrientes !== "object") continue;
+    if (desde && a.fecha_local) {
+      if (new Date(`${a.fecha_local}T12:00:00Z`).getTime() < desde) continue;
+    }
+    for (const n of ["N", "P2O5", "K2O"]) {
+      const v = Number(a.nutrientes[n]);
+      if (Number.isFinite(v) && v > 0) total[n] += v;
+    }
+  }
+  return total;
+}
+
 async function vistaCuaderno(req, res, u) {
   // motivo=neq.abonado a secas dejaría fuera los motivo NULL (SQL de 3 valores):
   // los tratamientos sin motivo también son tratamientos.
   const [abonados, riegos, trats] = await Promise.all([
     supabaseSelect("acciones",
       `usuario_id=eq.${u.id}&tipo=eq.aplicacion&motivo=eq.abonado` +
-      `&select=id,fecha_local,producto_nombre,dosis,coste_estimado_eur,notas&order=fecha_local.asc`),
+      `&select=id,fecha_local,producto_nombre,dosis,coste_estimado_eur,notas,nutrientes&order=fecha_local.asc`),
     supabaseSelect("acciones",
       `usuario_id=eq.${u.id}&tipo=eq.riego` +
       `&select=fecha_local,cantidad_l_m2,duracion_min,franja_horaria&order=fecha_local.asc`),
@@ -322,7 +353,8 @@ async function vistaCuaderno(req, res, u) {
     // El manejo elige la tabla de precios: en ecológico el mismo nitrógeno
     // cuesta ~20 veces más, y hasta ahora se le enseñaba el precio de la urea.
     { superficie_m2: u.area_m2 ?? null, metodo_riego: u.metodo_riego || null,
-      manejo: u.manejo || null },
+      manejo: u.manejo || null,
+      ya_aplicado: yaAplicadoEnCiclo(abonados, u.fecha_plantacion) },
   );
 
   return res.status(200).json({
@@ -385,6 +417,7 @@ async function vistaCuaderno(req, res, u) {
     })),
     abonados: (abonados || []).map(a => ({
       id: a.id, fecha: a.fecha_local, producto: a.producto_nombre || null,
+      nutrientes: a.nutrientes || null,
       dosis: a.dosis || null, coste_eur: a.coste_estimado_eur ?? null, notas: a.notas || null,
     })),
     plan,
