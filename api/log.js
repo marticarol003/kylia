@@ -7,7 +7,7 @@
 //
 // Recursos soportados:
 //   registro-usuario, acciones, observaciones, jornadas,
-//   mediciones, recomendaciones-log, eventos, acceso
+//   mediciones, recomendaciones-log, eventos, acceso, config-app
 
 const {
   isConfigured, supabaseInsert, supabaseUpdate, supabaseSelect, supabaseDelete,
@@ -19,6 +19,7 @@ const ACCESO = require("./_acceso.js");
 const HANDLERS = {
   "registro-usuario":    handleRegistroUsuario,
   "acceso":              handleAcceso,
+  "config-app":          handleConfigApp,
   "acciones":            handleAcciones,
   "borrar-accion":       handleBorrarAccion,
   "observaciones":       handleObservaciones,
@@ -139,6 +140,58 @@ async function handleAcceso(req, res, body) {
   } catch (err) {
     console.error("[acceso] error:", err.message);
     return res.status(500).json({ ok: false, error: "no se pudo procesar el acceso" });
+  }
+}
+
+// ─── config-app (la configuración deja de vivir solo en el móvil) ──
+// Guarda la foto de la config de /app en la fila del PROPIETARIO, para poder
+// restaurarla en otro dispositivo. Ver db/config-en-servidor-2026-08-10.sql.
+//
+// Dos guardas, y las dos existen por la misma razón — que este endpoint puede
+// borrarle la configuración a alguien:
+//   · Se rechaza una config VACÍA. Un móvil que arranca sin datos y no consigue
+//     bajarse la del servidor (sin cobertura, por ejemplo) no puede pisar la
+//     buena con su nada.
+//   · Se hace UPDATE de una sola columna, nunca upsert de la fila. `registro-
+//     usuario` sí escribe la fila entera, y así se perdió el piloto de tomate de
+//     Breda; aquí no puede pasar.
+async function handleConfigApp(req, res, body) {
+  const propietario_id = (body.propietario_id || "").toString().trim();
+  if (!ES_UUID.test(propietario_id)) {
+    return res.status(400).json({ error: "propietario_id inválido" });
+  }
+  const config = body.config;
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return res.status(400).json({ error: "config debe ser un objeto" });
+  }
+
+  // "Vacía" = no tiene ni finca reconocible ni zonas. Sin esto, el primer
+  // arranque de un dispositivo nuevo borraría la config de todos los demás.
+  const finca = config.finca && typeof config.finca === "object" ? config.finca : null;
+  const zonas = Array.isArray(config.zonas) ? config.zonas : [];
+  const tieneAlgo = zonas.length > 0 ||
+    (finca && (finca.parcela || (Array.isArray(finca.cultivos) && finca.cultivos.length) ||
+               finca.areaParcela != null || finca.fechaPlantacion));
+  if (!tieneAlgo) {
+    console.warn("[config-app] config vacía, no se guarda:", propietario_id);
+    return res.status(200).json({ ok: false, reason: "config_vacia" });
+  }
+
+  if (!isConfigured()) {
+    return res.status(200).json({ ok: true, persisted: false, reason: "supabase_not_configured" });
+  }
+
+  const foto = { ...config, guardado: new Date().toISOString() };
+  try {
+    const filas = await supabaseUpdate("usuarios", `id=eq.${propietario_id}`, { config_app: foto });
+    if (!Array.isArray(filas) || filas.length === 0) {
+      return res.status(404).json({ ok: false, error: "propietario no encontrado" });
+    }
+    console.log("[config-app]", JSON.stringify({ propietario_id, zonas: zonas.length }));
+    return res.status(200).json({ ok: true, persisted: true, guardado: foto.guardado });
+  } catch (err) {
+    console.error("[config-app] error:", err.message);
+    return res.status(500).json({ ok: false, error: "no se pudo guardar la configuración" });
   }
 }
 

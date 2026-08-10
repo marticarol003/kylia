@@ -136,8 +136,14 @@ async function canjear(body) {
     `id=eq.${a.id}&usado_en=is.null`, { usado_en: new Date().toISOString() });
   if (!Array.isArray(quemado) || quemado.length === 0) return noVale;
 
-  const zonas = await supabaseSelect("usuarios",
-    `propietario_id=eq.${a.propietario_id}&select=id,nombre,cultivos,area_m2,metodo_riego,fecha_plantacion,ciudad&order=nombre.asc`);
+  // La config viaja EN EL CANJEO, no en una segunda llamada: si el móvil nuevo
+  // adopta al propietario pero no puede restaurar la configuración, el enlace no
+  // ha servido de nada — el agricultor abre la app y la ve en blanco.
+  const [zonas, dueño] = await Promise.all([
+    supabaseSelect("usuarios",
+      `propietario_id=eq.${a.propietario_id}&select=id,nombre,cultivos,area_m2,metodo_riego,fecha_plantacion,ciudad&order=nombre.asc`),
+    supabaseSelect("usuarios", `id=eq.${a.propietario_id}&select=config_app`),
+  ]);
 
   console.log("[acceso] canjeado", JSON.stringify({ email: a.email, zonas: (zonas || []).length }));
   return {
@@ -146,6 +152,7 @@ async function canjear(body) {
       ok: true,
       propietario_id: a.propietario_id,
       email: a.email,
+      config: dueño?.[0]?.config_app || null,
       zonas: (zonas || []).map(z => ({
         id: z.id, nombre: z.nombre, cultivo: (z.cultivos || [])[0] || null,
         area_m2: z.area_m2, metodo_riego: z.metodo_riego,

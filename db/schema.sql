@@ -56,6 +56,7 @@ create table usuarios (
   piloto_sombra         boolean     not null default false,    -- true → Kylia calla, diario-b congela
   suelo_oferta          jsonb,                                 -- caché de ofertaSuelo() (SoilGrids); NULL = sin calcular
   producto_fert         jsonb,                                 -- caché de qué fertilizante comprar (búsqueda web en vivo); lleva `clave` y `consultado`
+  config_app            jsonb,                                 -- foto de la config de /app del propietario, para restaurarla en otro dispositivo
   origen                text,
   preferencias          jsonb       default '{}'::jsonb,
   ua                    text,

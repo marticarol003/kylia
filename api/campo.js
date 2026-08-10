@@ -170,6 +170,31 @@ async function vistaHoy(res, u) {
 // A propósito NO calcula ni devuelve la decisión de riego: el piloto silencioso
 // no debe ver lo que Kylia recomienda (sesgaría el experimento). Solo la config
 // para adaptar el registro (cubos vs horas) y lo que ya lleva apuntado.
+// La configuración de /app guardada en el servidor, para que un dispositivo que
+// no tiene nada pueda restaurarla. Es lo que hace útil el enlace por correo:
+// sin esto, el móvil nuevo adopta al propietario y aun así ve la app en blanco.
+//
+// Si la fila consultada no tiene foto pero es una ZONA (su propietario es otra
+// fila), se mira la del propietario — que es donde vive siempre. Así funciona
+// aunque el dispositivo pregunte con el id de una zona.
+async function vistaConfig(res, u) {
+  let config = u.config_app || null;
+  let de = u.id;
+
+  if (!config && u.propietario_id && u.propietario_id !== u.id) {
+    const dueños = await supabaseSelect("usuarios", `id=eq.${u.propietario_id}&select=id,config_app`);
+    if (dueños?.[0]?.config_app) { config = dueños[0].config_app; de = dueños[0].id; }
+  }
+
+  return res.status(200).json({
+    ok: true, vista: "config",
+    propietario_id: u.propietario_id || u.id,
+    config,                                   // null = este propietario nunca guardó
+    guardado: config?.guardado || null,
+    de,                                       // de qué fila salió (la propia o la del propietario)
+  });
+}
+
 async function vistaPerfil(res, u) {
   const [accs, aplics] = await Promise.all([
     supabaseSelect("acciones",
@@ -624,6 +649,7 @@ module.exports = async (req, res) => {
     const u = (usuarios || [])[0];
     if (!u) return res.status(404).json({ ok: false, error: "usuario no encontrado (¿ejecutaste el alta?)" });
 
+    if (vista === "config")      return await vistaConfig(res, u);
     if (vista === "reveal")      return await vistaReveal(req, res, u);
     if (vista === "comparativa") return await vistaComparativa(req, res, u);
     if (vista === "perfil")      return await vistaPerfil(res, u);

@@ -132,6 +132,83 @@
         },
       };
 
+      // ─ La configuración vive también en el servidor ────────────────
+      // Hasta ahora la finca, sus zonas y sus cultivos vivían SOLO en el
+      // localStorage de este móvil. Cambiabas de teléfono y Kylia estaba en
+      // blanco. Con el enlace por correo el dispositivo adopta al propietario;
+      // esto es lo que hace que además se traiga su campo.
+      //
+      // Las dos direcciones son deliberadamente asimétricas, y ese es el punto:
+      //   · Se BAJA solo cuando este dispositivo no tiene nada. Si tiene datos,
+      //     manda él: nadie quiere que abrir la app te pise lo que acabas de
+      //     configurar porque otro móvil guardó antes.
+      //   · Se SUBE cuando el agricultor cambia algo, nunca al arrancar.
+      // Restaurar recarga la página en vez de parchear el estado en caliente:
+      // media app ya ha leído localStorage de forma síncrona a estas alturas.
+      function tieneConfigLocal() {
+        try {
+          const c = JSON.parse(localStorage.getItem("kylia_config") || "null");
+          if (!c) return false;
+          return Boolean(c.parcela || (c.cultivos || []).length ||
+                         c.areaParcela != null || c.fechaPlantacion);
+        } catch (_) { return false; }
+      }
+
+      function restaurarConfig(config, propietarioId) {
+        if (!config || typeof config !== "object") return false;
+        if (config.finca) localStorage.setItem("kylia_config", JSON.stringify(config.finca));
+        if (Array.isArray(config.zonas)) localStorage.setItem("kylia_zonas", JSON.stringify(config.zonas));
+        if (config.zonaActiva) localStorage.setItem("kylia_zona_activa", config.zonaActiva);
+        else localStorage.removeItem("kylia_zona_activa");
+        // El modo viaja con la config: quien ya usaba Kylia en otro móvil no es
+        // un visitante nuevo y no debe caer en el modo silencioso del piloto.
+        if (config.modo === "demo" || config.modo === "piloto") {
+          localStorage.setItem("kylia_modo", config.modo);
+        }
+        if (propietarioId) localStorage.setItem("kylia_user_id", propietarioId);
+        return true;
+      }
+
+      // Canjear el enlace del correo: adopta al propietario y trae su campo.
+      async function canjearAcceso(token) {
+        try {
+          const res = await fetch("/api/log", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ recurso: "acceso", accion: "canjear", token }),
+          });
+          const d = await res.json();
+          if (!d.ok) { alert("Ese enlace ya no vale. Pide otro desde la app."); return; }
+          restaurarConfig(d.config, d.propietario_id);
+          // Aunque no hubiera config guardada, el dispositivo ya es suyo.
+          localStorage.setItem("kylia_user_id", d.propietario_id);
+          location.replace("/app");            // sin ?acceso= en la barra ni en el historial
+        } catch (_) {
+          alert("No se ha podido entrar ahora mismo. Inténtalo en un momento.");
+        }
+      }
+
+      // Arranque en un dispositivo sin datos: pregunta si el servidor guarda algo.
+      async function restaurarSiVacio() {
+        if (tieneConfigLocal()) return;
+        try {
+          const res = await fetch(`/api/campo?vista=config&usuario_id=${encodeURIComponent(userId)}`,
+                                  { cache: "no-store" });
+          if (!res.ok) return;
+          const d = await res.json();
+          if (d?.ok && d.config && restaurarConfig(d.config, null)) location.reload();
+        } catch (_) { /* sin cobertura: se sigue con lo local, que es nada */ }
+      }
+
+      window.kyliaSync.guardarConfigServidor = function (config) {
+        return post("/api/log", { recurso: "config-app", propietario_id: userId, config });
+      };
+
+      try {
+        const tokenAcceso = new URLSearchParams(location.search).get("acceso");
+        if (tokenAcceso) canjearAcceso(tokenAcceso);
+        else restaurarSiVacio();
+      } catch (_) { /* noop */ }
+
       // ─ kyliaTrack: ahora va al backend propio (antes Plausible) ────
       window.kyliaTrack = function (event, props) {
         try { window.kyliaSync.evento(event, props); } catch (_) { /* noop */ }
@@ -2734,6 +2811,29 @@
       cfgFinca = newCfg;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cfgFinca));
       cfg = configEfectiva();
+      subirConfig();
+    }
+
+    // ─── La foto de la configuración, al servidor ────────────────────────────
+    // Sube finca + zonas + zona activa a la fila del propietario, para poder
+    // restaurarlo en otro dispositivo (ver el bloque de kyliaSync y
+    // db/config-en-servidor-2026-08-10.sql). Va con retardo porque el panel de
+    // configuración guarda en cada tecla: sin esto, escribir un nombre de finca
+    // serían quince peticiones. Y se sube SIEMPRE la foto completa, no un
+    // fragmento — así el servidor nunca queda a medias entre dos estados.
+    let subidaPendiente = null;
+    function subirConfig() {
+      clearTimeout(subidaPendiente);
+      subidaPendiente = setTimeout(() => {
+        try {
+          window.kyliaSync?.guardarConfigServidor?.({
+            finca: cfgFinca,
+            zonas: zonasGuardadas(),
+            zonaActiva: zonaActiva || null,
+            modo: window.kyliaSync?.modo || null,
+          });
+        } catch (_) { /* el guardado local ya está hecho; esto es el espejo */ }
+      }, 1500);
     }
 
     // ─── Modelos de riesgo ────────────────────────────────────────────────────
@@ -5159,6 +5259,7 @@
     }
     function saveZonas() {
       localStorage.setItem(ZONAS_KEY, JSON.stringify([...zonasSel.values()]));
+      subirConfig();   // las zonas son la mitad de la configuración: viajan igual
     }
 
     // Verde relleno = mía. Contorno claro = disponible, tócala. Los dos trozos de
