@@ -72,17 +72,25 @@
       } catch (_) { /* noop */ }
 
       // ─ Decisión de modo ────────────────────────────────────────────
-      // demo:    usuarios antiguos (ya tienen riegos/aplicaciones), o ?demo=1, o kylia_modo=demo
-      // piloto:  por defecto para nuevos visitantes (modo silencioso, sin recomendaciones visibles)
+      // demo:    ve el producto entero. Es el DEFECTO.
+      // piloto:  modo silencioso — calcula en segundo plano y no enseña nada,
+      //          para no influir en las decisiones de un ensayo en curso.
+      //
+      // El defecto era el piloto, y estaba al revés. El modo silencioso oculta
+      // el cockpit, las recomendaciones, la meteo, la FAQ y también el PLAN DE
+      // ABONADO (ver el bloque html[data-modo-kylia="piloto"] del CSS), así que
+      // un agricultor que se diera de alta solo rellenaba la configuración
+      // entera para acabar en una pantalla que le dice que vuelva en dos meses
+      // — y sin ver justo aquello por lo que se le va a cobrar.
+      //
+      // Invertirlo no saca a nadie de su ensayo: el piloto es SIEMPRE explícito
+      // y se fija al darlo de alta (piloto/alta/index.html) o con ?modo=piloto,
+      // y `forzado` se mira antes que nada. Lo que cambia es solo el visitante
+      // nuevo, que ahora ve el producto en vez de una app apagada.
       function detectarModo() {
         const forzado = localStorage.getItem("kylia_modo");
         if (forzado === "demo" || forzado === "piloto") return forzado;
-        const teniaDatos =
-          localStorage.getItem("kylia_config") ||
-          localStorage.getItem("kylia_riegos") ||
-          localStorage.getItem("kylia_aplicaciones") ||
-          localStorage.getItem("kylia_ultimo_riego");
-        return teniaDatos ? "demo" : "piloto";
+        return "demo";
       }
       const modo = detectarModo();
       document.documentElement.dataset.modoKylia = modo;
@@ -1678,7 +1686,6 @@
     html[data-modo-kylia="piloto"] #card-hoy,
     html[data-modo-kylia="piloto"] #card-parcela,
     html[data-modo-kylia="piloto"] #recomendaciones-container,
-    html[data-modo-kylia="piloto"] #alertas-container,
     html[data-modo-kylia="piloto"] #abonado-toggle,
     html[data-modo-kylia="piloto"] #abonado-cuerpo,
     html[data-modo-kylia="piloto"] section.card[aria-label="Condiciones meteorológicas"],
@@ -2281,10 +2288,6 @@
         <div class="cultivos-grid" id="cultivos-grid"></div>
       </div>
       <div class="config-field">
-        <label for="input-cultivos-secundarios">Otros cultivos en la parcela (opcional)</label>
-        <input type="text" id="input-cultivos-secundarios" placeholder="Ej: rúcula y rabanito" maxlength="120" autocomplete="off">
-      </div>
-      <div class="config-field">
         <label>Método de riego habitual</label>
         <div class="cultivos-grid" id="metodo-riego-grid">
           <button type="button" class="btn-cultivo" data-metodo="goteo">Goteo</button>
@@ -2437,7 +2440,6 @@
     <div id="recomendaciones-container"></div>
 
     <!-- Alertas plagas -->
-    <div id="alertas-container"></div>
 
     <!-- Plan de abonado (motor de nutrición MAPA, calculado en servidor) -->
     <button type="button" class="plagas-toggle" id="abonado-toggle" aria-expanded="false" aria-controls="abonado-cuerpo" hidden>
@@ -2753,7 +2755,6 @@
       lat:                 41.3828,
       lon:                 2.1771,
       cultivos:            ["lechuga"],
-      cultivosSecundarios: "",
       parcela:             null,
       metodoRiego:         null,
       manejo:              null,
@@ -2918,198 +2919,39 @@
       }, 1500);
     }
 
-    // ─── Modelos de riesgo ────────────────────────────────────────────────────
-
-    // Myzus persicae / Nasonovia ribisnigri en Lactuca sativa
-    function calcularRiesgoPulgon({ tempMax, humMax, vientoMax, lluvia }) {
-      const lluviaFuerte  = lluvia    > 8;
-      const vientoAlto    = vientoMax > 25;
-      const tempOptima    = tempMax >= 18 && tempMax <= 22;
-      const tempFavorable = tempMax >= 12 && tempMax <= 28;
-      const humAlta       = humMax  > 65;
-      const humModerada   = humMax  >= 50;
-
-      if (lluviaFuerte) {
-        return { nivel: "BAJO", clase: "bajo",
-          motivo: `La lluvia (${lluvia} mm) reduce la actividad del pulgón temporalmente.` };
-      }
-      if (tempOptima && humAlta && !vientoAlto) {
-        return { nivel: "ALTO", clase: "alto",
-          motivo: `Temperatura (${tempMax}°C) y humedad (${humMax}%) óptimas. Revisa los cultivos y prepara tratamiento preventivo.` };
-      }
-      if (tempFavorable && humAlta && !vientoAlto) {
-        return { nivel: "MEDIO", clase: "medio",
-          motivo: `Condiciones favorables (${tempMax}°C, ${humMax}%). Revisa las plantas a primera hora.` };
-      }
-      if (tempFavorable && humModerada && !vientoAlto) {
-        return { nivel: "MEDIO", clase: "medio",
-          motivo: `Temperatura propicia (${tempMax}°C) con humedad moderada. Mantente atento.` };
-      }
-      return { nivel: "BAJO", clase: "bajo",
-        motivo: vientoAlto
-          ? `Viento fuerte (${vientoMax} km/h) dificulta el establecimiento del pulgón.`
-          : "Las condiciones actuales no favorecen el desarrollo del pulgón." };
-    }
-
-    // Bremia lactucae en Lactuca sativa
-    function calcularRiesgoMildiu({ tempMax, humMax, lluvia }) {
-      const tempInfeccion  = tempMax >= 10 && tempMax <= 22;
-      const tempInhibicion = tempMax > 27;
-      const humCritica     = humMax  > 85;
-      const humFavorable   = humMax  >= 70;
-      const hayLluvia      = lluvia  > 0.5;
-
-      if (tempInhibicion) {
-        return { nivel: "BAJO", clase: "bajo",
-          motivo: `Las altas temperaturas (${tempMax}°C) inhiben las esporas del mildiu.` };
-      }
-      if (tempInfeccion && (humCritica || hayLluvia)) {
-        return { nivel: "ALTO", clase: "alto",
-          motivo: `Condiciones críticas: ${tempMax}°C, ${humMax}% humedad${hayLluvia ? ` y ${lluvia} mm de lluvia` : ""}. Aplica fungicida preventivo.` };
-      }
-      if (tempInfeccion && humFavorable) {
-        return { nivel: "MEDIO", clase: "medio",
-          motivo: `Humedad elevada (${humMax}%) con temperatura propicia (${tempMax}°C). Vigila las hojas inferiores.` };
-      }
-      return { nivel: "BAJO", clase: "bajo",
-        motivo: "Las condiciones actuales no son favorables para el mildiu." };
-    }
-
-    // Pieris brassicae / Plutella xylostella en brassicas
-    function calcularRiesgoOrugaCol({ tempMax, lluvia }) {
-      const tempActiva     = tempMax >= 16 && tempMax <= 28;
-      const lluviaFuerte   = lluvia  > 8;
-      const lluviaModerada = lluvia  > 3;
-
-      if (tempMax < 10 || tempMax > 32) {
-        return { nivel: "BAJO", clase: "bajo",
-          motivo: tempMax < 10
-            ? `Frío (${tempMax}°C) — las orugas están inactivas.`
-            : `Calor excesivo (${tempMax}°C) reduce la actividad de las orugas.` };
-      }
-      if (lluviaFuerte) {
-        return { nivel: "BAJO", clase: "bajo",
-          motivo: `La lluvia fuerte (${lluvia} mm) reduce la supervivencia de las larvas jóvenes.` };
-      }
-      if (tempActiva && !lluviaModerada) {
-        return { nivel: "ALTO", clase: "alto",
-          motivo: `Temperatura ideal (${tempMax}°C) y tiempo seco. Revisa el envés de las hojas en busca de huevos o larvas.` };
-      }
-      if (tempMax >= 12) {
-        return { nivel: "MEDIO", clase: "medio",
-          motivo: `Condiciones moderadas (${tempMax}°C). Mantente atento al envés de las hojas.` };
-      }
-      return { nivel: "BAJO", clase: "bajo",
-        motivo: "Las condiciones actuales no favorecen el desarrollo de orugas." };
-    }
-
-    // Bemisia tabaci / Trialeurodes vaporariorum
-    function calcularRiesgoMoscaBlanca({ tempMax, humMax, lluvia }) {
-      const tempOptima    = tempMax >= 25 && tempMax <= 32;
-      const tempFavorable = tempMax >= 20;
-      const humBaja       = humMax  < 65;
-      const humModerada   = humMax  < 75;
-      const lluviaInhibe  = lluvia  > 5;
-
-      if (tempMax < 18 || lluviaInhibe) {
-        return { nivel: "BAJO", clase: "bajo",
-          motivo: tempMax < 18
-            ? `Temperatura baja (${tempMax}°C) — la mosca blanca está inactiva.`
-            : `La lluvia (${lluvia} mm) reduce las poblaciones de mosca blanca.` };
-      }
-      if (tempOptima && humBaja) {
-        return { nivel: "ALTO", clase: "alto",
-          motivo: `Calor (${tempMax}°C) y baja humedad (${humMax}%) favorecen la explosión de mosca blanca. Revisa el envés de las hojas.` };
-      }
-      if (tempFavorable && humModerada) {
-        return { nivel: "MEDIO", clase: "medio",
-          motivo: `Condiciones moderadas (${tempMax}°C, ${humMax}%). Vigila especialmente las plantas jóvenes.` };
-      }
-      return { nivel: "BAJO", clase: "bajo",
-        motivo: "Las condiciones actuales no favorecen la mosca blanca." };
-    }
-
-    // Tetranychus urticae
-    function calcularRiesgoAranaRoja({ tempMax, humMax, lluvia }) {
-      const tempOptima  = tempMax >= 28;
-      const tempFavor   = tempMax >= 23;
-      const humCritica  = humMax  < 45;
-      const humBaja     = humMax  < 60;
-      const lluviaInhib = lluvia  > 3;
-      const humAlta     = humMax  > 65;
-
-      if (tempMax < 20 || humAlta || lluviaInhib) {
-        return { nivel: "BAJO", clase: "bajo",
-          motivo: humAlta || lluviaInhib
-            ? "Humedad alta o lluvia — la araña roja está controlada naturalmente."
-            : `Temperatura baja (${tempMax}°C) — la araña roja está inactiva.` };
-      }
-      if (tempOptima && humCritica) {
-        return { nivel: "ALTO", clase: "alto",
-          motivo: `Calor extremo (${tempMax}°C) y ambiente muy seco (${humMax}%). Revisa urgentemente el envés de las hojas.` };
-      }
-      if (tempFavor && humBaja) {
-        return { nivel: "MEDIO", clase: "medio",
-          motivo: `Temperatura alta (${tempMax}°C) y baja humedad (${humMax}%). Vigila los cultivos.` };
-      }
-      return { nivel: "BAJO", clase: "bajo",
-        motivo: "Las condiciones actuales no favorecen la araña roja." };
-    }
-
-    // ─── Catálogo ─────────────────────────────────────────────────────────────
-    const ALERTAS = {
-      pulgon:       { titulo: "Pulgón",           calcFn: calcularRiesgoPulgon },
-      mildiu:       { titulo: "Mildiu",           calcFn: calcularRiesgoMildiu },
-      oruga_col:    { titulo: "Oruga de la col",  calcFn: calcularRiesgoOrugaCol },
-      mosca_blanca: { titulo: "Mosca blanca",     calcFn: calcularRiesgoMoscaBlanca },
-      arana_roja:   { titulo: "Araña roja",       calcFn: calcularRiesgoAranaRoja },
-    };
+    // ─── Modelos de riesgo de plaga: RETIRADOS (13-ago-2026) ─────────────────
+    // Eran cinco heurísticas sobre el clima diario (pulgón, mildiu, oruga de la
+    // col, mosca blanca y araña roja) que clasificaban el riesgo en BAJO/MEDIO/
+    // ALTO. El consejo del 24-jul congeló el pilar entero: el modelo que vale
+    // necesita clima HORARIO y validación, no umbrales de máximas diarias.
 
     const CULTIVOS = [
-      { id: "lechuga",   nombre: "Lechuga",        alertas: ["pulgon", "mildiu"] },
-      { id: "espinaca",  nombre: "Espinaca",        alertas: ["pulgon", "mildiu"] },
-      { id: "brassica",  nombre: "Col / Coliflor",  alertas: ["pulgon", "oruga_col"] },
-      { id: "tomate",    nombre: "Tomate",          alertas: ["mosca_blanca", "arana_roja"] },
-      { id: "pimiento",  nombre: "Pimiento",        alertas: ["mosca_blanca", "arana_roja"] },
-      { id: "berenjena", nombre: "Berenjena",       alertas: ["mosca_blanca", "arana_roja"] },
-      { id: "calabacin", nombre: "Calabacín",       alertas: ["mosca_blanca"] },
+      { id: "lechuga",   nombre: "Lechuga" },
+      { id: "espinaca",  nombre: "Espinaca" },
+      { id: "brassica",  nombre: "Col / Coliflor" },
+      { id: "tomate",    nombre: "Tomate" },
+      { id: "pimiento",  nombre: "Pimiento" },
+      { id: "berenjena", nombre: "Berenjena" },
+      { id: "calabacin", nombre: "Calabacín" },
       // El motor lleva su curva de Kc afinada desde el 29-jun (cebolla tierna
       // trasplantada, FAO-56 Tablas 11-12) y es uno de los pilotos —
       // El Tros de l'Uri, en Palafolls— pero faltaba en esta lista, así que
       // no había forma de elegirla en la app: se quedaba sin Kc por fase y
       // sin plan de abonado. Solo mildiu (Peronospora destructor): del resto
       // de plagas de cebolla, el trips es el que manda y no está modelado.
-      { id: "cebolla",   nombre: "Cebolla",         alertas: ["mildiu"] },
+      { id: "cebolla",   nombre: "Cebolla" },
     ];
 
-    // ─── Catálogo de productos fitosanitarios ─────────────────────────────────
-    const PRODUCTOS_PLAGA = {
-      pulgon: {
-        titulo: "Pulgón",
-        eco:  { nombre: "Jabón potásico (p.ej. Neudosan / Pirecid)", dosis: "5-10 mL/L de agua", modo: "Pulveriza cubriendo bien el envés de las hojas. Repite cada 5-7 días." },
-        conv: { nombre: "Imidacloprid 20% SL (p.ej. Confidor)", dosis: "0.35 mL/L de agua", modo: "No aplicar durante la floración. Plazo de seguridad: 7-14 días según cultivo." },
-      },
-      mildiu: {
-        titulo: "Mildiu",
-        eco:  { nombre: "Oxicloruro de cobre (p.ej. Cuprocol 50 WG)", dosis: "3-4 g/L de agua", modo: "Preventivo. Aplica antes de lluvia o cuando la humedad supere el 80%." },
-        conv: { nombre: "Metalaxil-M + Mancozeb (p.ej. Ridomil Gold MZ)", dosis: "2.5 g/L de agua", modo: "Curativo. Alterna con cobre cada 2 aplicaciones para evitar resistencias." },
-      },
-      oruga_col: {
-        titulo: "Oruga de la col",
-        eco:  { nombre: "Bacillus thuringiensis kurstaki (p.ej. Dipel WG)", dosis: "1-2 g/L de agua", modo: "Aplica al atardecer, cuando las larvas están activas. Repite a los 7 días." },
-        conv: { nombre: "Spinosad SC (p.ej. Conserve)", dosis: "0.5 mL/L de agua", modo: "Máximo 4 aplicaciones por temporada para prevenir resistencias." },
-      },
-      mosca_blanca: {
-        titulo: "Mosca blanca",
-        eco:  { nombre: "Jabón potásico + piretrina (p.ej. Spruzit Concentrado)", dosis: "10 mL/L de agua", modo: "Cubre bien el envés. Repite cada 5-7 días. Eficaz en adultos y ninfas jóvenes." },
-        conv: { nombre: "Spirotetramat (p.ej. Movento 150 OD)", dosis: "0.75 mL/L de agua", modo: "Sistémico: actúa en 7-10 días. Consulta el plazo de seguridad del envase." },
-      },
-      arana_roja: {
-        titulo: "Araña roja",
-        eco:  { nombre: "Aceite de neem (p.ej. Neemrot) o azufre mojable", dosis: "5 mL/L + mojante (neem) · 3 g/L (azufre)", modo: "Aplica tarde-noche. Evita temperaturas >32°C. Repite cada 7 días." },
-        conv: { nombre: "Abamectina 1.8% CE (p.ej. Vertimec Pro)", dosis: "1.5 mL/L de agua", modo: "Alta eficacia contra huevos y larvas. Plazo de seguridad: 3-7 días según cultivo." },
-      },
-    };
+    // Aquí vivía PRODUCTOS_PLAGA: nombres comerciales y dosis de fitosanitarios
+    // cableados, que la app RECOMENDABA a agricultores sin asesor. Se retiró el
+    // 13-ago-2026 por riesgo regulatorio — entre ellos había imidacloprid, cuyos
+    // usos en exterior están retirados en la UE desde 2018, y un plazo de
+    // seguridad "7-14 días según cultivo" que el RD 1051/2022 no admite aproximado.
+    //
+    // La distinción que se mantiene, y que es la que importa: Kylia ya NO
+    // recomienda tratamientos, pero sigue ayudando a REGISTRAR los que el
+    // agricultor ha aplicado por su cuenta (data/productos.json + el modal de
+    // aplicación). Eso es el cuaderno legal, y no prescribe nada.
 
     // ─── UI helpers ───────────────────────────────────────────────────────────
     function formatearDiaSemana(fechaIso) {
@@ -3253,80 +3095,11 @@
     }
 
     // ─── Renderizado dinámico de alertas ──────────────────────────────────────
-    function renderizarAlertas(datosHoy = null, diasFuturos = []) {
-      const container = document.getElementById("alertas-container");
-      container.innerHTML = "";
-
-      const cultivosActivos = cfg.cultivos;
-      const alertasActivas = new Set();
-      cultivosActivos.forEach((cId) => {
-        const c = CULTIVOS.find((x) => x.id === cId);
-        if (c) c.alertas.forEach((a) => alertasActivas.add(a));
-      });
-
-      if (alertasActivas.size === 0) {
-        container.innerHTML =
-          '<div class="alertas-empty">Selecciona tus cultivos en la configuración &#9881;<br>para ver las alertas correspondientes.</div>';
-        return;
-      }
-
-      // Mapa alertaId → nombres de cultivos seleccionados que la generan
-      const alertaCultivos = {};
-      cultivosActivos.forEach((cId) => {
-        const c = CULTIVOS.find((x) => x.id === cId);
-        if (c) c.alertas.forEach((aId) => {
-          if (!alertaCultivos[aId]) alertaCultivos[aId] = [];
-          alertaCultivos[aId].push(c.nombre);
-        });
-      });
-
-      // Cockpit: las plagas viven plegadas tras un único encabezado (menos scroll).
-      const header = document.createElement("button");
-      header.type = "button";
-      header.className = "plagas-toggle";
-      header.innerHTML =
-        `<span class="plagas-toggle-txt">&#128737; Vigilancia de plagas y enfermedades</span>` +
-        `<span class="plagas-toggle-cta">ver detalle &#9662;</span>`;
-      const wrap = document.createElement("div");
-      wrap.className = "plagas-cards";
-      wrap.hidden = true;
-      header.addEventListener("click", () => {
-        wrap.hidden = !wrap.hidden;
-        header.classList.toggle("abierto", !wrap.hidden);
-      });
-      container.appendChild(header);
-      container.appendChild(wrap);
-
-      Object.entries(ALERTAS).forEach(([alertaId, alerta]) => {
-        if (!alertasActivas.has(alertaId)) return;
-
-        const riskId     = `${alertaId}-risk`;
-        const reasonId   = `${alertaId}-reason`;
-        const forecastId = `${alertaId}-forecast`;
-
-        const chips = (alertaCultivos[alertaId] || [])
-          .map((n) => `<span class="chip-cultivo">${n}</span>`)
-          .join("");
-
-        const section = document.createElement("section");
-        section.className = "card card-alerta";
-        section.setAttribute("aria-label", `Riesgo de ${alerta.titulo.toLowerCase()}`);
-        section.innerHTML =
-          `<div class="alerta-titulo">${alerta.titulo}</div>` +
-          `<div class="alerta-cultivos">${chips}</div>` +
-          `<span id="${riskId}" class="risk-badge">--</span>` +
-          `<p id="${reasonId}" class="risk-reason"></p>` +
-          `<div class="forecast">` +
-            `<div class="forecast-label">Próximos 3 días</div>` +
-            `<div id="${forecastId}" class="forecast-grid"></div>` +
-          `</div>`;
-        wrap.appendChild(section);
-
-        if (datosHoy) {
-          actualizarPlaga(riskId, reasonId, forecastId, alerta.calcFn, datosHoy, diasFuturos);
-        }
-      });
-    }
+    // El pilar anti-plagas se retiró el 13-ago-2026. Vivía aquí renderizarAlertas,
+    // que pintaba niveles de riesgo derivados de cinco heurísticas de clima diario.
+    // El consejo del 24-jul ya había CONGELADO el pilar y dejado escrito que el MVP
+    // correcto es otro (riesgo de mildiu con clima horario); lo que seguía en
+    // producción era la v0 que aquella decisión descartó. Ver docs/tecnico/.
 
     // ─── Salud del cultivo (NDVI) ──────────────────────────────────────────────────
     // Una entrada es "nueva" (post-Statistical API + NDMI) si trae ndmi.
@@ -3415,12 +3188,20 @@
       if (!ultimoET0 || !ultimoET0.length) return null;
       const conLamina = riegosConLamina();
       const ultRiego  = conLamina[conLamina.length - 1] || null;
-      const refDate   = ultRiego?.date || ultimoNDMI?.fecha;
-      if (!refDate) return null;
 
       const cultivoId = (cfg.cultivos || [])[0] || null;
       const plant     = cfg.fechaPlantacion || null;
       const ahora     = Date.now();
+
+      // La PLANTACIÓN vale como referencia, y es lo que ya hacía el servidor
+      // (api/campo.js arranca la ventana ahí sin exigir riegos). La app pedía
+      // además un riego apuntado o una imagen de satélite, y quien acababa de
+      // darse de alta no tiene ninguna de las dos: se quedaba sin balance y la
+      // pantalla le decía "✓ Todo en orden · Sin alertas urgentes", que no es
+      // que no toque regar — es que no se había calculado nada. Un falso
+      // tranquilizador el primer día es peor que no decir nada.
+      const refDate = ultRiego?.date || ultimoNDMI?.fecha || plant;
+      if (!refDate) return null;
 
       // VENTANA: desde la plantación, igual que el servidor. Antes arrancaba en
       // el penúltimo riego, lo que equivalía a dar el suelo por LLENO ese día:
@@ -3618,33 +3399,6 @@
       return null;
     }
 
-    // Busca una aplicación reciente del catálogo cuyo efecto aún cubra el
-    // criterio dado y, por tanto, justifique silenciar la recomendación.
-    // criterio: { tipo: "plaga", clave: "pulgon" }
-    // Devuelve { aplicacion, producto, diasRestantes, fechaFin } o null.
-    function aplicacionReciente(criterio) {
-      if (!criterio) return null;
-      const hoy = new Date();
-      for (let i = aplicaciones.length - 1; i >= 0; i--) {
-        const a = aplicaciones[i];
-        const efecto = calcularEfectoAplicacion(a);
-        if (!efecto) continue;
-        if (efecto.fechaFin <= hoy) continue;
-        if (criterio.tipo === "plaga") {
-          if (efecto.tipo !== "tratamiento") continue;
-          if (!(efecto.producto.plagas || []).includes(criterio.clave)) continue;
-        } else {
-          continue;
-        }
-        return {
-          aplicacion: a,
-          producto: efecto.producto,
-          diasRestantes: Math.max(1, Math.ceil((efecto.fechaFin - hoy) / 86400000)),
-          fechaFin: efecto.fechaFin.toISOString().slice(0, 10),
-        };
-      }
-      return null;
-    }
 
     // Devuelve aplicaciones cuyo efecto aún está activo, para mostrar badge en
     // el historial. Distinto de aplicacionesConPlazoActivo (que mira cosecha).
@@ -4274,78 +4028,11 @@
         }
       }
 
-      // 2. TRATAMIENTO — solo si la ventana de riesgo justifica intervenir y
-      // no hay un tratamiento reciente cuya protección siga activa.
-      if (ultimoMeteo && cfg.cultivos?.length) {
-        const alertasActivas = new Set();
-        cfg.cultivos.forEach(cId => {
-          const c = CULTIVOS.find(x => x.id === cId);
-          if (c) c.alertas.forEach(a => alertasActivas.add(a));
-        });
-        alertasActivas.forEach(alertaId => {
-          const alerta = ALERTAS[alertaId];
-          if (!alerta) return;
-          const prod = PRODUCTOS_PLAGA[alertaId];
-          if (!prod) return;
-
-          const nivelHoy = alerta.calcFn(ultimoMeteo).nivel;
-          // Niveles de los próximos 3 días
-          const nivelesProx = ultimoPrevision.map(d => ({
-            dia: d,
-            nivel: alerta.calcFn(d).nivel,
-          }));
-          const diasAltos = (nivelHoy === "ALTO" ? 1 : 0)
-            + nivelesProx.filter(n => n.nivel === "ALTO").length;
-          const proximoDiaAlto = nivelesProx.find(n => n.nivel === "ALTO")?.dia;
-
-          // Si ya hay protección activa de una aplicación reciente, no insistir
-          const proteccion = aplicacionReciente({ tipo: "plaga", clave: alertaId });
-          if (proteccion) {
-            // Solo emitimos un aviso suave si la ventana actual o próxima es ALTA,
-            // para que el agricultor sepa que la protección ya cubre el riesgo.
-            if (nivelHoy === "ALTO" || proximoDiaAlto) {
-              recs.push({
-                id: `trat_${alertaId}`, categoria: "TRATAMIENTO", catClass: "tratamiento",
-                titulo: `Protección activa frente al ${prod.titulo.toLowerCase()} — quedan ${proteccion.diasRestantes} días`,
-                detalle: `Aplicaste ${proteccion.aplicacion.productoNombre} el ${proteccion.aplicacion.date}. Sigue protegiendo el cultivo hasta el ${proteccion.fechaFin}. Si ves síntomas claros antes de esa fecha, revisa y consulta — no hace falta volver a tratar todavía.`,
-                prod, prioridad: 6,
-                productoCriterio: { tipo: "plaga", clave: alertaId },
-                yaProtegido: true,
-              });
-            }
-            return;
-          }
-
-          if (nivelHoy === "ALTO" && diasAltos >= 2) {
-            // Hoy ALTO y mañana también: ventana real, merece tratar
-            recs.push({
-              id: `trat_${alertaId}`, categoria: "TRATAMIENTO", catClass: "tratamiento",
-              titulo: `Riesgo alto de ${prod.titulo.toLowerCase()} — actúa antes de que se extienda`,
-              detalle: `Las condiciones de hoy y las próximas son ideales para el ${prod.titulo.toLowerCase()}. La ventana favorable dura varios días, así que actuar ahora de forma preventiva es mucho más eficaz que esperar.`,
-              prod, prioridad: 2,
-              productoCriterio: { tipo: "plaga", clave: alertaId },
-            });
-          } else if (nivelHoy === "ALTO" && diasAltos === 1) {
-            // Hoy ALTO pero mañana baja: ventana puntual, mejor vigilar
-            recs.push({
-              id: `trat_vig_${alertaId}`, categoria: "TRATAMIENTO", catClass: "tratamiento",
-              titulo: `Vigila ${prod.titulo.toLowerCase()} hoy — riesgo puntual`,
-              detalle: `Las condiciones de hoy favorecen el ${prod.titulo.toLowerCase()}, pero mañana cambian. Revisa el cultivo en busca de síntomas; sólo aplica producto si ves daños activos. Tratar por una ventana de un día suele ser un gasto innecesario.`,
-              prod, prioridad: 4,
-              productoCriterio: { tipo: "plaga", clave: alertaId },
-            });
-          } else if (proximoDiaAlto && diasAltos >= 2) {
-            // Próximos días con ALTO sostenido → preventivo
-            recs.push({
-              id: `trat_prev_${alertaId}`, categoria: "TRATAMIENTO", catClass: "tratamiento",
-              titulo: `Prepárate: riesgo de ${prod.titulo.toLowerCase()} a partir del ${proximoDiaAlto.nombreDia}`,
-              detalle: `Hoy el riesgo es bajo, pero las condiciones serán favorables al ${prod.titulo.toLowerCase()} durante varios días seguidos a partir del ${proximoDiaAlto.nombreDia}. Prepara el producto con antelación para actuar en el momento justo.`,
-              prod, prioridad: 4,
-              productoCriterio: { tipo: "plaga", clave: alertaId },
-            });
-          }
-        });
-      }
+      // 2. TRATAMIENTO — retirado el 13-ago-2026, junto con los modelos de riesgo
+      // y el catálogo de fitosanitarios cableado. Kylia ya no recomienda tratar:
+      // el pilar estaba congelado desde el 24-jul y lo que quedaba vivo era la v0
+      // heurística que esa decisión descartó. Registrar lo aplicado sigue estando
+      // (es el cuaderno del RD 1051/2022); recomendarlo, no.
 
       // 3. NUTRICIÓN — retirada: heurística sin validar (se disparaba con
       // NDVI<0.5, que es vigor, no nitrógeno). El pilar de fertilizantes se
@@ -4817,12 +4504,14 @@
         section.appendChild(bloque);
       }
 
+      // Sin plagas, lo único que queda fuera del héroe es el análisis. Si tampoco
+      // hay análisis, no se pinta la tarjeta: decía "Sin acciones urgentes hoy. El
+      // cultivo está bien", y eso ya no lo sabe nadie — desde que se retiró la
+      // vigilancia de plagas, Kylia solo mira el agua y el abonado. Afirmar que el
+      // cultivo está bien sería el mismo falso tranquilizador que el balance daba
+      // el primer día.
       if (visibles.length === 0) {
-        const vacia = document.createElement("div");
-        vacia.className = "rec-vacia";
-        vacia.textContent = "Sin acciones urgentes hoy. El cultivo está bien.";
-        section.appendChild(vacia);
-        container.appendChild(section);
+        if (textoIA) container.appendChild(section);
         return;
       }
 
@@ -5218,14 +4907,12 @@
         document.getElementById("rain-value").textContent     = `${datosHoy.lluvia} mm`;
 
         ultimoPrevision = diasFuturos;
-        renderizarAlertas(datosHoy, diasFuturos);
         renderRecomendaciones();
 
         const hora = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
         setStatus(`Actualizado a las ${hora}`);
       } catch (err) {
         setStatus(`Error: ${err.message}`, true);
-        renderizarAlertas();
         ["temp-value", "humidity-value", "wind-value", "rain-value"].forEach((id) => {
           document.getElementById(id).textContent = "--";
         });
@@ -6076,10 +5763,6 @@
         const el = document.querySelector("#cultivos-grid .btn-cultivo.activo");
         return el ? [el.dataset.id] : [];
       }
-      function obtenerCultivosSecundarios() {
-        const el = document.getElementById("input-cultivos-secundarios");
-        return el ? el.value.trim() : "";
-      }
       function obtenerManejoSeleccionado() {
         const el = document.querySelector("#manejo-grid .btn-cultivo.activo");
         return el ? el.dataset.manejo : null;
@@ -6119,7 +5802,6 @@
             lat:                  nuevoCfg.lat,
             lon:                  nuevoCfg.lon,
             cultivos:             nuevoCfg.cultivos,
-            cultivos_secundarios: nuevoCfg.cultivosSecundarios || null,
             parcela:              nuevoCfg.parcela,
             metodo_riego:         nuevoCfg.metodoRiego || null,
             manejo:               nuevoCfg.manejo || null,
@@ -6183,7 +5865,6 @@
         inputNombre.value = cfg.nombre !== DEFAULTS.nombre ? cfg.nombre : "";
         inputCiudad.value = "";
         setFeedback(cfg.ciudad ? `Ubicación actual: ${cfg.ciudad}` : "");
-        document.getElementById("input-cultivos-secundarios").value = cfg.cultivosSecundarios || "";
         inicializarCultivos();
         inicializarManejo();
         inicializarMetodoRiego();
@@ -6285,12 +5966,11 @@
         const nombre = inputNombre.value.trim() || DEFAULTS.nombre;
         const ciudad = inputCiudad.value.trim();
         const cultivosSeleccionados = obtenerCultivosSeleccionados();
-        const cultivosSecundarios = obtenerCultivosSecundarios();
         const metodoRiego = obtenerMetodoRiegoSeleccionado();
         const manejo = obtenerManejoSeleccionado();
 
         if (!ciudad) {
-          await guardarYActualizar({ ...cfgFinca, nombre, cultivos: cultivosSeleccionados, cultivosSecundarios, metodoRiego, manejo });
+          await guardarYActualizar({ ...cfgFinca, nombre, cultivos: cultivosSeleccionados, metodoRiego, manejo });
           return;
         }
 
@@ -6307,7 +5987,7 @@
           }
 
           const lugar = data.results[0];
-          await guardarYActualizar({ ...cfgFinca, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
+          await guardarYActualizar({ ...cfgFinca, nombre, ciudad: lugar.name, lat: lugar.latitude, lon: lugar.longitude, cultivos: cultivosSeleccionados, parcela: null, metodoRiego, manejo });
         } catch (_) {
           setFeedback("Error de conexión. Inténtalo de nuevo.", true);
         } finally {
@@ -6323,7 +6003,6 @@
 
         const nombre = inputNombre.value.trim() || DEFAULTS.nombre;
         const cultivosSeleccionados = obtenerCultivosSeleccionados();
-        const cultivosSecundarios = obtenerCultivosSecundarios();
         const metodoRiego = obtenerMetodoRiegoSeleccionado();
         const manejo = obtenerManejoSeleccionado();
 
@@ -6335,14 +6014,23 @@
             const { latitude: lat, longitude: lon } = coords;
             setFeedback("Identificando lugar...");
 
+            // El contorno solo se tira si el GPS dice que el agricultor ya NO
+            // está en esa parcela. Antes se mandaba parcela:null siempre, así
+            // que actualizar la ubicación —o tocar el botón por curiosidad—
+            // borraba el contorno confirmado, y con él la medida del satélite y
+            // la superficie oficial de la que salen los kg del abonado.
+            const sigueEnLaParcela = cfgFinca.parcela &&
+              window.KyliaGeo?.contieneAlPunto(cfgFinca.parcela, [lon, lat]);
+            const parcela = sigueEnLaParcela ? cfgFinca.parcela : null;
+
             try {
               const res  = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=es`);
               const data = await res.json();
               const ciudad = data.city || data.locality || data.principalSubdivision || "Ubicación GPS";
 
-              await guardarYActualizar({ ...cfgFinca, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
+              await guardarYActualizar({ ...cfgFinca, nombre, ciudad, lat, lon, cultivos: cultivosSeleccionados, parcela, metodoRiego, manejo });
             } catch (_) {
-              await guardarYActualizar({ ...cfgFinca, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados, cultivosSecundarios, parcela: null, metodoRiego, manejo });
+              await guardarYActualizar({ ...cfgFinca, nombre, ciudad: "Ubicación GPS", lat, lon, cultivos: cultivosSeleccionados, parcela, metodoRiego, manejo });
             } finally {
               btnGps.disabled = false;
             }
@@ -6555,7 +6243,6 @@
     document.addEventListener("DOMContentLoaded", () => {
       actualizarHeader();
       initConfigPanel();
-      renderizarAlertas();
       renderRiegoRegistro();
       renderHistorialRiegos();
       renderHistorialAplicaciones();

@@ -274,6 +274,32 @@
     return { geometria: polDe(esquinas), area_m2: Math.round(areaM2(esquinas)) };
   }
 
-  return { areaM2, anilloExterior, partirPorLinea, R_TIERRA,
+  // ¿Cae este punto dentro del contorno? Ray casting clásico sobre el anillo
+  // exterior. Los huecos interiores no se miran a propósito: la pregunta que
+  // resuelve esto es "¿el agricultor está en su parcela?", y estar de pie junto
+  // a la caseta o la balsa que forman el hueco sigue siendo estar en ella.
+  //
+  // Lo que decide: si el GPS cae dentro, el contorno que ya tenía guardado sigue
+  // siendo el suyo y NO se toca. Antes, actualizar la ubicación borraba la
+  // parcela sin avisar, y con ella la referencia del satélite y la superficie.
+  function contieneAlPunto(geometry, punto) {
+    const ring = anilloExterior(geometry);
+    if (!ring || ring.length < 3 || !Array.isArray(punto)) return false;
+    const [x, y] = [Number(punto[0]), Number(punto[1])];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+
+    let dentro = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i];
+      const [xj, yj] = ring[j];
+      // El lado cruza la horizontal del punto, y el corte cae a su derecha.
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+        dentro = !dentro;
+      }
+    }
+    return dentro;
+  }
+
+  return { areaM2, anilloExterior, partirPorLinea, R_TIERRA, contieneAlPunto,
            esSimple, moverVertice, insertarVertice, quitarVertice, rectanguloCentrado };
 });

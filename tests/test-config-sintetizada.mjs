@@ -55,7 +55,7 @@ const app = leer("app", "index.html");
 const defaults = app.slice(app.indexOf("const DEFAULTS = {"), app.indexOf("const NDVI_HISTORY_DAYS"));
 const esperadas = [...defaults.matchAll(/^\s{6}(\w+):/gm)].map(m => m[1]);
 const desconocidas = Object.keys(c.finca).filter(k => !esperadas.includes(k));
-ok(esperadas.length >= 14, `se comparan contra los ${esperadas.length} campos de DEFAULTS`);
+ok(esperadas.length >= 13, `se comparan contra los ${esperadas.length} campos de DEFAULTS`);
 ok(desconocidas.length === 0,
    `ninguna clave se sale del panel${desconocidas.length ? ": " + desconocidas.join(", ") : ""}`);
 

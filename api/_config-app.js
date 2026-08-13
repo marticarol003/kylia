@@ -45,7 +45,6 @@ function configDesdeFila(fila) {
   poner("ciudad",              fila.ciudad);
   poner("lat",                 fila.lat);
   poner("lon",                 fila.lon);
-  poner("cultivosSecundarios", fila.cultivos_secundarios);
   poner("parcela",             fila.parcela);
   poner("metodoRiego",         fila.metodo_riego);
   poner("manejo",              fila.manejo);
@@ -64,8 +63,12 @@ function configDesdeFila(fila) {
 
 // Las columnas que hacen falta para lo de arriba. Se nombran aquí para que quien
 // añada un campo al panel lo añada en un solo sitio.
+// `cultivos_secundarios` NO está: la columna sigue en la base con lo que se
+// escribió en su día, pero el campo se retiró del alta el 13-ago-2026 porque
+// ningún motor lo leía nunca — se pedía en el formulario, se guardaba, se subía
+// al servidor y se restauraba, y ahí se acababa.
 const COLUMNAS_FINCA =
-  "nombre,ciudad,lat,lon,cultivos,cultivos_secundarios,parcela,metodo_riego," +
+  "nombre,ciudad,lat,lon,cultivos,parcela,metodo_riego," +
   "manejo,suelo,fecha_plantacion,caudal,area_m2,capacidad_regadera";
 
 module.exports = { configDesdeFila, COLUMNAS_FINCA };
