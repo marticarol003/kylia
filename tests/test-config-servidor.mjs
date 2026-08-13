@@ -73,7 +73,9 @@ ok(/location\.reload\(\)/.test(iife),
 
 console.log("── el enlace del correo entrega el campo, no solo la identidad ──");
 const acceso = leer("api", "_acceso.js");
-ok(/config: dueño\?\.\[0\]\?\.config_app \|\| null/.test(acceso),
+// La forma exacta la fija test-config-sintetizada.mjs; aquí solo importa que la
+// config salga del canjeo y no de una segunda llamada.
+ok(/const config = fila\?\.config_app/.test(acceso) && /\bconfig,/.test(acceso),
    "el canjeo devuelve la configuración en la MISMA llamada (si no, se adopta al dueño y se ve la app vacía)");
 ok(/canjearAcceso/.test(app) && /accion: "canjear"/.test(app), "la app canjea el token de ?acceso=");
 ok(/location\.replace\("\/app"\)/.test(iife),

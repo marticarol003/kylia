@@ -19,6 +19,7 @@ const { necesidadNutrientes, creditoResiduosN } = require("./_motor-nutricion.js
 const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
 const { ofertaSuelo } = require("./_suelo-oferta.js");
 const { rendimientoEsperadoT } = require("./_rendimiento.js");
+const { configDesdeFila, COLUMNAS_FINCA } = require("./_config-app.js");
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
 const ES_UUID = /^[0-9a-f-]{36}$/i;
@@ -182,9 +183,18 @@ async function vistaConfig(res, u) {
   let de = u.id;
 
   if (!config && u.propietario_id && u.propietario_id !== u.id) {
-    const dueños = await supabaseSelect("usuarios", `id=eq.${u.propietario_id}&select=id,config_app`);
-    if (dueños?.[0]?.config_app) { config = dueños[0].config_app; de = dueños[0].id; }
+    const dueños = await supabaseSelect("usuarios",
+      `id=eq.${u.propietario_id}&select=id,config_app,${COLUMNAS_FINCA}`);
+    const dueño = dueños?.[0];
+    const suya = dueño && (dueño.config_app || configDesdeFila(dueño));
+    if (suya) { config = suya; de = dueño.id; }
   }
+
+  // Último recurso: la finca reconstruida desde la propia fila. `config_app`
+  // solo se escribe cuando el agricultor cambia algo, así que quien configuró su
+  // campo antes de que existiera esa columna la tiene vacía — y sin esto abriría
+  // la app en blanco teniendo la parcela guardada. Ver _config-app.js.
+  if (!config) config = configDesdeFila(u);
 
   return res.status(200).json({
     ok: true, vista: "config",

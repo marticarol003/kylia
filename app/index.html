@@ -177,13 +177,23 @@
             body: JSON.stringify({ recurso: "acceso", accion: "canjear", token }),
           });
           const d = await res.json();
-          if (!d.ok) { alert("Ese enlace ya no vale. Pide otro desde la app."); return; }
+          if (!d.ok) {
+            alert("Ese enlace ya no vale. Pide otro desde la app.");
+            location.replace("/app");   // el token no se queda en la barra ni aunque falle
+            return;
+          }
           restaurarConfig(d.config, d.propietario_id);
           // Aunque no hubiera config guardada, el dispositivo ya es suyo.
           localStorage.setItem("kylia_user_id", d.propietario_id);
+          // Abrir el enlace que llegó a SU correo es identificarse, y con más
+          // fuerza que escribirlo en un formulario. Sin esto el gate salta justo
+          // después de canjear y le pide el email a quien acaba de demostrarlo.
+          if (d.email) localStorage.setItem("kylia_user_email", d.email);
+          if (d.nombre) localStorage.setItem("kylia_user_nombre", d.nombre);
           location.replace("/app");            // sin ?acceso= en la barra ni en el historial
         } catch (_) {
           alert("No se ha podido entrar ahora mismo. Inténtalo en un momento.");
+          location.replace("/app");
         }
       }
 
@@ -2140,8 +2150,12 @@
     (function () {
       const gate = document.getElementById("gate");
       const yaIdentificado = !!localStorage.getItem("kylia_user_email");
+      // Con ?acceso= hay un canjeo en vuelo y esta carga termina en recarga: el
+      // email llega de la respuesta, no del formulario. Enseñar aquí el gate solo
+      // conseguiría pedirle el correo durante un segundo a quien viene de abrirlo.
+      const canjeando = new URLSearchParams(location.search).has("acceso");
 
-      if (!yaIdentificado) {
+      if (!yaIdentificado && !canjeando) {
         gate.hidden = false;
         // Focus al primer campo accionable para accesibilidad por teclado
         requestAnimationFrame(() => {

@@ -23,6 +23,7 @@
 
 const crypto = require("crypto");
 const { supabaseInsert, supabaseSelect, supabaseUpdate } = require("./_supabase.js");
+const { configDesdeFila, COLUMNAS_FINCA } = require("./_config-app.js");
 
 const VIDA_MIN     = 15;   // minutos que vive un enlace
 const MAX_POR_HORA = 5;    // peticiones por email y hora
@@ -142,17 +143,28 @@ async function canjear(body) {
   const [zonas, dueño] = await Promise.all([
     supabaseSelect("usuarios",
       `propietario_id=eq.${a.propietario_id}&select=id,nombre,cultivos,area_m2,metodo_riego,fecha_plantacion,ciudad&order=nombre.asc`),
-    supabaseSelect("usuarios", `id=eq.${a.propietario_id}&select=config_app`),
+    supabaseSelect("usuarios", `id=eq.${a.propietario_id}&select=config_app,${COLUMNAS_FINCA}`),
   ]);
 
-  console.log("[acceso] canjeado", JSON.stringify({ email: a.email, zonas: (zonas || []).length }));
+  // El espejo si existe; si no, la finca reconstruida desde su propia fila. Sin
+  // esto, quien no haya tocado la configuración desde que existe `config_app`
+  // adopta a su propietario y abre la app vacía — ver _config-app.js.
+  const fila   = dueño?.[0] || null;
+  const config = fila?.config_app || configDesdeFila(fila);
+
+  console.log("[acceso] canjeado", JSON.stringify({
+    email: a.email, zonas: (zonas || []).length,
+    config: fila?.config_app ? "espejo" : (config ? "sintetizada" : "ninguna"),
+  }));
   return {
     estado: 200,
     cuerpo: {
       ok: true,
       propietario_id: a.propietario_id,
       email: a.email,
-      config: dueño?.[0]?.config_app || null,
+      // El nombre viaja para que el móvil nuevo salude igual que el viejo.
+      nombre: fila?.nombre || null,
+      config,
       zonas: (zonas || []).map(z => ({
         id: z.id, nombre: z.nombre, cultivo: (z.cultivos || [])[0] || null,
         area_m2: z.area_m2, metodo_riego: z.metodo_riego,
