@@ -20,6 +20,7 @@ const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
 const { ofertaSuelo } = require("./_suelo-oferta.js");
 const { rendimientoEsperadoT } = require("./_rendimiento.js");
 const { configDesdeFila, COLUMNAS_FINCA } = require("./_config-app.js");
+const { puedeVer } = require("./_sesion.js");
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
 const ES_UUID = /^[0-9a-f-]{36}$/i;
@@ -717,6 +718,17 @@ module.exports = async (req, res) => {
     const usuarios = await supabaseSelect("usuarios", `id=eq.${usuarioId}&select=*`);
     const u = (usuarios || [])[0];
     if (!u) return res.status(404).json({ ok: false, error: "usuario no encontrado (¿ejecutaste el alta?)" });
+
+    // Quien trae sesión solo puede mirar lo suyo. Sin sesión se deja pasar,
+    // porque hoy nadie la tiene todavía y el cron de avisos llama por HTTP sin
+    // cookie; queda contado en el log para poder cerrar esto con datos. El
+    // porqué entero y el plan de cierre están en _sesion.js.
+    const permiso = puedeVer(req, u);
+    if (!permiso.permitido) {
+      console.warn("[campo] sesión ajena:", JSON.stringify({ pedido: usuarioId, sesion: permiso.sesion }));
+      return res.status(403).json({ ok: false, error: "esa parcela no es tuya" });
+    }
+    if (permiso.motivo === "sin_sesion") console.log("[campo] acceso sin sesión:", vista);
 
     if (vista === "config")      return await vistaConfig(res, u);
     if (vista === "reveal")      return await vistaReveal(req, res, u);

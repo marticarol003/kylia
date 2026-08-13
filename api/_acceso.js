@@ -24,6 +24,7 @@
 const crypto = require("crypto");
 const { supabaseInsert, supabaseSelect, supabaseUpdate } = require("./_supabase.js");
 const { configDesdeFila, COLUMNAS_FINCA } = require("./_config-app.js");
+const SESION = require("./_sesion.js");
 
 const VIDA_MIN     = 15;   // minutos que vive un enlace
 const MAX_POR_HORA = 5;    // peticiones por email y hora
@@ -156,8 +157,15 @@ async function canjear(body) {
     email: a.email, zonas: (zonas || []).length,
     config: fila?.config_app ? "espejo" : (config ? "sintetizada" : "ninguna"),
   }));
+  // El canjeo es el ÚNICO punto del sistema donde alguien demuestra ser quien
+  // dice —abrió un enlace de un solo uso que llegó a su correo—, así que es
+  // donde nace la sesión. Sin SESION_SECRET configurado no se emite ninguna y
+  // todo sigue funcionando igual que antes.
+  const cookies = [SESION.cabeceraSetCookie(SESION.emitir(a.propietario_id))].filter(Boolean);
+
   return {
     estado: 200,
+    cookies,
     cuerpo: {
       ok: true,
       propietario_id: a.propietario_id,

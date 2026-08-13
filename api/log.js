@@ -15,6 +15,7 @@ const {
 } = require("./_supabase.js");
 
 const ACCESO = require("./_acceso.js");
+const { puedeVer } = require("./_sesion.js");
 
 const HANDLERS = {
   "registro-usuario":    handleRegistroUsuario,
@@ -132,10 +133,20 @@ async function handleRegistroUsuario(req, res, body) {
     // fila quedó con otro email/cultivo). Si la fila existente es piloto_sombra=
     // true y su email NO coincide con el entrante, es una colisión de id → no la
     // tocamos y devolvemos 409 en vez de destruir el piloto.
-    const previa = (await supabaseSelect("usuarios", `id=eq.${id}&select=email,piloto_sombra`))[0];
+    const previa = (await supabaseSelect("usuarios", `id=eq.${id}&select=id,email,piloto_sombra,propietario_id`))[0];
     if (previa && previa.piloto_sombra && previa.email !== fila.email) {
       console.warn("[registro-usuario] colisión con piloto silencioso, no se sobrescribe:", id);
       return res.status(409).json({ ok: false, reason: "pilot_collision", protegido: true });
+    }
+
+    // Este upsert es el vector destructivo del sistema: escribe la fila entera
+    // por UUID, y un campo con null explícito borra. Quien traiga sesión no
+    // puede usarlo contra la parcela de otro. Sin sesión sigue pasando, que es
+    // lo que hoy hace todo el mundo — ver el plan de cierre en _sesion.js.
+    const permiso = puedeVer(req, previa);
+    if (!permiso.permitido) {
+      console.warn("[registro-usuario] sesión ajena:", JSON.stringify({ pedido: id, sesion: permiso.sesion }));
+      return res.status(403).json({ ok: false, error: "esa parcela no es tuya" });
     }
 
     const filas = await supabaseInsert("usuarios", fila, { upsert: true });
@@ -161,6 +172,8 @@ async function handleAcceso(req, res, body) {
     const r = accion === "pedir"   ? await ACCESO.pedir(body, ip)
             : accion === "canjear" ? await ACCESO.canjear(body)
             : { estado: 400, cuerpo: { error: "accion debe ser 'pedir' o 'canjear'" } };
+    // El canjeo devuelve además la cookie de sesión (ver _sesion.js).
+    if (Array.isArray(r.cookies) && r.cookies.length) res.setHeader("Set-Cookie", r.cookies);
     return res.status(r.estado).json(r.cuerpo);
   } catch (err) {
     console.error("[acceso] error:", err.message);
