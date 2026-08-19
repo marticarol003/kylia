@@ -106,6 +106,12 @@ ok(/ES_UUID\.test\(propietarioId\)/.test(pago),
    "el webhook no escribe con un propietario_id que no tenga forma de UUID");
 ok(/return res\.status\(500\)/.test(pago),
    "si no se puede guardar el cobro se devuelve 500, para que Stripe reintente");
+// Comprobado en producción el 13-ago: con la lista de columnas explícita, /api/pago
+// daba 500 mientras la migración no estuviera ejecutada. Es la misma trampa que
+// campo.js ya tenía documentada.
+ok(!/select=id,propietario_id,email,gratuito_de_por_vida/.test(pago) &&
+   (pago.match(/&select=\*/g) || []).length === 2,
+   "las consultas usan select=*: sin la migración ejecutada, pedir las columnas nuevas revienta");
 const sql = leer("db", "suscripciones-2026-08-13.sql");
 ok(/gratuito_de_por_vida/.test(sql) && /palabra dada/.test(sql),
    "la migración marca la gratuidad de los pilotos y deja escrito por qué");

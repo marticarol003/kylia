@@ -47,14 +47,20 @@ function leerCuerpoCrudo(req) {
 
 // Todas las parcelas de la persona: cada fila de `usuarios` con su propietario
 // es una parcela, y la suma de sus áreas es lo que se factura.
+//
+// `select=*` y no la lista de columnas, por el mismo motivo que lo hace campo.js:
+// mientras no se haya ejecutado db/suscripciones-2026-08-13.sql las columnas de
+// suscripción NO EXISTEN, y un select explícito las pide y revienta con 500. Se
+// comprobó en producción: así es exactamente como está el sistema hoy. Con `*`
+// llega lo que haya y las columnas que falten se leen como undefined, que es lo
+// correcto — quien no tiene la columna tampoco tiene suscripción.
 async function zonasDe(propietarioId) {
   return (await supabaseSelect("usuarios",
-    `propietario_id=eq.${propietarioId}&select=id,area_m2,gratuito_de_por_vida,email,suscripcion_estado,stripe_customer_id`)) || [];
+    `propietario_id=eq.${propietarioId}&select=*`)) || [];
 }
 
 async function calcularPara(usuarioId) {
-  const filas = await supabaseSelect("usuarios",
-    `id=eq.${usuarioId}&select=id,propietario_id,email,gratuito_de_por_vida,suscripcion_estado,stripe_customer_id`);
+  const filas = await supabaseSelect("usuarios", `id=eq.${usuarioId}&select=*`);
   const u = filas?.[0];
   if (!u) return null;
 
