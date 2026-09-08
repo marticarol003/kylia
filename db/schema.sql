@@ -44,7 +44,11 @@ create table usuarios (
   fecha_plantacion      date,                                  -- día 0 de la fenología (Kc, raíz)
   piloto_inicio         date,                                  -- arranque limpio del contrafactual del reveal
   fecha_cosecha         date,                                  -- cierra el piloto: diario-b deja de congelar y el reveal
-                                                               -- corta su ventana aquí (NULL = piloto en marcha)
+                                                               -- corta su ventana aquí (NULL = piloto en marcha).
+                                                               -- Cosecha ESCALONADA (cebolleta: se arranca a manojos
+                                                               -- durante semanas) → el día que EMPIEZA, no el que acaba:
+                                                               -- desde el primer manojo la superficie con cultivo encoge
+                                                               -- y el motor sigue calculando ETc para la parcela entera.
   caudal                numeric,                               -- pluviometría del emisor (mm/h = L/m²·h)
   area_m2               numeric,                               -- superficie: escala mm↔litros y regaderas
   capacidad_regadera    numeric,                               -- litros por regadera (riego manual)
