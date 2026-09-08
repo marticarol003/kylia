@@ -400,6 +400,7 @@
     }
     html += `</div>`;
 
+    html += madurezCard(data.madurez);
     html += desgloseCard(data.desglose, h.nivel);
 
     if (data.riegos_recientes && data.riegos_recientes.length) {
@@ -482,6 +483,34 @@
     return h < 12 ? "manana" : h < 16 ? "mediodia" : h < 21 ? "tarde" : "noche"; };
 
   // Tarjeta "el porqué de hoy": de dónde sale la decisión (balance FAO-56).
+  // Cuándo estará lista. Es una VENTANA DE MADUREZ, no una fecha de cosecha:
+  // cuándo cortar lo decide el padre, no el modelo. El servidor solo la manda
+  // cuando ha podido contar el calor del ciclo entero (ver FAO_GDD en el motor);
+  // si no puede, no se pinta nada en vez de inventar una fecha.
+  const MESES = ["enero","febrero","marzo","abril","mayo","junio",
+                 "julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  function diaLargo(iso) { const [,m,d] = iso.split("-"); return `${+d} de ${MESES[+m-1]}`; }
+  function madurezCard(m) {
+    if (!m) return "";
+    if (m.estado === "lista") {
+      return `<div class="card"><div class="label">Cuándo estará lista</div>
+        <div class="next"><span class="big">Ya debería estarlo</span></div>
+        <div class="porque" style="text-align:left;max-width:none;margin-top:6px">
+          Kylia calcula cuándo el cultivo está hecho. Cuándo cortar lo decides tú.</div></div>`;
+    }
+    const [,ma] = m.desde.split("-"), [,mb] = m.hasta.split("-");
+    const rango = ma === mb
+      ? `Entre el ${+m.desde.split("-")[2]} y el ${diaLargo(m.hasta)}`
+      : `Entre el ${diaLargo(m.desde)} y el ${diaLargo(m.hasta)}`;
+    const pct = Math.round((m.fraccion || 0) * 100);
+    return `<div class="card"><div class="label">Cuándo estará lista</div>
+      <div class="next"><span class="big">${rango}</span></div>
+      <div class="porque" style="text-align:left;max-width:none;margin-top:6px">
+        Le quedan unos <b>${m.dias_restantes}</b> día${m.dias_restantes === 1 ? "" : "s"} ·
+        ${pct}% del ciclo hecho (${m.gdd_acum} de ${m.gdd_objetivo} grados-día).
+        Es una ventana de madurez estimada por la temperatura acumulada, no una fecha de cosecha.</div></div>`;
+  }
+
   function desgloseCard(d, nivel) {
     if (!d) return "";
     const pct = v => Math.max(0, Math.min(100, (v / d.taw) * 100));
