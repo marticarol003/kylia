@@ -29,11 +29,67 @@
     calabacin: { ini: 0.50, med: 0.95, fin: 0.75, L: [25, 35, 25, 15], zr: [0.20, 0.60], p: 0.50 },
     // Cebolla tierna / cebolleta (green onion, FAO-56 Tablas 11-12), TRASPLANTADA
     // y cosechada verde (no bulbifica ni se seca → fin sigue ~1.00). Raíz super-
-    // ficial. Adaptado a La Selva en pleno verano (plantada 24-jun): ciclo ~70 d
-    // comprimido y adelantado por el calor, arranque corto por ir de plantel, kc
-    // med subido a 1.05 por clima seco interior (RHmin~35%, FAO-56 ec. 70) y kc
-    // ini a 0.75 por la aspersión frecuente que moja la superficie (más Es).
+    // ficial. Arranque corto por ir de plantel, kc med subido a 1.05 por clima
+    // seco interior (RHmin~35%, FAO-56 ec. 70) y kc ini a 0.75 por la aspersión
+    // frecuente que moja la superficie (más Es).
+    //
+    // ⚠️ El total (70 d) NO está "comprimido por el calor", como decía este
+    // comentario hasta el 8-sep-2026: es EXACTAMENTE el de FAO-56 Tabla 11 para
+    // plantación de abril/mayo. Lo que comprime el ciclo es la temperatura, y de
+    // eso se encarga ahora FAO_GDD (ver abajo): en el ciclo real de Oriol
+    // (plantado el 24-jun) estos 70 días de calendario habrían fallado por 21.
     cebolla:   { ini: 0.75, med: 1.05, fin: 1.00, L: [15, 25, 20, 10], zr: [0.20, 0.30], p: 0.30 },
+  };
+
+  // ── Fenología por CALOR, no por calendario (FAO56rev) ──────────────
+  // Las L de arriba son días, y los días solo miden bien el desarrollo del
+  // cultivo si plantas cuando plantaba la tabla que los publicó. FAO-56 da esas
+  // longitudes atadas a una fecha y una región ("Mediterranean, April"); usarlas
+  // para otra fecha de plantación es el error que este bloque arregla.
+  //
+  // EL CASO QUE LO DESTAPÓ. Piloto de cebolleta de El Tros de l'Uri: plantado el
+  // 24-jun-2026, primera cosecha el 12-ago-2026 → 49 días. El modelo de
+  // calendario decía 70, o sea el 2 de septiembre: 21 días tarde. Y no era un
+  // error de la tabla, era un error de UNIDAD — con la temperatura real de su
+  // campo, la misma suma térmica que Oriol acumuló en 49 días de verano necesita
+  // 70 días plantando el 1 de mayo, que es justo la fecha de referencia de FAO.
+  // Los dos números eran correctos; lo que estaba mal era contarlos en días.
+  //
+  // La revisión de FAO-56 (FAO56rev) hace exactamente esto: sustituye las
+  // longitudes fijas en días por grados-día acumulados (GDD). Aquí se sigue ese
+  // criterio, y las L de calendario se quedan como EJE de la curva Kc, no como
+  // reloj: el reloj es el calor.
+  //
+  // GDD del día = max(0, (Tmax+Tmin)/2 − Tbase)   [método de la media simple]
+  //
+  // DE DÓNDE SALEN ESTOS NÚMEROS (reproducible con scripts/derivar-gdd.mjs):
+  // no están inventados ni ajustados a nuestros pilotos. Para cada cultivo se
+  // toma su fila mediterránea de la Tabla 11 de FAO-56 —sus longitudes de fase y
+  // SU FECHA DE PLANTACIÓN DE REFERENCIA— y se integra la temperatura real de 21
+  // años (2005-2025, Open-Meteo, 41.674 N 2.766 E) sobre esas mismas fases. El
+  // resultado es "cuánto calor pide cada fase", que ya no depende del calendario.
+  // Se usa la MEDIANA de los 21 años; el P10-P90 sale en ±7% del total.
+  //
+  // Tbase por cultivo: Pereira & Paredes (2025), la revisión de umbrales térmicos
+  // hecha expresamente para alimentar la curva Kc de FAO56rev.
+  //
+  // VALIDACIÓN (los dos ciclos cerrados que hay, ninguno usado para calibrar):
+  //   cebolleta · La Selva   · plantada 24-jun → real 12-ago : térmico −3 d, calendario +21 d
+  //   lechuga   · Sant Boi   · plantada 05-jun → real 30-jul : térmico −6 d, calendario +20 d
+  // El sesgo es NEGATIVO en los dos: el modelo dice "ya está lista" unos días
+  // antes de que el agricultor la arranque, que es lo que tiene que hacer —
+  // predice madurez agronómica, no la decisión comercial de cortar. Por eso lo
+  // que se enseña es una VENTANA "a partir de", nunca una fecha de cosecha.
+  const FAO_GDD = {
+    //            Tbase °C   GDD por fase [inicial, desarrollo, media, final]   ref. FAO-56 Tabla 11
+    lechuga:   { tbase:  4.0, gdd: [220, 408, 251, 192] },   // 75 d, abril,       Mediterráneo
+    espinaca:  { tbase:  4.0, gdd: [220, 254, 228,  89] },   // 60 d, abril,       Mediterráneo
+    brassica:  { tbase:  4.0, gdd: [521, 468, 370,  78] },   // 130 d, septiembre
+    tomate:    { tbase: 10.0, gdd: [211, 491, 671, 376] },   // 145 d, abril/mayo, Mediterráneo
+    pimiento:  { tbase: 10.0, gdd: [271, 481, 583, 252] },   // 125 d, abril/junio, Europa y Medit.
+    berenjena: { tbase: 10.5, gdd: [339, 568, 513, 179] },   // 130 d, mayo/junio, Mediterráneo
+    calabacin: { tbase: 10.0, gdd: [128, 307, 335, 219] },   // 100 d, abril,      Mediterráneo
+    cebolla:   { tbase:  6.0, gdd: [154, 323, 335, 176] },   // 70 d, abril/mayo,  Mediterráneo
   };
   const SUELO_AWC = { arenoso: 0.08, franco: 0.15, arcilloso: 0.16 }; // θFC−θWP, FAO-56 Tabla 19
   const SUELO_AWC_DEFAULT = 0.15;   // franco
@@ -91,6 +147,176 @@
     return k.zr[0] + (k.zr[1] - k.zr[0]) * f;
   }
 
+  // ── Grados-día: el reloj real del cultivo ─────────────────────────
+  // Método de la media simple, que es el que usan las tablas de Tbase de las que
+  // salen nuestros umbrales. Sin las dos temperaturas del día no hay GDD: se
+  // devuelve null y quien llame decide, en vez de colar un 0 que parecería un
+  // día frío de verdad.
+  function gradosDia(tmax, tmin, tbase) {
+    // Ojo con el hueco: Number(null) es 0 y Number("") también, o sea que un día
+    // SIN dato colaría como un día a 0 °C — frío inventado que retrasaría la
+    // madurez. Los null se descartan antes de convertir.
+    if (tmax == null || tmin == null || tmax === "" || tmin === "") return null;
+    const a = Number(tmax), b = Number(tmin), t = Number(tbase);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(t)) return null;
+    return Math.max(0, (a + b) / 2 - t);
+  }
+
+  // Calor total que pide el ciclo entero (mm de fenología, por así decirlo).
+  function gddDelCiclo(cultivoId) {
+    const g = FAO_GDD[cultivoId];
+    return g ? g.gdd.reduce((a, b) => a + b, 0) : null;
+  }
+
+  // Pasa un calor acumulado al DÍA del eje de FAO (el de las L), fase por fase.
+  // Se hace por fases y no con una regla de tres sobre el total porque el calor
+  // no se reparte igual que los días: una fase de abril acumula mucho menos por
+  // día que la misma fase en julio, y aplanar eso deformaría la curva Kc.
+  // Devolver el día del eje —y no un Kc— es lo que deja intactas a kcDelDia,
+  // faseDelDia y zrDelDia: siguen siendo las mismas funciones de siempre, solo
+  // que el número que reciben ya no es un día de calendario.
+  function diasFenologicos(cultivoId, gddAcum) {
+    const k = FAO_KC[cultivoId], g = FAO_GDD[cultivoId];
+    if (!k || !g || gddAcum == null || !Number.isFinite(Number(gddAcum))) return null;
+    let resto = Math.max(0, Number(gddAcum)), dias = 0;
+    for (let f = 0; f < 4; f++) {
+      if (resto >= g.gdd[f]) { resto -= g.gdd[f]; dias += k.L[f]; continue; }
+      return dias + (g.gdd[f] > 0 ? k.L[f] * (resto / g.gdd[f]) : 0);
+    }
+    // Pasado el ciclo se sigue extrapolando al ritmo de la última fase, para que
+    // el Kc no dé un salto el día que se cruza la madurez.
+    return dias + (g.gdd[3] > 0 ? k.L[3] * (resto / g.gdd[3]) : 0);
+  }
+
+  // Curva fenológica de una parcela: fecha → día del eje de FAO.
+  //
+  // Devuelve null —y entonces todo el motor vuelve al calendario de siempre, sin
+  // cambiar ni un decimal— si falta la tabla térmica del cultivo, si no hay
+  // fecha de plantación, si la serie no trae temperaturas, o si LA SERIE NO
+  // LLEGA A LA PLANTACIÓN. Esto último importa: con el arranque del ciclo sin
+  // contar, la suma térmica va corta y el cultivo parecería más joven de lo que
+  // es, que es exactamente el defecto que veníamos a arreglar. Mejor calendario
+  // honesto que termómetro a medias.
+  function curvaFenologica(cultivoId, serie, fechaPlantacion) {
+    const g = FAO_GDD[cultivoId];
+    if (!g || !fechaPlantacion) return null;
+    const plant = String(fechaPlantacion).slice(0, 10);
+    const dias = [...(serie || [])]
+      .filter(d => d && d.date && d.date >= plant && gradosDia(d.tmax, d.tmin, g.tbase) != null)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (!dias.length || dias[0].date > plant) return null;
+
+    const mapa = new Map();
+    let acum = 0;
+    for (const d of dias) {
+      acum += gradosDia(d.tmax, d.tmin, g.tbase);
+      mapa.set(d.date, { gdd: acum, dias: diasFenologicos(cultivoId, acum) });
+    }
+    const ultima = dias[dias.length - 1].date;
+    const ult    = mapa.get(ultima);
+    // Ritmo de los últimos 7 días, para estirar la curva a los días de pronóstico
+    // que el balance sí tiene y la serie térmica no. Sin esto habría un salto
+    // justo en el día de hoy, que es el que se enseña en pantalla.
+    const atras  = mapa.get(dias[Math.max(0, dias.length - 8)].date);
+    const ritmo  = Math.max(0, (ult.dias - atras.dias) / Math.max(1, Math.min(7, dias.length - 1)));
+
+    return {
+      desde: plant, hasta: ultima, gddAcum: ult.gdd, gddObjetivo: gddDelCiclo(cultivoId),
+      tbase: g.tbase,
+      diaDe(fechaISO) {
+        const hit = mapa.get(fechaISO);
+        if (hit) return hit.dias;
+        if (fechaISO < plant) return 0;
+        if (fechaISO > ultima) {
+          const n = Math.round((new Date(`${fechaISO}T12:00:00`) - new Date(`${ultima}T12:00:00`)) / 86400000);
+          return ult.dias + ritmo * n;
+        }
+        return null;   // hueco en medio de la serie: que decida quien llama
+      },
+    };
+  }
+
+  // Ventana de MADUREZ — no de cosecha. Kylia no sabe cuándo va a cortar el
+  // agricultor: eso lo deciden el precio de la semana, el comprador y si tiene
+  // gente. Lo que sí puede decir es a partir de cuándo el cultivo está hecho.
+  //
+  //   gddAcum:     calor acumulado hasta hoy (de curvaFenologica)
+  //   pronostico:  [{date, tmax, tmin}] de los próximos días (real, ~16 d)
+  //   normales:    {1..12: {tmax, tmin}} medias mensuales del sitio, para el
+  //                horizonte largo (un tomate a 100 días no tiene pronóstico)
+  //
+  // La ANCHURA de la ventana no es un adorno, y sus dos términos tienen fuente:
+  //   · 4 días fijos     → error del propio modelo. Los dos ciclos validados
+  //                        fallaron 3 y 6 días, y ese error no se encoge porque
+  //                        falte menos: sigue ahí el día antes de cosechar.
+  //   · 8% de lo que falta → el calor que aún no ha caído. El P10-P90 interanual
+  //                        del calor del ciclo, medido sobre 21 años, es ±7-8%.
+  // Una fecha sola sería una promesa que no se puede cumplir; una ventana es un
+  // dato con el que se puede planificar.
+  function ventanaMadurez(cultivoId, opts = {}) {
+    const { gddAcum = null, desdeISO = null, pronostico = [], normales = null } = opts;
+    const objetivo = gddDelCiclo(cultivoId);
+    const g = FAO_GDD[cultivoId];
+    if (!g || objetivo == null || gddAcum == null) return null;
+
+    const hoy = desdeISO || new Date().toISOString().slice(0, 10);
+    if (gddAcum >= objetivo) {
+      return { estado: "lista", desde: hoy, probable: hoy, hasta: hoy, dias_restantes: 0,
+               gdd_acum: Math.round(gddAcum), gdd_objetivo: objetivo, fraccion: 1, metodo: "termico" };
+    }
+
+    const prev = new Map((pronostico || []).filter(d => d && d.date).map(d => [d.date, d]));
+    const sumar = (f, n) => { const d = new Date(`${f}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+
+    let acum = gddAcum, fecha = hoy, n = 0, usadoPronostico = 0;
+    while (acum < objetivo && n < 400) {
+      fecha = sumar(hoy, ++n);
+      const p = prev.get(fecha);
+      let dg = p ? gradosDia(p.tmax, p.tmin, g.tbase) : null;
+      if (dg != null) usadoPronostico++;
+      else if (normales) {
+        const m = normales[Number(fecha.slice(5, 7))];
+        dg = m ? gradosDia(m.tmax, m.tmin, g.tbase) : null;
+      }
+      if (dg == null) return null;         // sin forma de proyectar, no se inventa
+      acum += dg;
+    }
+    if (acum < objetivo) return null;
+
+    const medio = 4 + Math.round(n * 0.08);
+    return {
+      estado: "en_curso",
+      desde:    sumar(fecha, -medio),
+      probable: fecha,
+      hasta:    sumar(fecha,  medio),
+      dias_restantes: n,
+      gdd_acum: Math.round(gddAcum), gdd_objetivo: objetivo,
+      fraccion: Math.min(1, gddAcum / objetivo),
+      metodo: usadoPronostico >= n ? "pronostico" : (usadoPronostico > 0 ? "pronostico+normales" : "normales"),
+    };
+  }
+
+  // Medias mensuales de Tmax/Tmin a partir de una serie histórica diaria. Es lo
+  // que alimenta el horizonte largo de ventanaMadurez cuando el pronóstico se
+  // acaba. Puro: la descarga la hace quien llame.
+  function normalesMensuales(serie) {
+    const acc = {};
+    for (const d of serie || []) {
+      if (!d || !d.date) continue;
+      const m = Number(d.date.slice(5, 7));
+      const a = Number(d.tmax), b = Number(d.tmin);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+      (acc[m] = acc[m] || { tmax: 0, tmin: 0, n: 0 });
+      acc[m].tmax += a; acc[m].tmin += b; acc[m].n++;
+    }
+    const out = {};
+    for (const [m, v] of Object.entries(acc)) {
+      if (!v.n) continue;
+      out[Number(m)] = { tmax: Math.round((v.tmax / v.n) * 10) / 10, tmin: Math.round((v.tmin / v.n) * 10) / 10 };
+    }
+    return Object.keys(out).length ? out : null;
+  }
+
   // Agua total (TAW) y fácilmente disponible (RAW), en mm, según textura, cultivo
   // y día del ciclo (la raíz crece → el depósito crece). Compatible hacia atrás:
   // sin cultivo/día usa los fallbacks fijos (ZR_M, P_AGOTAMIENTO).
@@ -132,8 +358,17 @@
   //   opts:    { suelo, cultivoId, metodoRiego, fechaPlantacion }
   // Devuelve { Dr, taw, raw, efic, kcActual, etcAcum, et0Acum, lluviaAcum, sinFenologia }.
   function balanceHidrico(serie, riegos, opts = {}) {
-    const { suelo, cultivoId = null, metodoRiego, fechaPlantacion = null } = opts;
+    const { suelo, cultivoId = null, metodoRiego, fechaPlantacion = null,
+            serieTermica = null, termico = true } = opts;
     const efic = EFIC_RIEGO[metodoRiego] ?? EFIC_DEFAULT;
+    // Reloj del cultivo: calor si se puede, calendario si no. curvaFenologica
+    // devuelve null en cuanto falta algo, y entonces esto se comporta EXACTAMENTE
+    // como antes del 8-sep-2026 — la validación contra pyfao56 sigue en pie.
+    const curva = termico ? curvaFenologica(cultivoId, serieTermica || serie, fechaPlantacion) : null;
+    const diaFen = (fecha, caeEn) => {
+      const t = curva ? curva.diaDe(fecha) : null;
+      return t == null ? diasEntre(fechaPlantacion, caeEn) : t;
+    };
 
     // fecha → mm netos del día, o null = "regó y no sabemos cuánto" (recarga
     // completa). Un null MANDA sobre las cantidades del mismo día, se lea el array
@@ -151,7 +386,7 @@
     let Dr = 0, etcAcum = 0, et0Acum = 0, lluviaAcum = 0;
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     for (const dia of orden) {
-      const dias = diasEntre(fechaPlantacion, new Date(`${dia.date}T12:00:00`));
+      const dias = diaFen(dia.date, new Date(`${dia.date}T12:00:00`));
       // ETc primero: el umbral (RAW) depende de ella por el ajuste de p.
       const kc  = kcDelDia(cultivoId, dias);
       const etc = kc * (dia.et0 ?? 0);
@@ -166,12 +401,19 @@
       etcAcum += etc; et0Acum += (dia.et0 ?? 0); lluviaAcum += pe;
     }
 
-    const ultima = orden.length ? new Date(`${orden[orden.length - 1].date}T12:00:00`) : new Date();
+    const ultimaISO = orden.length ? orden[orden.length - 1].date : new Date().toISOString().slice(0, 10);
+    const ultima    = new Date(`${ultimaISO}T12:00:00`);
+    const diasFin   = diaFen(ultimaISO, ultima);
     return {
       Dr, taw, raw, efic,
-      kcActual: kcDelDia(cultivoId, diasEntre(fechaPlantacion, ultima)),
+      kcActual: kcDelDia(cultivoId, diasFin),
       etcAcum, et0Acum, lluviaAcum,
       sinFenologia: !fechaPlantacion,
+      // Trazabilidad: en qué reloj se ha calculado todo esto.
+      modoFenologia: curva ? "termico" : "calendario",
+      diasFenologicos: diasFin == null ? null : Math.round(diasFin * 10) / 10,
+      gddAcum: curva ? Math.round(curva.gddAcum) : null,
+      faseActual: faseDelDia(cultivoId, diasFin),
     };
   }
 
@@ -302,15 +544,18 @@
   // para comparar manzanas con manzanas contra el agua realmente vertida (que también
   // es bruta: lo que sale del aspersor/regadera, antes de pérdidas).
   function simularKylia(serie, opts = {}) {
-    const { suelo, cultivoId = null, metodoRiego, fechaPlantacion = null } = opts;
+    const { suelo, cultivoId = null, metodoRiego, fechaPlantacion = null,
+            serieTermica = null, termico = true } = opts;
     const efic = EFIC_RIEGO[metodoRiego] ?? EFIC_DEFAULT;
+    const curva = termico ? curvaFenologica(cultivoId, serieTermica || serie, fechaPlantacion) : null;
 
     const orden = [...(serie || [])].sort((a, b) => a.date.localeCompare(b.date));
     let Dr = 0, acum = 0;
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     const puntos = [];
     for (const dia of orden) {
-      const dias = diasEntre(fechaPlantacion, new Date(`${dia.date}T12:00:00`));
+      const tf   = curva ? curva.diaDe(dia.date) : null;
+      const dias = tf == null ? diasEntre(fechaPlantacion, new Date(`${dia.date}T12:00:00`)) : tf;
       // ETc primero: el umbral (RAW) depende de ella por el ajuste de p.
       const kc  = kcDelDia(cultivoId, dias);
       const etc = kc * (dia.et0 ?? 0);
@@ -326,13 +571,15 @@
     // el depósito no llegó al umbral). Honestidad del reveal: comparar acumulados
     // a igual fecha favorece al que riega menos a menudo; este dato lo explicita.
     return { puntos, total: Math.round(acum * 10) / 10, taw, raw, efic,
+             modoFenologia: curva ? "termico" : "calendario",
              deficitFinal: Math.round((Dr / efic) * 10) / 10 };
   }
 
   return {
-    FAO_KC, SUELO_AWC, ZR_M, P_AGOTAMIENTO, PE_MIN_MM, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
+    FAO_KC, FAO_GDD, SUELO_AWC, ZR_M, P_AGOTAMIENTO, PE_MIN_MM, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
     VENTANA_PRONOSTICO_DIAS,
     kcDelDia, faseDelDia, zrDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia,
+    gradosDia, gddDelCiclo, diasFenologicos, curvaFenologica, ventanaMadurez, normalesMensuales,
   };
 
 });

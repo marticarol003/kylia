@@ -43,7 +43,7 @@ function sumarDias(diaStr, n) {
 async function climaSerie(lat, lon, desde) {
   const dias = desde ? Math.min(92, Math.max(1, diasDesde(desde) + 1)) : 30;
   const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}`
-    + `&daily=et0_fao_evapotranspiration,precipitation_sum`
+    + `&daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min`
     + `&past_days=${dias}&forecast_days=1&timezone=Europe%2FMadrid`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`open-meteo ${res.status}`);
@@ -52,6 +52,9 @@ async function climaSerie(lat, lon, desde) {
     date,
     et0:    d.et0_fao_evapotranspiration?.[i] ?? 0,
     lluvia: d.precipitation_sum?.[i] ?? 0,
+    // Temperatura: el reloj fenológico del motor (FAO_GDD). Misma llamada.
+    tmax:   d.temperature_2m_max?.[i] ?? null,
+    tmin:   d.temperature_2m_min?.[i] ?? null,
   }));
 }
 

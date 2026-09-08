@@ -13,7 +13,7 @@
 // aquí solo se leen las filas y se ensambla.
 
 const { isConfigured, supabaseSelect, supabaseUpdate, preludio } = require("./_supabase.js");
-const { balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia, faseDelDia } = require("./_motor-riego.js");
+const { balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia, faseDelDia, ventanaMadurez, curvaFenologica } = require("./_motor-riego.js");
 const { construirReveal } = require("./_reveal.js");
 const { necesidadNutrientes, creditoResiduosN } = require("./_motor-nutricion.js");
 const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
@@ -21,6 +21,7 @@ const { ofertaSuelo } = require("./_suelo-oferta.js");
 const { rendimientoEsperadoT } = require("./_rendimiento.js");
 const { configDesdeFila, COLUMNAS_FINCA } = require("./_config-app.js");
 const { puedeVer } = require("./_sesion.js");
+const { serieTermica, normalesMensuales } = require("./_clima-termico.js");
 
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
 const ES_UUID = /^[0-9a-f-]{36}$/i;
@@ -57,13 +58,16 @@ async function climaSerie(lat, lon, desde) {
   if (hit && Date.now() - hit.t < CLIMA_TTL_MS) return hit.serie;
 
   const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}`
-    + `&daily=et0_fao_evapotranspiration,precipitation_sum`
+    + `&daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min`
     + `&past_days=${past}&forecast_days=7&timezone=Europe%2FMadrid`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`open-meteo ${res.status}`);
   const d = (await res.json()).daily || {};
   const serie = (d.time || []).map((date, i) => ({
     date, et0: d.et0_fao_evapotranspiration?.[i] ?? 0, lluvia: d.precipitation_sum?.[i] ?? 0,
+    // Temperatura: el reloj fenológico del motor. Va en la MISMA llamada, así que
+    // no cuesta una petición más (ver FAO_GDD en assets/js/motor-riego.js).
+    tmax: d.temperature_2m_max?.[i] ?? null, tmin: d.temperature_2m_min?.[i] ?? null,
   }));
   cacheClima.set(clave, { t: Date.now(), serie });
   return serie;
@@ -101,8 +105,14 @@ async function vistaHoy(res, u) {
                  // riego; el balance tiene que ver la lámina del caudal de HOY.
                  litros: laminaRiego(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal) }));
 
+  // Reloj fenológico: la temperatura de TODO el ciclo, que puede empezar antes
+  // de donde llega `serie` (el pronóstico solo da 92 días de pasado y un tomate
+  // son 145). Si esto falla o viene vacío, el motor vuelve solo al calendario.
+  const termica = await serieTermica(u.lat, u.lon, u.fecha_plantacion).catch(() => []);
+
   const opts = { suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
-                 metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion };
+                 metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
+                 serieTermica: termica };
   const presOpts = { metodoRiego: u.metodo_riego, caudalMmh: u.caudal,
                      areaM2: u.area_m2, capacidadRegaderaL: u.capacidad_regadera };
 
@@ -140,7 +150,13 @@ async function vistaHoy(res, u) {
   const desglose = {
     suelo: u.suelo || "franco", cultivo: cultivoId,
     dias_planta: diasDesde(u.fecha_plantacion),
-    fase: faseDelDia(cultivoId, diasDesde(u.fecha_plantacion)),
+    // La fase sale del reloj que de verdad ha usado el balance. Con el de
+    // calendario, la cebolleta de Oriol se pasó el ciclo entero una fase por
+    // detrás de donde estaba (ver FAO_GDD en el motor).
+    dias_fenologicos: balHoy.diasFenologicos,
+    reloj: balHoy.modoFenologia,
+    gdd: balHoy.gddAcum,
+    fase: balHoy.faseActual ?? faseDelDia(cultivoId, diasDesde(u.fecha_plantacion)),
     kc:  Number(balHoy.kcActual.toFixed(2)),
     et0: Number(et0Hoy.toFixed(1)),
     etc: Number((balHoy.kcActual * et0Hoy).toFixed(1)),    // gasto de la planta hoy
@@ -152,8 +168,24 @@ async function vistaHoy(res, u) {
     efic: balHoy.efic, metodo: u.metodo_riego,
   };
 
+  // ── ¿Cuándo estará lista? ────────────────────────────────────────
+  // No es "cuándo cosechar": eso lo deciden el precio de la semana, el comprador
+  // y si tiene gente. Es a partir de cuándo el cultivo está hecho, en ventana y
+  // nunca en fecha suelta. Solo sale si el balance ha ido por calor: con el
+  // reloj de calendario el número sería justo el que falla por tres semanas.
+  let madurez = null;
+  if (balHoy.modoFenologia === "termico" && balHoy.gddAcum != null) {
+    const normales = await normalesMensuales(u.lat, u.lon).catch(() => null);
+    madurez = ventanaMadurez(cultivoId, {
+      gddAcum: balHoy.gddAcum,
+      desdeISO: hoy,
+      pronostico: termica.filter(d => d.date > hoy),
+      normales,
+    });
+  }
+
   return res.status(200).json({
-    ok: true, vista: "hoy",
+    ok: true, vista: "hoy", madurez,
     usuario: { ciudad: u.ciudad, cultivo: cultivoId,
                area_m2: u.area_m2, capacidad_regadera: u.capacidad_regadera,
                metodo_riego: u.metodo_riego, caudal: u.caudal },
@@ -164,6 +196,45 @@ async function vistaHoy(res, u) {
       et0: Number((climaHoy.et0 ?? 0).toFixed(1)), lluvia: Number((climaHoy.lluvia ?? 0).toFixed(1)),
     },
     desglose, proximo, riegos_recientes: recientes,
+  });
+}
+
+// ── Vista "madurez": ¿cuándo estará lista? ────────────────────────
+// La consume /app, que calcula su propio balance en el navegador pero no puede
+// bajarse diez años de temperatura para proyectar el final del ciclo. Aquí ya
+// están la serie térmica y las normales, cacheadas y compartidas entre pilotos.
+//
+// Es deliberadamente barata: NO calcula el balance de agua, solo el reloj del
+// cultivo. Y devuelve `null` sin drama cuando no se puede saber (sin fecha de
+// plantación, sin cultivo con tabla térmica, o sin temperatura que cubra el
+// arranque del ciclo): en pantalla eso es "no se enseña la tarjeta", que es
+// mejor que una fecha inventada.
+async function vistaMadurez(res, u) {
+  const cultivoId = (u.cultivos || [])[0] || null;
+  const vacio = { ok: true, vista: "madurez", madurez: null, cultivo: cultivoId, reloj: "calendario" };
+  if (!cultivoId || !u.fecha_plantacion || u.lat == null || u.lon == null) return res.status(200).json(vacio);
+
+  const cosecha = u.fecha_cosecha ? String(u.fecha_cosecha).slice(0, 10) : null;
+  if (cosecha) return res.status(200).json({ ...vacio, cosechado: true, fecha_cosecha: cosecha });
+
+  const termica = await serieTermica(u.lat, u.lon, u.fecha_plantacion).catch(() => []);
+  const curva   = curvaFenologica(cultivoId, termica, u.fecha_plantacion);
+  if (!curva) return res.status(200).json(vacio);
+
+  const hoy       = hoyISO();
+  const normales  = await normalesMensuales(u.lat, u.lon).catch(() => null);
+  const madurez   = ventanaMadurez(cultivoId, {
+    gddAcum: curva.gddAcum, desdeISO: hoy,
+    pronostico: termica.filter(d => d.date > hoy), normales,
+  });
+  const diaFen = curva.diaDe(hoy);
+
+  return res.status(200).json({
+    ok: true, vista: "madurez", madurez, cultivo: cultivoId, reloj: "termico",
+    fase: faseDelDia(cultivoId, diaFen),
+    dias_calendario:  diasDesde(u.fecha_plantacion),
+    dias_fenologicos: diaFen == null ? null : Math.round(diaFen),
+    gdd: Math.round(curva.gddAcum), gdd_objetivo: curva.gddObjetivo, tbase: curva.tbase,
   });
 }
 
@@ -489,10 +560,18 @@ async function revealDeUsuario(u) {
       const idxFin = serie.findIndex(s => s.date === corte);
       const hasta  = serie.slice(0, (idxFin >= 0 ? idxFin : serie.length - 1) + 1);
       const dias   = desde ? hasta.filter(d => d.date >= desde) : hasta;
+      // El reloj fenológico va APARTE de la ventana simulada, y a propósito: la
+      // comparación puede arrancar después de la plantación (`desde`), pero el
+      // cultivo lleva creciendo desde el día 0. Si el calor se contara solo sobre
+      // el trozo simulado, el contrafactual creería joven a una planta hecha y
+      // regaría de menos — y encima el resultado dependería de cuántos días hace
+      // que se plantó, porque climaSerie corta a 92. Así es determinista.
+      const termica = await serieTermica(u.lat, u.lon, u.fecha_plantacion).catch(() => []);
       if (dias.length) {
         const sim = simularKylia(dias, {
           suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
           metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
+          serieTermica: termica,
         });
         contrafactual = { puntos: sim.puntos, total: sim.total, deficitFinal: sim.deficitFinal };
       }
@@ -605,9 +684,14 @@ async function vistaComparativa(req, res, u) {
   const dias   = inicio ? hasta.filter(d => d.date >= inicio) : hasta;
 
   // 🟢 Kylia: contrafactual sobre el campo del padre (Dr arranca en 0 = suelo lleno tras el asentamiento).
+  // La serie térmica va aparte de `dias` porque la comparación arranca el día
+  // DESPUÉS de plantar y el calor hay que contarlo desde el día 0 (ver el mismo
+  // razonamiento en el reveal).
+  const termica = await serieTermica(u.lat, u.lon, u.fecha_plantacion).catch(() => []);
   const kylia = simularKylia(dias, {
     suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
     metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
+    serieTermica: termica,
   });
   const acumKylia = {};
   kylia.puntos.forEach(p => { acumKylia[p.date] = p.acum_l_m2; });
@@ -735,6 +819,7 @@ module.exports = async (req, res) => {
     if (vista === "comparativa") return await vistaComparativa(req, res, u);
     if (vista === "perfil")      return await vistaPerfil(res, u);
     if (vista === "cuaderno")    return await vistaCuaderno(req, res, u);
+    if (vista === "madurez")     return await vistaMadurez(res, u);
     return await vistaHoy(res, u);
   } catch (err) {
     console.error("[campo] error:", err.message);

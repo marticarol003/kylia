@@ -2141,6 +2141,30 @@
       font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
       color: var(--muted); margin: 14px 0 6px;
     }
+    /* ── Cuándo estará lista ─────────────────────────────────────────
+       Tarjeta de PLANIFICACIÓN, no de acción: va debajo de la del día
+       porque no pide hacer nada hoy, y encima del cockpit porque es lo
+       que el agricultor no puede saber mirando la planta. */
+    .card-madurez { padding: 16px 18px; }
+    .madurez-cab {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    }
+    .madurez-titulo { font-size: .82rem; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--muted); }
+    .madurez-fase { font-size: .78rem; color: var(--muted); }
+    .madurez-fecha {
+      margin: 8px 0 0; font-size: 1.18rem; font-weight: 700; line-height: 1.25;
+      color: var(--verde, #013A27);
+    }
+    .madurez-barra {
+      margin: 12px 0 8px; height: 6px; border-radius: 999px;
+      background: #e8efe9; overflow: hidden;
+    }
+    .madurez-barra > span {
+      display: block; height: 100%; border-radius: 999px;
+      background: var(--verde, #013A27); transition: width .4s ease;
+    }
+    .madurez-nota { margin: 0; font-size: .8rem; color: var(--muted); line-height: 1.45; }
   </style>
 </head>
 <body>
@@ -2397,6 +2421,20 @@
     <section class="card card-hoy" id="card-hoy" aria-label="Acción del día">
       <div id="hoy-contenido"><p class="hoy-cargando">Cargando datos...</p></div>
       <div class="hoy-detalle" id="det-hoy"></div>
+    </section>
+
+    <!-- Cuándo estará lista: ventana de MADUREZ, nunca una fecha de cosecha.
+         Nace oculta; si el servidor no puede calcularla (sin fecha de plantación,
+         cultivo sin tabla térmica, o sin temperatura que cubra el arranque del
+         ciclo) se queda oculta en vez de enseñar una fecha inventada. -->
+    <section class="card card-madurez" id="card-madurez" aria-label="Cuándo estará lista" hidden>
+      <div class="madurez-cab">
+        <span class="madurez-titulo">Cuándo estará lista</span>
+        <span class="madurez-fase" id="madurez-fase"></span>
+      </div>
+      <p class="madurez-fecha" id="madurez-fecha"></p>
+      <div class="madurez-barra" id="madurez-barra"><span id="madurez-progreso" style="width:0"></span></div>
+      <p class="madurez-nota" id="madurez-nota"></p>
     </section>
 
     <!-- Cockpit: salud del cultivo + meteo en rejilla de tiles -->
@@ -3118,6 +3156,7 @@
       renderRecomendaciones();
       cargarNDVI(true);
       cargarET0();
+      window.pintarMadurez?.();
       cargarPlanAbonado();
       window.kyliaTrack?.("zona-cambiada", { zona: nuevo ? "secundaria" : "principal" });
     }
@@ -3262,7 +3301,14 @@
         refDate,
         diasDesdeUltimoRiego: ultRiego ? Math.max(0, diasDesde(ultRiego.date, ahora)) : null,
         ultimoLitros:         ultRiego?.litros ?? null,
-        kcActual:             kcDelDia(cultivoId, diasDesde(plant, ahora)),
+        // Del balance, no recalculado aparte: si el balance ha ido por calor y
+        // esto por calendario, la pantalla enseñaría un Kc que no es el que ha
+        // movido el déficit. Es el mismo tipo de desajuste app↔servidor que ya
+        // costó una sesión entera el 31-jul.
+        kcActual:             bal.kcActual,
+        modoFenologia:        bal.modoFenologia,
+        diasFenologicos:      bal.diasFenologicos,
+        faseActual:           bal.faseActual,
         sinFenologia:         !plant,
       };
     }
@@ -3674,14 +3720,23 @@
         // se cazó el 31-jul por otra causa. No se piden más días: nada en la app
         // consume el pronóstico, y meterlo aquí lo colaría en los acumuladores de
         // ET₀ "desde el último riego" (que suman todo lo que haya en la serie).
-          + `&daily=et0_fao_evapotranspiration,precipitation_sum&past_days=${past}&forecast_days=1&timezone=auto`;
+          + `&daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min&past_days=${past}&forecast_days=1&timezone=auto`;
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) return;
         const data  = await res.json();
         const dates = data?.daily?.time || [];
         const vals  = data?.daily?.et0_fao_evapotranspiration || [];
         const lluv  = data?.daily?.precipitation_sum || [];
-        ultimoET0 = dates.map((date, i) => ({ date, et0: vals[i] ?? 0, lluvia: lluv[i] ?? 0 }));
+        // Tmax/Tmin: el reloj fenológico del motor. Van en la MISMA llamada, así
+        // que no cuestan una petición más, y con ellas el Kc deja de ir por días
+        // de calendario (que sobre la cebolleta de Oriol iban una fase por
+        // detrás toda la campaña). Ver FAO_GDD en assets/js/motor-riego.js.
+        const tmx   = data?.daily?.temperature_2m_max || [];
+        const tmn   = data?.daily?.temperature_2m_min || [];
+        ultimoET0 = dates.map((date, i) => ({
+          date, et0: vals[i] ?? 0, lluvia: lluv[i] ?? 0,
+          tmax: tmx[i] ?? null, tmin: tmn[i] ?? null,
+        }));
       } catch (_) {
         ultimoET0 = null;
       }
@@ -5729,6 +5784,71 @@
         });
       })();
 
+      // ── Cuándo estará lista ──────────────────────────────────────────────
+      // El agricultor no tiene por qué llevar la cuenta de los días. El servidor
+      // sabe cuánto calor ha acumulado su parcela desde la plantación y cuánto
+      // le pide el ciclo (FAO56rev: grados-día, no días de calendario), y con el
+      // pronóstico y las normales del sitio proyecta cuándo llega.
+      //
+      // Se enseña una VENTANA y se dice que es de MADUREZ. Kylia no sabe cuándo
+      // va a cortar: eso lo deciden el precio de la semana, el comprador y si
+      // tiene gente ese día. Prometer una fecha de cosecha sería fallar siempre
+      // y por motivos que el modelo no puede ver.
+      (function () {
+        const bloque = document.getElementById("card-madurez");
+        if (!bloque) return;
+        const elFecha = document.getElementById("madurez-fecha");
+        const elFase  = document.getElementById("madurez-fase");
+        const elNota  = document.getElementById("madurez-nota");
+        const elProg  = document.getElementById("madurez-progreso");
+
+        const MES = ["enero","febrero","marzo","abril","mayo","junio",
+                     "julio","agosto","septiembre","octubre","noviembre","diciembre"];
+        const trozo = iso => { const [, m, d] = iso.split("-"); return { d: Number(d), m: Number(m) - 1 }; };
+        const dia   = iso => { const t = trozo(iso); return `${t.d} de ${MES[t.m]}`; };
+        // "entre el 5 y el 21 de agosto" si caen en el mismo mes; si no, mes en los dos.
+        function rango(a, b) {
+          const A = trozo(a), B = trozo(b);
+          return A.m === B.m ? `Entre el ${A.d} y el ${B.d} de ${MES[B.m]}`
+                             : `Entre el ${dia(a)} y el ${dia(b)}`;
+        }
+
+        async function pintar() {
+          const uid = window.kyliaSync?.userId;
+          if (!uid) return;
+          let d;
+          try {
+            const res = await fetch(`/api/campo?vista=madurez&usuario_id=${encodeURIComponent(uid)}`,
+                                    { cache: "no-store" });
+            d = await res.json();
+          } catch (_) { return; }
+          // Sin respuesta útil el bloque se queda como está (oculto): una fecha a
+          // medias en la pantalla principal es peor que no decir nada.
+          if (!d?.ok || !d.madurez) { bloque.hidden = true; return; }
+
+          const m = d.madurez;
+          elFase.textContent = d.fase ? `fase ${d.fase}` : "";
+          const pct = Math.round((m.fraccion ?? 0) * 100);
+          elProg.style.width = `${Math.max(2, Math.min(100, pct))}%`;
+
+          if (m.estado === "lista") {
+            elFecha.textContent = "Ya debería estar lista";
+            elNota.textContent  = "Kylia calcula cuándo el cultivo está hecho. "
+              + "Cuándo cortar lo decides tú: eso depende del precio, del comprador y de tu semana.";
+          } else {
+            elFecha.textContent = rango(m.desde, m.hasta);
+            const quedan = m.dias_restantes;
+            elNota.textContent =
+              `Le quedan unos ${quedan} día${quedan === 1 ? "" : "s"} · ${pct}% del ciclo hecho `
+              + `(${m.gdd_acum} de ${m.gdd_objetivo} grados-día). `
+              + "Es una ventana de madurez estimada por la temperatura acumulada, no una fecha de cosecha.";
+          }
+          bloque.hidden = false;
+        }
+
+        window.pintarMadurez = pintar;
+      })();
+
       // ── Tu suscripción ───────────────────────────────────────────────────
       // Hasta ahora /app no tenía por dónde pagar: el precio se calculaba en el
       // servidor y no se enseñaba en ninguna pantalla. Esto le pregunta a
@@ -5849,6 +5969,7 @@
         cargarNDVI(true);
         cargarHumedadSuelo();
         cargarET0();
+        window.pintarMadurez?.();
       });
     }
 
@@ -5953,6 +6074,7 @@
         cargarNDVI(true);
         cargarHumedadSuelo();
         cargarET0();
+        window.pintarMadurez?.();
       }
 
       function setFeedback(texto, esError = false) {
@@ -6393,6 +6515,7 @@
       cargarNDVI();
       cargarHumedadSuelo();
       cargarET0();
+      window.pintarMadurez?.();
       cargarPlanAbonado();
       setInterval(cargarDatos, REFRESH_MS);
       setInterval(cargarNDVI, 6 * 60 * 60 * 1000);       // cada 6h (Sentinel-2 revisita ~5 días)
@@ -6419,6 +6542,7 @@
         cargarNDVI(true);
         cargarHumedadSuelo();
         cargarET0();
+        window.pintarMadurez?.();
       });
 
       // Delegación: botones de riego en riego-registro se renderizan dinámicamente
