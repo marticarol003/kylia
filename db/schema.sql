@@ -45,10 +45,16 @@ create table usuarios (
   piloto_inicio         date,                                  -- arranque limpio del contrafactual del reveal
   fecha_cosecha         date,                                  -- cierra el piloto: diario-b deja de congelar y el reveal
                                                                -- corta su ventana aquí (NULL = piloto en marcha).
-                                                               -- Cosecha ESCALONADA (cebolleta: se arranca a manojos
-                                                               -- durante semanas) → el día que EMPIEZA, no el que acaba:
-                                                               -- desde el primer manojo la superficie con cultivo encoge
-                                                               -- y el motor sigue calculando ETc para la parcela entera.
+                                                               -- Cosecha ESCALONADA: el día bueno depende de si recolectar
+                                                               -- QUITA la planta o no.
+                                                               --  · cebolleta → se arranca a manojos: la superficie con
+                                                               --    cultivo encoge desde el primer día, así que se cierra
+                                                               --    el día que EMPIEZA la cosecha (si no, el motor calcula
+                                                               --    ETc de una parcela que ya está medio vacía).
+                                                               --  · tomate → coger fruta no quita la mata: sigue ahí y
+                                                               --    sigue transpirando, así que se cierra el día que se
+                                                               --    RETIRA el cultivo (cerrar en la 1ª recolección borraría
+                                                               --    semanas en las que sí había que regar).
   caudal                numeric,                               -- pluviometría del emisor (mm/h = L/m²·h)
   area_m2               numeric,                               -- superficie: escala mm↔litros y regaderas
   capacidad_regadera    numeric,                               -- litros por regadera (riego manual)
