@@ -47,10 +47,16 @@
 | Vercel Inc. | Hosting de la aplicación | EEUU | Cláusulas Contractuales Tipo + Data Privacy Framework |
 | Supabase Inc. | Base de datos + auth | EEUU (datos en EU) | CCT + DPF; instancia en región europea |
 | Stripe Payments | Cobros y facturación | EEUU/Irlanda | CCT + DPF |
-| Beehiiv / `[proveedor email]` | Newsletter y emails transaccionales | EEUU | CCT + DPF |
+| Resend | Emails transaccionales: enlace de acceso, avisos de riego, respuestas a tu feedback | EEUU | CCT + DPF |
+| Google (API Gemini, con búsqueda) | Redactar en lenguaje llano la recomendación agronómica y buscar qué fertilizante se puede comprar cerca | EEUU | CCT + DPF |
+| Anthropic (API Claude) | Misma finalidad de redacción, como alternativa | EEUU | CCT + DPF |
+| Open-Meteo | Clima y previsión por coordenadas de la parcela | UE | No aplica (servicio prestado desde la UE) |
+| ISRIC — World Soil Information (SoilGrids) | Textura y capacidad de retención del suelo por coordenadas | Países Bajos (UE) | No aplica (datos públicos abiertos, UE) |
 | ESA / Copernicus (Sentinel-2) | Imágenes satélite (datos abiertos) | EU | No aplica (datos públicos abiertos) |
 | Ministerio de Agricultura (SIGPAC) | Geometrías de parcelas | España | No aplica (datos públicos abiertos) |
-| `[REVISAR — añadir cualquier otro proveedor]` | | | |
+| CallMeBot | Avisos por WhatsApp, **solo** para quien lo pide expresamente | UE | Consentimiento; se deja de usar en cuanto lo retiras |
+
+**Qué sale de Kylia hacia cada proveedor, dicho con precisión.** A los servicios de IA (Google, Anthropic) se les manda **contexto agronómico** —cultivo, día del ciclo, déficit de agua, análisis de suelo— y, cuando se busca dónde comprar un fertilizante, **el municipio** de la parcela, para que el resultado sea comprable cerca. **Nunca** tu nombre, tu email, tu teléfono ni la referencia SIGPAC de la parcela. A los servicios de clima y suelo solo van **coordenadas**, sin nada que las asocie a una persona. Datos identificativos solo los recibe quien los necesita para su función: Supabase (los guarda), Resend (te escribe), Stripe (te cobra).
 
 Todos los encargados firman contratos conformes al artículo 28 RGPD.
 

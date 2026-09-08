@@ -17,7 +17,7 @@ DOCS = [
 
 CSS = """
 :root {
-  --verde:#2b7a3a; --verde-700:#1f5a2b; --verde-900:#0f3617; --verde-50:#e8f3ea;
+  --verde:#013A27; --verde-700:#002518; --verde-900:#001710; --verde-50:#E7F1EC;
   --slate-900:#0f172a; --slate-700:#334155; --slate-500:#64748b; --slate-300:#cbd5e1; --slate-200:#e2e8f0; --slate-50:#f8fafc;
   --text:var(--slate-900); --muted:var(--slate-500); --subtle:var(--slate-700); --border:var(--slate-200);
   --max:820px; --radius:16px;
@@ -25,7 +25,7 @@ CSS = """
 }
 *,*::before,*::after { box-sizing:border-box; }
 html,body,h1,h2,h3,h4,p,ul,ol { margin:0; padding:0; }
-body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, system-ui, sans-serif;
+body { font-family:"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, system-ui, sans-serif;
        color:var(--text); line-height:1.65; -webkit-font-smoothing:antialiased; background:#fff; }
 a { color:var(--verde); text-decoration:none; }
 a:hover { text-decoration:underline; }
@@ -34,7 +34,7 @@ a:hover { text-decoration:underline; }
 .nav { position:sticky; top:0; z-index:50; background:rgba(255,255,255,0.92);
        backdrop-filter:saturate(180%) blur(10px); border-bottom:1px solid var(--border); }
 .nav-inner { display:flex; align-items:center; justify-content:space-between; padding:14px 0; gap:24px; max-width:1180px; margin:0 auto; padding-left:24px; padding-right:24px; }
-.brand { display:inline-flex; align-items:center; gap:8px; color:var(--verde-900); font-weight:800; letter-spacing:-0.02em; font-size:1.1rem; }
+.brand { display:inline-flex; align-items:center; gap:8px; color:var(--verde-900); font-weight:700; letter-spacing:-0.02em; font-size:1.1rem; }
 .brand-dot { width:14px; height:14px; border-radius:50%; background:var(--verde); }
 .nav-links { display:flex; gap:24px; align-items:center; font-size:0.95rem; }
 .nav-links a { color:var(--subtle); }
@@ -77,7 +77,7 @@ footer { border-top:1px solid var(--border); padding:32px 0; color:var(--muted);
 NAV_HTML = """
 <nav class="nav" aria-label="Principal">
   <div class="nav-inner">
-    <a href="/" class="brand"><span class="brand-dot" aria-hidden="true"></span>Kylia</a>
+    <a href="/" class="brand"><svg class="brand-logo" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="flex:0 0 auto"><path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(45)"/><path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(225)"/><circle cx="12" cy="12" r="2.4"/></svg>Kylia</a>
     <div class="nav-links">
       <a href="/precios">Precios</a>
       <a href="/cooperativas">Cooperativas</a>
@@ -136,8 +136,11 @@ def render_page(slug, title, description, md_content):
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="theme-color" content="#2b7a3a" />
+<meta name="theme-color" content="#013A27" />
 <meta name="robots" content="index,follow" />
 <title>{title} — Kylia</title>
 <meta name="description" content="{description}" />
@@ -146,7 +149,7 @@ def render_page(slug, title, description, md_content):
 <meta property="og:title" content="{title} — Kylia" />
 <meta property="og:description" content="{description}" />
 <meta property="og:image" content="https://kylia.app/assets/img/og-image.png" />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%232b7a3a%22/><path d=%22M10 20 Q16 10 22 20 Z%22 fill=%22white%22/></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23013A27%22/><g fill=%22%23ffffff%22><path d=%22M0 0C2 -2.2 2 -5 0 -7.2C-2 -5 -2 -2.2 0 0Z%22 transform=%22translate(16 16) rotate(45)%22/><path d=%22M0 0C2 -2.2 2 -5 0 -7.2C-2 -5 -2 -2.2 0 0Z%22 transform=%22translate(16 16) rotate(225)%22/><circle cx=%2216%22 cy=%2216%22 r=%223.3%22/></g></svg>" />
 <style>{CSS}</style>
 </head>
 <body>
@@ -178,8 +181,11 @@ INDEX_HTML = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="theme-color" content="#2b7a3a" />
+<meta name="theme-color" content="#013A27" />
 <meta name="robots" content="index,follow" />
 <title>Legal — Kylia</title>
 <meta name="description" content="Términos, privacidad, cookies y DPA Enterprise de Kylia. Conformidad RGPD y LSSI." />
@@ -188,7 +194,7 @@ INDEX_HTML = f"""<!DOCTYPE html>
 <meta property="og:title" content="Legal — Kylia" />
 <meta property="og:description" content="Documentos legales de Kylia: términos, privacidad, cookies y DPA." />
 <meta property="og:image" content="https://kylia.app/assets/img/og-image.png" />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%232b7a3a%22/><path d=%22M10 20 Q16 10 22 20 Z%22 fill=%22white%22/></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%23013A27%22/><g fill=%22%23ffffff%22><path d=%22M0 0C2 -2.2 2 -5 0 -7.2C-2 -5 -2 -2.2 0 0Z%22 transform=%22translate(16 16) rotate(45)%22/><path d=%22M0 0C2 -2.2 2 -5 0 -7.2C-2 -5 -2 -2.2 0 0Z%22 transform=%22translate(16 16) rotate(225)%22/><circle cx=%2216%22 cy=%2216%22 r=%223.3%22/></g></svg>" />
 <style>{CSS}
 .cards {{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:18px; margin-top:32px; }}
 @media (max-width:600px) {{ .cards {{ grid-template-columns:1fr; }} }}

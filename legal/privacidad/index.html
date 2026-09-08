@@ -232,10 +232,34 @@ footer { border-top:1px solid var(--border); padding:32px 0; color:var(--muted);
 <td>CCT + DPF</td>
 </tr>
 <tr>
-<td>Beehiiv / <code>[proveedor email]</code></td>
-<td>Newsletter y emails transaccionales</td>
+<td>Resend</td>
+<td>Emails transaccionales: enlace de acceso, avisos de riego, respuestas a tu feedback</td>
 <td>EEUU</td>
 <td>CCT + DPF</td>
+</tr>
+<tr>
+<td>Google (API Gemini, con búsqueda)</td>
+<td>Redactar en lenguaje llano la recomendación agronómica y buscar qué fertilizante se puede comprar cerca</td>
+<td>EEUU</td>
+<td>CCT + DPF</td>
+</tr>
+<tr>
+<td>Anthropic (API Claude)</td>
+<td>Misma finalidad de redacción, como alternativa</td>
+<td>EEUU</td>
+<td>CCT + DPF</td>
+</tr>
+<tr>
+<td>Open-Meteo</td>
+<td>Clima y previsión por coordenadas de la parcela</td>
+<td>UE</td>
+<td>No aplica (servicio prestado desde la UE)</td>
+</tr>
+<tr>
+<td>ISRIC — World Soil Information (SoilGrids)</td>
+<td>Textura y capacidad de retención del suelo por coordenadas</td>
+<td>Países Bajos (UE)</td>
+<td>No aplica (datos públicos abiertos, UE)</td>
 </tr>
 <tr>
 <td>ESA / Copernicus (Sentinel-2)</td>
@@ -250,13 +274,14 @@ footer { border-top:1px solid var(--border); padding:32px 0; color:var(--muted);
 <td>No aplica (datos públicos abiertos)</td>
 </tr>
 <tr>
-<td><code>[REVISAR — añadir cualquier otro proveedor]</code></td>
-<td></td>
-<td></td>
-<td></td>
+<td>CallMeBot</td>
+<td>Avisos por WhatsApp, <strong>solo</strong> para quien lo pide expresamente</td>
+<td>UE</td>
+<td>Consentimiento; se deja de usar en cuanto lo retiras</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Qué sale de Kylia hacia cada proveedor, dicho con precisión.</strong> A los servicios de IA (Google, Anthropic) se les manda <strong>contexto agronómico</strong> —cultivo, día del ciclo, déficit de agua, análisis de suelo— y, cuando se busca dónde comprar un fertilizante, <strong>el municipio</strong> de la parcela, para que el resultado sea comprable cerca. <strong>Nunca</strong> tu nombre, tu email, tu teléfono ni la referencia SIGPAC de la parcela. A los servicios de clima y suelo solo van <strong>coordenadas</strong>, sin nada que las asocie a una persona. Datos identificativos solo los recibe quien los necesita para su función: Supabase (los guarda), Resend (te escribe), Stripe (te cobra).</p>
 <p>Todos los encargados firman contratos conformes al artículo 28 RGPD.</p>
 <h2 id="4-tus-derechos">4. Tus derechos</h2>
 <p>Como titular de los datos puedes ejercer los siguientes derechos:</p>

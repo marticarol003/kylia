@@ -51,6 +51,23 @@ ok(piloto.motivo === "gratuito_de_por_vida", "y se dice por qué, para que el im
 const vacio = P.precioAnual([]);
 ok(vacio.cobrable === false && vacio.motivo === "sin_superficie",
    "sin parcelas dadas de alta no se cobra la base 'por si acaso': no hay nada que gestionar");
+ok(P.precioAnual(zonas(null, 0)).motivo === "sin_superficie",
+   "y zonas creadas pero sin superficie configurada tampoco facturan");
+
+console.log("── la parcela pequeña de verdad SÍ es una parcela ──");
+// El bancal de 33 lechugas son 5 m² = 0,0005 ha. Redondeando a la décima daba 0,
+// caía en "sin_superficie" y /api/pago respondía "todavía no has dado de alta
+// ninguna parcela" a quien la tenía dada de alta y en uso. La tarifa no tiene
+// suelo: 99 € es la base "hasta 5 ha".
+const bancal = P.precioAnual(zonas(5));
+ok(bancal.motivo !== "sin_superficie",
+   "5 m² no son 'ninguna parcela': el mensaje ya no miente");
+ok(bancal.cobrable === true && bancal.total_cent === 9900,
+   `una parcela real, por pequeña que sea, paga la base (salen ${P.euros(bancal.total_cent)} €)`);
+ok(!/no has dado de alta|no hay ninguna parcela/.test(P.explicacion(bancal)),
+   `y la explicación habla de precio, no de ausencia: "${P.explicacion(bancal)}"`);
+ok(P.hectareasFacturables(5) === 0.1 && P.hectareasFacturables(0) === 0,
+   "el suelo de 0,1 ha solo se aplica cuando hay superficie: 0 m² siguen siendo 0 ha");
 
 console.log("── el IVA se calcula, no se olvida ──");
 ok(marc.total_con_iva_cent === 16335, "135 € + 21% = 163,35 € (lo que de verdad se le carga)");
@@ -116,6 +133,26 @@ const sql = leer("db", "suscripciones-2026-08-13.sql");
 ok(/gratuito_de_por_vida/.test(sql) && /palabra dada/.test(sql),
    "la migración marca la gratuidad de los pilotos y deja escrito por qué");
 ok(/add column if not exists/.test(sql), "y es idempotente");
+
+console.log("── el precio se puede ver y pagar desde /app ──");
+// El esqueleto de cobro existía entero en el servidor y no había NINGUNA
+// pantalla donde el agricultor viera su precio ni pudiera pagar.
+const app = leer("app", "index.html");
+ok(/id="suscripcion-bloque"/.test(app), "/app tiene el bloque de suscripción");
+ok(/<div class="suscripcion" id="suscripcion-bloque" hidden>/.test(app),
+   "que nace oculto: sin respuesta del servidor no se enseña un precio a medias");
+ok(/accion, usuario_id: window\.kyliaSync\?\.userId/.test(app),
+   "el botón manda la acción y el usuario a /api/pago");
+ok(/abrir\("checkout"\)/.test(app) && /abrir\("portal"\)/.test(app),
+   "y cubre las dos: activar la suscripción y gestionarla después");
+ok(/total_con_iva_cent/.test(app),
+   "el importe se enseña también con IVA: la línea de Stripe va con tax_behavior exclusive, o sea que el 21% se suma encima");
+ok(/if \(p\.motivo === "sin_superficie"\) \{ bloque\.hidden = true; return; \}/.test(app),
+   "sin parcela con superficie el bloque se esconde, en vez de enseñar un precio de 0");
+ok(/if \(d\.configurado\)/.test(app),
+   "sin Stripe montado se ve el precio pero no un botón que no lleva a ningún sitio");
+ok(/tax_behavior: "exclusive"/.test(leer("api", "_stripe.js")),
+   "y el servidor cobra de verdad con el IVA por encima, que es lo que /app promete");
 
 console.log("── nada de esto cobra todavía ──");
 delete process.env.STRIPE_SECRET_KEY;

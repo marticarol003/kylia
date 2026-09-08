@@ -986,6 +986,22 @@
       font: inherit; font-weight: 600; cursor: pointer;
     }
     .btn-otro-movil:disabled { opacity: .5; cursor: default; }
+    .suscripcion { margin-top: 22px; padding-top: 18px; border-top: 1px solid #e6e6e6; }
+    .suscripcion-precio {
+      font-size: 1.15rem; font-weight: 700; color: var(--verde, #013A27);
+      margin: 0 0 2px; line-height: 1.3;
+    }
+    .suscripcion-precio .iva { font-size: .82rem; font-weight: 500; color: var(--muted); }
+    .btn-suscripcion {
+      width: 100%; margin-top: 12px; padding: 12px 16px; border: 0;
+      background: var(--verde, #013A27); color: #fff; border-radius: 10px;
+      font: inherit; font-weight: 700; cursor: pointer;
+    }
+    .btn-suscripcion.secundario {
+      background: transparent; color: var(--verde, #013A27);
+      border: 1px solid var(--verde, #013A27);
+    }
+    .btn-suscripcion:disabled { opacity: .5; cursor: default; }
     .config-hint {
       font-size: 0.82rem;
       color: var(--muted);
@@ -2347,6 +2363,18 @@
           <button type="button" class="btn-otro-movil" id="btn-otro-movil">Enviar enlace</button>
         </div>
         <p class="config-feedback" id="otro-movil-feedback" aria-live="polite"></p>
+      </div>
+
+      <!-- Tu suscripción. Nace oculto y solo se enseña cuando el servidor tiene
+           algo que decir: sin Supabase, sin parcela con superficie o si la
+           consulta falla, se queda escondido. Un precio a medias en la pantalla
+           donde el agricultor está configurando su campo es peor que nada. -->
+      <div class="suscripcion" id="suscripcion-bloque" hidden>
+        <p class="config-bloque-titulo">Tu suscripción</p>
+        <p class="suscripcion-precio" id="suscripcion-precio"></p>
+        <p class="config-hint" id="suscripcion-detalle"></p>
+        <button type="button" class="btn-suscripcion" id="btn-suscripcion" hidden></button>
+        <p class="config-feedback" id="suscripcion-feedback" aria-live="polite"></p>
       </div>
     </div>
 
@@ -5701,6 +5729,113 @@
         });
       })();
 
+      // ── Tu suscripción ───────────────────────────────────────────────────
+      // Hasta ahora /app no tenía por dónde pagar: el precio se calculaba en el
+      // servidor y no se enseñaba en ninguna pantalla. Esto le pregunta a
+      // /api/pago qué le toca a ESTA persona —la superficie sale de las zonas de
+      // SIGPAC que ya tiene dadas de alta, ni se la inventamos ni se la
+      // preguntamos— y, cuando haya pasarela, la abre.
+      //
+      // El importe se enseña SIN IVA y CON IVA a la vez, porque es lo que de
+      // verdad le van a cargar: la línea de Stripe va con tax_behavior
+      // "exclusive", o sea que el 21% se suma encima. A quien está en régimen
+      // especial agrario no se lo devuelve nadie, así que esconderlo sería
+      // enseñarle un precio que no existe.
+      (function () {
+        const bloque   = document.getElementById("suscripcion-bloque");
+        const elPrecio = document.getElementById("suscripcion-precio");
+        const elDet    = document.getElementById("suscripcion-detalle");
+        const boton    = document.getElementById("btn-suscripcion");
+        const aviso    = document.getElementById("suscripcion-feedback");
+        if (!bloque || !boton) return;
+
+        const euros = c => (c / 100).toLocaleString("es-ES",
+          { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        async function abrir(accion) {
+          aviso.textContent = "Abriendo…";
+          boton.disabled = true;
+          try {
+            const res = await fetch("/api/pago", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ accion, usuario_id: window.kyliaSync?.userId }),
+            });
+            const d = await res.json();
+            if (d?.ok && d.url) { location.href = d.url; return; }   // se va a Stripe
+            aviso.textContent = d?.reason === "stripe_no_configurado"
+              ? "El pago todavía no está abierto."
+              : "No se ha podido abrir ahora mismo. Inténtalo en un momento.";
+          } catch (_) {
+            aviso.textContent = "No se ha podido abrir ahora mismo. Inténtalo en un momento.";
+          } finally {
+            boton.disabled = false;
+          }
+        }
+
+        async function pintar() {
+          const uid = window.kyliaSync?.userId;
+          if (!uid) return;
+          let d;
+          try {
+            const res = await fetch(`/api/pago?usuario_id=${encodeURIComponent(uid)}`,
+                                    { cache: "no-store" });
+            d = await res.json();
+          } catch (_) { return; }
+          // Sin servidor, o con una persona que todavía no existe en él, no hay
+          // nada honesto que decir: el bloque se queda como estaba (oculto).
+          if (!d?.ok) return;
+
+          const p = d.precio || {};
+          // Sin ninguna parcela con superficie tampoco: el agricultor está justo
+          // en la pantalla donde la va a dar de alta, y un precio de 0 ahí solo
+          // confunde.
+          if (p.motivo === "sin_superficie") { bloque.hidden = true; return; }
+
+          aviso.textContent = "";
+          boton.hidden = true;
+          boton.className = "btn-suscripcion";
+          boton.onclick = null;
+
+          const importe = `${euros(p.total_cent)} €/año ` +
+            `<span class="iva">+ IVA · ${euros(p.total_con_iva_cent)} € en total</span>`;
+
+          if (p.motivo === "gratuito_de_por_vida") {
+            elPrecio.textContent = "Gratis de por vida";
+            elDet.textContent = d.explicacion || "";
+          } else if (d.estado === "activa") {
+            elPrecio.innerHTML = importe;
+            elDet.textContent = "Suscripción activa. Se renueva sola cada año.";
+            boton.hidden = false;
+            boton.textContent = "Gestionar suscripción";
+            boton.className = "btn-suscripcion secundario";
+            boton.onclick = () => abrir("portal");
+          } else if (d.estado === "impago") {
+            elPrecio.innerHTML = importe;
+            elDet.textContent = "El último cobro no ha salido. Revisa la tarjeta para no perder el acceso.";
+            boton.hidden = false;
+            boton.textContent = "Actualizar el pago";
+            boton.onclick = () => abrir("portal");
+          } else {
+            elPrecio.innerHTML = importe;
+            elDet.textContent = d.explicacion || "";
+            if (d.configurado) {
+              boton.hidden = false;
+              boton.textContent = "Activar suscripción";
+              boton.onclick = () => abrir("checkout");
+            } else {
+              // Stripe todavía no está montado. Se enseña el precio igual —que
+              // sepa lo que va a costar— pero sin un botón que no lleva a nada.
+              elDet.textContent = `${d.explicacion || ""} De momento no se cobra nada.`.trim();
+            }
+          }
+          bloque.hidden = false;
+        }
+
+        // Se repinta al abrir la configuración porque el precio depende de la
+        // superficie dada de alta, y es ahí donde se acaba de tocar.
+        window.pintarSuscripcion = pintar;
+      })();
+
       document.getElementById("btn-confirmar-parcela").addEventListener("click", () => {
         if (!parcelaPendiente) return;
         // Sobre cfgFinca, no sobre cfg: el contorno confirmado es el de la
@@ -5959,6 +6094,7 @@
           mostrarConfigActual();
           initMapaParcela();
           forzarRedibujoMapa();
+          window.pintarSuscripcion?.();
         }
       });
 

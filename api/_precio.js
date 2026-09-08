@@ -4,6 +4,16 @@
 // Tarifa decidida el 11-ago-2026 (docs/negocio/precio-por-valor.md):
 //
 //   Productor: 99 €/año hasta 5 ha · +12 €/ha adicional · tope 400 €/año
+//   SIN IVA: la línea de Stripe va con tax_behavior "exclusive", o sea que el
+//   21% se suma encima y el agricultor paga 119,79 €.
+//
+// 🚧 PENDIENTE (decidido el 28-ago-2026, SIN IMPLEMENTAR): pasar la tarifa a
+// IVA INCLUIDO — 120 €/año hasta 5 ha · +15 €/ha · tope 480 €/año, con
+// tax_behavior "inclusive". Los netos quedan en 99,17 / 12,40 / 396,69 €, o sea
+// que el ingreso no se mueve. El motivo: muchos horticultores están en RÉGIMEN
+// ESPECIAL AGRARIO y no se deducen el IVA, así que anunciarles "99 €" cuando van
+// a pagar 119,79 € es enseñarles un número que no existe. Cambiar las constantes
+// de aquí SIN cambiar _stripe.js (o al revés) descuadra el cargo: van juntas.
 //
 // LA SUPERFICIE NO SE LE PREGUNTA AL AGRICULTOR: sale de las zonas que ya tiene
 // dadas de alta, cuyo `area_m2` viene de la superficie oficial de SIGPAC. Eso
@@ -26,10 +36,16 @@ const IVA_PCT         = 21;      // España, servicios digitales
 // Redondeo comercial: las hectáreas se cobran a la décima. Cobrar por 3,4287 ha
 // no es más justo, es menos explicable — y un recibo que no se puede explicar en
 // una frase se discute.
+// Y nunca por debajo de la décima cuando hay superficie de verdad: un bancal de
+// 5 m² son 0,0005 ha, que redondeaban a 0 y caían en "sin_superficie" — o sea
+// que el precio le decía "todavía no has dado de alta ninguna parcela" a alguien
+// que SÍ la tiene dada de alta y la está usando. La tarifa no tiene suelo (99 €
+// es la base "hasta 5 ha"), así que una parcela real paga la base por pequeña
+// que sea, y 0 hectáreas queda reservado para "aquí todavía no hay nada".
 function hectareasFacturables(m2) {
   const ha = Number(m2) / 10000;
   if (!Number.isFinite(ha) || ha <= 0) return 0;
-  return Math.round(ha * 10) / 10;
+  return Math.max(0.1, Math.round(ha * 10) / 10);
 }
 
 // `zonas`: filas de `usuarios` del propietario (cada una es una parcela).
@@ -57,8 +73,10 @@ function precioAnual(zonas, opts = {}) {
       total_con_iva_cent: 0, iva_pct: IVA_PCT, topado: false,
     };
   }
-  // Sin superficie no hay precio que calcular. No se cobra la base "por si
-  // acaso": todavía no hay nada que gestionar.
+  // Sin NINGUNA superficie no hay precio que calcular. No se cobra la base "por
+  // si acaso": todavía no hay nada que gestionar. Aquí solo se cae si ninguna
+  // zona tiene `area_m2` (recién creadas, o a medio configurar) — una parcela
+  // pequeña de verdad ya no entra por aquí, entra por la base.
   if (ha <= 0) {
     return {
       cobrable: false, motivo: "sin_superficie",
@@ -90,7 +108,7 @@ const euros = (cent) => (cent / 100).toLocaleString("es-ES", { minimumFractionDi
 // puede explicar el recibo en una línea, el precio está mal contado.
 function explicacion(p) {
   if (p.motivo === "gratuito_de_por_vida") return "Gratis de por vida: eres uno de los pilotos de 2026.";
-  if (p.motivo === "sin_superficie")       return "Todavía no has dado de alta ninguna parcela.";
+  if (p.motivo === "sin_superficie")       return "Todavía no hay ninguna parcela con superficie: en cuanto des una de alta, aquí sale el precio.";
   if (p.topado) return `${p.hectareas} ha · tarifa máxima: ${euros(p.total_cent)} €/año + IVA.`;
   if (p.extra_cent === 0) return `${p.hectareas} ha (hasta ${UMBRAL_HA}): ${euros(p.total_cent)} €/año + IVA.`;
   return `${p.hectareas} ha: ${euros(BASE_CENT)} € hasta ${UMBRAL_HA} ha + ` +
