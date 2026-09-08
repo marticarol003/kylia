@@ -108,6 +108,24 @@ ok(vLejos.desde < vLejos.probable && vLejos.probable < vLejos.hasta,
 ok(M.ventanaMadurez("cebolla", { gddAcum: 5000, desdeISO: "2026-08-12" }).estado === "lista",
    "pasado el calor del ciclo, el estado es 'lista' y no una fecha futura");
 
+console.log("\n── el pronóstico no cuenta como calor ya caído ──");
+// Bug encontrado el 8-sep-2026 con datos de producción: la serie térmica trae 16
+// días de PRONÓSTICO, y curvaFenologica los sumaba en `gddAcum`. El tomate de
+// Ferran salía con 1823 °C·día sobre 1749 —o sea "lista"— cuando lo acumulado de
+// verdad eran 1653 y le faltaban seis días. La ventana se adelantaba justo lo que
+// durase el pronóstico, y como el agricultor cosecha por su cuenta, el fallo
+// habría pasado por acierto.
+const conFuturo = M.curvaFenologica("cebolla", serieCompleta, PLANT);   // llega al 20-ago
+ok(conFuturo.gddEn(COSECHA_REAL) < conFuturo.gddAcum,
+   `el calor al 12-ago (${Math.round(conFuturo.gddEn(COSECHA_REAL))}) es MENOR que al final de la serie (${Math.round(conFuturo.gddAcum)})`);
+ok(Math.abs(conFuturo.gddEn(COSECHA_REAL) - curva.gddAcum) < 0.01,
+   "y coincide exactamente con el de una serie cortada ese día: el futuro no cuenta");
+const balFuturo = M.balanceHidrico(hasta(COSECHA_REAL), [], { ...opts, serieTermica: serieCompleta });
+ok(balFuturo.gddAcum === Math.round(curva.gddAcum),
+   "el balance reporta el calor de su último día, no el del final de la serie térmica");
+ok(conFuturo.gddEn("2026-06-01") === 0 && conFuturo.gddEn("2026-06-24") > 0,
+   "antes de plantar no hay calor acumulado, y el día de la plantación ya empieza a contar");
+
 console.log("\n── nada de esto se inventa cuando no se puede saber ──");
 ok(M.curvaFenologica("cebolla", hasta(COSECHA_REAL).map(({ date, et0 }) => ({ date, et0 })), PLANT) === null,
    "sin temperaturas en la serie no hay reloj térmico (se vuelve al calendario)");

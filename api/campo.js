@@ -224,7 +224,9 @@ async function vistaMadurez(res, u) {
   const hoy       = hoyISO();
   const normales  = await normalesMensuales(u.lat, u.lon).catch(() => null);
   const madurez   = ventanaMadurez(cultivoId, {
-    gddAcum: curva.gddAcum, desdeISO: hoy,
+    // gddEn(hoy) y no gddAcum: la serie térmica trae 16 días de pronóstico y
+    // ese calor todavía no ha caído sobre la planta.
+    gddAcum: curva.gddEn(hoy) ?? curva.gddAcum, desdeISO: hoy,
     pronostico: termica.filter(d => d.date > hoy), normales,
   });
   const diaFen = curva.diaDe(hoy);
@@ -234,7 +236,7 @@ async function vistaMadurez(res, u) {
     fase: faseDelDia(cultivoId, diaFen),
     dias_calendario:  diasDesde(u.fecha_plantacion),
     dias_fenologicos: diaFen == null ? null : Math.round(diaFen),
-    gdd: Math.round(curva.gddAcum), gdd_objetivo: curva.gddObjetivo, tbase: curva.tbase,
+    gdd: Math.round(curva.gddEn(hoy) ?? curva.gddAcum), gdd_objetivo: curva.gddObjetivo, tbase: curva.tbase,
   });
 }
 

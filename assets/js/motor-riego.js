@@ -218,11 +218,35 @@
     // que el balance sí tiene y la serie térmica no. Sin esto habría un salto
     // justo en el día de hoy, que es el que se enseña en pantalla.
     const atras  = mapa.get(dias[Math.max(0, dias.length - 8)].date);
-    const ritmo  = Math.max(0, (ult.dias - atras.dias) / Math.max(1, Math.min(7, dias.length - 1)));
+    const pasos  = Math.max(1, Math.min(7, dias.length - 1));
+    const ritmo  = Math.max(0, (ult.dias - atras.dias) / pasos);
+    const ritmoGdd = Math.max(0, (ult.gdd - atras.gdd) / pasos);
 
     return {
-      desde: plant, hasta: ultima, gddAcum: ult.gdd, gddObjetivo: gddDelCiclo(cultivoId),
+      desde: plant, hasta: ultima,
+      // OJO: `gddAcum` es el calor al FINAL DE LA SERIE, y la serie normalmente
+      // trae pronóstico — 16 días de futuro. Para saber cuánto calor lleva el
+      // cultivo HOY hay que pedir `gddEn(hoy)`, no leer esto.
+      //
+      // No es teoría: el 8-sep-2026, el tomate de Ferran salía en producción con
+      // 1823 °C·día sobre un objetivo de 1749, o sea "lista", cuando lo acumulado
+      // de verdad eran 1653 y le faltaban seis días. La ventana de madurez se
+      // adelantaba justo lo que durase el pronóstico.
+      gddAcum: ult.gdd, gddObjetivo: gddDelCiclo(cultivoId),
       tbase: g.tbase,
+      // Calor acumulado a una fecha concreta. Misma partición que diaDe: antes de
+      // plantar 0, más allá de la serie se extrapola al ritmo reciente, y un
+      // hueco en medio devuelve null para que decida quien llama.
+      gddEn(fechaISO) {
+        const hit = mapa.get(fechaISO);
+        if (hit) return hit.gdd;
+        if (fechaISO < plant) return 0;
+        if (fechaISO > ultima) {
+          const n = Math.round((new Date(`${fechaISO}T12:00:00`) - new Date(`${ultima}T12:00:00`)) / 86400000);
+          return ult.gdd + ritmoGdd * n;
+        }
+        return null;
+      },
       diaDe(fechaISO) {
         const hit = mapa.get(fechaISO);
         if (hit) return hit.dias;
@@ -412,7 +436,9 @@
       // Trazabilidad: en qué reloj se ha calculado todo esto.
       modoFenologia: curva ? "termico" : "calendario",
       diasFenologicos: diasFin == null ? null : Math.round(diasFin * 10) / 10,
-      gddAcum: curva ? Math.round(curva.gddAcum) : null,
+      // Al último día DEL BALANCE, no al final de la serie térmica: esa suele
+      // llevar pronóstico y sumaría calor que todavía no ha caído.
+      gddAcum: curva ? Math.round(curva.gddEn(ultimaISO) ?? curva.gddAcum) : null,
       faseActual: faseDelDia(cultivoId, diasFin),
     };
   }
