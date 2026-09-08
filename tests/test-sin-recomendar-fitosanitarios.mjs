@@ -57,6 +57,26 @@ ok(catalogo.tratamientos.every(t => typeof t.plazoSeguridad === "number"),
 ok(!catalogo.tratamientos.some(t => /imidacloprid/i.test(t.sustanciaActiva || "")),
    "en el catálogo no hay imidacloprid");
 
+console.log("── y cada tratamiento dice en qué situación legal está ──");
+// Revisado el 8-sep-2026. El catálogo decía "curado, verificado contra MAPA" y
+// llevaba mancozeb con dosis: el TJUE anuló su prohibición en 2025, pero NO hay
+// ningún producto con registro en España, así que no se puede comprar ni aplicar.
+// Que la sustancia esté aprobada en la UE y que exista un producto autorizado en
+// España son dos cosas distintas, y la segunda es la que manda.
+ok(catalogo.tratamientos.every(t => t.registro && typeof t.registro.estado === "string"),
+   "todos los tratamientos llevan estado regulatorio, no solo los que alguien recordó mirar");
+ok(catalogo.tratamientos.every(t => ["autorizado", "sin_producto_autorizado_es", "por_verificar"].includes(t.registro.estado)),
+   "y el estado es uno de los tres previstos");
+ok(catalogo.tratamientos.every(t => t.registro.estado === "por_verificar" ? true : !!t.registro.comprobado),
+   "lo que se declara comprobado lleva fecha de comprobación");
+const mancozeb = catalogo.tratamientos.find(t => t.id === "mancozeb");
+ok(mancozeb && mancozeb.registro.estado === "sin_producto_autorizado_es",
+   "mancozeb está marcado como lo que es: sin producto que se pueda comprar en España");
+ok(/data\/productos\.json/.test(app) && /registro\?\.estado !== "sin_producto_autorizado_es"/.test(app),
+   "y la app no lo ofrece: lo que no se puede comprar no se enseña como opción");
+ok(mancozeb && /identificar/i.test(mancozeb.registro.nota || ""),
+   "pero sigue en el catálogo para IDENTIFICAR una aplicación antigua — el cuaderno registra lo que pasó, no lo que debería haber pasado");
+
 console.log("── la tarjeta de recomendaciones no miente cuando está vacía ──");
 const render = app.slice(app.indexOf("function renderRecomendaciones"), app.indexOf("const ICONOS_REC"));
 ok(!/El cultivo está bien/.test(render),

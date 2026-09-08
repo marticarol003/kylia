@@ -4237,6 +4237,14 @@
         return (CATALOGO.tratamientos || []).filter(p =>
           (p.plagas || []).includes(criterio.clave)
           && (p.cultivos || []).some(c => cultivosActivos.includes(c))
+          // Lo que no se puede comprar no se ofrece. El mancozeb es el caso vivo:
+          // el TJUE anuló su prohibición en 2025, así que la sustancia ya no está
+          // prohibida, pero NO hay ningún producto con registro en España, y para
+          // aplicar algo hace falta un producto registrado, no una sustancia
+          // aprobada. Sigue en el catálogo para poder IDENTIFICAR una aplicación
+          // vieja en el cuaderno; ofrecerlo sería la misma clase de fallo que el
+          // imidacloprid que se retiró el 13-ago.
+          && p.registro?.estado !== "sin_producto_autorizado_es"
         );
       }
       if (criterio.tipo === "fertilizante") {

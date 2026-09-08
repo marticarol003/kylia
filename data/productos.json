@@ -1,15 +1,17 @@
 {
-  "version": "1.1.0",
-  "lastReviewed": "2026-05-22",
-  "fuenteDatos": "Registro de productos fitosanitarios MAPA + fichas técnicas fabricantes 2025-2026.",
+  "version": "1.2.0",
+  "lastReviewed": "2026-09-08",
+  "fuenteDatos": "Registro de productos fitosanitarios MAPA + fichas técnicas fabricantes 2025-2026. El bloque `registro` de cada tratamiento dice QUÉ se ha comprobado y CUÁNDO: `comprobado: null` significa que esa sustancia no se ha verificado contra fuente oficial, no que esté bien.",
   "escalaEficacia": {
-    "alta":  "Resultados consistentes en condiciones típicas del cultivo.",
+    "alta": "Resultados consistentes en condiciones típicas del cultivo.",
     "media": "Funciona con aplicación correcta; puede necesitar repetición o condiciones favorables.",
-    "baja":  "Acción parcial o sólo en casos leves; útil como complemento."
+    "baja": "Acción parcial o sólo en casos leves; útil como complemento."
   },
   "campos": {
     "duracionProteccion": "Días de protección/eficacia residual sobre el cultivo (no confundir con plazoSeguridad, que regula la cosecha).",
-    "duracionEfecto": "Días durante los que el fertilizante sigue aportando nutrientes a la planta."
+    "duracionEfecto": "Días durante los que el fertilizante sigue aportando nutrientes a la planta.",
+    "registro.estado": "autorizado = sustancia activa aprobada en la UE y comprobado. sin_producto_autorizado_es = no existe producto con registro en España; NO se ofrece como opción, solo sirve para identificar una aplicación antigua en el cuaderno. por_verificar = no comprobado contra fuente oficial en la última revisión.",
+    "registro": "Estado regulatorio. OJO: que una sustancia activa esté aprobada en la UE NO significa que haya un producto autorizado en España para un cultivo concreto — eso lo dice el Registro del MAPA, y es la fuente final."
   },
   "tratamientos": [
     {
@@ -23,10 +25,27 @@
       "eficacia": "media",
       "costeMin": 8,
       "costeMax": 12,
-      "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga", "espinaca", "brassica"],
-      "plagas": ["pulgon", "mosca_blanca"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "berenjena",
+        "calabacin",
+        "lechuga",
+        "espinaca",
+        "brassica"
+      ],
+      "plagas": [
+        "pulgon",
+        "mosca_blanca"
+      ],
       "duracionProteccion": 5,
-      "notas": "Acción por contacto, sin residualidad. Repetir cada 7-10 días si la población es alta."
+      "notas": "Acción por contacto, sin residualidad. Repetir cada 7-10 días si la población es alta.",
+      "registro": {
+        "estado": "por_verificar",
+        "ue": "No comprobada en esta revisión.",
+        "comprobado": null,
+        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+      }
     },
     {
       "id": "aceite-parafinico",
@@ -39,10 +58,25 @@
       "eficacia": "media",
       "costeMin": 9,
       "costeMax": 14,
-      "cultivos": ["tomate", "pimiento", "berenjena", "calabacin"],
-      "plagas": ["pulgon", "mosca_blanca", "arana_roja"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "berenjena",
+        "calabacin"
+      ],
+      "plagas": [
+        "pulgon",
+        "mosca_blanca",
+        "arana_roja"
+      ],
       "duracionProteccion": 7,
-      "notas": "Asfixia los insectos por contacto. Mejor a primera hora de la mañana."
+      "notas": "Asfixia los insectos por contacto. Mejor a primera hora de la mañana.",
+      "registro": {
+        "estado": "por_verificar",
+        "ue": "No comprobada en esta revisión.",
+        "comprobado": null,
+        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+      }
     },
     {
       "id": "azadiractina",
@@ -55,10 +89,28 @@
       "eficacia": "media",
       "costeMin": 12,
       "costeMax": 18,
-      "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga", "brassica"],
-      "plagas": ["pulgon", "mosca_blanca", "oruga_col", "arana_roja"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "berenjena",
+        "calabacin",
+        "lechuga",
+        "brassica"
+      ],
+      "plagas": [
+        "pulgon",
+        "mosca_blanca",
+        "oruga_col",
+        "arana_roja"
+      ],
       "duracionProteccion": 7,
-      "notas": "Repelente y disruptor del crecimiento del insecto. Acción más lenta que un convencional."
+      "notas": "Repelente y disruptor del crecimiento del insecto. Acción más lenta que un convencional.",
+      "registro": {
+        "estado": "por_verificar",
+        "ue": "No comprobada en esta revisión.",
+        "comprobado": null,
+        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+      }
     },
     {
       "id": "bacillus-thuringiensis",
@@ -71,10 +123,23 @@
       "eficacia": "alta",
       "costeMin": 15,
       "costeMax": 22,
-      "cultivos": ["brassica", "tomate", "pimiento", "lechuga"],
-      "plagas": ["oruga_col"],
+      "cultivos": [
+        "brassica",
+        "tomate",
+        "pimiento",
+        "lechuga"
+      ],
+      "plagas": [
+        "oruga_col"
+      ],
       "duracionProteccion": 5,
-      "notas": "Específico para orugas, inofensivo para fauna útil. Pierde efecto con UV; mejor al atardecer."
+      "notas": "Específico para orugas, inofensivo para fauna útil. Pierde efecto con UV; mejor al atardecer.",
+      "registro": {
+        "estado": "por_verificar",
+        "ue": "No comprobada en esta revisión.",
+        "comprobado": null,
+        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+      }
     },
     {
       "id": "spinosad",
@@ -87,10 +152,23 @@
       "eficacia": "alta",
       "costeMin": 18,
       "costeMax": 28,
-      "cultivos": ["tomate", "pimiento", "lechuga", "brassica"],
-      "plagas": ["oruga_col"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "lechuga",
+        "brassica"
+      ],
+      "plagas": [
+        "oruga_col"
+      ],
       "duracionProteccion": 10,
-      "notas": "Origen bacteriano, autorizado en producción ecológica. Tóxico para abejas; aplicar a última hora."
+      "notas": "Origen bacteriano, autorizado en producción ecológica. Tóxico para abejas; aplicar a última hora.",
+      "registro": {
+        "estado": "por_verificar",
+        "ue": "No comprobada en esta revisión.",
+        "comprobado": null,
+        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+      }
     },
     {
       "id": "azufre-micronizado",
@@ -103,10 +181,24 @@
       "eficacia": "alta",
       "costeMin": 5,
       "costeMax": 10,
-      "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga"],
-      "plagas": ["arana_roja"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "berenjena",
+        "calabacin",
+        "lechuga"
+      ],
+      "plagas": [
+        "arana_roja"
+      ],
       "duracionProteccion": 7,
-      "notas": "Acción preventiva y curativa contra oídio y eficaz contra araña roja en bajas poblaciones."
+      "notas": "Acción preventiva y curativa contra oídio y eficaz contra araña roja en bajas poblaciones.",
+      "registro": {
+        "estado": "por_verificar",
+        "ue": "No comprobada en esta revisión.",
+        "comprobado": null,
+        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+      }
     },
     {
       "id": "oxicloruro-cobre",
@@ -119,10 +211,22 @@
       "eficacia": "alta",
       "costeMin": 10,
       "costeMax": 15,
-      "cultivos": ["tomate", "pimiento", "lechuga"],
-      "plagas": ["mildiu"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "lechuga"
+      ],
+      "plagas": [
+        "mildiu"
+      ],
       "duracionProteccion": 10,
-      "notas": "Autorizado en ecológico con límite anual de 4 kg Cu/ha. Reduce eficacia tras lluvia fuerte."
+      "notas": "Autorizado en ecológico con límite anual de 4 kg Cu/ha. Reduce eficacia tras lluvia fuerte.",
+      "registro": {
+        "estado": "por_verificar",
+        "ue": "Renovada como sustancia CANDIDATA A LA SUSTITUCIÓN por Reg. (UE) 2018/1981, con vigencia hasta el 31-dic-2025. No se ha podido confirmar la prórroga posterior.",
+        "comprobado": "2026-09-08",
+        "nota": "Límite legal de aplicación: 28 kg de cobre/ha acumulados en 7 años (media de 4 kg/ha y año). Ese tope es del CUADERNO, no de una aplicación suelta: hay que arrastrarlo entre campañas."
+      }
     },
     {
       "id": "acetamiprid",
@@ -135,10 +239,24 @@
       "eficacia": "alta",
       "costeMin": 10,
       "costeMax": 15,
-      "cultivos": ["tomate", "pimiento", "berenjena", "lechuga", "brassica"],
-      "plagas": ["pulgon", "mosca_blanca"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "berenjena",
+        "lechuga",
+        "brassica"
+      ],
+      "plagas": [
+        "pulgon",
+        "mosca_blanca"
+      ],
       "duracionProteccion": 14,
-      "notas": "Sistémico, persiste 10-14 días. Restricciones en floración para proteger polinizadores."
+      "notas": "Sistémico, persiste 10-14 días. Restricciones en floración para proteger polinizadores.",
+      "registro": {
+        "estado": "autorizado",
+        "ue": "Aprobada (Dir. 2004/99/CE), renovada por Reg. (UE) 2018/113. La siguiente renovación debe iniciarse antes del 28-feb-2031.",
+        "comprobado": "2026-09-08"
+      }
     },
     {
       "id": "lambda-cihalotrina",
@@ -151,10 +269,23 @@
       "eficacia": "alta",
       "costeMin": 8,
       "costeMax": 12,
-      "cultivos": ["tomate", "pimiento", "brassica"],
-      "plagas": ["pulgon", "oruga_col", "mosca_blanca"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "brassica"
+      ],
+      "plagas": [
+        "pulgon",
+        "oruga_col",
+        "mosca_blanca"
+      ],
       "duracionProteccion": 10,
-      "notas": "Piretroide de amplio espectro. Muy tóxico para abejas: NO aplicar en floración."
+      "notas": "Piretroide de amplio espectro. Muy tóxico para abejas: NO aplicar en floración.",
+      "registro": {
+        "estado": "autorizado",
+        "ue": "Período de aprobación prorrogado por Reg. (UE) 2026/1421, de 30-jun-2026 (sigue en proceso de renovación).",
+        "comprobado": "2026-09-08"
+      }
     },
     {
       "id": "mancozeb",
@@ -167,10 +298,23 @@
       "eficacia": "alta",
       "costeMin": 12,
       "costeMax": 18,
-      "cultivos": ["tomate", "pimiento", "lechuga"],
-      "plagas": ["mildiu"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "lechuga"
+      ],
+      "plagas": [
+        "mildiu"
+      ],
       "duracionProteccion": 10,
-      "notas": "Multisitio, bajo riesgo de resistencias. Aplicar antes de la lluvia para cubrir el follaje."
+      "notas": "Multisitio, bajo riesgo de resistencias. Aplicar antes de la lluvia para cubrir el follaje.",
+      "registro": {
+        "estado": "sin_producto_autorizado_es",
+        "ue": "No renovación (Reg. (UE) 2020/2087) ANULADA por el TJUE en 2025: a nivel de sustancia activa ya no hay prohibición.",
+        "espana": "Sin registros activos en el Registro de Productos Fitosanitarios del MAPA. El MAPA no ha concedido autorización, ni siquiera excepcional.",
+        "comprobado": "2026-09-08",
+        "nota": "En la práctica NO hay producto que un agricultor español pueda comprar ni aplicar legalmente: para usarlo hace falta un producto con número de registro, no solo que la sustancia esté aprobada. Se mantiene en el catálogo para poder IDENTIFICAR una aplicación antigua en el cuaderno, pero no debe ofrecerse como opción."
+      }
     },
     {
       "id": "abamectina",
@@ -183,10 +327,22 @@
       "eficacia": "alta",
       "costeMin": 14,
       "costeMax": 20,
-      "cultivos": ["tomate", "pimiento", "berenjena", "lechuga"],
-      "plagas": ["arana_roja"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "berenjena",
+        "lechuga"
+      ],
+      "plagas": [
+        "arana_roja"
+      ],
       "duracionProteccion": 12,
-      "notas": "Translaminar (penetra la hoja). Muy eficaz contra ácaros y minadores."
+      "notas": "Translaminar (penetra la hoja). Muy eficaz contra ácaros y minadores.",
+      "registro": {
+        "estado": "autorizado",
+        "ue": "Aprobación renovada por Reg. (UE) 2023/515, aplicable desde el 1-abr-2023.",
+        "comprobado": "2026-09-08"
+      }
     }
   ],
   "fertilizantes": [
@@ -201,7 +357,15 @@
       "eficacia": "media",
       "costeMin": 20,
       "costeMax": 40,
-      "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga", "espinaca", "brassica"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "berenjena",
+        "calabacin",
+        "lechuga",
+        "espinaca",
+        "brassica"
+      ],
       "tipoFertilizante": "fondo",
       "duracionEfecto": 90,
       "notas": "Mejora estructura del suelo y aporta nutrición lenta. Cero plazos legales: aplicable cualquier momento."
@@ -217,7 +381,15 @@
       "eficacia": "media",
       "costeMin": 60,
       "costeMax": 120,
-      "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga", "espinaca", "brassica"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "berenjena",
+        "calabacin",
+        "lechuga",
+        "espinaca",
+        "brassica"
+      ],
       "tipoFertilizante": "fondo",
       "duracionEfecto": 120,
       "notas": "Aporta NPK natural y mejora la actividad biológica del suelo. Efecto a medio-largo plazo."
@@ -233,7 +405,11 @@
       "eficacia": "alta",
       "costeMin": 80,
       "costeMax": 110,
-      "cultivos": ["lechuga", "espinaca", "brassica"],
+      "cultivos": [
+        "lechuga",
+        "espinaca",
+        "brassica"
+      ],
       "tipoFertilizante": "hojas",
       "duracionEfecto": 25,
       "notas": "Equilibrio para hortícolas de hoja con más nitrógeno para el desarrollo foliar."
@@ -249,7 +425,12 @@
       "eficacia": "alta",
       "costeMin": 60,
       "costeMax": 90,
-      "cultivos": ["tomate", "pimiento", "berenjena", "calabacin"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "berenjena",
+        "calabacin"
+      ],
       "tipoFertilizante": "fruto",
       "duracionEfecto": 25,
       "notas": "Mayor proporción de potasa para mejorar la calidad y conservación del fruto."
@@ -265,7 +446,15 @@
       "eficacia": "media",
       "costeMin": 25,
       "costeMax": 40,
-      "cultivos": ["tomate", "pimiento", "berenjena", "calabacin", "lechuga", "espinaca", "brassica"],
+      "cultivos": [
+        "tomate",
+        "pimiento",
+        "berenjena",
+        "calabacin",
+        "lechuga",
+        "espinaca",
+        "brassica"
+      ],
       "tipoFertilizante": "bioestimulante",
       "duracionEfecto": 10,
       "notas": "Bioestimulante. Mejora la recuperación tras estrés hídrico o térmico. Compatible con producción ecológica."
