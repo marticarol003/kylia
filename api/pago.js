@@ -24,6 +24,7 @@
 const { isConfigured, supabaseSelect, supabaseUpdate } = require("./_supabase.js");
 const PRECIO = require("./_precio.js");
 const STRIPE = require("./_stripe.js");
+const { puedeVer } = require("./_sesion.js");
 
 const ES_UUID  = /^[0-9a-f-]{36}$/i;
 const BASE_URL = process.env.APP_BASE_URL || "https://kylia.app";
@@ -74,6 +75,30 @@ async function calcularPara(usuarioId) {
   return { u, propietarioId, zonas, precio: p, explicacion: PRECIO.explicacion(p) };
 }
 
+// ── Quién puede tocar el cobro de quién ───────────────────────────
+// pago.js era el ÚNICO endpoint con datos personales que ni siquiera importaba
+// _sesion.js: campo.js y log.js al menos llamaban a puedeVer (permisivo, pero
+// cableado), y aquí no había nada. O sea que el día que se cierre el paso 2,
+// este habría seguido abierto de par en par — y es el peor sitio para eso: el
+// portal de Stripe gestiona la facturación y la baja de la suscripción.
+//
+// Se mantiene EXACTAMENTE el mismo criterio que el resto y ni un día más
+// estricto: sin sesión se deja pasar (hoy nadie tiene una, y romperlo sería
+// repetir la auth fail-closed de los crons que hubo que revertir el 28-jul).
+// Lo que sí cierra desde el primer día es el salto entre usuarios: quien TIENE
+// sesión no puede pedir el precio, abrir el checkout ni entrar al portal de
+// otro. Y ese es el caso realista, porque los UUID no se adivinan: se filtran.
+function noEsSuyo(req, res, u, accion) {
+  const permiso = puedeVer(req, u);
+  if (!permiso.permitido) {
+    console.warn("[pago] sesión ajena:", JSON.stringify({ accion, pedido: u?.id, sesion: permiso.sesion }));
+    res.status(403).json({ ok: false, error: "esa parcela no es tuya" });
+    return true;
+  }
+  if (permiso.motivo === "sin_sesion") console.log("[pago] acceso sin sesión:", accion);
+  return false;
+}
+
 async function handleGet(req, res) {
   const usuarioId = (req.query?.usuario_id || "").toString().trim();
   if (!ES_UUID.test(usuarioId)) return res.status(400).json({ error: "usuario_id inválido (UUID)" });
@@ -81,6 +106,7 @@ async function handleGet(req, res) {
 
   const r = await calcularPara(usuarioId);
   if (!r) return res.status(404).json({ ok: false, error: "usuario no encontrado" });
+  if (noEsSuyo(req, res, r.u, "precio")) return;
 
   return res.status(200).json({
     ok: true,
@@ -103,6 +129,7 @@ async function handleCheckout(req, res, body) {
 
   const r = await calcularPara(usuarioId);
   if (!r) return res.status(404).json({ ok: false, error: "usuario no encontrado" });
+  if (noEsSuyo(req, res, r.u, "checkout")) return;
   if (!r.precio.cobrable) {
     // No es un error: a un piloto con gratuidad ganada NO se le abre una pasarela.
     return res.status(200).json({ ok: true, cobrar: false, motivo: r.precio.motivo, explicacion: r.explicacion });
@@ -126,6 +153,7 @@ async function handlePortal(req, res, body) {
   if (!STRIPE.configurado()) return res.status(200).json({ ok: false, reason: "stripe_no_configurado" });
 
   const r = await calcularPara(usuarioId);
+  if (r && noEsSuyo(req, res, r.u, "portal")) return;
   const customer = r?.u?.stripe_customer_id || r?.zonas.find(z => z.stripe_customer_id)?.stripe_customer_id;
   if (!customer) return res.status(400).json({ ok: false, error: "sin cliente de Stripe todavía" });
 

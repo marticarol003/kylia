@@ -97,6 +97,33 @@ ok(/const permiso = puedeVer\(req, previa\);/.test(log),
    "y registro-usuario también, que es el upsert que puede DESTRUIR una parcela");
 ok(/sin_sesion/.test(campo), "los accesos sin sesión quedan en el log, para cerrar esto con datos");
 
+console.log("── y el cobro, que era el único que ni lo importaba ──");
+// pago.js no importaba _sesion.js EN ABSOLUTO. campo.js y log.js al menos
+// llamaban a puedeVer —permisivo, pero cableado—; aquí no había nada, así que el
+// día que se cierre el paso 2 este habría seguido abierto. Y es el peor sitio:
+// el portal de Stripe gestiona la facturación y la baja de la suscripción.
+const pago = leer("api", "pago.js");
+ok(/require\("\.\/_sesion\.js"\)/.test(pago), "pago.js importa la sesión");
+ok(/function noEsSuyo\(req, res, u, accion\)/.test(pago) && /esa parcela no es tuya/.test(pago),
+   "y tiene la misma guardia que el resto, con el mismo mensaje");
+for (const accion of ["precio", "checkout", "portal"]) {
+  ok(new RegExp(`noEsSuyo\\(req, res, r(\\?)?\\.u, "${accion}"\\)`).test(pago),
+     `la acción "${accion}" comprueba de quién es la parcela antes de responder`);
+}
+// El webhook lo llama Stripe, que no trae cookie: va firmado y no debe pasar por aquí.
+const webhook = pago.slice(pago.indexOf("async function handleWebhook"));
+ok(!/noEsSuyo/.test(webhook),
+   "el webhook NO pasa por la guardia: lo llama Stripe sin cookie y ya va autenticado por firma");
+ok(/verificarFirma/.test(webhook), "su autenticación es la firma, que es la que vale ahí");
+
+console.log("── y sigue siendo permisivo, ni un día más estricto ──");
+// Esto es lo que impide que el arreglo se convierta en una caída: hoy nadie tiene
+// sesión, y exigirla repetiría la auth fail-closed de los crons del 28-jul.
+ok(S.puedeVer({ headers: {} }, { id: OTRO }).permitido === true,
+   "sin cookie, /api/pago sigue respondiendo como hasta ahora");
+ok(S.puedeVer(conCookie(token), { id: OTRO, propietario_id: OTRO }).permitido === false,
+   "pero quien SÍ tiene sesión ya no puede abrir el portal de cobro de otro");
+
 console.log("── el cron de avisos no se rompe ──");
 const aviso = leer("api", "aviso-lechugas.js");
 ok(/api\/campo\?vista=hoy&usuario_id=/.test(aviso) && !/cookie/i.test(aviso),
