@@ -14,7 +14,7 @@
 //
 // Los márgenes van en el @page del CSS del informe, no aquí: cada documento sabe
 // los suyos.
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { resolve, basename } from "path";
 import { pathToFileURL } from "url";
 
@@ -35,8 +35,19 @@ try {
   await pagina.goto(pathToFileURL(rutaEntrada).href, { waitUntil: "networkidle0", timeout: 60000 });
   await pagina.evaluateHandle("document.fonts.ready");
   await pagina.pdf({ path: rutaSalida, format: "A4", printBackground: true, preferCSSPageSize: true });
-  const paginas = await pagina.evaluate(() => document.querySelectorAll(".hoja").length);
-  console.log(`✓ ${basename(rutaSalida)} · ${paginas} página${paginas === 1 ? "" : "s"}`);
+
+  // Cuántas páginas tiene el PDF DE VERDAD, no cuántos bloques .hoja hay en el
+  // HTML: si un bloque se pasa de alto, Chrome lo parte y aparece una página de
+  // sobra con cuatro líneas sueltas. Contando divs eso no se ve — pasó con el
+  // informe de Ferran, que salía "2 páginas" y eran 3, la última rota.
+  const bytes = readFileSync(rutaSalida);
+  const paginas = (bytes.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length;
+  const bloques = await pagina.evaluate(() => document.querySelectorAll(".hoja").length);
+  console.log(`✓ ${basename(rutaSalida)} · ${paginas || "?"} páginas (${bloques} bloques en el HTML)`);
+  if (paginas && bloques && paginas !== bloques) {
+    console.warn(`  ⚠️ descuadre: algún bloque no cabe en su página y Chrome lo ha partido.`);
+    console.warn(`     Comprueba la altura: en A4 con estos márgenes caben ~1015 px.`);
+  }
   if (fallos.length) console.warn("  ⚠️ errores de JS en el documento:", fallos.join(" | "));
 } finally {
   await navegador.close();
