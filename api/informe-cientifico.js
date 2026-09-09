@@ -28,7 +28,7 @@ const { isConfigured, supabaseSelect } = require("./_supabase.js");
 const { revealDeUsuario } = require("./campo.js");
 
 const { fetchConTimeout } = require("./_http.js");
-const MODEL = "claude-opus-4-8";
+const MODEL = "claude-opus-5";   // mismo precio que 4.8 ($5/$25) y más capaz
 const ES_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Caché en memoria por (usuario, día): el informe de cierre no cambia dentro
@@ -175,6 +175,13 @@ module.exports = async (req, res) => {
   if (claveClaude) intentos.push({ fuente: "claude", llamar: () => llamarClaude(claveClaude, prompt) });
   if (claveGemini) intentos.push({ fuente: "gemini", llamar: () => llamarGemini(claveGemini, prompt) });
 
+  // Por qué acabó en plantilla. Hasta ahora la respuesta decía `fuente:
+  // "plantilla"` y punto, así que desde fuera era imposible distinguir "no hay
+  // claves configuradas" de "el modelo falló" — y para averiguarlo había que
+  // entrar en los logs de Vercel. El informe de Ferran salió por plantilla el
+  // 8-sep y costó dos hipótesis equivocadas.
+  let motivo = intentos.length ? null : "sin_claves";
+
   for (const { fuente, llamar } of intentos) {
     try {
       const texto = await llamar();
@@ -193,12 +200,13 @@ module.exports = async (req, res) => {
       return res.json(resultado);
     } catch (err) {
       console.error(`[informe-cientifico] ${fuente}:`, err.message);
+      motivo = `${fuente}: ${err.message}`;
       // sigue con el siguiente proveedor
     }
   }
 
   // Sin claves o con todos los proveedores caídos: plantilla honesta.
-  const plantilla = informePlantilla(reveal);
+  const plantilla = { ...informePlantilla(reveal), motivo };
   cacheInformes.set(claveCache, plantilla);
   return res.json(plantilla);
 };
@@ -213,12 +221,20 @@ async function llamarClaude(apiKey, prompt) {
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2500,
+      // 2500 se quedaba corto: el informe va dentro de un JSON, así que al topar
+      // el límite se corta a media cadena, JSON.parse revienta y el error que se
+      // registra es "JSON inválido en respuesta" — que manda a mirar el prompt
+      // cuando el problema era el tamaño. Con la función a 60 s (vercel.json)
+      // cabe de sobra.
+      max_tokens: 8000,
       messages: [{ role: "user", content: prompt }],
     }),
   });
   if (!resp.ok) throw new Error(`Anthropic ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
   const data = await resp.json();
+  // Si se topó el límite, decirlo tal cual: si no, el síntoma llega disfrazado
+  // de JSON malformado tres pasos más abajo.
+  if (data?.stop_reason === "max_tokens") throw new Error("respuesta truncada por max_tokens");
   // La respuesta trae bloques; nos quedamos con el texto (saltando thinking).
   const texto = (data?.content || [])
     .filter(b => b && b.type === "text").map(b => b.text).join("").trim();
