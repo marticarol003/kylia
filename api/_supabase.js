@@ -133,9 +133,10 @@ function parseBody(req) {
 // CORS + método. Llama res.status(...).end()/.json(...) si decide cortar.
 // Devuelve true si la request debe procesarse; false si ya respondió.
 function preludio(req, res, metodo = "POST") {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", `${metodo}, OPTIONS`);
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // El ACAO era "*". Ahora solo se devuelve si el origen está en la lista de
+  // _origen.js; una petición sin `Origin` (crons, servidor a servidor) sigue
+  // pasando igual, porque ahí CORS no pinta nada.
+  require("./_origen.js").cabecerasCors(req, res, `${metodo}, OPTIONS`);
   if (req.method === "OPTIONS") { res.status(204).end(); return false; }
   if (req.method !== metodo)    { res.status(405).json({ error: "Método no permitido" }); return false; }
   return true;

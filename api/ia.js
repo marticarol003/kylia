@@ -17,6 +17,9 @@
 // mercado en vivo con Claude + web search, así que cuesta dinero por consulta y
 // tarda; por eso cachea. Ver la cabecera de _ia-producto-fertilizante.js.
 
+const { cabecerasCors, ipDe } = require("./_origen.js");
+const { guardia } = require("./_limite.js");
+
 const HANDLERS = {
   "recomendacion":         require("./_ia-recomendacion.js"),
   "recomendaciones-texto": require("./_ia-recomendaciones-texto.js"),
@@ -33,13 +36,24 @@ module.exports = async (req, res) => {
     tipo = ((body || {}).tipo || "").toString().trim();
   }
 
+  // CORS acotado (antes era "*": cualquier web podía gastar nuestra cuota de
+  // Gemini con el navegador de sus visitantes) + límite de uso persistente.
+  // El CORS solo frena a un navegador ajeno; el límite frena también a un script.
+  cabecerasCors(req, res, "POST, OPTIONS");
+  if (req.method === "OPTIONS") return res.status(204).end();
+
   const handler = HANDLERS[tipo];
   if (!handler) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    if (req.method === "OPTIONS") return res.status(204).end();
     return res.status(400).json({
       error: `tipo inválido: '${tipo || "(vacío)"}'. Usa ?tipo=${Object.keys(HANDLERS).join(" | ")}`,
     });
   }
+
+  // El límite se aplica AQUÍ y no dentro de cada _ia-*.js: es el único sitio por
+  // el que pasan los cuatro, y así el contador no se puede olvidar al añadir uno
+  // nuevo. `producto-fertilizante` tiene su propio cupo, mucho más corto, porque
+  // sale a buscar al mercado con Claude y cada consulta cuesta dinero.
+  if (!(await guardia(req, res, `ia:${tipo}`, ipDe(req)))) return;
+
   return handler(req, res);
 };

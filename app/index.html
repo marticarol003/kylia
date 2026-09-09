@@ -5593,12 +5593,25 @@
       if (window.L) return Promise.resolve();
       if (leafletPromise) return leafletPromise;
       leafletPromise = new Promise((resolve, reject) => {
+        // SRI: el navegador comprueba el hash antes de ejecutar nada. Sin esto,
+        // Kylia ejecuta con plena confianza lo que un CDN de terceros le sirva
+        // ese día — y este script corre en la misma página que la parcela, la
+        // ubicación y la sesión del agricultor. Los hashes son los publicados
+        // por Leaflet, los mismos que ya usaba /piloto/alta (que sí los tenía).
+        // `crossOrigin` es obligatorio: sin él, un recurso de otro dominio no se
+        // puede verificar y la carga falla.
+        const SRI_CSS = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
+        const SRI_JS  = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
         const css = document.createElement("link");
         css.rel = "stylesheet";
         css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        css.integrity = SRI_CSS;
+        css.crossOrigin = "anonymous";
         document.head.appendChild(css);
         const js = document.createElement("script");
         js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        js.integrity = SRI_JS;
+        js.crossOrigin = "anonymous";
         js.async = true;
         js.onload = () => resolve();
         js.onerror = () => reject(new Error("leaflet-load-failed"));

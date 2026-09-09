@@ -1,4 +1,6 @@
 const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js");
+const { cabecerasCors, ipDe } = require("./_origen.js");
+const { guardia } = require("./_limite.js");
 
 const TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
@@ -259,7 +261,10 @@ async function refrescarMediciones(req, res) {
 }
 
 module.exports = async (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // CORS acotado (antes "*") + límite en el modo punto. El modo lote no lleva
+  // límite: lo llama el cron desde GitHub Actions sin `Origin`, y meterle un
+  // contador por IP sería ponerle un freno justo al único que debe pasar.
+  cabecerasCors(req, res, "GET, OPTIONS");
   if (req.method === "OPTIONS") return res.status(204).end();
 
   // Modo lote (cron): escribe el NDVI de todos los pilotos en `mediciones`.
@@ -272,6 +277,10 @@ module.exports = async (req, res) => {
   const lat = parseFloat(req.query.lat);
   const lon = parseFloat(req.query.lon);
   if (isNaN(lat) || isNaN(lon)) return res.status(400).json({ error: "lat/lon requeridos" });
+
+  // Cada punto es una llamada a Copernicus y unos segundos de función. Público y
+  // sin contador, un bucle lo convierte en una factura.
+  if (!(await guardia(req, res, "sentinel:punto", ipDe(req)))) return;
 
   const token = await obtenerToken();
   if (!token) return res.status(502).json({ error: "Auth failed" });
