@@ -20,6 +20,7 @@
 
 const crypto = require("crypto");
 
+const { fetchConTimeout } = require("./_http.js");
 const API = "https://api.stripe.com/v1";
 
 function clave()      { return (process.env.STRIPE_SECRET_KEY || "").trim(); }
@@ -53,7 +54,7 @@ async function llamar(ruta, cuerpo, opts = {}) {
   // suscripciones al mismo agricultor. Stripe devuelve la primera respuesta.
   if (opts.idempotencia) cabeceras["Idempotency-Key"] = opts.idempotencia;
 
-  const res  = await fetch(`${API}${ruta}`, {
+  const res  = await fetchConTimeout(`${API}${ruta}`, {
     method: "POST", headers: cabeceras, body: aFormulario(cuerpo).join("&"),
   });
   const data = await res.json().catch(() => ({}));

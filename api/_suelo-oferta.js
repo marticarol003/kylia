@@ -20,6 +20,8 @@
 //     ZONA, honesto como punto de partida; no sustituye a una analítica de la
 //     parcela cuando el agricultor la tenga.
 
+const { fetchConTimeout } = require("./_http.js");
+
 const SG_BASE = "https://rest.isric.org/soilgrids/v2.0/properties/query";
 
 // Modelo de mineralización de N — Tabla 4.2 de la Guía de fertilización de MAPA
@@ -55,7 +57,12 @@ function r2(x) { return Math.round((Number(x) || 0) * 100) / 100; }
 // ponderada en profundidad 0-30 cm en unidades reales, o null si el píxel está
 // enmascarado (urbano/agua) o no hay dato.
 async function consultaPunto(lat, lon, fetchImpl) {
-  const doFetch = fetchImpl || globalThis.fetch;
+  // Con reloj: este es EL fetch que provocó el helper. El 9-sep, con SoilGrids
+  // lento, la consulta se fue a 307 s — y encima consultaConFallback reintenta en
+  // puntos vecinos, así que sin tope se multiplica. El límite corto (6 s) es
+  // deliberado: el fallback ya cubre el fallo, así que rendirse pronto es mejor
+  // que esperar a un servidor que no va a contestar.
+  const doFetch = fetchImpl || fetchConTimeout;
   const qs = new URLSearchParams();
   for (const p of PROPIEDADES) qs.append("property", p);
   for (const d of PROFUNDIDADES) qs.append("depth", d);

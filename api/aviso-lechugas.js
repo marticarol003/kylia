@@ -43,6 +43,7 @@ const { isConfigured, supabaseSelect, supabaseDelete } = require("./_supabase.js
 const { laminaRiego } = require("./_motor-riego.js");
 const webpush = require("web-push");
 
+const { fetchConTimeout } = require("./_http.js");
 const USUARIO_ID = "d5475c3d-365b-47ff-b31e-fa659a8362fb"; // 33 lechugas · aspersión
 const CAMPO_URL  = "https://kylia.app/campo";
 const EMAIL_DEFECTO = "marticarol003@gmail.com";
@@ -69,7 +70,7 @@ const fmtFecha = iso => { const [, m, d] = (iso || "").split("-"); return d ? `$
 // La vista "hoy" del propio /api/campo: misma decisión que ve el padre en pantalla.
 async function decisionDeHoy(req) {
   const base = `https://${req.headers.host || "kylia.app"}`;
-  const res = await fetch(`${base}/api/campo?vista=hoy&usuario_id=${USUARIO_ID}`);
+  const res = await fetchConTimeout(`${base}/api/campo?vista=hoy&usuario_id=${USUARIO_ID}`);
   if (!res.ok) throw new Error(`campo?vista=hoy ${res.status}`);
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || "vista hoy sin datos");
@@ -200,12 +201,12 @@ async function enviarPush(sub, { subject, texto, fase }) {
 async function enviarWhatsApp({ phone, apikey, texto }) {
   const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}` +
               `&apikey=${encodeURIComponent(apikey)}&text=${encodeURIComponent(texto)}`;
-  const res = await fetch(url);
+  const res = await fetchConTimeout(url);
   if (!res.ok) throw new Error(`callmebot ${res.status}`);
 }
 
 async function enviarEmail({ to, subject, html }) {
-  const res = await fetch("https://api.resend.com/emails", {
+  const res = await fetchConTimeout("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,

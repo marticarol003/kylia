@@ -23,6 +23,7 @@ const { configDesdeFila, COLUMNAS_FINCA } = require("./_config-app.js");
 const { puedeVer } = require("./_sesion.js");
 const { serieTermica, normalesMensuales } = require("./_clima-termico.js");
 
+const { fetchConTimeout } = require("./_http.js");
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
 const ES_UUID = /^[0-9a-f-]{36}$/i;
 
@@ -60,7 +61,7 @@ async function climaSerie(lat, lon, desde) {
   const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}`
     + `&daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min`
     + `&past_days=${past}&forecast_days=7&timezone=Europe%2FMadrid`;
-  const res = await fetch(url);
+  const res = await fetchConTimeout(url);
   if (!res.ok) throw new Error(`open-meteo ${res.status}`);
   const d = (await res.json()).daily || {};
   const serie = (d.time || []).map((date, i) => ({

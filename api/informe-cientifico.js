@@ -27,6 +27,7 @@
 const { isConfigured, supabaseSelect } = require("./_supabase.js");
 const { revealDeUsuario } = require("./campo.js");
 
+const { fetchConTimeout } = require("./_http.js");
 const MODEL = "claude-opus-4-8";
 const ES_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -203,7 +204,7 @@ module.exports = async (req, res) => {
 };
 
 async function llamarClaude(apiKey, prompt) {
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+  const resp = await fetchConTimeout("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "x-api-key": apiKey,
@@ -230,7 +231,7 @@ async function llamarClaude(apiKey, prompt) {
 // (1/piloto/día como mucho por la caché) y la calidad importa más que la latencia.
 async function llamarGemini(apiKey, prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-  const resp = await fetch(url, {
+  const resp = await fetchConTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

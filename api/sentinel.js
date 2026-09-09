@@ -2,6 +2,7 @@ const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js
 const { cabecerasCors, ipDe } = require("./_origen.js");
 const { guardia } = require("./_limite.js");
 
+const { fetchConTimeout } = require("./_http.js");
 const TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
 const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
 
@@ -137,7 +138,7 @@ function pickLatestValid(statsJson) {
 
 // OAuth2 Copernicus: un token, reutilizable para varias parcelas en un lote.
 async function obtenerToken() {
-  const tokenRes = await fetch(TOKEN_URL, {
+  const tokenRes = await fetchConTimeout(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -169,7 +170,7 @@ async function medirParcela(token, lat, lon, geometry) {
     },
   };
 
-  const statsRes = await fetch(STATS_URL, {
+  const statsRes = await fetchConTimeout(STATS_URL, {
     method: "POST",
     headers: {
       Authorization:  `Bearer ${token}`,

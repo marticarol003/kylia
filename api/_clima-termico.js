@@ -22,6 +22,8 @@
 // reescribe, las normales se mueven en décadas) y cada refresco de /campo o
 // /pilotos preguntaría por todos los pilotos a la vez.
 
+const { fetchConTimeout } = require("./_http.js");
+
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
 const ARCHIVE  = "https://archive-api.open-meteo.com/v1/archive";
 const TZ       = "Europe%2FMadrid";
@@ -53,7 +55,7 @@ function aSerie(d) {
 }
 
 async function pedir(url) {
-  const res = await fetch(url);
+  const res = await fetchConTimeout(url);
   if (!res.ok) throw new Error(`open-meteo ${res.status}`);
   return aSerie((await res.json()).daily);
 }

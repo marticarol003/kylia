@@ -16,6 +16,9 @@
 // "/rest/v1/<tabla>", así que si el env trae cualquiera de esos sufijos se
 // duplicaría el path ("//rest/v1" o "/rest/v1/rest/v1") y PostgREST lo rechaza
 // con PGRST125 "Invalid path". Dejamos solo "https://<ref>.supabase.co".
+
+const { fetchConTimeout } = require("./_http.js");
+
 const SUPABASE_URL = (process.env.SUPABASE_URL || "")
   .trim()
   .replace(/\/+$/, "")          // sin barra(s) final(es)
@@ -49,7 +52,7 @@ async function supabaseInsert(table, payload, opts = {}) {
   const preferParts = ["return=representation"];
   if (opts.upsert)            preferParts.push("resolution=merge-duplicates");
   if (opts.ignoreDuplicates)  preferParts.push("resolution=ignore-duplicates");
-  const res = await fetch(url, {
+  const res = await fetchConTimeout(url, {
     method:  "POST",
     headers: {
       ...authHeaders(),
@@ -72,7 +75,7 @@ async function supabaseUpdate(table, filter, patch) {
     return { ok: false, reason: "not_configured" };
   }
   const url = `${SUPABASE_URL}/rest/v1/${table}?${filter}`;
-  const res = await fetch(url, {
+  const res = await fetchConTimeout(url, {
     method:  "PATCH",
     headers: {
       ...authHeaders(),
@@ -97,7 +100,7 @@ async function supabaseDelete(table, filter) {
     return { ok: false, reason: "not_configured" };
   }
   const url = `${SUPABASE_URL}/rest/v1/${table}?${filter}`;
-  const res = await fetch(url, {
+  const res = await fetchConTimeout(url, {
     method:  "DELETE",
     headers: { ...authHeaders(), "Prefer": "return=representation" },
   });
@@ -112,7 +115,7 @@ async function supabaseDelete(table, filter) {
 async function supabaseSelect(table, query = "") {
   if (!isConfigured()) return [];
   const url = `${SUPABASE_URL}/rest/v1/${table}${query ? "?" + query : ""}`;
-  const res = await fetch(url, { headers: authHeaders() });
+  const res = await fetchConTimeout(url, { headers: authHeaders() });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     const path = url.replace(SUPABASE_URL, "");   // sin dominio/clave, solo el path+query

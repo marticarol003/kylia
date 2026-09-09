@@ -1,5 +1,6 @@
 const { aplicaSatelite, motivoSinSatelite, SUP_MIN_SATELITE_M2 } = require("./_satelite.js");
 
+const { fetchConTimeout } = require("./_http.js");
 // Usos SIGPAC que son cultivo. Se dejan fuera los que nunca son una zona de
 // cultivo del agricultor y solo ensucian el mapa: CA camino, ZU zona urbana,
 // AG agua, IM improductivo, ED edificaciones, ZV zona censurada, MT monte.
@@ -97,7 +98,7 @@ module.exports = async (req, res) => {
   const url = `https://sigpac.mapa.es/vectorsdg/vector/recinto@3857/${Z}.${x}.${y}.geojson`;
 
   try {
-    const sigpacRes = await fetch(url, { headers: { "User-Agent": "Kylia/1.0" } });
+    const sigpacRes = await fetchConTimeout(url, { headers: { "User-Agent": "Kylia/1.0" } });
     if (!sigpacRes.ok) {
       return res.status(502).json({ error: "SIGPAC no responde", status: sigpacRes.status });
     }

@@ -2,7 +2,9 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "functions": {
-    "api/ia.js": { "maxDuration": 60 }
+    "api/ia.js":                 { "maxDuration": 60 },
+    "api/informe-cientifico.js": { "maxDuration": 60 },
+    "api/sentinel.js":           { "maxDuration": 60 }
   },
   "headers": [
     {

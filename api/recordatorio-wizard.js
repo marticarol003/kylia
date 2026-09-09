@@ -16,6 +16,7 @@
 
 const { isConfigured, supabaseSelect } = require("./_supabase.js");
 
+const { fetchConTimeout } = require("./_http.js");
 const APP_URL = "https://kylia.app/app";
 
 function emailHtml({ nombre }) {
@@ -40,7 +41,7 @@ function emailHtml({ nombre }) {
 }
 
 async function enviarEmail({ to, nombre }) {
-  await fetch("https://api.resend.com/emails", {
+  await fetchConTimeout("https://api.resend.com/emails", {
     method:  "POST",
     headers: {
       "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,

@@ -26,6 +26,7 @@ const { supabaseInsert, supabaseSelect, supabaseUpdate } = require("./_supabase.
 const { configDesdeFila, COLUMNAS_FINCA } = require("./_config-app.js");
 const SESION = require("./_sesion.js");
 
+const { fetchConTimeout } = require("./_http.js");
 const VIDA_MIN     = 15;   // minutos que vive un enlace
 const MAX_POR_HORA = 5;    // peticiones por email y hora
 const BASE_URL     = process.env.APP_BASE_URL || "https://kylia.app";
@@ -58,7 +59,7 @@ async function enviarCorreo(email, enlace) {
   // servidor), no al que pide: hacia fuera la respuesta es siempre la misma.
   if (!key) { console.warn("[acceso] RESEND_API_KEY sin configurar: no se envía"); return false; }
 
-  const res = await fetch("https://api.resend.com/emails", {
+  const res = await fetchConTimeout("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify({

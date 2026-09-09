@@ -9,6 +9,8 @@
 // }
 // Response: { textos: [{ id, titulo, detalle }, ...] }
 
+const { fetchConTimeout } = require("./_http.js");
+
 const NOMBRES_CULTIVO = {
   lechuga: "lechuga", espinaca: "espinaca", brassica: "col/coliflor",
   tomate: "tomate", pimiento: "pimiento", berenjena: "berenjena", calabacin: "calabacín",
@@ -79,7 +81,7 @@ ${JSON.stringify(candidatosCompactos)}`;
 
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-    const resp = await fetch(url, {
+    const resp = await fetchConTimeout(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -12,6 +12,8 @@
 // Si ninguna está configurada el endpoint funciona igual, pero los contactos
 // solo quedan en los logs del servidor (Vercel → Deployments → Logs).
 
+const { fetchConTimeout } = require("./_http.js");
+
 module.exports = async (req, res) => {
   require("./_origen.js").cabecerasCors(req, res, "POST, OPTIONS");
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -49,7 +51,7 @@ module.exports = async (req, res) => {
   // 2) Webhook opcional
   if (process.env.WAITLIST_WEBHOOK_URL) {
     try {
-      await fetch(process.env.WAITLIST_WEBHOOK_URL, {
+      await fetchConTimeout(process.env.WAITLIST_WEBHOOK_URL, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(contacto),
@@ -62,7 +64,7 @@ module.exports = async (req, res) => {
   // 3) Reenvío por email vía Resend (opcional)
   if (process.env.RESEND_API_KEY && process.env.WAITLIST_FORWARD_EMAIL) {
     try {
-      await fetch("https://api.resend.com/emails", {
+      await fetchConTimeout("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,

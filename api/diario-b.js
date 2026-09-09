@@ -21,6 +21,7 @@
 const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js");
 const { balanceHidrico, decisionRiego, laminaRiego } = require("./_motor-riego.js");
 
+const { fetchConTimeout } = require("./_http.js");
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
 
 function hoyISO() {
@@ -45,7 +46,7 @@ async function climaSerie(lat, lon, desde) {
   const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}`
     + `&daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min`
     + `&past_days=${dias}&forecast_days=1&timezone=Europe%2FMadrid`;
-  const res = await fetch(url);
+  const res = await fetchConTimeout(url);
   if (!res.ok) throw new Error(`open-meteo ${res.status}`);
   const d = (await res.json()).daily || {};
   return (d.time || []).map((date, i) => ({

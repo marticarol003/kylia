@@ -38,6 +38,7 @@
 
 const { isConfigured, supabaseSelect, supabaseUpdate, parseBody, preludio } = require("./_supabase.js");
 
+const { fetchConTimeout } = require("./_http.js");
 const API_BASE  = "https://generativelanguage.googleapis.com/v1beta/models";
 const MODEL     = "gemini-2.5-flash";   // mismo modelo que el resto de /api/ia
 const CACHE_DIAS = 30;    // por debajo de esto no se vuelve a buscar aunque coincida la clave
@@ -121,7 +122,7 @@ function claveDe(ctx) {
 
 async function buscarProducto(ctx, apiKey) {
   const url = `${API_BASE}/${MODEL}:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
+  const res = await fetchConTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

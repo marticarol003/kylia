@@ -7,6 +7,8 @@
 //
 // Sin claves configuradas, el endpoint sigue funcionando — solo loguea.
 
+const { fetchConTimeout } = require("./_http.js");
+
 module.exports = async (req, res) => {
   require("./_origen.js").cabecerasCors(req, res, "POST, OPTIONS");
   if (req.method === "OPTIONS") return res.status(204).end();
@@ -46,7 +48,7 @@ module.exports = async (req, res) => {
   // 2) Webhook opcional
   if (process.env.FEEDBACK_WEBHOOK_URL) {
     try {
-      await fetch(process.env.FEEDBACK_WEBHOOK_URL, {
+      await fetchConTimeout(process.env.FEEDBACK_WEBHOOK_URL, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(registro),
@@ -73,7 +75,7 @@ module.exports = async (req, res) => {
         ctx.numAplicaciones != null && `Nº aplicaciones:    ${ctx.numAplicaciones}`,
       ].filter(Boolean).join("\n");
 
-      await fetch("https://api.resend.com/emails", {
+      await fetchConTimeout("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
