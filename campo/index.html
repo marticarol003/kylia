@@ -329,6 +329,14 @@
     media: { tag:"Atención", titular:"Vigila el riego" },
     alta:  { tag:"Hoy toca", titular:"Riega" },
   };
+  // Escape para todo lo que entra en innerHTML y no lo hemos escrito nosotros.
+  // Aquí no había ninguno: `ciudad` y `cultivo` salen de la tabla `usuarios`, y
+  // esas columnas las escribe /api/log, que hoy acepta escrituras por UUID sin
+  // sesión. O sea que un tercero podía dejar `<img src=x onerror=…>` en `ciudad`
+  // y se ejecutaba en esta pantalla. Mismo escape que ya usan /pilotos y
+  // /piloto/cuaderno.
+  const esc = s => String(s == null ? "" : s)
+    .replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmtFecha = iso => { const [,m,d] = iso.split("-"); return `${d}/${m}`; };
   const durTxt = m => { if (m == null) return null; if (m < 60) return `${m} min`;
     const h = m / 60; return Number.isInteger(h) ? `${h} h` : (h === 1.5 ? "1½ h" : `${h} h`); };
@@ -348,7 +356,7 @@
     if (!data.ok) {
       const txt = data.error && /no encontrado/.test(data.error)
         ? `Este campo aún no está dado de alta. Ejecuta el SQL de alta en Supabase.`
-        : `No se pudo cargar: ${data.error || data.reason || "error"}.`;
+        : `No se pudo cargar: ${esc(data.error || data.reason || "error")}.`;
       root.innerHTML = `<div class="msg">${txt}</div>`;
       document.getElementById("registro").style.display = "none";
       return;
@@ -362,7 +370,7 @@
       const u0 = USUARIO;
       root.innerHTML = `
         <h1>${campoActual().titulo}</h1>
-        <div class="sub">${u0.ciudad || ""}${u0.cultivo ? " · " + u0.cultivo : ""}</div>
+        <div class="sub">${esc(u0.ciudad || "")}${u0.cultivo ? " · " + esc(u0.cultivo) : ""}</div>
         <div class="estado baja">
           <span class="tag">Cosechado</span>
           <div class="titular">Piloto cerrado</div>
@@ -380,7 +388,7 @@
 
     let html = `
       <h1>${campoActual().titulo}</h1>
-      <div class="sub">${u.ciudad || ""}${u.cultivo ? " · " + u.cultivo : ""} · ${fmtFecha(h.fecha)}</div>
+      <div class="sub">${esc(u.ciudad || "")}${u.cultivo ? " · " + esc(u.cultivo) : ""} · ${fmtFecha(h.fecha)}</div>
       <div class="estado ${h.nivel}">
         <span class="tag">${n.tag}</span>
         <div class="titular">${titular}</div>
@@ -549,7 +557,7 @@
     fetch(`/api/campo?vista=hoy&usuario_id=${encodeURIComponent(campoActual().id)}`)
       .then(r => r.json()).then(pintarHoy)
       .catch(e => { document.getElementById("root").innerHTML =
-        `<div class="msg">No se pudo conectar.<br><small>${e.message}</small></div>`; });
+        `<div class="msg">No se pudo conectar.<br><small>${esc(e.message)}</small></div>`; });
     cargarAbonado();
   }
 
@@ -756,7 +764,7 @@
   function pintarComparativa(data) {
     const box = document.getElementById("comparativa");
     if (!data.ok) {
-      box.innerHTML = `<div class="msg">No se pudo cargar la comparativa: ${data.error || data.reason || "error"}.<br>
+      box.innerHTML = `<div class="msg">No se pudo cargar la comparativa: ${esc(data.error || data.reason || "error")}.<br>
         <small>¿Ejecutaste <code>db/alta-campo-padre-aspersion.sql</code> en Supabase?</small></div>`;
       return;
     }
@@ -858,7 +866,7 @@
     box.innerHTML = `<div class="msg skel">Cargando comparativa…</div>`;
     fetch(`/api/campo?vista=comparativa&usuario_id=${encodeURIComponent(CAMPOS.padre.id)}`)
       .then(r => r.json()).then(pintarComparativa)
-      .catch(e => { box.innerHTML = `<div class="msg">No se pudo conectar.<br><small>${e.message}</small></div>`; });
+      .catch(e => { box.innerHTML = `<div class="msg">No se pudo conectar.<br><small>${esc(e.message)}</small></div>`; });
   }
 
   // ── Navegación ────────────────────────────────────────────────

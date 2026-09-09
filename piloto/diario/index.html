@@ -177,6 +177,12 @@
   const ID = (params.get("id") || params.get("usuario_id") ||
               (() => { try { return localStorage.getItem("kylia_user_id"); } catch (_) { return null; } })() || "").trim();
 
+  // Escape para lo que entra en innerHTML y no lo escribimos nosotros. Este
+  // fichero no tenía ninguno: `ciudad`, `cultivo` y el nombre del producto salen
+  // de la base de datos, y esas columnas las escribe /api/log, que hoy acepta
+  // escrituras por UUID sin sesión. Mismo escape que /pilotos y /piloto/cuaderno.
+  const esc = s => String(s == null ? "" : s)
+    .replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmtFecha = iso => { const [,m,d] = String(iso).split("-"); return `${d}/${m}`; };
   const hoyLocal = () => { const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
@@ -190,13 +196,13 @@
   function pintar(data) {
     const root = $("root");
     if (!data.ok) {
-      root.innerHTML = `<div class="msg">No se pudo cargar tu cuaderno: ${data.error || data.reason || "error"}.</div>`;
+      root.innerHTML = `<div class="msg">No se pudo cargar tu cuaderno: ${esc(data.error || data.reason || "error")}.</div>`;
       return;
     }
     USUARIO = data.usuario || {};
     const u = USUARIO;
     let html = `<h1>Tu cuaderno</h1>
-      <div class="sub">${[u.ciudad, u.cultivo].filter(Boolean).join(" · ") || "Tu campo"}</div>
+      <div class="sub">${esc([u.ciudad, u.cultivo].filter(Boolean).join(" · ") || "Tu campo")}</div>
       <div class="silencio">🤫 <b>Piloto silencioso.</b> Apunta lo que hagas (regar, tratar, lo que veas).
         Kylia no te aconseja durante el piloto — así tu informe final es limpio.</div>`;
 
@@ -213,7 +219,8 @@
       }
       for (const a of aplics) {
         const esAbono = a.motivo === "abonado";
-        const v = `${a.producto || (esAbono ? "abonado" : "tratamiento")}${a.dosis ? ` · ${a.dosis}` : ""}`;
+        // `producto` y `dosis` son texto libre del agricultor.
+        const v = `${esc(a.producto || (esAbono ? "abonado" : "tratamiento"))}${a.dosis ? ` · ${esc(a.dosis)}` : ""}`;
         html += `<li><span class="f">${fmtFecha(a.fecha)} ${esAbono ? "🌱" : "🧪"}</span><span class="r"><span class="v">${v}</span>` +
                 `${a.id != null ? `<button class="del" data-borrar="${a.id}" data-que="${esAbono ? "abonado" : "tratamiento"}" title="Borrar este apunte">✕</button>` : ""}</span></li>`;
       }

@@ -4003,18 +4003,25 @@
             : `Protege hasta ${formatearFechaCorta(finIso)} · ${diasEf} día${diasEf !== 1 ? "s" : ""}`;
           efectoBadge = `<span class="apl-efecto${claseExtra}">${texto}</span>`;
         }
-        const sustancia = a.sustanciaActiva ? ` · ${a.sustanciaActiva}` : "";
-        const cultivo   = a.cultivo ? ` · ${a.cultivo}` : "";
-        const dosis     = a.dosis ? ` · ${a.dosis}` : "";
-        const notas     = a.notas ? `<div class="apl-detalle">${a.notas}</div>` : "";
+        // TODO lo de aquí lo escribe el agricultor a mano: cuando aplica un
+        // producto que no está en el catálogo, el nombre, la dosis y las notas son
+        // texto libre suyo. Iban al innerHTML sin escapar, así que un
+        // `<img src=x onerror=...>` como nombre de producto se ejecutaba. Y no se
+        // queda en su móvil: `producto_nombre` se sube a `acciones` vía /api/log,
+        // que hoy acepta escrituras por UUID sin sesión — o sea que la misma
+        // cadena la acaba pintando la pantalla de otro.
+        const sustancia = a.sustanciaActiva ? ` · ${esc(a.sustanciaActiva)}` : "";
+        const cultivo   = a.cultivo ? ` · ${esc(a.cultivo)}` : "";
+        const dosis     = a.dosis ? ` · ${esc(a.dosis)}` : "";
+        const notas     = a.notas ? `<div class="apl-detalle">${esc(a.notas)}</div>` : "";
         const li = document.createElement("li");
         li.innerHTML =
           `<div class="apl-fila-1">`
           + `<div>`
-          +   `<div class="apl-nombre">${a.productoNombre}${a.fueOtro ? " <small style=\"font-weight:400;color:var(--muted);\">(fuera de catálogo)</small>" : ""}</div>`
+          +   `<div class="apl-nombre">${esc(a.productoNombre)}${a.fueOtro ? " <small style=\"font-weight:400;color:var(--muted);\">(fuera de catálogo)</small>" : ""}</div>`
           +   `<div class="apl-meta">${formatearFechaCorta(a.date)}${sustancia}${cultivo}${dosis}</div>`
           + `</div>`
-          + `<button class="apl-borrar" data-date="${a.date}" data-nombre="${a.productoNombre.replace(/"/g, "&quot;")}" aria-label="Borrar aplicación">✕</button>`
+          + `<button class="apl-borrar" data-date="${esc(a.date)}" data-nombre="${esc(a.productoNombre)}" aria-label="Borrar aplicación">✕</button>`
           + `</div>`
           + badge
           + efectoBadge
@@ -4588,9 +4595,12 @@
         if (textoIA === "cargando") {
           bloque.innerHTML = `<p class="ia-cargando">Analizando tu parcela...</p>`;
         } else {
+          // El análisis lo escribe Gemini, y es prosa: no tiene que llevar
+          // marcado. Sin escapar, cualquier cosa que el modelo devuelva entre
+          // ángulos se ejecutaba en la pantalla del agricultor.
           bloque.innerHTML =
             `<div class="ia-label"><span>&#10024;</span> Análisis</div>`
-            + `<p class="ia-texto">${textoIA}</p>`;
+            + `<p class="ia-texto">${esc(textoIA)}</p>`;
         }
         section.appendChild(bloque);
       }
@@ -4718,6 +4728,35 @@
       return String(s ?? "").replace(/[&<>"']/g, c =>
         ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     }
+    // esc() impide romper el atributo, pero NO impide que la URL sea
+    // `javascript:...`, que se ejecuta al tocar el enlace. Y estas URLs no las
+    // escribimos nosotros: las trae la IA de una búsqueda web en vivo
+    // (_ia-producto-fertilizante.js). Así que se valida el esquema, y solo
+    // http/https pasan. Se usa el parser del navegador y no una expresión
+    // regular a propósito: él ya normaliza los trucos de tabuladores y saltos de
+    // línea con los que se disfraza `java\nscript:`.
+    function urlSegura(u) {
+      try {
+        // Sin base a propósito: estas URLs son EXTERNAS (fuentes de una búsqueda
+        // web, el checkout de Stripe) y tienen que venir absolutas. Con
+        // location.origin de base, una cadena cualquiera se resolvía contra
+        // kylia.app y salía un enlace roto a nuestra propia web; y un
+        // "//evil.com/x" habría heredado nuestro esquema. Sin base, las dos cosas
+        // lanzan y acaban en null.
+        const p = new URL(String(u ?? ""));
+        return (p.protocol === "http:" || p.protocol === "https:") ? p.href : null;
+      } catch (_) { return null; }
+    }
+    // Una fuente de la búsqueda: enlace si la URL es http(s), y si no, el título
+    // en texto plano. No se descarta la fuente entera —saber DE DÓNDE salió el
+    // dato es parte de la honestidad del producto—, solo deja de ser pinchable.
+    function enlaceFuente(f) {
+      const href = urlSegura(f && f.url);
+      const titulo = esc((f && f.titulo) || "fuente");
+      return href
+        ? `<a href="${esc(href)}" target="_blank" rel="noopener">${titulo}</a>`
+        : `<span class="pq-fuente-sin-enlace">${titulo}</span>`;
+    }
     function nDec(v, d) {
       return Number(v ?? 0).toLocaleString("es-ES", { minimumFractionDigits: d, maximumFractionDigits: d });
     }
@@ -4787,7 +4826,7 @@
             <ul class="pq-desc">${pr.descartados.map(x =>
               `<li><b>${esc(x.producto || "")}</b> — ${esc(x.motivo || "")}</li>`).join("")}</ul>` : ""}
           ${(pr.fuentes || []).length ? `<p class="pq-fuentes">Buscado el ${esc(pr.consultado || "—")} en: ${
-            pr.fuentes.map(f => `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.titulo)}</a>`).join(" · ")}</p>` : ""}
+            pr.fuentes.map(f => enlaceFuente(f)).join(" · ")}</p>` : ""}
         ` : `<p class="pq-txt">Aún no se ha buscado el producto en el mercado, así que la cantidad va en gramos de nutriente. Toca “¿Qué compro para esto?”.</p>`}
         <p class="pq-pie">Los coeficientes salen de la Guía de fertilización racional de MAPA. La materia orgánica del suelo la estima SoilGrids por coordenada: <b>es un prior, no una analítica de tu parcela</b>, y es el término más flojo de todo este cálculo. El suelo limpio es un supuesto declarado, no un cero medido.</p>`;
     }
@@ -4875,14 +4914,14 @@
       const alt = (d.alternativas || []).slice(0, 3).map(a =>
         `<li><strong>${esc(a.producto || "")}</strong>${a.pct_nutriente ? ` · ${a.pct_nutriente}% N` : ""}${
           a.eur_kg_nutriente ? ` · ${nDec(a.eur_kg_nutriente, 0)} €/kg de N` : ""}${
-          a.url ? ` · <a href="${esc(a.url)}" target="_blank" rel="noopener">ficha</a>` : ""}
+          urlSegura(a.url) ? ` · <a href="${esc(urlSegura(a.url))}" target="_blank" rel="noopener">ficha</a>` : ""}
           ${a.por_que ? `<br><span class="compra-por-que">${esc(a.por_que)}</span>` : ""}</li>`).join("");
       // Los descartados son la mitad del valor: dicen por qué NO comprar lo que
       // sale primero al buscar.
       const desc = (d.descartados || []).slice(0, 3).map(x =>
         `<li><strong>${esc(x.producto || "")}</strong> — ${esc(x.motivo || "")}</li>`).join("");
       const fuentes = (d.citas || []).slice(0, 6).map(f =>
-        `<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.titulo)}</a>`).join(" · ");
+        enlaceFuente(f)).join(" · ");
 
       return `<div class="compra">
         <p class="compra-titulo">${esc(r.producto || "Sin recomendación")}</p>
@@ -5902,7 +5941,11 @@
               body: JSON.stringify({ accion, usuario_id: window.kyliaSync?.userId }),
             });
             const d = await res.json();
-            if (d?.ok && d.url) { location.href = d.url; return; }   // se va a Stripe
+            // Se comprueba el esquema aunque la URL venga de nuestra propia API:
+            // `location.href = "javascript:…"` también ejecuta, y esta línea es
+            // la única del fichero que navega a una URL que llega por la red.
+            const destino = d?.ok && d.url ? urlSegura(d.url) : null;
+            if (destino) { location.href = destino; return; }         // se va a Stripe
             aviso.textContent = d?.reason === "stripe_no_configurado"
               ? "El pago todavía no está abierto."
               : "No se ha podido abrir ahora mismo. Inténtalo en un momento.";

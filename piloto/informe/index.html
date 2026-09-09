@@ -88,6 +88,12 @@
   </div>
 
 <script>
+  // Escape para lo que entra en innerHTML y no lo escribimos nosotros. Este
+  // fichero no tenía ninguno: `ciudad`, `cultivo` y el nombre del producto salen
+  // de la base de datos, y esas columnas las escribe /api/log, que hoy acepta
+  // escrituras por UUID sin sesión. Mismo escape que /pilotos y /piloto/cuaderno.
+  const esc = s => String(s == null ? "" : s)
+    .replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmtFecha = iso => { const [,m,d] = String(iso).split("-"); return `${d}/${m}`; };
   const params = new URLSearchParams(location.search);
   const id = params.get("id") || params.get("usuario_id");
@@ -139,11 +145,11 @@
 
   function pintar(data) {
     const root = document.getElementById("root");
-    if (!data.ok) { root.innerHTML = `<div class="msg">No se pudo cargar el informe: ${data.error || data.reason || "error"}.</div>`; return; }
+    if (!data.ok) { root.innerHTML = `<div class="msg">No se pudo cargar el informe: ${esc(data.error || data.reason || "error")}.</div>`; return; }
     const inf = data.informe, u = inf.usuario, agua = inf.dimensiones.agua;
 
     let html = `<h1>Tu informe del piloto</h1>
-      <div class="sub">${[u.ciudad, u.cultivo, u.metodo_riego].filter(Boolean).join(" · ")}` +
+      <div class="sub">${esc([u.ciudad, u.cultivo, u.metodo_riego].filter(Boolean).join(" · "))}` +
       `${inf.periodo ? ` · ${fmtFecha(inf.periodo.desde)}–${fmtFecha(inf.periodo.hasta)}` : ""}</div>`;
 
     if (!agua.disponible) {
