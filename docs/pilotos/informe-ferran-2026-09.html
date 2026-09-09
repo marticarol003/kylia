@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<!--
+  Informe de cierre del piloto de tomate de Ferran (Mas Cancadell, Breda).
+  Generado el 9-sep-2026 a partir de /api/campo?vista=reveal, con el piloto ya
+  cerrado (fecha_cosecha 2026-09-08).
+
+  ⚠️ NO ENVIAR sin medir antes el caudal del goteo. Los 32 mm/h están marcados
+  provisionales desde el alta y el titular entero cuelga de ellos: a 32 el exceso
+  es del 68%, a 16 del 35%, y por debajo de 10,4 mm/h no hubo exceso. Es la misma
+  trampa del campo del padre, donde medir con un cubo bajó el caudal de 15 a 5,4.
+
+  Vive en docs/ (excluido del despliegue por .vercelignore), así que NO se
+  publica en kylia.app. Ábrelo con doble clic.
+-->
+<title>El agua del tomacó</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+:root {
+  --verde:      #013A27;
+  --verde-alto: #0B5A3F;
+  --agua:       #2C4A5E;
+  --exceso:     #A8681C;
+  --tinta:      #101A16;
+  --apagado:    #566B62;
+  --tenue:      #7C8E86;
+  --fondo:      #F5F8F5;
+  --papel:      #FFFFFF;
+  --linea:      #DCE5DF;
+  --linea-suave:#EAF0EB;
+  --aviso-fondo:#FBF3E6;
+  --aviso-linea:#E4CBA0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --verde:      #6FD3A6;
+    --verde-alto: #8FE0BC;
+    --agua:       #8FB4CC;
+    --exceso:     #E0A458;
+    --tinta:      #E8F0EA;
+    --apagado:    #9DB0A7;
+    --tenue:      #7A8D84;
+    --fondo:      #0C1310;
+    --papel:      #141D19;
+    --linea:      #26332C;
+    --linea-suave:#1D2823;
+    --aviso-fondo:#231B0E;
+    --aviso-linea:#4A3A1C;
+  }
+}
+:root[data-theme="dark"] {
+  --verde:      #6FD3A6;
+  --verde-alto: #8FE0BC;
+  --agua:       #8FB4CC;
+  --exceso:     #E0A458;
+  --tinta:      #E8F0EA;
+  --apagado:    #9DB0A7;
+  --tenue:      #7A8D84;
+  --fondo:      #0C1310;
+  --papel:      #141D19;
+  --linea:      #26332C;
+  --linea-suave:#1D2823;
+  --aviso-fondo:#231B0E;
+  --aviso-linea:#4A3A1C;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--tinta);
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hoja {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 52px;
+}
+
+/* ── Cabecera ───────────────────────────────────────────── */
+.masthead {
+  padding: 64px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.sello {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--verde);
+}
+.sello svg { flex: 0 0 auto; }
+
+h1 {
+  font-family: Fraunces, Georgia, "Times New Roman", serif;
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-size: clamp(2.3rem, 6.5vw, 3.4rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  margin: 0;
+  text-wrap: balance;
+  color: var(--tinta);
+}
+.entradilla {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 1.09rem;
+  color: var(--apagado);
+}
+
+.ficha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
+  gap: 1px;
+  background: var(--linea);
+  border: 1px solid var(--linea);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ficha div {
+  background: var(--papel);
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ficha dt {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tenue);
+}
+.ficha dd {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Secciones ──────────────────────────────────────────── */
+section { display: flex; flex-direction: column; gap: 20px; }
+
+.rotulo {
+  font-size: 0.71rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--verde);
+  padding-bottom: 9px;
+  border-bottom: 2px solid var(--verde);
+  align-self: flex-start;
+}
+h2 {
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 600;
+  font-size: 1.72rem;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  margin: 0;
+  text-wrap: balance;
+}
+h3 {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+p { margin: 0; max-width: 66ch; }
+p + p { margin-top: -4px; }
+strong { font-weight: 700; }
+
+/* ── El titular ─────────────────────────────────────────── */
+.titular {
+  background: var(--papel);
+  border: 1px solid var(--linea);
+  border-radius: 4px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.dias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 34px;
+}
+.dias > div { display: flex; flex-direction: column; gap: 2px; }
+.cifra {
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 700;
+  font-size: 3.1rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.cifra.regado { color: var(--exceso); }
+.cifra.kylia  { color: var(--verde); }
+.pie-cifra {
+  font-size: 0.83rem;
+  color: var(--apagado);
+  max-width: 22ch;
+}
+
+/* ── Barras de agua ─────────────────────────────────────── */
+.barras { display: flex; flex-direction: column; gap: 18px; }
+.barra { display: flex; flex-direction: column; gap: 7px; }
+.barra-cab {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.87rem;
+}
+.barra-cab b { font-variant-numeric: tabular-nums; font-size: 1rem; }
+.barra-pista {
+  height: 26px;
+  background: var(--linea-suave);
+  border-radius: 2px;
+  overflow: hidden;
+  display: flex;
+}
+.barra-relleno { height: 100%; }
+.barra-relleno.agua   { background: var(--agua); }
+.barra-relleno.exceso { background: var(--exceso); opacity: 0.42; }
+.barra-relleno.kylia  { background: var(--verde); }
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.79rem;
+  color: var(--apagado);
+}
+.leyenda span { display: flex; align-items: center; gap: 6px; }
+.pastilla { width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto; }
+
+/* ── Tablas ─────────────────────────────────────────────── */
+.tabla-caja { overflow-x: auto; border: 1px solid var(--linea); border-radius: 4px; background: var(--papel); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { padding: 9px 15px; text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th {
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--tenue);
+  border-bottom: 1px solid var(--linea);
+}
+tbody td { font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--linea-suave); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr.destacada td { background: var(--linea-suave); font-weight: 700; }
+
+/* ── Aviso ──────────────────────────────────────────────── */
+.aviso {
+  background: var(--aviso-fondo);
+  border: 1px solid var(--aviso-linea);
+  border-radius: 4px;
+  padding: 26px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.aviso h3 { color: var(--exceso); }
+
+.notas { display: flex; flex-direction: column; gap: 16px; }
+.nota {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 13px;
+  font-size: 0.93rem;
+  color: var(--apagado);
+}
+.nota::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--verde);
+  margin-top: 9px;
+  margin-left: 7px;
+}
+.nota b { color: var(--tinta); font-weight: 600; }
+
+/* ── Pie ────────────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--linea);
+  padding-top: 24px;
+  font-size: 0.82rem;
+  color: var(--tenue);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+@media (max-width: 560px) {
+  body { font-size: 16px; }
+  .masthead { padding-top: 44px; }
+  .titular { padding: 24px 20px; }
+  .cifra { font-size: 2.5rem; }
+  .dias { gap: 24px; }
+}
+</style>
+
+<div class="hoja">
+
+  <header class="masthead">
+    <div class="sello">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(45)"/>
+        <path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(225)"/>
+        <circle cx="12" cy="12" r="2.4"/>
+      </svg>
+      Kylia · cierre de piloto
+    </div>
+
+    <h1>El agua del tomacó</h1>
+
+    <p class="entradilla">
+      Durante 88 días Kylia calculó, en silencio y sin decirte nada, cuánta agua
+      pedía tu tomate cada mañana. Tú regaste como riegas siempre. Esto es la
+      comparación de las dos cosas — con lo que muestra y con lo que todavía no
+      puede demostrar.
+    </p>
+
+    <dl class="ficha">
+      <div><dt>Finca</dt><dd>Mas Cancadell</dd></div>
+      <div><dt>Cultivo</dt><dd>Tomacó, eco</dd></div>
+      <div><dt>Parcela</dt><dd>30 m²</dd></div>
+      <div><dt>Riego</dt><dd>Goteo</dd></div>
+      <div><dt>Plantado</dt><dd>30 mayo</dd></div>
+      <div><dt>Medido</dt><dd>13 jun – 8 sep</dd></div>
+    </dl>
+  </header>
+
+  <section>
+    <div class="rotulo">Lo que muestran los datos</div>
+    <h2>Regaste 73 días de 88. El cultivo pedía agua 10.</h2>
+    <p>
+      Este es el hallazgo, y es el único que no depende de ninguna medición
+      dudosa: tu goteo va con pauta fija —30 minutos cada mañana— llueva, refresque
+      o apriete el calor. El tomate no consume igual todos los días, así que una
+      pauta fija acierta por casualidad.
+    </p>
+
+    <div class="titular">
+      <div class="dias">
+        <div>
+          <span class="cifra regado">73</span>
+          <span class="pie-cifra">días que regaste</span>
+        </div>
+        <div>
+          <span class="cifra kylia">9</span>
+          <span class="pie-cifra">días que Kylia habría regado</span>
+        </div>
+      </div>
+
+      <div class="barras">
+        <div class="barra">
+          <div class="barra-cab">
+            <span>Agua que aplicaste</span>
+            <b>1.199,8 L/m²</b>
+          </div>
+          <div class="barra-pista">
+            <div class="barra-relleno agua" style="width:32.4%"></div>
+            <div class="barra-relleno exceso" style="width:67.6%"></div>
+          </div>
+        </div>
+        <div class="barra">
+          <div class="barra-cab">
+            <span>Agua que el cultivo pedía</span>
+            <b>389,0 L/m²</b>
+          </div>
+          <div class="barra-pista">
+            <div class="barra-relleno kylia" style="width:32.4%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="leyenda">
+        <span><i class="pastilla" style="background:var(--agua)"></i> lo que el cultivo necesitaba</span>
+        <span><i class="pastilla" style="background:var(--exceso);opacity:.42"></i> lo que fue de más</span>
+      </div>
+    </div>
+
+    <p>
+      En tus 30 m²: aplicaste <strong>36,0 m³</strong> y el cultivo pedía
+      <strong>11,7 m³</strong>. La diferencia son <strong>24,3 m³</strong> — unos
+      121 bidones de 200 litros. Llevado a una hectárea del mismo manejo serían
+      unos <strong>8.100 m³</strong> de más por campaña.
+    </p>
+  </section>
+
+  <section>
+    <div class="rotulo">Semana a semana</div>
+    <h2>El desfase no fue un mal día: fue todo el verano.</h2>
+    <p>
+      Hasta finales de junio el suelo aún tenía reserva y el cultivo era pequeño:
+      Kylia no habría regado nada. A partir de julio ya pedía agua, pero nunca
+      tanta como la que caía.
+    </p>
+    <div class="tabla-caja">
+      <table>
+        <thead>
+          <tr><th>Semana</th><th>Aplicaste</th><th>Pedía</th><th>De más</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>15 – 21 jun</td><td>64,0</td><td>0,0</td><td>64,0</td></tr>
+          <tr><td>22 – 28 jun</td><td>48,0</td><td>0,0</td><td>48,0</td></tr>
+          <tr><td>29 jun – 5 jul</td><td>79,9</td><td>0,0</td><td>79,9</td></tr>
+          <tr><td>6 – 12 jul</td><td>63,9</td><td>0,0</td><td>63,9</td></tr>
+          <tr><td>13 – 19 jul</td><td>112,0</td><td>44,6</td><td>67,4</td></tr>
+          <tr><td>20 – 26 jul</td><td>112,0</td><td>78,9</td><td>33,1</td></tr>
+          <tr><td>27 jul – 2 ago</td><td>112,0</td><td>35,8</td><td>76,2</td></tr>
+          <tr><td>3 – 9 ago</td><td>112,0</td><td>44,1</td><td>67,9</td></tr>
+          <tr><td>10 – 16 ago</td><td>112,0</td><td>85,6</td><td>26,4</td></tr>
+          <tr><td>17 – 23 ago</td><td>112,0</td><td>0,0</td><td>112,0</td></tr>
+          <tr><td>24 – 30 ago</td><td>112,0</td><td>51,8</td><td>60,2</td></tr>
+          <tr><td>31 ago – 6 sep</td><td>112,0</td><td>48,2</td><td>63,8</td></tr>
+          <tr class="destacada"><td>Total</td><td>1.199,8</td><td>389,0</td><td>810,8</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:.86rem;color:var(--apagado)">Todo en litros por metro cuadrado.</p>
+  </section>
+
+  <section>
+    <div class="rotulo">Lo que este informe no puede demostrar</div>
+    <h2>El porcentaje depende de un número que todavía no hemos medido.</h2>
+
+    <div class="aviso">
+      <h3>El caudal de tu goteo está sin medir</h3>
+      <p>
+        El agua que aplicaste no se pesó: se calcula multiplicando los minutos de
+        riego por el caudal de la instalación, y ese caudal —32 mm/h— quedó
+        anotado como <em>provisional</em> en la visita de junio. Nunca se
+        comprobó con un recipiente y un reloj.
+      </p>
+      <p>
+        Importa mucho, porque el titular se mueve entero con él:
+      </p>
+      <div class="tabla-caja" style="border-color:var(--aviso-linea)">
+        <table>
+          <thead>
+            <tr><th>Si el caudal real fuera…</th><th>Habrías aplicado</th><th>Agua de más</th></tr>
+          </thead>
+          <tbody>
+            <tr class="destacada"><td>32 mm/h <span style="font-weight:400;color:var(--apagado)">(lo anotado)</span></td><td>1.200 L/m²</td><td>68 %</td></tr>
+            <tr><td>24 mm/h</td><td>900 L/m²</td><td>57 %</td></tr>
+            <tr><td>16 mm/h</td><td>600 L/m²</td><td>35 %</td></tr>
+            <tr><td>10,4 mm/h</td><td>390 L/m²</td><td>ninguna</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Por debajo de <strong>10,4 mm/h</strong> no habría sobrado agua. Ya nos
+        pasó en otra parcela del piloto: al medir el caudal con un cubo bajó de 15
+        a 5,4 mm/h. Así que antes de dar el 65 % por bueno hay que medirlo — es
+        una hora de reloj y un recipiente.
+      </p>
+    </div>
+
+    <div class="notas">
+      <div class="nota">
+        <p><b>Los días sí son firmes.</b> Que regaras 73 días y el cultivo pidiera
+        agua 10 no depende del caudal en absoluto: sale del calendario de riegos y
+        del balance de agua del suelo. Aunque el caudal resulte ser la mitad, el
+        problema de fondo —regar por calendario y no por necesidad— sigue igual.</p>
+      </div>
+      <div class="nota">
+        <p><b>El cálculo va a favor tuyo, no nuestro.</b> El modelo de Kylia vacía
+        el suelo algo más rápido que el estándar FAO-56, así que se atribuye más
+        riegos de los que dispararía la referencia. El ahorro que sale es un
+        <em>mínimo</em>, no un máximo.</p>
+      </div>
+      <div class="nota">
+        <p><b>De la demanda estamos seguros; de la decisión, menos.</b> Cuánta agua
+        pide el cultivo cada día está validado contra el estándar internacional sin
+        error apreciable. Acertar el día exacto de regar es más difícil: en una
+        prueba sobre 60 ventanas, Kylia y la referencia coincidían el 62 % de las
+        veces. Por eso el dato fuerte de este informe es el volumen, no el
+        calendario.</p>
+      </div>
+      <div class="nota">
+        <p><b>El porcentaje tiene grano grueso.</b> Kylia no riega un poquito cada
+        día: espera a que el suelo baje del umbral y entonces repone de golpe. Así
+        que el total depende de cuántas veces se cruza ese umbral en el ciclo — en
+        el tuyo, nueve. Un riego simulado son unos 43 mm, o sea que uno más o uno
+        menos mueve el resultado unos <strong>3-4 puntos</strong>. Léelo como
+        “alrededor de dos tercios”, no como un 68 % exacto.</p>
+      </div>
+      <div class="nota">
+        <p><b>No hay euros.</b> Falta tu tarifa del agua (€/m³) para traducir los
+        23,5 m³ a dinero. Con ese dato lo calculamos en un minuto.</p>
+      </div>
+      <div class="nota">
+        <p><b>No medimos ni cosecha ni tratamientos.</b> Este piloto solo midió
+        agua. No sabemos si con menos riego habrías cogido más o menos kilos, y no
+        vamos a insinuarlo.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="rotulo">Un apunte del final del ciclo</div>
+    <h2>La planta aún no había cerrado su ciclo cuando recogiste.</h2>
+    <p>
+      Kylia cuenta el desarrollo del cultivo en calor acumulado, no en días. Tu
+      tomate llevaba <strong>1.653 grados-día</strong> de los 1.749 que pide el
+      ciclo completo: un 94 %. Es lo normal en un tomate que se recoge a mano y
+      escalonado —empiezas a coger mucho antes de que la mata termine—, pero
+      conviene dejarlo escrito, porque significa que el ciclo se cortó por
+      decisión de campaña y no porque la planta hubiera acabado.
+    </p>
+  </section>
+
+  <section>
+    <div class="rotulo">Lo siguiente</div>
+    <h2>Tres cosas, por orden.</h2>
+    <div class="notas">
+      <div class="nota">
+        <p><b>Medir el caudal.</b> Un recipiente recto bajo un gotero, una hora de
+        reloj, y medir lo recogido. Con eso el informe deja de tener asterisco.</p>
+      </div>
+      <div class="nota">
+        <p><b>Tu tarifa del agua.</b> Los €/m³ que pagas, y ponemos el ahorro en
+        euros.</p>
+      </div>
+      <div class="nota">
+        <p><b>La campaña que viene, con Kylia hablando.</b> Este piloto fue en
+        silencio a propósito, para no influirte. En la siguiente puede decirte cada
+        mañana cuántos minutos toca — y entonces el ahorro deja de ser un cálculo y
+        pasa a ser agua que no sale del pozo.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div>Kylia · informe de cierre del piloto de Mas Cancadell (Breda, La Selva).</div>
+    <div>Método: balance hídrico FAO-56 sobre el clima diario de tu parcela. El contrafactual se simula sin ver tus riegos reales.</div>
+    <div>Periodo medido del 13 de junio al 8 de septiembre de 2026, día en que se retiró el cultivo · cobertura del registro 100 %.</div>
+  </footer>
+
+</div>
+
+</body>
+</html>
