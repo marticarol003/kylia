@@ -71,8 +71,17 @@ ok(/if \(ll >= MOTOR\.PE_MIN_MM\) neto -= ll;/.test(alta),
    "y se descuenta la lluvia que llegó a infiltrar");
 ok(/estimado: true/.test(alta),
    "los riegos sembrados van marcados: no son un registro real y no se disfrazan de tal");
-ok(/if \(caudal > 0\.5 && caudal < 80\) saveConfig/.test(alta),
-   "el caudal deducido se guarda solo si sale en un rango creíble");
+
+console.log("\n── el primer aviso sigue a los días desde su último riego, no a una lámina inventada ──");
+// Con lámina plana el residuo quedaba por encima del umbral y el primer aviso
+// salía "RIEGA" en 14 de 16 casos probados, incluso diciendo que regó HOY: el
+// consejo era una constante disfrazada de cálculo.
+ok(/litros: i === fechas\.length - 1 \? null : lamina/.test(alta),
+   "el último riego sembrado entra como recarga completa, que es la premisa que dice el comentario");
+ok(!/saveConfig\(\{ \.\.\.cfg, caudal \}\)/.test(alta),
+   "y NO se escribe un caudal deducido: no es una medida, es la suposición despejada");
+ok(/se mide con un cubo/.test(alta),
+   "queda dicho dónde sale de verdad el caudal");
 
 console.log("\n── se le habla en su unidad, no en la nuestra ──");
 ok(/como los que haces normalmente/.test(alta),

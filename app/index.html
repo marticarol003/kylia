@@ -6484,16 +6484,41 @@
           const efic = MOTOR.EFIC_RIEGO[A.metodo] ?? MOTOR.EFIC_DEFAULT;
           const lamina = Math.max(1, Math.round((Math.max(0, neto) / fechas.length / efic) * 10) / 10);
 
-          riegos = fechas.map(f => ({ date: f, litros: lamina, duracion: Number(A.minutos), estimado: true }));
+          // EL ÚLTIMO RIEGO VA COMO RECARGA COMPLETA (litros:null), no como una
+          // lámina estimada. Es la única forma de que la premisa de arriba se
+          // cumpla de verdad: si su rutina cubre la demanda, el día que regó por
+          // última vez el suelo estaba lleno.
+          //
+          // Con lámina plana no se cumplía, y el efecto era grave. Kc sube a lo
+          // largo del ciclo: los riegos del principio sobran (y el sobrante se
+          // tira, porque el déficit se recorta en 0) y los del final se quedan
+          // cortos. El residuo que quedaba era mayor que el umbral, así que el
+          // primer aviso salía "RIEGA" en 14 de 16 casos probados — incluso
+          // diciendo que había regado HOY. O sea: el consejo era una constante
+          // disfrazada de cálculo.
+          //
+          // Así, el déficit de hoy es exactamente la ETc de los días que han
+          // pasado desde su último riego. Nada inventado: su fecha, la ET0 de
+          // sus coordenadas y el Kc del cultivo.
+          riegos = fechas.map((f, i) => ({
+            date: f,
+            litros: i === fechas.length - 1 ? null : lamina,
+            duracion: Number(A.minutos),
+            estimado: true,
+          }));
           saveRiegos(riegos);
 
-          // Y de paso queda deducido su caudal, sin habérselo preguntado: si esa
-          // lámina sale en los minutos que él riega, eso es lo que echa su
-          // instalación. Con esto los avisos futuros le hablan en minutos suyos.
-          if (A.metodo !== "regadera" && Number(A.minutos) > 0) {
-            const caudal = Math.round((lamina * efic) / (Number(A.minutos) / 60) * 10) / 10;
-            if (caudal > 0.5 && caudal < 80) saveConfig({ ...cfg, caudal });
-          }
+          // NO se deduce el caudal. Se hacía —lámina entre los minutos que él
+          // riega— y era tentador porque sale un número creíble (13 mm/h en el
+          // caso típico, dentro del rango 5,4-15 medido en los pilotos). Pero no
+          // es una medida: es la propia suposición despejada, y una vez escrita
+          // en la configuración contamina en silencio los litros, el reveal y
+          // todo lo que venga detrás. Es la misma trampa que dio un 68% falso en
+          // el informe de Ferran, y la que hizo que el campo del padre pasara de
+          // 15 a 5,4 mm/h en cuanto se midió con un cubo.
+          //
+          // El caudal se mide, y se mide con un cubo. Hasta entonces se le habla
+          // en los minutos que él ya usa, que es lo que sí sabemos.
         }
 
         // ── paso 4 · el primer aviso ──
