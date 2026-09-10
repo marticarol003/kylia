@@ -155,6 +155,27 @@ tbody tr.tot td { border-top: 1.5px solid var(--linea); border-bottom: 0; font-w
 .mini.k { background: var(--agua); }
 
 .cautelas { margin-top: 14px; border: 1px solid var(--linea); padding: 13px 18px; }
+.fiab { margin-top: 14px; border: 1px solid var(--linea); }
+.fiab-cab {
+  padding: 11px 18px; border-bottom: 1px solid var(--linea); background: var(--crema);
+  font-size: 8pt; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--verde);
+}
+.fiab-fila { display: grid; grid-template-columns: 92px 1fr; gap: 14px; padding: 11px 18px; }
+.fiab-fila + .fiab-fila { border-top: 1px solid #EFF3F0; }
+.sello-niv {
+  align-self: start; font-size: 6.8pt; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; padding: 3px 7px; border-radius: 2px; text-align: center; color: #fff;
+}
+.sello-niv.mes { background: var(--verde); }
+.sello-niv.cal { background: var(--agua); }
+.sello-niv.est { background: var(--exceso); }
+.fiab-txt { font-size: 8.7pt; color: var(--gris); line-height: 1.45; }
+.fiab-txt b { color: var(--tinta); }
+.horquilla { display: flex; align-items: center; gap: 0; margin: 7px 0 4px; height: 22px; font-size: 7.5pt; }
+.hq-tramo { height: 8px; background: var(--linea); position: relative; }
+.hq-dentro { height: 8px; background: var(--exceso); opacity: .35; }
+.hq-mejor { width: 3px; height: 18px; background: var(--exceso); }
+.hq-pie { display: flex; justify-content: space-between; font-size: 7.3pt; color: var(--tenue); }
 .cautelas h3 {
   font-size: 8pt; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
   color: var(--exceso); margin: 0 0 10px;
@@ -296,22 +317,76 @@ footer {
     al principi del cicle, quan la planta encara era petita i el sòl tenia reserva.
   </p>
 
-  <div class="cautelas">
-    <h3>El que aquest informe no pot demostrar</h3>
-    <ul>
-      <li><b>El cabal no s'ha tornat a mesurar.</b> Els 15 mm/h surten del got de
-        l'1 de juliol. L'aigua que vas aplicar es calcula multiplicant minuts per
-        cabal, així que si el real fos menor, l'excés també.</li>
-      <li><b>El càlcul va a favor teu, no del nostre.</b> El model de la Kylia
-        buida el sòl una mica més ràpid que l'estàndard FAO-56, o sigui que s'atribueix més
-        regs dels que dispararia la referència. L'estalvi és un mínim.</li>
-      <li><b>De quanta aigua demana el cultiu n'estem segurs; del dia exacte, menys.</b>
-        La demanda està validada contra l'estàndard internacional sense error
-        apreciable. Encertar el dia de regar és més difícil: en una prova sobre 60
-        finestres, la Kylia i la referència coincidien el 62 % de les vegades.</li>
-      <li><b>No vam mesurar collita.</b> Aquest pilot va mesurar aigua. No sabem si
-        amb menys reg hauries collit més o menys quilos, i no ho insinuarem.</li>
-    </ul>
+  <footer>
+    Kylia · balanç hídric FAO-56 sobre el clima diari de la teva parcel·la.
+  </footer>
+</div>
+
+<div class="hoja salto">
+  <div class="sello">L'aigua de la ceba tendra · pàgina 3</div>
+
+  <h2 style="margin-top:16px">De què està fet cada número</h2>
+  <p class="txt">
+    Un informe que no diu d'on surten les seves xifres no serveix per decidir res.
+    Aquests són els tres tipus de número que hi ha aquí dins, i què en sabem de
+    cadascun.
+  </p>
+
+  <div class="fiab">
+    <div class="fiab-cab">Els tres nivells</div>
+
+    <div class="fiab-fila">
+      <span class="sello-niv mes">Mesurat</span>
+      <div class="fiab-txt">
+        <b>Els 13 regs, amb les seves dates i minuts.</b> Surten del teu propi registre.
+        Aquí no hi ha cap estimació: és el que vas apuntar.
+      </div>
+    </div>
+
+    <div class="fiab-fila">
+      <span class="sello-niv cal">Calculat</span>
+      <div class="fiab-txt">
+        <b>Els 238,4 L/m² que el cultiu demanava.</b> Balanç hídric FAO-56 amb el clima diari
+        de la teva parcel·la. Aquest càlcul s'ha contrastat contra el simulador de referència
+        internacional: <b>error 0,000</b> en 60 finestres. De quanta aigua demana el cultiu,
+        n'estem segurs.
+        <br><br>
+        Encertar <i>el dia</i> exacte de regar és més difícil: en aquella mateixa prova, la
+        Kylia i la referència coincidien el <b>62 %</b> de les vegades. Per això el que val
+        d'aquest informe és el volum, no el calendari.
+      </div>
+    </div>
+
+    <div class="fiab-fila">
+      <span class="sello-niv est">Estimat</span>
+      <div class="fiab-txt">
+        <b>Els 360 L/m² que vas tirar.</b> L'aigua no es va pesar: es calcula multiplicant els
+        minuts de reg pel cabal de l'aspersor, mesurat amb el got l'1 de juliol (15 mm/h).
+        <b>Tota la incertesa de l'informe és aquí</b>, i es diu com el que és — una forquilla:
+        <div class="horquilla">
+          <span class="hq-tramo" style="width:18%"></span>
+          <span class="hq-dentro" style="width:26%"></span>
+          <span class="hq-mejor"></span>
+          <span class="hq-dentro" style="width:26%"></span>
+          <span class="hq-tramo" style="width:30%"></span>
+        </div>
+        <div class="hq-pie"><span>cabal 12 mm/h → 17 %</span><span><b>15 mm/h → 34 %</b></span><span>18 mm/h → 45 %</span></div>
+        <br>
+        Si tornes a mesurar el cabal, aquesta forquilla es tanca i el número queda fix.
+      </div>
+    </div>
+
+    <div class="fiab-fila">
+      <span class="sello-niv est">Fora d'abast</span>
+      <div class="fiab-txt">
+        <b>La collita no s'ha mesurat.</b> Aquest pilot mesurava aigua. No sabem si amb menys
+        reg hauries collit més o menys quilos, i no ho insinuarem.
+        <br><br>
+        I una nota de mètode que juga <b>a favor teu</b>: el model de la Kylia buida el sòl una
+        mica més ràpid que l'estàndard, o sigui que s'atribueix més regs dels que dispararia la
+        referència. L'estalvi calculat és un mínim, no un màxim.
+      </div>
+    </div>
   </div>
 
   <footer>
