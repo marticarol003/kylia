@@ -2340,6 +2340,23 @@
         <button type="button" class="alta-atras" data-ir="1">‹ Atrás</button>
         <p class="alta-preg" id="alta-desc-tit">Esto es lo que ya sabemos de tu zona</p>
         <ul class="alta-desc" id="alta-desc"></ul>
+
+        <!-- LA PREGUNTA QUE EVITA ABONAR DE MÁS. Sale solo si SIGPAC ha
+             encontrado recinto; si no, no hay nada que confirmar. -->
+        <div id="alta-q-cultivada" hidden>
+          <p class="alta-preg">¿Cultivas todo el recinto o solo una parte?</p>
+          <div class="alta-chips" id="alta-cultivada">
+            <button type="button" class="alta-chip" data-todo="1">Todo</button>
+            <button type="button" class="alta-chip" data-todo="0">Solo una parte</button>
+          </div>
+          <div id="alta-parte" hidden style="margin-top:10px">
+            <label class="alta-preg" for="alta-area" style="font-size:.95rem">¿Cuántos metros cuadrados cultivas, más o menos?</label>
+            <input type="number" class="alta-input" id="alta-area" min="1" step="1"
+                   inputmode="numeric" placeholder="Ej: 440">
+            <p class="alta-nota" id="alta-area-nota">Aproximado vale. Con esto salen los kilos del abonado; el riego funciona igual sin ello.</p>
+          </div>
+        </div>
+
         <p class="alta-nota" id="alta-desc-pie">Buscando…</p>
         <button type="button" class="alta-btn" data-ir="3">Seguir</button>
       </section>
@@ -6335,6 +6352,7 @@
         const hoyISO = () => new Date().toISOString().slice(0, 10);
         const menos = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
 
+        window.__A = A;   // sonda para los tests de navegador
         function pintarPuntos() {
           $("alta-puntos").innerHTML = [0,1,2,3,4,5,6]
             .map(i => `<span class="alta-punto${i <= paso ? " on" : ""}"></span>`).join("");
@@ -6425,7 +6443,7 @@
           const clave = `${A.lat.toFixed(3)},${A.lon.toFixed(3)}`;
           if (sueloPedido === clave) return;
           sueloPedido = clave;
-          A.descSuelo = A.descClima = null;
+          A.descSuelo = A.descClima = A.descRecinto = null;
 
           fetch(`/api/campo?vista=textura&lat=${A.lat.toFixed(5)}&lon=${A.lon.toFixed(5)}`,
                 { cache: "no-store" })
@@ -6454,6 +6472,23 @@
             })
             .catch(() => {})
             .finally(pintarDescubrimiento);
+
+          // EL RECINTO DE SIGPAC, con una frontera que hay que respetar: la
+          // superficie oficial es la del RECINTO, no la cultivada. En horticultura
+          // pequeña un bancal de 440 m² vive dentro de un recinto que puede tener
+          // hectáreas, y el plan de abonado escala LINEALMENTE con la superficie:
+          // dar el recinto entero por cultivado multiplica los kg de nitrógeno por
+          // el mismo factor que te has equivocado. Por eso aquí solo se guarda como
+          // referencia; lo que se cultiva lo confirma él en el paso siguiente.
+          fetch(`/api/sigpac?lat=${A.lat.toFixed(6)}&lon=${A.lon.toFixed(6)}`, { cache: "no-store" })
+            .then(r => r.json())
+            .then(d => {
+              if (!d?.parcela || !(d.superficie_m2 > 0)) return;
+              A.descRecinto = { geometria: d.parcela, superficie_m2: d.superficie_m2,
+                                referencia: d.referencia || null, uso: d.uso || null };
+            })
+            .catch(() => {})
+            .finally(pintarDescubrimiento);
         }
 
         const NOMBRE_SUELO = {
@@ -6475,6 +6510,8 @@
                                         `${es(A.descSuelo.arcilla_pct)}% arcilla · ${es(A.descSuelo.arena_pct)}% arena · SoilGrids`]);
           if (A.descClima) filas.push(["💧", `Hoy se evaporan ${es(A.descClima.et0.toFixed(1))} mm`,
                                         "es el agua que tu cultivo tiene que reponer"]);
+          if (A.descRecinto) filas.push(["🗺️", `Recinto de ${A.descRecinto.superficie_m2.toLocaleString("es-ES")} m²`,
+                                        `${A.descRecinto.referencia || "SIGPAC"} · superficie oficial`]);
           ul.innerHTML = filas.map(([ic, t, sub]) =>
             `<li><span class="alta-desc-ic" aria-hidden="true">${ic}</span>`
             + `<span><b>${esc(t)}</b><small>${esc(sub)}</small></span></li>`).join("");
@@ -6483,7 +6520,37 @@
           pie.textContent = filas.length
             ? "Todo esto lo hemos sacado de tus coordenadas. No hace falta que lo compruebes."
             : "No hemos podido consultar tu zona ahora mismo. Puedes seguir: se usarán valores medios y se afinan después.";
+          // Solo hay algo que confirmar si hay recinto.
+          $("alta-q-cultivada").hidden = !A.descRecinto;
         }
+
+        // ── ¿Todo el recinto o una parte? ─────────────────────────────────
+        // Es la única pregunta del paso 2, y existe por una razón concreta:
+        // ver arriba, en la consulta a SIGPAC. Regla dura — mientras no haya
+        // una superficie CULTIVADA confirmada, `areaParcela` se queda a null y
+        // el plan de abonado no se calcula. Vale más no dar plan que darlo
+        // multiplicado por diez.
+        grupo("alta-cultivada", "todo", "todoElRecinto", () => {
+          const todo = A.todoElRecinto === "1";
+          $("alta-parte").hidden = todo;
+          if (todo) {
+            A.areaCultivada = A.descRecinto?.superficie_m2 ?? null;
+          } else {
+            A.areaCultivada = null;
+            requestAnimationFrame(() => $("alta-area").focus());
+          }
+        });
+        $("alta-area").addEventListener("input", ev => {
+          const v = Number(ev.target.value);
+          // Un número mayor que el propio recinto no puede ser: se avisa en vez
+          // de guardarlo callando.
+          const techo = A.descRecinto?.superficie_m2;
+          const pasa = v > 0 && (!techo || v <= techo);
+          A.areaCultivada = pasa ? v : null;
+          $("alta-area-nota").textContent = (v > 0 && techo && v > techo)
+            ? `El recinto entero son ${techo.toLocaleString("es-ES")} m². No puedes cultivar más que eso.`
+            : "Aproximado vale. Con esto salen los kilos del abonado; el riego funciona igual sin ello.";
+        });
 
         $("alta-geo").addEventListener("click", () => {
           $("alta-geo").classList.add("sel");
@@ -6556,6 +6623,11 @@
             riegoMinutos: Number(A.minutos) || null,
             lat: A.lat, lon: A.lon,
             ciudad: A.ciudad || cfg.ciudad || null,
+            // La geometría del recinto sirve para que el satélite mida DENTRO de
+            // la parcela y no en un punto. La superficie, en cambio, es la
+            // CULTIVADA que él ha confirmado — nunca la del recinto.
+            parcela: A.descRecinto?.geometria || cfg.parcela || null,
+            areaParcela: A.areaCultivada ?? cfg.areaParcela ?? null,
             // Deducido de sus coordenadas vía SoilGrids (ver leerSuelo). Si esa
             // consulta no llegó a tiempo o el píxel está enmascarado, 'franco'
             // sigue siendo el término medio de la tabla de FAO-56 — pero ahora

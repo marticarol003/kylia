@@ -17,10 +17,12 @@
 // que la planta gasta. De ahí sale la lámina de los riegos sembrados — y de
 // paso, su caudal, sin habérselo preguntado.
 import { readFileSync } from "fs";
+import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
+const require = createRequire(import.meta.url);
 const app = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
 const alta = app.slice(app.indexOf("// ── El alta: los dos primeros minutos"),
                        app.indexOf("// ── Borrar la cuenta ──"));
@@ -149,12 +151,17 @@ ok(/\$\("alta-b4"\)\?\.addEventListener\("click", \(\) => ir\(6\)\)/.test(alta),
 console.log("\n── la pantalla de descubrimiento no pregunta nada ──");
 ok(/data-paso="2"/.test(app) && /Esto es lo que ya sabemos de tu zona/.test(app),
    "existe y se llama por lo que es");
-ok(!/alta-chip/.test(paso(2)), "no tiene ni un chip: no se le pide nada");
+// Nació sin preguntas, y ahora tiene exactamente UNA: la de la superficie
+// cultivada, que es la que evita multiplicar los kg de abonado. Cualquier otra
+// que aparezca aquí es alcance colándose.
+const chips2 = (paso(2).match(/class="alta-chips" id="([\w-]+)"/g) || []);
+ok(chips2.length === 1 && /alta-cultivada/.test(chips2[0]),
+   "una sola pregunta, y es la de la superficie cultivada");
 ok(/if \(n === 2\) pintarDescubrimiento\(\);/.test(alta), "se pinta al entrar");
 ok(/\.finally\(pintarDescubrimiento\)/.test(alta),
    "y también cuando responde cada consulta, así que da igual el orden de llegada");
-ok(/A\.descSuelo = A\.descClima = null;/.test(alta),
-   "al cambiar de punto se limpia lo anterior: no se enseña el suelo del pueblo de al lado");
+ok(/A\.descSuelo = A\.descClima = A\.descRecinto = null;/.test(alta),
+   "al cambiar de punto se limpia lo anterior: no se enseña el suelo ni el recinto del pueblo de al lado");
 
 console.log("\n── y no rellena huecos con valores plausibles ──");
 ok(/if \(!d\?\.ok \|\| !d\.textura\) return;/.test(alta),
@@ -164,6 +171,50 @@ ok(/No hemos podido consultar tu zona ahora mismo/.test(alta),
    "si no llega nada se dice, y se deja seguir");
 ok(/se usarán valores medios y se afinan después/.test(alta),
    "diciendo qué pasa entonces");
+
+console.log("\n── V1 · SIGPAC da el recinto, NO la superficie cultivada ──");
+// Es la corrección grave de la propuesta. En horticultura pequeña un bancal de
+// 440 m² vive dentro de un recinto que puede tener hectáreas, y el plan de
+// abonado escala LINEALMENTE con la superficie: dar el recinto por cultivado
+// multiplica los kg de nitrógeno por el mismo factor que te has equivocado.
+ok(/\/api\/sigpac\?lat=\$\{A\.lat/.test(alta), "el alta pide el recinto en cuanto tiene el punto");
+ok(/A\.descRecinto = \{ geometria: d\.parcela, superficie_m2: d\.superficie_m2/.test(alta),
+   "y lo guarda aparte, sin tocar la superficie de la parcela");
+ok(/superficie oficial/.test(app) && /Recinto de \$\{A\.descRecinto\.superficie_m2/.test(alta),
+   "se enseña etiquetado como recinto, no como 'tu campo'");
+ok(/id="alta-cultivada"/.test(app) && /¿Cultivas todo el recinto o solo una parte\?/.test(app),
+   "y SIEMPRE se pregunta si cultiva todo o una parte");
+ok(/\$\("alta-q-cultivada"\)\.hidden = !A\.descRecinto;/.test(alta),
+   "la pregunta solo sale si hay recinto: sin él no hay nada que confirmar");
+
+console.log("\n── lo que se guarda es la superficie CULTIVADA ──");
+ok(/areaParcela: A\.areaCultivada \?\? cfg\.areaParcela \?\? null/.test(alta),
+   "areaParcela sale de lo confirmado, nunca del recinto directamente");
+ok(/parcela: A\.descRecinto\?\.geometria/.test(alta),
+   "la geometría del recinto sí se usa: es la que hace que el satélite mida dentro y no en un punto");
+ok(/A\.areaCultivada = A\.descRecinto\?\.superficie_m2 \?\? null;/.test(alta),
+   "'todo' toma la superficie oficial");
+ok(/A\.areaCultivada = null;/.test(alta) && /\$\("alta-parte"\)\.hidden = todo;/.test(alta),
+   "'una parte' la borra y pide los metros");
+ok(/const pasa = v > 0 && \(!techo \|\| v <= techo\);/.test(alta),
+   "no se acepta cultivar más metros que el recinto entero");
+ok(/No puedes cultivar más que eso/.test(alta), "y se dice, en vez de guardarlo callando");
+
+console.log("\n── la regla dura, comprobada contra el motor real ──");
+// Sin superficie confirmada NO debe salir plan de abonado. No hace falta añadir
+// ninguna comprobación nueva: el motor ya se comporta así, y esto lo fija para
+// que nadie lo 'arregle' poniendo un área por defecto.
+const NUTRI = require(join(RAIZ, "api", "_motor-nutricion.js"));
+const REND  = require(join(RAIZ, "api", "_rendimiento.js"));
+const oferta = { N: 30, P2O5: null, K2O: null };
+const sinArea = NUTRI.necesidadNutrientes("lechuga",
+  REND.rendimientoEsperadoT("lechuga", null, {})?.rendimiento_t, oferta, { area_m2: null });
+ok(!!sinArea.motivo && /rendimiento esperado/i.test(sinArea.motivo),
+   "sin superficie no hay rendimiento y por tanto no hay plan de abonado");
+const conArea = NUTRI.necesidadNutrientes("lechuga",
+  REND.rendimientoEsperadoT("lechuga", 440, {})?.rendimiento_t, oferta, { area_m2: 440 });
+ok(!conArea.motivo && conArea.nutrientes?.N != null,
+   "y con ella sí, sin haber cambiado nada del motor");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
