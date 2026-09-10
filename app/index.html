@@ -712,6 +712,35 @@
     .hoy-plazos ul { margin: 0; padding-left: 16px; }
     .hoy-plazos li { margin: 3px 0; }
     .hoy-cargando { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    /* Acciones del día. Cada una es una fila tocable; la tarjeta entera
+       desaparece cuando no hay ninguna. */
+    /* En modo acciones la tarjeta es solo un contenedor: el color lo pone cada
+       acción. El degradado verde heredado dejaba un doble marco y, peor, pintaba
+       el texto de blanco sobre el fondo claro de la fila. */
+    .card-hoy.acciones {
+      display: flex; flex-direction: column; gap: 10px;
+      background: transparent; box-shadow: none; padding: 0; border: none;
+      color: var(--text);
+    }
+    .card-hoy.acciones .btn-por-que { color: var(--muted); align-self: flex-start; }
+    #hoy-contenido { display: flex; flex-direction: column; gap: 10px; }
+    .accion {
+      display: flex; align-items: flex-start; gap: 12px; width: 100%;
+      padding: 14px; border-radius: 14px; text-align: left;
+      border: 1.5px solid var(--border); background: #fff; cursor: pointer;
+      font: inherit; color: inherit; transition: border-color .12s ease, background .12s ease;
+    }
+    button.accion:hover { border-color: var(--verde, #013A27); }
+    button.accion:active { transform: scale(.995); }
+    .accion.urgente { border-color: #B23B2E; background: #FEF6F5; }
+    .accion.bloqueo { border-color: #A8681C; background: #FDF8F1; cursor: default; }
+    .accion-icono { font-size: 1.5rem; line-height: 1.1; flex: 0 0 auto; }
+    .accion-cuerpo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .accion-verbo { font-weight: 700; font-size: 1.05rem; color: var(--verde, #013A27); }
+    .accion.urgente .accion-verbo { color: #B23B2E; }
+    .accion.bloqueo .accion-verbo { color: #A8681C; }
+    .accion-detalle { font-weight: 600; font-size: .95rem; color: var(--text); }
+    .accion-razon { font-size: .82rem; color: var(--muted); line-height: 1.45; }
     .btn-regar-grande {
       display: inline-block; padding: 11px 22px;
       background: var(--low); color: #fff; border: none;
@@ -2134,6 +2163,9 @@
     .cal-pt.riego { background: #2C5F7C; }
     .cal-pt.aplic { background: #6B8E23; }
     .cal-pt.pedia { background: #A8681C; }
+    /* Previsión: hueco, no macizo. Lo que aún no ha pasado no se pinta con el
+       mismo peso que lo que sí. */
+    .cal-pt.previsto { background: transparent; border: 1.5px solid #2C5F7C; width: 7px; height: 7px; }
     .cal-hito {
       position: absolute; top: 2px; right: 3px; font-size: .5rem; line-height: 1;
     }
@@ -2735,6 +2767,7 @@
         <span><i class="cal-pt riego"></i> regaste</span>
         <span><i class="cal-pt aplic"></i> aplicaste algo</span>
         <span><i class="cal-pt pedia"></i> el cultivo pedía agua</span>
+        <span><i class="cal-pt previsto"></i> riego previsto</span>
         <span>🌱 plantación · 🍅 lista · ✂️ cosecha</span>
       </div>
       <p class="cal-pie" id="cal-pie"></p>
@@ -3374,6 +3407,7 @@
       renderRecomendaciones();
       cargarNDVI(true);
       cargarET0();
+      cargarPronostico().then(() => { renderHoy(); renderCalendario(); });
       window.pintarMadurez?.();
       cargarPlanAbonado();
       window.kyliaTrack?.("zona-cambiada", { zona: nuevo ? "secundaria" : "principal" });
@@ -3918,6 +3952,68 @@
     // Se usa para estimar cuánta agua ha perdido la planta desde la última imagen
     // del satélite, permitiendo al usuario saber si la planta está hidratada
     // aunque el NDMI sea de hace días.
+    // Pronóstico de ET₀ para PLANIFICAR, en su propia variable a propósito.
+    // `ultimoET0` alimenta acumuladores que suman todo lo que haya en la serie
+    // ("ET₀ desde el último riego"): meter días futuros ahí inflaría el déficit
+    // de HOY con agua que aún no se ha evaporado. Son dos cosas distintas y se
+    // guardan separadas.
+    let pronosticoET0 = null;
+    async function cargarPronostico() {
+      try {
+        const p = puntoConsulta();
+        const url = `https://api.open-meteo.com/v1/forecast`
+          + `?latitude=${p.lat.toFixed(5)}&longitude=${p.lon.toFixed(5)}`
+          + `&daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min`
+          + `&past_days=0&forecast_days=8&timezone=auto`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) return;
+        const d = await res.json();
+        const t = d?.daily?.time || [];
+        pronosticoET0 = t.map((date, i) => ({
+          date,
+          et0:    d.daily.et0_fao_evapotranspiration?.[i] ?? 0,
+          lluvia: d.daily.precipitation_sum?.[i] ?? 0,
+          tmax:   d.daily.temperature_2m_max?.[i] ?? null,
+          tmin:   d.daily.temperature_2m_min?.[i] ?? null,
+        }));
+      } catch (_) { pronosticoET0 = null; }
+    }
+
+    // Los días en que, si no llueve y no riega, el suelo cruzará el umbral.
+    // NO es una promesa: es la proyección de HOY con el pronóstico de HOY, y se
+    // rehace cada vez que entra un dato. Por eso en la interfaz va como
+    // "previsto" y con el aviso de que se recalcula solo.
+    //
+    // Se corta a 8 días porque más allá el pronóstico de lluvia no acierta —
+    // el mismo motivo por el que el motor solo mira 48 h para descontar lluvia.
+    function planRiegoPrevisto() {
+      const b = calcularBalanceHidrico();
+      if (!b || !pronosticoET0 || !cfg.fechaPlantacion) return [];
+      // Se parte de que HOY hace lo que se le pide. Si no, el primer "previsto"
+      // sería mañana y el calendario repetiría la alerta de hoy en vez de
+      // planificar — que es justo lo contrario de para qué sirve.
+      let Dr = b.Dr > b.raw ? 0 : b.Dr;
+      const dias = [];
+      const hoyStr = new Date().toISOString().slice(0, 10);
+      for (const d of pronosticoET0) {
+        if (d.date <= hoyStr) continue;
+        const df = MOTOR.diasEntre(cfg.fechaPlantacion, new Date(`${d.date}T12:00:00`));
+        Dr += MOTOR.kcDelDia(cfg.cultivos?.[0] || null, df) * (d.et0 ?? 0);
+        const ll = Math.max(0, d.lluvia ?? 0);
+        if (ll >= MOTOR.PE_MIN_MM) Dr = Math.max(0, Dr - ll);
+        if (Dr > b.raw) { dias.push({ date: d.date, mm: Math.round(Dr) }); Dr = 0; }
+      }
+      return dias;
+    }
+
+    // Puerta SOLO para pruebas en navegador sin red (tests/*.mjs con puppeteer).
+    // No la usa nada del producto.
+    window.__inyectar = (serie) => {
+      const hoy = new Date().toISOString().slice(0, 10);
+      ultimoET0     = serie.filter(d => d.date <= hoy);   // igual que cargarET0
+      pronosticoET0 = serie.filter(d => d.date >= hoy);   // igual que cargarPronostico
+      renderHoy(); renderCalendario();
+    };
     async function cargarET0() {
       try {
         const p   = puntoConsulta();
@@ -3991,76 +4087,125 @@
     function renderRecomendacion() { /* replaced by renderHoy */ }
 
     // ─── Card "Acción del día" ─────────────────────────────────────────────────
+    // ─── Lo que hay que hacer hoy ─────────────────────────────────────────
+    // Antes esto era una tarjeta que SIEMPRE decía algo, y cuando no había nada
+    // que decir decía "Todo en orden". Eso no es información: es ruido diario
+    // que enseña a ignorar la tarjeta, y justo el día que sí importa ya nadie
+    // la mira. Ahora es una lista de acciones y cuando está vacía, desaparece.
+    //
+    // FITOSANITARIOS: aquí NO hay ninguna acción de "toca tratar". Kylia no
+    // receta —decisión del consejo del 24-jul, fijada en
+    // tests/test-sin-recomendar-fitosanitarios.mjs— y sin el reconocimiento del
+    // DARP tampoco puede. Lo que sí sale es lo que es cuaderno: un plazo de
+    // seguridad corriendo, que es una restricción legal de recolección.
+    function accionesDeHoy() {
+      const acc = [];
+
+      // 1 · Regar
+      const alerta = calcularAlertaRiego();
+      const bal    = calcularBalanceHidrico();
+      const cerca  = !alerta && bal && bal.Dr >= 0.75 * bal.raw;
+      if (alerta || cerca) {
+        const mm = Math.round(bal && bal.Dr > 0 ? bal.Dr : (alerta ? alerta.et0 : 0));
+        const eq = fmtRiego(mm);
+        acc.push({
+          id: "regar", icono: "💧", verbo: "Regar",
+          urgente: !!alerta,
+          detalle: `${mm} L/m²` + (/L\/m²/.test(eq) ? "" : ` · ${eq}`),
+          razon: alerta
+            ? `Desde ${alerta.desde} han evaporado ${alerta.et0.toFixed(0)} mm del suelo.`
+            : "La planta empieza a notar la falta de agua.",
+          onClick: () => abrirModalRiego(),
+        });
+      }
+
+      // 2 · Abonar. El tramo que toca sale del reparto que ya calcula el
+      // servidor (MAPA, fondo/cobertera o tercios) cruzado con lo que avanza el
+      // ciclo. No se propone nada que ya esté apuntado como aplicado.
+      const ab = tramoDeAbonadoPendiente();
+      if (ab) {
+        acc.push({
+          id: "abonar", icono: "🌱", verbo: "Abonar",
+          urgente: false,
+          detalle: ab.detalle,
+          razon: ab.razon,
+          onClick: () => {
+            const t = document.getElementById("abonado-toggle");
+            t?.scrollIntoView({ behavior: "smooth", block: "center" });
+            if (t?.getAttribute("aria-expanded") === "false") t.click();
+          },
+        });
+      }
+
+      // 3 · Plazo de seguridad: no es un consejo, es una restricción legal.
+      for (const p of aplicacionesConPlazoActivo()) {
+        acc.push({
+          id: "plazo", icono: "⏳", verbo: "No recolectar todavía",
+          urgente: false, bloqueo: true,
+          detalle: `${p.diasRestantes} día${p.diasRestantes !== 1 ? "s" : ""}`,
+          razon: `${p.productoNombre} — plazo de seguridad hasta el ${formatearFechaCorta(p.fechaLimite)}.`,
+        });
+      }
+      return acc;
+    }
+
+    // Qué tramo del plan de abonado toca. Se apoya entero en lo que ya calcula
+    // el servidor: `reparto` viene sobre lo PENDIENTE (si el fondo está echado,
+    // el motor ya lo quita), así que aquí no hay que descontar nada — solo mirar
+    // por dónde va el ciclo y quedarse con el tramo que ya ha empezado.
+    // Devuelve null en cuanto falta algo: no se empuja a abonar por si acaso.
+    function tramoDeAbonadoPendiente() {
+      const plan = window.__planAbonado;
+      const frac = window.__madurez?.fraccion;
+      if (!plan?.lineas?.length || frac == null) return null;
+      const l = plan.lineas.find(x => x.nutriente === "N");
+      if (!l || !(l.pendiente_kg > 0) || !l.reparto?.length) return null;
+
+      // Los tramos vienen en orden y sus pct suman 1: el inicio de cada uno es
+      // la suma de los anteriores. El que toca es el último que ya ha empezado.
+      let acum = 0, actual = null;
+      for (const t of l.reparto) {
+        if (acum <= frac) actual = t;
+        acum += (t.pct || 0) / 100;
+      }
+      if (!actual) return null;
+      return {
+        detalle: `${fmtAbono(actual.kg)} de N`,
+        razon: `Toca el ${actual.momento} — ${actual.pct}% de lo que queda por echar.`,
+      };
+    }
+
     function renderHoy() {
       const el   = document.getElementById("hoy-contenido");
       const card = document.getElementById("card-hoy");
       if (!el || !card) return;
 
-      const alerta = calcularAlertaRiego();
+      const acc = accionesDeHoy();
+      // Sin nada que hacer, la tarjeta no está. Es la diferencia entre una app
+      // que avisa y una que habla todos los días.
+      if (!acc.length) { card.hidden = true; el.innerHTML = ""; return; }
+      card.hidden = false;
+      // Sin `urgente` en la TARJETA: el color lo lleva cada acción. Ponerlo aquí
+      // reactivaba el degradado verde heredado (misma especificidad, declarado
+      // después) y volvía el doble marco.
+      card.className = "card card-hoy acciones";
 
-      // Alerta moderada: 15-28mm de balance (ET₀ evaporada + déficit residual
-      // si el último riego no compensó el intervalo anterior)
-      let alertaModesta = null;
-      if (!alerta && ultimoET0) {
-        const bal = calcularBalanceHidrico();
-        if (bal && bal.Dr >= 0.75 * bal.raw) alertaModesta = { et0: bal.Dr };
+      el.innerHTML = acc.map(a => `
+        <${a.onClick ? "button type=\"button\"" : "div"} class="accion${a.urgente ? " urgente" : ""}${a.bloqueo ? " bloqueo" : ""}" data-accion="${a.id}">
+          <span class="accion-icono" aria-hidden="true">${a.icono}</span>
+          <span class="accion-cuerpo">
+            <span class="accion-verbo">${esc(a.verbo)}</span>
+            <span class="accion-detalle">${esc(a.detalle)}</span>
+            <span class="accion-razon">${esc(a.razon)}</span>
+          </span>
+        </${a.onClick ? "button" : "div"}>`).join("")
+        + `<button class="btn-por-que" id="btn-por-que-hoy">¿Por qué?</button>`;
+
+      for (const a of acc) {
+        if (!a.onClick) continue;
+        el.querySelector(`[data-accion="${a.id}"]`)?.addEventListener("click", a.onClick);
       }
-
-      const porQue = `<button class="btn-por-que" id="btn-por-que-hoy">¿Por qué?</button>`;
-      // Lámina a reponer (mm = L/m²): el déficit FAO-56 si lo tenemos, si no el ET₀ acumulado.
-      const _bal = calcularBalanceHidrico();
-      const laminaMm = (lvl) => Math.round(_bal && _bal.Dr > 0 ? _bal.Dr : lvl);
-      const cifra = (mm) => {
-        const eq = fmtRiego(mm);
-        const equivLinea = /L\/m²/.test(eq) ? "" : `<div class="hoy-equiv">≈ ${eq} de riego</div>`;
-        return `<div class="hoy-cifra">${mm}<small> L/m²</small></div>${equivLinea}`;
-      };
-      if (alerta) {
-        const mm = laminaMm(alerta.et0);
-        card.className = "card card-hoy urgente";
-        el.innerHTML =
-          `<div class="hoy-icono">💧</div>`
-          + `<div class="hoy-accion">Riega hoy</div>`
-          + cifra(mm)
-          + `<p class="hoy-razon">Desde ${alerta.desde} han evaporado ${alerta.et0.toFixed(0)} mm del suelo.</p>`
-          + `<button class="btn-regar-grande" id="btn-regar-hoy">He regado hoy</button>`
-          + porQue;
-      } else if (alertaModesta) {
-        const mm = laminaMm(alertaModesta.et0);
-        card.className = "card card-hoy atencion";
-        el.innerHTML =
-          `<div class="hoy-icono">⚠️</div>`
-          + `<div class="hoy-accion">Revisa el riego</div>`
-          + cifra(mm)
-          + `<p class="hoy-razon">La planta empieza a notar la falta de agua (${alertaModesta.et0.toFixed(0)} mm evaporados).</p>`
-          + `<button class="btn-regar-grande btn-regar-sec" id="btn-regar-hoy">He regado hoy</button>`
-          + porQue;
-      } else {
-        const diasRiego = ultimoRiego ? Math.max(0, Math.round((Date.now() - new Date(ultimoRiego)) / 86400000)) : null;
-        card.className = "card card-hoy bien";
-        el.innerHTML =
-          `<div class="hoy-icono">✓</div>`
-          + `<div class="hoy-accion">Todo en orden</div>`
-          + `<p class="hoy-razon">${diasRiego !== null ? `Regado hace ${diasRiego} día${diasRiego !== 1 ? "s" : ""}. Sin alertas urgentes.` : "Sin alertas urgentes. Sigue con tu rutina habitual."}</p>`
-          + porQue;
-      }
-
-      // Aviso de plazo de seguridad activo si hay aplicaciones recientes
-      const plazos = aplicacionesConPlazoActivo();
-      if (plazos.length) {
-        const items = plazos.map(p =>
-          `<li><strong>${p.productoNombre}</strong> — no recolectar hasta ${formatearFechaCorta(p.fechaLimite)} (${p.diasRestantes} día${p.diasRestantes !== 1 ? "s" : ""})</li>`
-        ).join("");
-        el.innerHTML += `<div class="hoy-plazos">
-          <div class="hoy-plazos-titulo">Plazo de seguridad activo</div>
-          <ul>${items}</ul>
-        </div>`;
-      }
-
-      const btn = document.getElementById("btn-regar-hoy");
-      if (btn) btn.addEventListener("click", registrarRiego);
-      const btnPq = document.getElementById("btn-por-que-hoy");
-      if (btnPq) btnPq.addEventListener("click", () => {
+      document.getElementById("btn-por-que-hoy")?.addEventListener("click", () => {
         const det = document.getElementById("det-hoy");
         if (!det) return;
         det.textContent = generarDetalleHoy();
@@ -5209,7 +5354,11 @@
         const d = await res.json();
         if (!d || d.ok === false) return;
 
+        // Se guarda para que accionesDeHoy() sepa qué tramo toca sin volver a
+        // pedirlo: es exactamente la misma consulta.
+        window.__planAbonado = d.plan || null;
         cuerpo.innerHTML = pintarPlanAbonado(d.plan, d.rendimiento, d);
+        renderHoy();
         const btnComprar = document.getElementById("btn-comprar");
         if (btnComprar) btnComprar.addEventListener("click", () => buscarQueComprar(btnComprar));
         toggle.hidden = false;
@@ -7241,6 +7390,10 @@
       const plant   = cfg.fechaPlantacion;
       const cosecha = window.__fechaCosecha || null;   // la deja la vista de madurez del servidor
       const pedia   = diasQueKyliaPedia();
+      // Previsión: los días que Kylia espera pedir riego si no llueve. No es una
+      // promesa — se rehace cada vez que entra clima nuevo — y por eso va con
+      // otro punto y con su aviso al pie.
+      const previsto = new Map(planRiegoPrevisto().map(d => [d.date, d.mm]));
       const riegoEn = new Set(riegos.map(r => r.date));
       const aplicEn = new Set(aplicaciones.map(a => a.date));
       const mad     = window.__madurez || null;   // lo deja pintarMadurez
@@ -7273,6 +7426,10 @@
         if (riegoEn.has(f)) marcas += `<i class="cal-pt riego"></i>`;
         if (aplicEn.has(f)) marcas += `<i class="cal-pt aplic"></i>`;
         if (pedia.has(f))   marcas += `<i class="cal-pt pedia"></i>`;
+        if (previsto.has(f)) {
+          marcas += `<i class="cal-pt previsto"></i>`;
+          clases.push("con-previsto");
+        }
 
         const tag = (!futuro && enCiclo) ? "button" : "div";
         const attr = tag === "button" ? ` type="button" data-cal-dia="${f}"` : "";
@@ -7294,10 +7451,21 @@
           (nP ? ` y el cultivo pidió agua ${nP}.` : ".") +
           (!futuroMes() ? " Toca un día para apuntar un riego con esa fecha." : "")
         : "Toca un día para apuntar un riego con esa fecha.";
+      // La previsión se declara como lo que es. Sin esta línea, un punto en el
+      // jueves que viene se lee como una cita, y no lo es: es la proyección de
+      // hoy, y cambia si llueve o si riega antes.
+      if (previsto.size) {
+        const prox = [...previsto.keys()].sort()[0];
+        pie.textContent += ` Con el tiempo previsto, el cultivo volvería a pedir agua el ${formatearFechaCorta(prox)}; se recalcula cada día.`;
+      }
 
-      // El botón de mes siguiente no pasa del mes actual: el calendario registra
-      // lo que ha pasado, no lo que va a pasar.
-      document.getElementById("cal-sig").disabled = futuroMes();
+      // El mes siguiente solo se abre si la previsión llega hasta él: el
+      // calendario sigue sin enseñar meses vacíos de futuro.
+      const finPrevision = [...previsto.keys()].sort().pop();
+      const sigMes = new Date(calMes.getFullYear(), calMes.getMonth() + 1, 1);
+      const previsionLlega = finPrevision &&
+        finPrevision >= iso(sigMes) && finPrevision < iso(new Date(sigMes.getFullYear(), sigMes.getMonth() + 1, 1));
+      document.getElementById("cal-sig").disabled = futuroMes() && !previsionLlega;
       engancharCalendario();
       caja.hidden = false;
     }
@@ -7511,6 +7679,7 @@
       setInterval(cargarNDVI, 6 * 60 * 60 * 1000);       // cada 6h (Sentinel-2 revisita ~5 días)
       setInterval(cargarHumedadSuelo, 60 * 60 * 1000);   // cada hora (Open-Meteo es horario)
       setInterval(cargarET0, 6 * 60 * 60 * 1000);        // cada 6h (ET₀ diaria, cambia poco)
+      setInterval(() => cargarPronostico().then(renderCalendario), 6 * 60 * 60 * 1000);
       document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
 
       // Selector de zona (delegación: las pestañas se repintan al guardar).
