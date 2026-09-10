@@ -1,7 +1,7 @@
 {
-  "version": "1.2.0",
-  "lastReviewed": "2026-09-08",
-  "fuenteDatos": "Registro de productos fitosanitarios MAPA + fichas técnicas fabricantes 2025-2026. El bloque `registro` de cada tratamiento dice QUÉ se ha comprobado y CUÁNDO: `comprobado: null` significa que esa sustancia no se ha verificado contra fuente oficial, no que esté bien.",
+  "version": "1.3.0",
+  "lastReviewed": "2026-09-10",
+  "fuenteDatos": "MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026. Cada tratamiento lleva en `registro` qué se comprobó y cuándo. Lo verificado es la PRESENCIA en la lista de aprobadas y la AUSENCIA del índice de excluidas/no renovadas; las fechas de fin de aprobación no se han leído del PDF porque sus columnas no se extraen de forma fiable.",
   "escalaEficacia": {
     "alta": "Resultados consistentes en condiciones típicas del cultivo.",
     "media": "Funciona con aplicación correcta; puede necesitar repetición o condiciones favorables.",
@@ -41,10 +41,9 @@
       "duracionProteccion": 5,
       "notas": "Acción por contacto, sin residualidad. Repetir cada 7-10 días si la población es alta.",
       "registro": {
-        "estado": "por_verificar",
-        "ue": "No comprobada en esta revisión.",
-        "comprobado": null,
-        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+        "estado": "autorizado",
+        "ue": "Figura en la lista de sustancias APROBADAS del MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026, con prórrogas del período de aprobación. No aparece en el índice de excluidas / no renovadas.",
+        "comprobado": "2026-09-10"
       }
     },
     {
@@ -72,10 +71,10 @@
       "duracionProteccion": 7,
       "notas": "Asfixia los insectos por contacto. Mejor a primera hora de la mañana.",
       "registro": {
-        "estado": "por_verificar",
-        "ue": "No comprobada en esta revisión.",
-        "comprobado": null,
-        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+        "estado": "autorizado",
+        "ue": "Figura en la lista de sustancias APROBADAS del MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026, con prórrogas del período de aprobación. No aparece en el índice de excluidas / no renovadas.",
+        "comprobado": "2026-09-10",
+        "nota": "⚠️ AQUÍ EL Nº CAS MANDA. En la lista oficial conviven variantes aprobadas (CAS 8042-47-5, 64742-46-7, 72623-86-0) con una EXCLUIDA: «Aceite parafínico (CAS 64742-54-7) (ex)». Al registrar una aplicación conviene apuntar el CAS del envase, no solo «aceite de parafina»."
       }
     },
     {
@@ -106,10 +105,9 @@
       "duracionProteccion": 7,
       "notas": "Repelente y disruptor del crecimiento del insecto. Acción más lenta que un convencional.",
       "registro": {
-        "estado": "por_verificar",
-        "ue": "No comprobada en esta revisión.",
-        "comprobado": null,
-        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+        "estado": "autorizado",
+        "ue": "Figura en la lista de sustancias APROBADAS del MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026, con prórrogas del período de aprobación. No aparece en el índice de excluidas / no renovadas.",
+        "comprobado": "2026-09-10"
       }
     },
     {
@@ -135,10 +133,9 @@
       "duracionProteccion": 5,
       "notas": "Específico para orugas, inofensivo para fauna útil. Pierde efecto con UV; mejor al atardecer.",
       "registro": {
-        "estado": "por_verificar",
-        "ue": "No comprobada en esta revisión.",
-        "comprobado": null,
-        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+        "estado": "autorizado",
+        "ue": "Figura en la lista de sustancias APROBADAS del MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026, con prórrogas del período de aprobación. No aparece en el índice de excluidas / no renovadas.",
+        "comprobado": "2026-09-10"
       }
     },
     {
@@ -164,10 +161,9 @@
       "duracionProteccion": 10,
       "notas": "Origen bacteriano, autorizado en producción ecológica. Tóxico para abejas; aplicar a última hora.",
       "registro": {
-        "estado": "por_verificar",
-        "ue": "No comprobada en esta revisión.",
-        "comprobado": null,
-        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+        "estado": "autorizado",
+        "ue": "Figura en la lista de sustancias APROBADAS del MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026, con prórrogas del período de aprobación. No aparece en el índice de excluidas / no renovadas.",
+        "comprobado": "2026-09-10"
       }
     },
     {
@@ -194,10 +190,9 @@
       "duracionProteccion": 7,
       "notas": "Acción preventiva y curativa contra oídio y eficaz contra araña roja en bajas poblaciones.",
       "registro": {
-        "estado": "por_verificar",
-        "ue": "No comprobada en esta revisión.",
-        "comprobado": null,
-        "nota": "Sustancia de uso habitual en producción ecológica; su estado de aprobación no se ha verificado contra fuente oficial. Verificar antes de volver a ofrecerla."
+        "estado": "autorizado",
+        "ue": "Figura en la lista de sustancias APROBADAS del MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026, con prórrogas del período de aprobación. No aparece en el índice de excluidas / no renovadas.",
+        "comprobado": "2026-09-10"
       }
     },
     {
@@ -222,10 +217,10 @@
       "duracionProteccion": 10,
       "notas": "Autorizado en ecológico con límite anual de 4 kg Cu/ha. Reduce eficacia tras lluvia fuerte.",
       "registro": {
-        "estado": "por_verificar",
-        "ue": "Renovada como sustancia CANDIDATA A LA SUSTITUCIÓN por Reg. (UE) 2018/1981, con vigencia hasta el 31-dic-2025. No se ha podido confirmar la prórroga posterior.",
-        "comprobado": "2026-09-08",
-        "nota": "Límite legal de aplicación: 28 kg de cobre/ha acumulados en 7 años (media de 4 kg/ha y año). Ese tope es del CUADERNO, no de una aplicación suelta: hay que arrastrarlo entre campañas."
+        "estado": "autorizado",
+        "ue": "Figura en la lista de sustancias APROBADAS del MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026, con prórrogas del período de aprobación. No aparece en el índice de excluidas / no renovadas.",
+        "comprobado": "2026-09-10",
+        "nota": "Candidata a la sustitución. Límite legal de aplicación: 28 kg de cobre/ha acumulados en 7 años (media de 4 kg/ha y año) — es un tope de CUADERNO, hay que arrastrarlo entre campañas. La fecha de fin de aprobación NO se ha leído de la lista: sus columnas no se extraen fiables y un dato así no se pone a ojo."
       }
     },
     {
@@ -255,7 +250,8 @@
       "registro": {
         "estado": "autorizado",
         "ue": "Aprobada (Dir. 2004/99/CE), renovada por Reg. (UE) 2018/113. La siguiente renovación debe iniciarse antes del 28-feb-2031.",
-        "comprobado": "2026-09-08"
+        "comprobado": "2026-09-10",
+        "espana": "Confirmado también en el MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026: no está entre las excluidas ni las no renovadas."
       }
     },
     {
@@ -284,7 +280,8 @@
       "registro": {
         "estado": "autorizado",
         "ue": "Período de aprobación prorrogado por Reg. (UE) 2026/1421, de 30-jun-2026 (sigue en proceso de renovación).",
-        "comprobado": "2026-09-08"
+        "comprobado": "2026-09-10",
+        "espana": "Confirmado también en el MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026: no está entre las excluidas ni las no renovadas."
       }
     },
     {
@@ -310,9 +307,9 @@
       "notas": "Multisitio, bajo riesgo de resistencias. Aplicar antes de la lluvia para cubrir el follaje.",
       "registro": {
         "estado": "sin_producto_autorizado_es",
-        "ue": "No renovación (Reg. (UE) 2020/2087) ANULADA por el TJUE en 2025: a nivel de sustancia activa ya no hay prohibición.",
+        "ue": "No renovación (Reg. (UE) 2020/2087) ANULADA por el TJUE en 2025, así que a nivel de sustancia activa ya no hay prohibición. PERO la lista oficial del MAPA del 1-jul-2026 —posterior a esa sentencia— lo sigue recogiendo como «Mancoceb (no renov)», es decir, entre las NO renovadas.",
         "espana": "Sin registros activos en el Registro de Productos Fitosanitarios del MAPA. El MAPA no ha concedido autorización, ni siquiera excepcional.",
-        "comprobado": "2026-09-08",
+        "comprobado": "2026-09-10",
         "nota": "En la práctica NO hay producto que un agricultor español pueda comprar ni aplicar legalmente: para usarlo hace falta un producto con número de registro, no solo que la sustancia esté aprobada. Se mantiene en el catálogo para poder IDENTIFICAR una aplicación antigua en el cuaderno, pero no debe ofrecerse como opción."
       }
     },
@@ -341,7 +338,8 @@
       "registro": {
         "estado": "autorizado",
         "ue": "Aprobación renovada por Reg. (UE) 2023/515, aplicable desde el 1-abr-2023.",
-        "comprobado": "2026-09-08"
+        "comprobado": "2026-09-10",
+        "espana": "Confirmado también en el MAPA, «Lista comunitaria de sustancias activas aprobadas, excluidas y en evaluación» (Reg. 2021/155), edición del 1-jul-2026: no está entre las excluidas ni las no renovadas."
       }
     }
   ],

@@ -77,6 +77,25 @@ ok(/data\/productos\.json/.test(app) && /registro\?\.estado !== "sin_producto_au
 ok(mancozeb && /identificar/i.test(mancozeb.registro.nota || ""),
    "pero sigue en el catálogo para IDENTIFICAR una aplicación antigua — el cuaderno registra lo que pasó, no lo que debería haber pasado");
 
+// Verificado el 10-sep contra la lista oficial del MAPA (Reg. 2021/155, edición
+// del 1-jul-2026): las 10 restantes figuran en la lista de APROBADAS y ninguna
+// aparece en el índice de excluidas / no renovadas; mancozeb sí, como
+// «Mancoceb (no renov)» — y esa edición es POSTERIOR a la sentencia del TJUE.
+ok(catalogo.tratamientos.every(t => t.registro.comprobado),
+   "ya no queda ninguna materia activa sin comprobar contra fuente oficial");
+ok(catalogo.tratamientos.every(t => t.registro.estado !== "por_verificar"),
+   "y ninguna se queda en 'por_verificar'");
+ok(/Mancoceb \(no renov\)/.test(mancozeb.registro.ue),
+   "la nota de mancozeb cita el término literal de la lista oficial, no un resumen");
+const cobre = catalogo.tratamientos.find(t => t.id === "oxicloruro-cobre");
+ok(/28 kg/.test(cobre.registro.nota) && /cuaderno/i.test(cobre.registro.nota),
+   "el cobre arrastra su tope de 28 kg/ha en 7 años, que es un límite de cuaderno entre campañas");
+ok(/NO se ha leído/.test(cobre.registro.nota),
+   "y se dice qué NO se comprobó (la fecha de caducidad) en vez de ponerla a ojo");
+const parafina = catalogo.tratamientos.find(t => t.id === "aceite-parafinico");
+ok(/CAS/.test(parafina.registro.nota) && /64742-54-7/.test(parafina.registro.nota),
+   "el aceite de parafina avisa de que una variante por nº CAS SÍ está excluida: no todas son la misma sustancia");
+
 console.log("── la tarjeta de recomendaciones no miente cuando está vacía ──");
 const render = app.slice(app.indexOf("function renderRecomendaciones"), app.indexOf("const ICONOS_REC"));
 ok(!/El cultivo está bien/.test(render),
