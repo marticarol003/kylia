@@ -147,16 +147,47 @@ derivación de §3**: son comprobación, no ajuste.
 |---|---|---|---|---|---|
 | El Tros de l'Uri · La Selva | cebolleta | 24-jun-2026 | 12-ago-2026 | 9-ago → **−3 d** | 2-sep → **+21 d** |
 | Campo del padre · Sant Boi | lechuga | 5-jun-2026 | 30-jul-2026 | 24-jul → **−6 d** | 19-ago → **+20 d** |
+| Bancal de 33 · Sant Boi | lechuga | 18-jul-2026 | 9-sep-2026 | 2-sep → **−7 d** | 1-oct → **+22 d** |
 
-**El sesgo es negativo en los dos**, y eso es lo que tiene que pasar: el modelo
+**El sesgo es negativo en los tres**, y eso es lo que tiene que pasar: el modelo
 predice **madurez agronómica** y el agricultor corta unos días después, cuando le
 cuadra. Por eso lo que se enseña es una ventana *"a partir de"*, nunca una fecha
 de cosecha (§5).
 
-Con n=2 esto no es una validación estadística. Lo que le da peso es que **dos
-caminos independientes llegan al mismo sitio**: la fila de FAO para plantación de
-primavera y la temperatura medida en el campo de Oriol. La serie de cosechas de
-este otoño es lo que lo convertirá en un RMSE.
+Y ahora los dos sesgos se pueden cuantificar, que es lo que no se podía con n=2:
+
+| | media | dispersión |
+|---|---|---|
+| Modelo de calendario | **+21 días tarde** | ±1 |
+| Modelo térmico | **−5 días pronto** | ±2 |
+
+Lo llamativo es la consistencia del calendario: +21, +20, +22, en dos cultivos y
+tres ciclos. No es ruido, es un sesgo estructural — el que se corrigió al pasar a
+grados-día.
+
+### ⚠️ La ventana está mal centrada, y hay que decidir qué hacer
+
+Con esos −5 días de sesgo y una anchura de ±4 días cerca de la madurez, **la
+cosecha real cae fuera de la ventana en 2 de los 3 ciclos**:
+
+| Ciclo | Ventana (±4 d al final) | Cosecha real | |
+|---|---|---|---|
+| cebolleta | 5-ago → 13-ago | 12-ago | dentro |
+| lechuga 440 m² | 20-jul → 28-jul | 30-jul | **fuera** |
+| lechuga bancal | 29-ago → 6-sep | 9-sep | **fuera** |
+
+Desplazar el centro +5 días los metería los tres. **No se ha hecho**, y a
+propósito: con n=3 meter una corrección empírica en el motor es exactamente la
+trampa que ya costó dinero una vez (el mecanismo construido sobre 5 muestras).
+
+Es además una decisión de producto, no de modelo: ¿la ventana debe decir **cuándo
+está lista la planta** (lo que hace ahora, y es lo que promete su texto) o
+**cuándo vas a cortar tú** (lo que el agricultor querría para planificar)? Si es
+lo segundo, los +5 días medidos son la calibración, y hay que decirlo en pantalla.
+
+Con n=3 esto ya no es anecdótico, pero tampoco es un RMSE. Lo que le da peso es
+que **dos caminos independientes llegan al mismo sitio**: la fila de FAO para
+plantación de primavera y la temperatura medida en el campo de Oriol.
 
 ### El defecto no era solo de planificación: era de riego
 
@@ -218,7 +249,7 @@ acerca. El 30 de junio —seis días después de plantar— la fecha probable er
 
 ---
 
-## 7. Un tercer ciclo que NO sirve para validar (y por qué)
+## 7. Un ciclo que NO sirve para validar (y por qué)
 
 El tomate de Ferran se cerró el 8-sep-2026, así que parece un tercer punto de
 validación. **No lo es, y conviene que quede escrito para que nadie lo cuente
