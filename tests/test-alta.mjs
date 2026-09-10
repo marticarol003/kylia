@@ -82,5 +82,31 @@ ok(/unos \$\{A\.minutos\} minutos/.test(alta) || /rato/.test(alta),
 ok(/Calculado con la rutina que nos has contado/.test(alta),
    "con una línea honesta de dónde sale el número");
 
+console.log("\n── una pregunta cada vez, también dentro de un paso ──");
+// El primer intento soltaba las cuatro preguntas del riego de golpe: en un móvil
+// es un muro que obliga a desplazarse antes de haber contestado nada, y contradice
+// lo único que se le prometió al agricultor ("dos minutos, una pregunta cada vez").
+for (const id of ["alta-q-cuando", "alta-q-cada", "alta-q-rato", "alta-q-ultimo"])
+  ok(new RegExp(`id="${id}" hidden`).test(app), `${id} arranca oculto`);
+ok(/const tras1 = \(\) => \{ revelar\("alta-q-cuando"\); revisar1\(\); \};/.test(alta),
+   "elegir cultivo destapa el cuándo");
+ok(/revelar\("alta-q-cada"\)/.test(alta), "elegir método destapa el cada cuánto");
+ok(/grupo\("alta-cada", "cada", "cada", \(\) => \{ revelar\("alta-q-rato"\)/.test(alta),
+   "el cada cuánto destapa el rato");
+ok(/grupo\("alta-rato", "min", "minutos", \(\) => \{ revelar\("alta-q-ultimo"\)/.test(alta),
+   "y el rato destapa el ancla del último riego");
+// `hidden` es una regla del navegador con specificity 0: sin esto, .alta-chips
+// {display:flex} la pisaba y los cultivos de "Otro" salían sin pulsar nada.
+ok(/\.alta \[hidden\] \{ display: none !important; \}/.test(app),
+   "[hidden] gana a las clases con display dentro del alta");
+ok(/\.alta-paso > \.alta-preg:first-of-type \{ margin-top: 0; \}/.test(app),
+   "solo la primera pregunta DEL PASO pierde el margen (si no, cada una se pega a los chips de arriba)");
+
+console.log("\n── el alta se pinta por encima de la app, no debajo ──");
+// Con z-index 60 el mapa de Leaflet y los botones flotantes se pintaban encima:
+// el gate está en 9999 y los modales en 9998.
+ok(/\.alta \{[\s\S]{0,400}z-index: 10000;/.test(app), "el alta está por encima del gate y de los modales");
+ok(/body\.alta-abierta \.fab-soporte/.test(app), "y los botones flotantes se esconden mientras está abierta");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

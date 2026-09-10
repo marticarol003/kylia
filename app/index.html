@@ -2246,12 +2246,22 @@
        nuestro, no suyo. El correo se pide AL FINAL, cuando ya ha visto para
        qué sirve — pedirlo antes es cobrar la entrada sin enseñar la sala. */
     .alta {
-      position: fixed; inset: 0; z-index: 60; background: #fff;
-      display: flex; flex-direction: column; overflow-y: auto;
-      padding: max(28px, env(safe-area-inset-top)) 22px 32px;
+      /* Por encima de TODO. Con z-index 60 el mapa de Leaflet y los botones
+         flotantes se pintaban encima del alta: el gate está en 9999 y los
+         modales en 9998, así que aquí no cabía un número pequeño. */
+      position: fixed; inset: 0; z-index: 10000; background: #fff;
+      display: flex; flex-direction: column;
+      overflow-y: auto;
+      padding: calc(max(28px, env(safe-area-inset-top)) + 6vh) 22px 48px;
     }
     .alta[hidden] { display: none; }
-    .alta-caja { width: 100%; max-width: 460px; margin: auto; }
+    /* Anclado arriba, no centrado: centrar hace que la pregunta salte de sitio
+       entre un paso corto y uno largo, y en un cuestionario de seis pantallas
+       eso se nota más que el hueco de abajo. */
+    .alta-caja { width: 100%; max-width: 440px; margin: 0 auto; }
+    /* Mientras el alta está abierta no hay nada más que tocar. */
+    body.alta-abierta .fab-soporte,
+    body.alta-abierta #gate { display: none !important; }
     .alta-paso { display: none; }
     .alta-paso.activo { display: block; animation: altaEntra .22s ease both; }
     @keyframes altaEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -2259,7 +2269,8 @@
 
     .alta-marca {
       display: flex; align-items: center; gap: 8px; font-weight: 800;
-      color: var(--verde, #013A27); font-size: 1.05rem; margin-bottom: 28px;
+      color: var(--verde, #013A27); font-size: 1.1rem; margin-bottom: 30px;
+      letter-spacing: -.01em;
     }
     .alta h2 {
       font-size: 1.5rem; line-height: 1.25; margin: 0 0 10px;
@@ -2268,8 +2279,16 @@
     .alta p.alta-txt { margin: 0 0 22px; color: var(--subtle, #334155); line-height: 1.55; }
     .alta p.alta-nota { margin: 14px 0 0; font-size: .84rem; color: var(--muted); line-height: 1.5; }
     .alta-preg { font-weight: 700; margin: 22px 0 10px; color: var(--verde, #013A27); }
-    .alta-preg:first-of-type { margin-top: 0; }
+    /* Solo la PRIMERA pregunta del paso pierde el margen. Antes bastaba con
+       :first-of-type, pero ahora cada pregunta vive en su propio div revelable
+       y todas eran la primera de su contenedor: se pegaban a los chips de
+       arriba. */
+    .alta-paso > .alta-preg:first-of-type { margin-top: 0; }
+    .alta-paso > div > .alta-preg { margin-top: 22px; }
 
+    /* [hidden] es una regla del navegador con specificity 0: cualquier clase
+       con display la pisa, y los cultivos de "Otro" salían sin pulsar nada. */
+    .alta [hidden] { display: none !important; }
     .alta-chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .alta-chip {
       flex: 1 1 auto; min-width: 44%; padding: 14px 12px; border-radius: 12px;
@@ -2325,7 +2344,7 @@
       <!-- 0 · Promesa -->
       <section class="alta-paso activo" data-paso="0">
         <div class="alta-marca">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(45)"/>
             <path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(225)"/>
             <circle cx="12" cy="12" r="2.4"/>
@@ -2356,6 +2375,7 @@
           <button type="button" class="alta-chip" data-cultivo="brassica">Col o coliflor</button>
         </div>
 
+        <div id="alta-q-cuando" hidden>
         <p class="alta-preg">¿Cuándo lo plantaste?</p>
         <div class="alta-chips" id="alta-cuando">
           <button type="button" class="alta-chip" data-hace="5">Esta semana</button>
@@ -2365,6 +2385,7 @@
         </div>
         <input type="date" class="alta-input" id="alta-fecha" hidden style="margin-top:8px">
         <p class="alta-nota">Con una fecha aproximada nos vale para empezar. Se puede afinar luego.</p>
+        </div>
         <button type="button" class="alta-btn" id="alta-b1" disabled data-ir="2">Seguir</button>
       </section>
 
@@ -2393,7 +2414,7 @@
           <button type="button" class="alta-chip" data-metodo="regadera">Regadera</button>
         </div>
 
-        <div id="alta-detalle-riego" hidden>
+        <div id="alta-q-cada" hidden>
           <p class="alta-preg">¿Cada cuánto riegas?</p>
           <div class="alta-chips" id="alta-cada">
             <button type="button" class="alta-chip" data-cada="1">Todos los días</button>
@@ -2402,6 +2423,9 @@
             <button type="button" class="alta-chip ancho" data-cada="3">Depende de cómo vea la tierra</button>
           </div>
 
+        </div>
+
+        <div id="alta-q-rato" hidden>
           <p class="alta-preg" id="alta-preg-rato">Cuando riegas, ¿cuánto rato lo dejas puesto?</p>
           <div class="alta-chips" id="alta-rato">
             <button type="button" class="alta-chip" data-min="15">15 min</button>
@@ -2410,9 +2434,11 @@
             <button type="button" class="alta-chip" data-min="60">1 hora</button>
           </div>
 
-          <!-- Este es el ancla. Sin él, el primer aviso sale de una rutina
-               declarada y siempre diría "riega"; con él, el balance arranca
-               donde de verdad está el suelo. Un toque. -->
+        </div>
+
+        <!-- Este es el ancla. Sin él, el primer aviso sale de una rutina
+             declarada y no sabe dónde está el suelo HOY. Un toque. -->
+        <div id="alta-q-ultimo" hidden>
           <p class="alta-preg">¿Cuándo regaste por última vez?</p>
           <div class="alta-chips" id="alta-ultimo">
             <button type="button" class="alta-chip" data-ult="0">Hoy</button>
@@ -6289,9 +6315,20 @@
           });
         }
 
+        // Una pregunta cada vez, también DENTRO de un paso: soltarlas todas de
+        // golpe es un muro, y en móvil obliga a desplazarse antes de haber
+        // contestado nada.
+        function revelar(id) {
+          const q = $(id);
+          if (!q || !q.hidden) return;
+          q.hidden = false;
+          requestAnimationFrame(() => q.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+        }
+
         // ── paso 1 ──
-        grupo("alta-cultivos", "cultivo", "cultivo", revisar1);
-        grupo("alta-cultivos-mas", "cultivo", "cultivo", revisar1);
+        const tras1 = () => { revelar("alta-q-cuando"); revisar1(); };
+        grupo("alta-cultivos", "cultivo", "cultivo", tras1);
+        grupo("alta-cultivos-mas", "cultivo", "cultivo", tras1);
         $("alta-otro-cultivo").addEventListener("click", () => {
           $("alta-cultivos-mas").hidden = false;
           $("alta-otro-cultivo").classList.add("sel");
@@ -6356,7 +6393,7 @@
 
         // ── paso 3 · riego ──
         grupo("alta-metodo", "metodo", "metodo", () => {
-          $("alta-detalle-riego").hidden = false;
+          revelar("alta-q-cada");
           // A regadera no se le pregunta "cuánto rato": se cuenta por viajes.
           const esRato = A.metodo !== "regadera";
           $("alta-preg-rato").textContent = esRato
@@ -6373,8 +6410,8 @@
                <button type="button" class="alta-chip" data-min="45">4 o más</button>`;
           revisar3();
         });
-        grupo("alta-cada", "cada", "cada", revisar3);
-        grupo("alta-rato", "min", "minutos", revisar3);
+        grupo("alta-cada", "cada", "cada", () => { revelar("alta-q-rato"); revisar3(); });
+        grupo("alta-rato", "min", "minutos", () => { revelar("alta-q-ultimo"); revisar3(); });
         grupo("alta-ultimo", "ult", "ultimo", revisar3);
         function revisar3() {
           $("alta-b3").disabled = !(A.metodo && A.cada && A.minutos && A.ultimo != null);
@@ -6526,6 +6563,7 @@
 
         function cerrar() {
           caja.hidden = true;
+          document.body.classList.remove("alta-abierta");
           document.body.style.overflow = "";
           location.reload();     // la app arranca ya con su campo puesto
         }
@@ -6534,6 +6572,7 @@
         // preguntar por dónde tiene el campo.
         window.abrirAlta = () => {
           caja.hidden = false;
+          document.body.classList.add("alta-abierta");
           document.body.style.overflow = "hidden";
           ir(0);
         };
