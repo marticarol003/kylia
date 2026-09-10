@@ -21,6 +21,7 @@ const HANDLERS = {
   "registro-usuario":    handleRegistroUsuario,
   "acceso":              handleAcceso,
   "config-app":          handleConfigApp,
+  "cuenta":              handleCuenta,
   "acciones":            handleAcciones,
   "borrar-accion":       handleBorrarAccion,
   "observaciones":       handleObservaciones,
@@ -160,6 +161,63 @@ async function handleRegistroUsuario(req, res, body) {
 // ─── acceso (enlace por correo: la parcela es de la persona) ───────
 // Dos acciones: "pedir" manda el enlace, "canjear" lo cambia por el
 // propietario_id y sus zonas. La lógica y el porqué de cada guarda de seguridad
+// ── Borrar la cuenta y todos los datos ─────────────────────────────
+// POST /api/log { recurso:"cuenta", accion:"borrar", usuario_id, email? }
+//
+// La política de privacidad promete el derecho de supresión, pero hasta ahora
+// la única vía era escribir a privacidad@kylia.app y esperar hasta un mes. Un
+// botón que lo hace en el momento es mejor cumplimiento y, sobre todo, es lo
+// que uno espera poder hacer con sus propios datos.
+//
+// SE BORRA DE VERDAD, no se marca como borrado: se eliminan TODAS las filas de
+// `usuarios` de esa persona (cada parcela es una fila) y el resto de tablas cae
+// por ON DELETE CASCADE — acciones, jornadas, mediciones, observaciones,
+// recomendaciones_log y push_subs. En `eventos` el usuario_id queda a NULL, que
+// es lo correcto: el evento de telemetría deja de estar asociado a nadie.
+//
+// EL CORREO HACE DE SEGUNDO FACTOR, y no es burocracia. Hoy las APIs aceptan
+// peticiones sin sesión, así que un endpoint destructivo que funcione solo con
+// el UUID convierte una fuga de UUID en un borrado. Si la cuenta tiene correo
+// registrado, hay que mandarlo y tiene que coincidir. Quien no tiene correo
+// —el que ha entrado en modo demo— no tiene nada que proteger ni nada que
+// perder, así que ahí basta el UUID.
+async function handleCuenta(req, res, body) {
+  if ((body.accion || "") !== "borrar") {
+    return res.status(400).json({ error: "accion debe ser 'borrar'" });
+  }
+  const id = (body.usuario_id || "").toString().trim();
+  if (!ES_UUID.test(id)) return res.status(400).json({ error: "usuario_id inválido (UUID)" });
+
+  const filas = await supabaseSelect("usuarios", `id=eq.${id}&select=*`);
+  const u = filas && filas[0];
+  // Ya no está: se responde OK. Borrar dos veces no es un error, y así el
+  // cliente puede reintentar sin quedarse con una cuenta a medio borrar.
+  if (!u) return res.status(200).json({ ok: true, borradas: 0, ya_no_estaba: true });
+
+  const permiso = puedeVer(req, u);
+  if (!permiso.permitido) {
+    console.warn("[cuenta] intento de borrado ajeno:", JSON.stringify({ pedido: id, sesion: permiso.sesion }));
+    return res.status(403).json({ ok: false, error: "esa cuenta no es tuya" });
+  }
+
+  const correoFila = (u.email || "").trim().toLowerCase();
+  if (correoFila) {
+    const dado = (body.email || "").toString().trim().toLowerCase();
+    if (dado !== correoFila) {
+      console.warn("[cuenta] borrado rechazado: el correo no coincide");
+      return res.status(403).json({ ok: false, error: "correo_no_coincide" });
+    }
+  }
+
+  // Todas las parcelas de la persona, no solo la que ha pedido el borrado.
+  const propietario = u.propietario_id || u.id;
+  const borradas = await supabaseDelete("usuarios", `propietario_id=eq.${propietario}`);
+  const sueltas  = await supabaseDelete("usuarios", `id=eq.${propietario}`);
+  const n = (Array.isArray(borradas) ? borradas.length : 0) + (Array.isArray(sueltas) ? sueltas.length : 0);
+  console.log("[cuenta] borrada:", JSON.stringify({ propietario, filas: n }));
+  return res.status(200).json({ ok: true, borradas: n });
+}
+
 // están en _acceso.js; aquí solo se enruta.
 async function handleAcceso(req, res, body) {
   if (!isConfigured()) {

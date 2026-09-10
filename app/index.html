@@ -67,7 +67,13 @@
           const origen = [u, us, um, uc].filter(Boolean).join("|");
           localStorage.setItem("kylia_origen", origen);
         }
-        if (params.get("demo") === "1") localStorage.setItem("kylia_modo", "demo");
+        if (params.get("demo") === "1") {
+          localStorage.setItem("kylia_modo", "demo");
+          // Una demo que empieza pidiendo el correo no es una demo: es un
+          // formulario. Se marca el dispositivo para que el gate no salte, y se
+          // recuerda entre recargas — si no, el primer refresco lo pediría igual.
+          localStorage.setItem("kylia_demo_sin_correo", "1");
+        }
         if (params.get("modo") === "piloto") localStorage.setItem("kylia_modo", "piloto");
       } catch (_) { /* noop */ }
 
@@ -2220,6 +2226,20 @@
     }
     .cal-leyenda span { display: flex; align-items: center; gap: 5px; }
     .cal-pie { margin: 10px 0 0; font-size: .74rem; color: var(--muted); line-height: 1.45; }
+    /* ── Borrar la cuenta ────────────────────────────────────────────
+       Al final del panel de configuración y con aspecto de lo que es:
+       no es un botón más, es el que no tiene vuelta atrás. */
+    .zona-peligro {
+      margin-top: 26px; padding-top: 18px; border-top: 1px solid #f0dede;
+    }
+    .zona-peligro .config-bloque-titulo { color: #9B2C2C; }
+    .btn-borrar-cuenta {
+      width: 100%; margin-top: 10px; padding: 12px 16px;
+      background: transparent; color: #9B2C2C; border: 1px solid #E3B4B4;
+      border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer;
+    }
+    .btn-borrar-cuenta.confirmar { background: #9B2C2C; color: #fff; border-color: #9B2C2C; }
+    .btn-borrar-cuenta:disabled { opacity: .5; cursor: default; }
   </style>
 </head>
 <body>
@@ -2252,12 +2272,16 @@
     (function () {
       const gate = document.getElementById("gate");
       const yaIdentificado = !!localStorage.getItem("kylia_user_email");
+      // En demo se prueba el producto entero sin dejar el correo. Se puede
+      // dejar después desde la configuración, que es donde tiene sentido:
+      // cuando ya sabes si esto te sirve.
+      const enDemo = localStorage.getItem("kylia_demo_sin_correo") === "1";
       // Con ?acceso= hay un canjeo en vuelo y esta carga termina en recarga: el
       // email llega de la respuesta, no del formulario. Enseñar aquí el gate solo
       // conseguiría pedirle el correo durante un segundo a quien viene de abrirlo.
       const canjeando = new URLSearchParams(location.search).has("acceso");
 
-      if (!yaIdentificado && !canjeando) {
+      if (!yaIdentificado && !canjeando && !enDemo) {
         gate.hidden = false;
         // Focus al primer campo accionable para accesibilidad por teclado
         requestAnimationFrame(() => {
@@ -2454,6 +2478,19 @@
         <p class="config-hint" id="suscripcion-detalle"></p>
         <button type="button" class="btn-suscripcion" id="btn-suscripcion" hidden></button>
         <p class="config-feedback" id="suscripcion-feedback" aria-live="polite"></p>
+      </div>
+
+      <!-- Derecho de supresión, ejercitable en el momento. La política de
+           privacidad lo promete; hasta ahora la única vía era escribir un correo
+           y esperar un mes. -->
+      <div class="zona-peligro">
+        <p class="config-bloque-titulo">Borrar mi cuenta</p>
+        <p class="config-hint" id="borrar-cuenta-texto">
+          Se borra todo: tus parcelas, tus riegos, tus aplicaciones y tu cuaderno.
+          En este dispositivo y en el servidor. No se puede deshacer.
+        </p>
+        <button type="button" class="btn-borrar-cuenta" id="btn-borrar-cuenta">Borrar mi cuenta y mis datos</button>
+        <p class="config-feedback" id="borrar-cuenta-feedback" aria-live="polite"></p>
       </div>
     </div>
 
@@ -5993,6 +6030,86 @@
         }
 
         window.pintarMadurez = pintar;
+      })();
+
+      // ── Borrar la cuenta ─────────────────────────────────────────────────
+      // La política de privacidad promete el derecho de supresión y hasta ahora
+      // la única vía era escribir a privacidad@kylia.app y esperar un mes. Esto
+      // lo hace en el momento.
+      //
+      // DOS TOQUES, no un confirm(). El primero convierte el botón en la
+      // pregunta y el segundo borra. Un `confirm()` del navegador se acepta por
+      // reflejo y en el móvil sale igual que cualquier otro aviso; obligar a
+      // leer un botón que ha cambiado de color y de texto es una barrera más
+      // honesta para algo que no tiene vuelta atrás.
+      //
+      // Y se borra PRIMERO en el servidor: si se limpiara antes el dispositivo y
+      // la petición fallara, el agricultor se quedaría sin sus datos aquí y con
+      // ellos allí — lo peor de las dos opciones.
+      (function () {
+        const btn   = document.getElementById("btn-borrar-cuenta");
+        const aviso = document.getElementById("borrar-cuenta-feedback");
+        if (!btn) return;
+        let armado = false;
+
+        function desarmar() {
+          armado = false;
+          btn.textContent = "Borrar mi cuenta y mis datos";
+          btn.classList.remove("confirmar");
+          aviso.textContent = "";
+        }
+
+        btn.addEventListener("click", async () => {
+          if (!armado) {
+            armado = true;
+            btn.textContent = "Sí, bórralo todo — esto no se puede deshacer";
+            btn.classList.add("confirmar");
+            aviso.textContent = "Toca otra vez para confirmar, o toca fuera para dejarlo.";
+            setTimeout(() => { if (armado) desarmar(); }, 12000);
+            return;
+          }
+
+          btn.disabled = true;
+          aviso.textContent = "Borrando…";
+          const uid = localStorage.getItem("kylia_user_id");
+          try {
+            const res = await fetch("/api/log", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                recurso: "cuenta", accion: "borrar", usuario_id: uid,
+                // El correo va como segundo factor: sin él, cualquiera que
+                // conociera un UUID podría borrarle los datos a otro.
+                email: localStorage.getItem("kylia_user_email") || null,
+              }),
+            });
+            const d = await res.json();
+            if (!d?.ok) {
+              aviso.textContent = d?.error === "correo_no_coincide"
+                ? "No hemos podido comprobar que la cuenta es tuya. Escribe a privacidad@kylia.app."
+                : "No se ha podido borrar ahora mismo. Inténtalo en un momento.";
+              btn.disabled = false; desarmar();
+              return;
+            }
+          } catch (_) {
+            aviso.textContent = "No se ha podido conectar. Inténtalo en un momento.";
+            btn.disabled = false; desarmar();
+            return;
+          }
+
+          // El servidor ya no tiene nada: ahora sí se limpia el dispositivo.
+          // localStorage.clear() y no borrar clave a clave: si mañana se añade
+          // una clave nueva y nadie se acuerda de ponerla aquí, quedaría un
+          // resto de los datos de alguien que pidió que no quedara ninguno.
+          try { localStorage.clear(); } catch (_) {}
+          try { sessionStorage.clear(); } catch (_) {}
+          aviso.textContent = "Borrado. Gracias por haberlo probado.";
+          setTimeout(() => location.replace("/"), 1200);
+        });
+
+        // Tocar fuera desarma: el botón cargado no se queda esperando.
+        document.addEventListener("click", (ev) => {
+          if (armado && !btn.contains(ev.target)) desarmar();
+        }, true);
       })();
 
       // ── Tu suscripción ───────────────────────────────────────────────────
