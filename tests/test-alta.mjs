@@ -1,0 +1,84 @@
+// Los dos primeros minutos de alguien que no ha visto Kylia nunca.
+//   node tests/test-alta.mjs
+//
+// El onboarding anterior era el panel de configuración: aterrizabas en la app y
+// te buscabas la vida. Este pregunta una cosa cada vez, todo a un toque, y no
+// menciona caudal, mapa, cuenta ni "configuración" — eso es vocabulario nuestro.
+//
+// LO QUE HACE QUE FUNCIONE NO ES LA INTERFAZ. Si preguntas "¿cuándo plantaste?"
+// y no siembras ningún riego anterior, el balance arranca en la plantación y
+// acumula tres semanas de evaporación: el primer aviso diría SIEMPRE "riega".
+// Probado. Y usar el caudal por defecto de la tabla tampoco arregla nada: con
+// los 4 mm/h del goteo salen 2 mm por riego contra ~87 mm de demanda, y vuelve
+// a decir siempre "riega".
+//
+// Se deduce de un hecho que sí tenemos: SU CULTIVO ESTÁ VIVO. Quien lleva tres
+// semanas regando cada dos días y tiene la planta en pie cubre, más o menos, lo
+// que la planta gasta. De ahí sale la lámina de los riegos sembrados — y de
+// paso, su caudal, sin habérselo preguntado.
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
+const app = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+const alta = app.slice(app.indexOf("// ── El alta: los dos primeros minutos"),
+                       app.indexOf("// ── Borrar la cuenta ──"));
+
+let fallos = 0;
+const ok = (c, m) => { if (c) console.log("  ✓", m); else { console.log("  ✗", m); fallos++; } };
+
+console.log("── aparece solo para quien no tiene nada ──");
+ok(/const sinCampo = !localStorage\.getItem\("kylia_config"\);/.test(alta),
+   "el criterio es si se guardó algo ALGUNA VEZ, no lo que diga cfg");
+ok(/`cfg` arranca con valores por defecto/.test(alta),
+   "y queda escrito el porqué: cfg trae un cultivo por defecto y miraría mal a todo el mundo");
+ok(/!new URLSearchParams\(location\.search\)\.has\("acceso"\)/.test(alta),
+   "quien viene de su enlace de correo no pasa por el alta");
+
+console.log("\n── seis pantallas, una pregunta cada vez ──");
+for (const n of [0,1,2,3,4,5]) ok(new RegExp(`data-paso="${n}"`).test(app), `existe la pantalla ${n}`);
+// Ojo: la copia SÍ menciona la palabra "caudales", pero para decir que no hacen
+// falta. Lo que se comprueba es que no se le PIDA ninguno.
+const pantallas = app.slice(app.indexOf('id="alta"'), app.indexOf('id="gate"'));
+ok(!/mm\/h/.test(pantallas) && !/data-caudal/.test(pantallas),
+   "no se le pide ningún caudal ni se le enseña un mm/h en toda el alta");
+ok(/No hace falta que sepas litros ni caudales/.test(pantallas),
+   "y se le dice explícitamente que no hace falta que lo sepa");
+ok(/data-cultivo="calabacin"/.test(app) && /data-cultivo="brassica"/.test(app),
+   '"Otro" no es un callejón sin salida: despliega los cultivos que el motor sí conoce');
+
+console.log("\n── el correo, al final ──");
+const iEmail = app.indexOf('id="alta-email"'), iVeredicto = app.indexOf('id="alta-veredicto"');
+ok(iEmail > iVeredicto && iVeredicto > 0,
+   "se pide DESPUÉS de enseñar el primer aviso, no antes");
+ok(/id="alta-saltar"/.test(app), "y se puede saltar: se sigue mirando sin dejarlo");
+
+console.log("\n── la siembra del historial, que es lo que lo hace funcionar ──");
+ok(/function sembrarHistorial/.test(alta), "existe");
+// Dentro de primerAviso, no en todo el bloque: la función se DEFINE antes, y
+// buscarla suelta encontraría la definición en vez de la llamada.
+const primer = alta.slice(alta.indexOf("async function primerAviso"));
+ok(primer.indexOf("await cargarET0()") < primer.indexOf("sembrarHistorial()"),
+   "se siembra DESPUÉS de tener el clima: la lámina sale de la ETc real, no de una tabla");
+ok(/SU CULTIVO ESTÁ VIVO/.test(alta),
+   "y el razonamiento está escrito donde se usa");
+ok(/neto \+= MOTOR\.kcDelDia\(A\.cultivo, dias\) \* \(d\.et0 \?\? 0\)/.test(alta),
+   "la ETc se calcula con el mismo motor que todo lo demás");
+ok(/if \(ll >= MOTOR\.PE_MIN_MM\) neto -= ll;/.test(alta),
+   "y se descuenta la lluvia que llegó a infiltrar");
+ok(/estimado: true/.test(alta),
+   "los riegos sembrados van marcados: no son un registro real y no se disfrazan de tal");
+ok(/if \(caudal > 0\.5 && caudal < 80\) saveConfig/.test(alta),
+   "el caudal deducido se guarda solo si sale en un rango creíble");
+
+console.log("\n── se le habla en su unidad, no en la nuestra ──");
+ok(/como los que haces normalmente/.test(alta),
+   "el consejo es 'un riego como los que haces', no una lámina en mm");
+ok(/unos \$\{A\.minutos\} minutos/.test(alta) || /rato/.test(alta),
+   "y se expresa en los minutos que él ya usa");
+ok(/Calculado con la rutina que nos has contado/.test(alta),
+   "con una línea honesta de dónde sale el número");
+
+if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
+console.log("\n✅ TODOS LOS TESTS VERDES");

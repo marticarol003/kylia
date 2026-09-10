@@ -2240,10 +2240,219 @@
     }
     .btn-borrar-cuenta.confirmar { background: #9B2C2C; color: #fff; border-color: #9B2C2C; }
     .btn-borrar-cuenta:disabled { opacity: .5; cursor: default; }
+    /* ── Alta: los dos primeros minutos ──────────────────────────────
+       Pantalla completa, una pregunta cada vez, todo a un toque. No se
+       menciona caudal, mapa, cuenta ni "configuración": eso es vocabulario
+       nuestro, no suyo. El correo se pide AL FINAL, cuando ya ha visto para
+       qué sirve — pedirlo antes es cobrar la entrada sin enseñar la sala. */
+    .alta {
+      position: fixed; inset: 0; z-index: 60; background: #fff;
+      display: flex; flex-direction: column; overflow-y: auto;
+      padding: max(28px, env(safe-area-inset-top)) 22px 32px;
+    }
+    .alta[hidden] { display: none; }
+    .alta-caja { width: 100%; max-width: 460px; margin: auto; }
+    .alta-paso { display: none; }
+    .alta-paso.activo { display: block; animation: altaEntra .22s ease both; }
+    @keyframes altaEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .alta-paso.activo { animation: none; } }
+
+    .alta-marca {
+      display: flex; align-items: center; gap: 8px; font-weight: 800;
+      color: var(--verde, #013A27); font-size: 1.05rem; margin-bottom: 28px;
+    }
+    .alta h2 {
+      font-size: 1.5rem; line-height: 1.25; margin: 0 0 10px;
+      color: var(--verde, #013A27); letter-spacing: -.01em;
+    }
+    .alta p.alta-txt { margin: 0 0 22px; color: var(--subtle, #334155); line-height: 1.55; }
+    .alta p.alta-nota { margin: 14px 0 0; font-size: .84rem; color: var(--muted); line-height: 1.5; }
+    .alta-preg { font-weight: 700; margin: 22px 0 10px; color: var(--verde, #013A27); }
+    .alta-preg:first-of-type { margin-top: 0; }
+
+    .alta-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .alta-chip {
+      flex: 1 1 auto; min-width: 44%; padding: 14px 12px; border-radius: 12px;
+      border: 1.5px solid #e2e8e4; background: #fff; font: inherit; font-size: .95rem;
+      font-weight: 600; color: var(--verde, #013A27); cursor: pointer; text-align: center;
+    }
+    .alta-chip:active { transform: scale(.97); }
+    .alta-chip.sel { background: var(--verde, #013A27); color: #fff; border-color: var(--verde, #013A27); }
+    .alta-chip.ancho { min-width: 100%; }
+
+    .alta-btn {
+      width: 100%; margin-top: 26px; padding: 15px 18px; border: 0; border-radius: 12px;
+      background: var(--verde, #013A27); color: #fff; font: inherit; font-weight: 700;
+      font-size: 1rem; cursor: pointer;
+    }
+    .alta-btn:disabled { opacity: .4; cursor: default; }
+    .alta-btn.fantasma { background: transparent; color: var(--muted); font-weight: 600; margin-top: 8px; }
+    .alta-atras {
+      background: none; border: 0; font: inherit; color: var(--muted); font-size: .88rem;
+      cursor: pointer; padding: 6px 0; margin-bottom: 14px;
+    }
+    .alta-input {
+      width: 100%; padding: 14px; border: 1.5px solid #e2e8e4; border-radius: 12px;
+      font: inherit; font-size: 1rem;
+    }
+    .alta-estado { margin-top: 12px; font-size: .88rem; color: var(--muted); min-height: 1.2em; }
+
+    /* El primer resultado: lo que ha venido a ver */
+    .alta-veredicto {
+      border-radius: 14px; padding: 24px 22px; margin-bottom: 4px;
+      background: #f2f7f3; border: 1px solid #dce7df;
+    }
+    .alta-veredicto.regar { background: #fdf4e8; border-color: #ecd9bd; }
+    .alta-veredicto h2 { margin-bottom: 8px; }
+    .alta-veredicto p { margin: 0; color: var(--subtle, #334155); line-height: 1.55; }
+    .alta-puntos { display: flex; gap: 6px; justify-content: center; margin-top: 26px; }
+    .alta-punto { width: 6px; height: 6px; border-radius: 50%; background: #dfe7e1; }
+    .alta-punto.on { background: var(--verde, #013A27); }
   </style>
 </head>
 <body>
   <!-- Gate de identificación — se oculta si ya hay email en localStorage -->
+  <!-- ════════════════════════════════════════════════════════════════
+       Alta: los dos primeros minutos de alguien que no ha visto Kylia nunca.
+       Una pregunta cada vez y todo a un toque. No se le pregunta el caudal, ni
+       cuántos goteros tiene, ni se le pide hacer pruebas con un vaso: eso es
+       trabajo nuestro. Y el correo va AL FINAL, cuando ya ha visto el primer
+       aviso — pedirlo antes es cobrar la entrada sin enseñar la sala.
+       ════════════════════════════════════════════════════════════════ -->
+  <div id="alta" class="alta" role="dialog" aria-modal="true" aria-label="Preparar tu primer aviso" hidden>
+    <div class="alta-caja">
+
+      <!-- 0 · Promesa -->
+      <section class="alta-paso activo" data-paso="0">
+        <div class="alta-marca">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(45)"/>
+            <path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(225)"/>
+            <circle cx="12" cy="12" r="2.4"/>
+          </svg> Kylia
+        </div>
+        <h2>Te ayuda a decidir cuándo regar sin cambiar tu forma de trabajar.</h2>
+        <p class="alta-txt">En dos minutos preparamos tu primer aviso.</p>
+        <button type="button" class="alta-btn" data-ir="1">Empezar</button>
+      </section>
+
+      <!-- 1 · Cultivo y cuándo -->
+      <section class="alta-paso" data-paso="1">
+        <button type="button" class="alta-atras" data-ir="0">‹ Atrás</button>
+        <p class="alta-preg">¿Qué tienes plantado ahora?</p>
+        <div class="alta-chips" id="alta-cultivos">
+          <button type="button" class="alta-chip" data-cultivo="tomate">Tomate</button>
+          <button type="button" class="alta-chip" data-cultivo="lechuga">Lechuga</button>
+          <button type="button" class="alta-chip" data-cultivo="cebolla">Cebolla</button>
+          <button type="button" class="alta-chip" data-cultivo="pimiento">Pimiento</button>
+          <button type="button" class="alta-chip" id="alta-otro-cultivo">Otro</button>
+        </div>
+        <!-- "Otro" no puede ser un callejón sin salida: el motor conoce ocho
+             cultivos y aquí caben los cuatro que no están arriba. -->
+        <div class="alta-chips" id="alta-cultivos-mas" hidden style="margin-top:8px">
+          <button type="button" class="alta-chip" data-cultivo="calabacin">Calabacín</button>
+          <button type="button" class="alta-chip" data-cultivo="berenjena">Berenjena</button>
+          <button type="button" class="alta-chip" data-cultivo="espinaca">Espinaca</button>
+          <button type="button" class="alta-chip" data-cultivo="brassica">Col o coliflor</button>
+        </div>
+
+        <p class="alta-preg">¿Cuándo lo plantaste?</p>
+        <div class="alta-chips" id="alta-cuando">
+          <button type="button" class="alta-chip" data-hace="5">Esta semana</button>
+          <button type="button" class="alta-chip" data-hace="21">Hace 2–4 semanas</button>
+          <button type="button" class="alta-chip" data-hace="50">Hace más de un mes</button>
+          <button type="button" class="alta-chip ancho" id="alta-fecha-btn">Elegir fecha</button>
+        </div>
+        <input type="date" class="alta-input" id="alta-fecha" hidden style="margin-top:8px">
+        <p class="alta-nota">Con una fecha aproximada nos vale para empezar. Se puede afinar luego.</p>
+        <button type="button" class="alta-btn" id="alta-b1" disabled data-ir="2">Seguir</button>
+      </section>
+
+      <!-- 2 · Lugar -->
+      <section class="alta-paso" data-paso="2">
+        <button type="button" class="alta-atras" data-ir="1">‹ Atrás</button>
+        <p class="alta-preg">¿Dónde está el cultivo?</p>
+        <div class="alta-chips">
+          <button type="button" class="alta-chip ancho" id="alta-geo">Usar mi ubicación</button>
+          <button type="button" class="alta-chip ancho" id="alta-muni">Buscar mi municipio</button>
+        </div>
+        <input type="text" class="alta-input" id="alta-muni-txt" hidden
+               placeholder="Escribe el municipio y pulsa intro" style="margin-top:8px">
+        <p class="alta-estado" id="alta-lugar-estado"></p>
+        <button type="button" class="alta-btn" id="alta-b2" disabled data-ir="3">Seguir</button>
+      </section>
+
+      <!-- 3 · Cómo riega -->
+      <section class="alta-paso" data-paso="3">
+        <button type="button" class="alta-atras" data-ir="2">‹ Atrás</button>
+        <p class="alta-preg">¿Cómo riegas normalmente?</p>
+        <div class="alta-chips" id="alta-metodo">
+          <button type="button" class="alta-chip" data-metodo="goteo">Goteo</button>
+          <button type="button" class="alta-chip" data-metodo="aspersion">Aspersión</button>
+          <button type="button" class="alta-chip" data-metodo="manguera">Manguera o surco</button>
+          <button type="button" class="alta-chip" data-metodo="regadera">Regadera</button>
+        </div>
+
+        <div id="alta-detalle-riego" hidden>
+          <p class="alta-preg">¿Cada cuánto riegas?</p>
+          <div class="alta-chips" id="alta-cada">
+            <button type="button" class="alta-chip" data-cada="1">Todos los días</button>
+            <button type="button" class="alta-chip" data-cada="2">Cada 2–3 días</button>
+            <button type="button" class="alta-chip" data-cada="5">Una o dos veces por semana</button>
+            <button type="button" class="alta-chip ancho" data-cada="3">Depende de cómo vea la tierra</button>
+          </div>
+
+          <p class="alta-preg" id="alta-preg-rato">Cuando riegas, ¿cuánto rato lo dejas puesto?</p>
+          <div class="alta-chips" id="alta-rato">
+            <button type="button" class="alta-chip" data-min="15">15 min</button>
+            <button type="button" class="alta-chip" data-min="30">30 min</button>
+            <button type="button" class="alta-chip" data-min="45">45 min</button>
+            <button type="button" class="alta-chip" data-min="60">1 hora</button>
+          </div>
+
+          <!-- Este es el ancla. Sin él, el primer aviso sale de una rutina
+               declarada y siempre diría "riega"; con él, el balance arranca
+               donde de verdad está el suelo. Un toque. -->
+          <p class="alta-preg">¿Cuándo regaste por última vez?</p>
+          <div class="alta-chips" id="alta-ultimo">
+            <button type="button" class="alta-chip" data-ult="0">Hoy</button>
+            <button type="button" class="alta-chip" data-ult="1">Ayer</button>
+            <button type="button" class="alta-chip" data-ult="3">Hace 2–3 días</button>
+            <button type="button" class="alta-chip" data-ult="7">Hace más</button>
+          </div>
+        </div>
+
+        <p class="alta-nota">No hace falta que sepas litros ni caudales. Con tu rutina nos basta.</p>
+        <button type="button" class="alta-btn" id="alta-b3" disabled>Ver mi primer aviso</button>
+      </section>
+
+      <!-- 4 · Primer resultado -->
+      <section class="alta-paso" data-paso="4">
+        <div class="alta-veredicto" id="alta-veredicto">
+          <h2 id="alta-v-tit">Calculando…</h2>
+          <p id="alta-v-txt"></p>
+        </div>
+        <p class="alta-nota" id="alta-v-nota"></p>
+        <div id="alta-v-acciones">
+          <button type="button" class="alta-btn" id="alta-b4">Entendido</button>
+        </div>
+      </section>
+
+      <!-- 5 · Guardar (el correo, por fin) -->
+      <section class="alta-paso" data-paso="5">
+        <h2>¿Quieres que Kylia se acuerde de tu campo y te avise cuando toque regar?</h2>
+        <p class="alta-txt">Te mandamos un enlace para entrar desde cualquier móvil. Sin contraseñas.</p>
+        <input type="email" class="alta-input" id="alta-email" placeholder="tu@correo.com" autocomplete="email">
+        <p class="alta-estado" id="alta-email-estado"></p>
+        <button type="button" class="alta-btn" id="alta-b5">Guardar mi campo</button>
+        <button type="button" class="alta-btn fantasma" id="alta-saltar">Ahora no, seguir mirando</button>
+        <p class="alta-nota">Puedes borrar tu cuenta y todos tus datos cuando quieras, desde la propia app.</p>
+      </section>
+
+      <div class="alta-puntos" id="alta-puntos" aria-hidden="true"></div>
+    </div>
+  </div>
+
   <div id="gate" class="gate-overlay" role="dialog" aria-modal="true" aria-labelledby="gate-title" aria-describedby="gate-desc" hidden>
     <div class="gate-card">
       <div class="gate-logo" aria-hidden="true"><svg class="brand-logo" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="flex:0 0 auto"><path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(45)"/><path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(225)"/><circle cx="12" cy="12" r="2.4"/></svg> Kylia</div>
@@ -6030,6 +6239,310 @@
         }
 
         window.pintarMadurez = pintar;
+      })();
+
+      // ── El alta: los dos primeros minutos ────────────────────────────────
+      // Aparece solo si esta persona no tiene todavía un campo configurado.
+      //
+      // LA PIEZA QUE HACE QUE FUNCIONE, y no es la interfaz: SE SIEMBRA EL
+      // HISTORIAL CON SU PROPIA RUTINA. Si le preguntas "¿cuándo plantaste?" y
+      // no registras ningún riego anterior, el balance arranca en la plantación
+      // con el suelo lleno y acumula tres semanas de evaporación: el primer
+      // aviso saldría SIEMPRE "riega", y encima una barbaridad de agua. Con lo
+      // que él acaba de decir —riego cada 2-3 días, media hora— se reconstruyen
+      // los riegos que ya ha hecho, y entonces el primer aviso puede salir que
+      // sí o que no. Que es de lo que iba la promesa.
+      (function () {
+        const caja = document.getElementById("alta");
+        if (!caja) return;
+        const A = { cultivo: null, plantado: null, lat: null, lon: null, ciudad: null,
+                    metodo: null, cada: null, minutos: null, ultimo: null };
+        let paso = 0;
+
+        const $ = id => document.getElementById(id);
+        const hoyISO = () => new Date().toISOString().slice(0, 10);
+        const menos = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+
+        function pintarPuntos() {
+          $("alta-puntos").innerHTML = [0,1,2,3,4,5]
+            .map(i => `<span class="alta-punto${i <= paso ? " on" : ""}"></span>`).join("");
+        }
+        function ir(n) {
+          paso = n;
+          caja.querySelectorAll(".alta-paso").forEach(sec =>
+            sec.classList.toggle("activo", Number(sec.dataset.paso) === n));
+          pintarPuntos();
+          caja.scrollTop = 0;
+          if (n === 4) primerAviso();
+        }
+        // Selección de un grupo de chips: uno activo, y se guarda en A.
+        function grupo(idGrupo, attr, campo, alTerminar) {
+          const g = $(idGrupo);
+          if (!g) return;
+          g.addEventListener("click", ev => {
+            const b = ev.target.closest(`[data-${attr}]`);
+            if (!b) return;
+            g.querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+            b.classList.add("sel");
+            A[campo] = b.dataset[attr];
+            alTerminar && alTerminar();
+          });
+        }
+
+        // ── paso 1 ──
+        grupo("alta-cultivos", "cultivo", "cultivo", revisar1);
+        grupo("alta-cultivos-mas", "cultivo", "cultivo", revisar1);
+        $("alta-otro-cultivo").addEventListener("click", () => {
+          $("alta-cultivos-mas").hidden = false;
+          $("alta-otro-cultivo").classList.add("sel");
+        });
+        $("alta-cuando").addEventListener("click", ev => {
+          const b = ev.target.closest("[data-hace]");
+          if (!b) return;
+          $("alta-cuando").querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+          b.classList.add("sel");
+          A.plantado = menos(Number(b.dataset.hace));
+          $("alta-fecha").hidden = true;
+          revisar1();
+        });
+        $("alta-fecha-btn").addEventListener("click", () => {
+          const f = $("alta-fecha");
+          f.hidden = false; f.max = hoyISO(); f.focus();
+        });
+        $("alta-fecha").addEventListener("change", ev => {
+          if (!ev.target.value) return;
+          A.plantado = ev.target.value;
+          $("alta-cuando").querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+          $("alta-fecha-btn").classList.add("sel");
+          revisar1();
+        });
+        function revisar1() { $("alta-b1").disabled = !(A.cultivo && A.plantado); }
+
+        // ── paso 2 · lugar ──
+        function lugarListo(txt) {
+          $("alta-lugar-estado").textContent = txt;
+          $("alta-b2").disabled = !(A.lat != null && A.lon != null);
+        }
+        $("alta-geo").addEventListener("click", () => {
+          $("alta-geo").classList.add("sel");
+          lugarListo("Buscando dónde estás…");
+          if (!navigator.geolocation) return lugarListo("Tu móvil no comparte la ubicación. Prueba a buscar el municipio.");
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              A.lat = pos.coords.latitude; A.lon = pos.coords.longitude;
+              lugarListo("Perfecto. Usaremos el tiempo de esta zona para saber cuánta agua ha recibido el cultivo.");
+            },
+            () => lugarListo("No hemos podido leer tu ubicación. Busca tu municipio."),
+            { timeout: 8000 }
+          );
+        });
+        $("alta-muni").addEventListener("click", () => {
+          $("alta-muni-txt").hidden = false; $("alta-muni-txt").focus();
+        });
+        $("alta-muni-txt").addEventListener("keydown", async ev => {
+          if (ev.key !== "Enter") return;
+          const q = ev.target.value.trim();
+          if (!q) return;
+          lugarListo("Buscando…");
+          try {
+            const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=es&country=ES`);
+            const d = await r.json();
+            const g = d?.results?.[0];
+            if (!g) return lugarListo("No encontramos ese municipio. Prueba con otro nombre.");
+            A.lat = g.latitude; A.lon = g.longitude; A.ciudad = g.name;
+            lugarListo(`Perfecto, ${g.name}. Usaremos el tiempo de esa zona para saber cuánta agua ha recibido el cultivo.`);
+          } catch (_) { lugarListo("No hemos podido buscar ahora mismo."); }
+        });
+
+        // ── paso 3 · riego ──
+        grupo("alta-metodo", "metodo", "metodo", () => {
+          $("alta-detalle-riego").hidden = false;
+          // A regadera no se le pregunta "cuánto rato": se cuenta por viajes.
+          const esRato = A.metodo !== "regadera";
+          $("alta-preg-rato").textContent = esRato
+            ? "Cuando riegas, ¿cuánto rato lo dejas puesto?"
+            : "¿Cuántas regaderas sueles echar?";
+          $("alta-rato").innerHTML = esRato
+            ? `<button type="button" class="alta-chip" data-min="15">15 min</button>
+               <button type="button" class="alta-chip" data-min="30">30 min</button>
+               <button type="button" class="alta-chip" data-min="45">45 min</button>
+               <button type="button" class="alta-chip" data-min="60">1 hora</button>`
+            : `<button type="button" class="alta-chip" data-min="10">1 regadera</button>
+               <button type="button" class="alta-chip" data-min="20">2</button>
+               <button type="button" class="alta-chip" data-min="30">3</button>
+               <button type="button" class="alta-chip" data-min="45">4 o más</button>`;
+          revisar3();
+        });
+        grupo("alta-cada", "cada", "cada", revisar3);
+        grupo("alta-rato", "min", "minutos", revisar3);
+        grupo("alta-ultimo", "ult", "ultimo", revisar3);
+        function revisar3() {
+          $("alta-b3").disabled = !(A.metodo && A.cada && A.minutos && A.ultimo != null);
+        }
+        $("alta-b3").addEventListener("click", () => { guardarAlta(); ir(4); });
+
+        // ── guardar lo aprendido y sembrar el historial ──
+        function guardarAlta() {
+          const cfgNuevo = {
+            ...cfg,
+            cultivos: [A.cultivo],
+            fechaPlantacion: A.plantado,
+            metodoRiego: A.metodo,
+            lat: A.lat, lon: A.lon,
+            ciudad: A.ciudad || cfg.ciudad || null,
+            // El suelo no se pregunta: 'franco' es el término medio de la tabla
+            // de FAO-56 y equivocarse ahí mueve menos que cualquier otra cosa
+            // que podríamos preguntar. Se afina después.
+            suelo: cfg.suelo || "franco",
+          };
+          saveConfig(cfgNuevo);
+
+        }
+
+        // Los riegos que ya ha hecho, reconstruidos con SU rutina: desde la
+        // plantación hasta el último que ha dicho, cada `cada` días.
+        //
+        // ⚠️ LO DIFÍCIL NO ES LAS FECHAS, ES CUÁNTA AGUA LLEVA CADA UNO. Y no se
+        // le puede preguntar: nadie sabe de memoria cuántos milímetros echa su
+        // goteo, y pedirle que lo mida con un vaso el primer día es perderlo.
+        //
+        // Usar el caudal por defecto de la tabla tampoco vale — se probó: con
+        // los 4 mm/h del goteo salen 2 mm por riego contra ~87 mm de demanda en
+        // tres semanas, y entonces el primer aviso dice SIEMPRE "riega", que es
+        // exactamente lo que rompe la promesa. Es el mismo agujero que dio un
+        // 68% falso en el informe de un piloto por un caudal mal puesto.
+        //
+        // Así que se deduce de un hecho que sí tenemos: SU CULTIVO ESTÁ VIVO.
+        // Alguien que lleva tres semanas regando cada dos días y tiene la planta
+        // en pie está cubriendo, más o menos, lo que la planta gasta. De ahí sale
+        // la lámina: la ETc acumulada repartida entre los riegos que ha hecho.
+        //
+        // Lo que esto compra: el balance arranca donde de verdad está el suelo, y
+        // el primer aviso depende de los días que han pasado desde su último
+        // riego — que es lo correcto. Lo que cuesta: si de verdad riega de más o
+        // de menos, esa desviación no se ve el primer día. Se ve en cuanto empieza
+        // a apuntar riegos de verdad, y entonces el número se corrige solo.
+        function sembrarHistorial() {
+          const cada = Math.max(1, Number(A.cada));
+          const fin  = menos(Number(A.ultimo));
+          const fechas = [];
+          for (let f = fin; f >= A.plantado; ) {
+            fechas.push(f);
+            const d = new Date(`${f}T12:00:00`); d.setDate(d.getDate() - cada);
+            f = d.toISOString().slice(0, 10);
+          }
+          fechas.reverse();
+          if (!fechas.length) { riegos = []; saveRiegos(riegos); return; }
+
+          // Lo que el cultivo ha gastado de verdad en ese tramo, descontando la
+          // lluvia que llegó a infiltrar.
+          let neto = 0;
+          for (const d of (ultimoET0 || [])) {
+            if (d.date < A.plantado || d.date > fin) continue;
+            const dias = MOTOR.diasEntre(A.plantado, new Date(`${d.date}T12:00:00`));
+            neto += MOTOR.kcDelDia(A.cultivo, dias) * (d.et0 ?? 0);
+            const ll = Math.max(0, d.lluvia ?? 0);
+            if (ll >= MOTOR.PE_MIN_MM) neto -= ll;
+          }
+          const efic = MOTOR.EFIC_RIEGO[A.metodo] ?? MOTOR.EFIC_DEFAULT;
+          const lamina = Math.max(1, Math.round((Math.max(0, neto) / fechas.length / efic) * 10) / 10);
+
+          riegos = fechas.map(f => ({ date: f, litros: lamina, duracion: Number(A.minutos), estimado: true }));
+          saveRiegos(riegos);
+
+          // Y de paso queda deducido su caudal, sin habérselo preguntado: si esa
+          // lámina sale en los minutos que él riega, eso es lo que echa su
+          // instalación. Con esto los avisos futuros le hablan en minutos suyos.
+          if (A.metodo !== "regadera" && Number(A.minutos) > 0) {
+            const caudal = Math.round((lamina * efic) / (Number(A.minutos) / 60) * 10) / 10;
+            if (caudal > 0.5 && caudal < 80) saveConfig({ ...cfg, caudal });
+          }
+        }
+
+        // ── paso 4 · el primer aviso ──
+        async function primerAviso() {
+          $("alta-v-tit").textContent = "Calculando…";
+          $("alta-v-txt").textContent = "";
+          await cargarET0();                       // trae el clima de su punto
+          sembrarHistorial();                      // necesita el clima: ver el porqué arriba
+          const b = calcularBalanceHidrico();
+          const dec = b ? MOTOR.decisionRiego(b, { lluviaPrevista: [] }) : null;
+          const caja = $("alta-veredicto");
+          if (!dec) {
+            $("alta-v-tit").textContent = "Ya está listo";
+            $("alta-v-txt").textContent = "Mañana por la mañana tendrás aquí el aviso del día.";
+            caja.classList.remove("regar");
+            $("alta-v-nota").textContent = "";
+            return;
+          }
+          const riega = dec.nivel === "alta";
+          caja.classList.toggle("regar", riega);
+          // Se habla en SU unidad: el rato que él riega, no una lámina en mm.
+          const rato = A.metodo === "regadera"
+            ? `${A.minutos / 10} regadera${A.minutos / 10 === 1 ? "" : "s"}`
+            : `unos ${A.minutos} minutos`;
+          $("alta-v-tit").textContent = riega ? "Hoy toca regar" : "Hoy no hace falta regar";
+          $("alta-v-txt").textContent = riega
+            ? `Haz un riego como los que haces normalmente: ${rato}. El cultivo lleva varios días gastando agua y lo que queda en el suelo ya no le llega.`
+            : "Lo que echaste la última vez todavía cubre lo que el cultivo ha gastado. Vuelve a mirar mañana antes de abrir el riego.";
+          $("alta-v-nota").textContent =
+            "Calculado con la rutina que nos has contado. Cuanto más apuntes, más fino será.";
+          $("alta-v-acciones").innerHTML = riega
+            ? `<button type="button" class="alta-btn" id="alta-regado">Ya he regado</button>
+               <button type="button" class="alta-btn fantasma" id="alta-luego">Lo haré luego</button>`
+            : `<button type="button" class="alta-btn" id="alta-luego">Entendido</button>`;
+          $("alta-regado")?.addEventListener("click", () => {
+            addRiego(hoyISO(), null, { duracion: Number(A.minutos) });
+            ir(5);
+          });
+          $("alta-luego")?.addEventListener("click", () => ir(5));
+        }
+
+        // ── paso 5 · el correo, por fin ──
+        $("alta-b5").addEventListener("click", async () => {
+          const email = $("alta-email").value.trim();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            $("alta-email-estado").textContent = "Revisa el correo, parece incompleto.";
+            return;
+          }
+          localStorage.setItem("kylia_user_email", email);
+          $("alta-email-estado").textContent = "Guardado.";
+          try {
+            await fetch("/api/log", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ recurso: "registro-usuario", id: localStorage.getItem("kylia_user_id"),
+                                     email, cultivos: [A.cultivo], ciudad: A.ciudad || null }),
+            });
+          } catch (_) { /* el campo ya está guardado en el móvil; el correo puede esperar */ }
+          cerrar();
+        });
+        $("alta-saltar").addEventListener("click", cerrar);
+        $("alta-b4")?.addEventListener("click", () => ir(5));
+
+        caja.addEventListener("click", ev => {
+          const b = ev.target.closest("[data-ir]");
+          if (b) ir(Number(b.dataset.ir));
+        });
+
+        function cerrar() {
+          caja.hidden = true;
+          document.body.style.overflow = "";
+          location.reload();     // la app arranca ya con su campo puesto
+        }
+
+        // Solo para quien no tiene nada: a quien ya usa Kylia no se le vuelve a
+        // preguntar por dónde tiene el campo.
+        window.abrirAlta = () => {
+          caja.hidden = false;
+          document.body.style.overflow = "hidden";
+          ir(0);
+        };
+        // Ojo con el criterio: `cfg` arranca con valores por defecto (cultivo
+        // "lechuga" incluido), así que mirar cfg diría que todo el mundo tiene
+        // campo. Lo que de verdad distingue a alguien nuevo es si ALGUNA VEZ se
+        // ha guardado algo — el mismo criterio que ya usa `eraPrimerUso`.
+        const sinCampo = !localStorage.getItem("kylia_config");
+        if (sinCampo && !new URLSearchParams(location.search).has("acceso")) window.abrirAlta();
       })();
 
       // ── Borrar la cuenta ─────────────────────────────────────────────────

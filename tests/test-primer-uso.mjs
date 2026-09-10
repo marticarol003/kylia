@@ -45,7 +45,12 @@ console.log("── actualizar la ubicación no borra la parcela ──");
 // Pasaba en las dos ramas del GPS, con parcela:null explícito. Se llevaba por
 // delante el contorno confirmado, y con él la medida del satélite y la
 // superficie oficial de la que salen los kg del abonado.
-const gps = app.slice(app.indexOf("navigator.geolocation.getCurrentPosition"), app.indexOf("btnGps.disabled = false;\n            setFeedback"));
+// Se ancla en el BOTÓN de la configuración, no en la primera geolocalización
+// que aparezca en el fichero: el alta de bienvenida también pide ubicación y
+// antes este corte se la comía, midiendo un trozo de código que no era este.
+const iGps = app.indexOf("btnGps");
+const gps = app.slice(app.indexOf("navigator.geolocation.getCurrentPosition", iGps),
+                      app.indexOf("btnGps.disabled = false;\n            setFeedback"));
 ok(!/parcela: null/.test(gps), "ya no se manda parcela:null a ciegas");
 ok(/contieneAlPunto\(cfgFinca\.parcela, \[lon, lat\]\)/.test(gps),
    "se decide con la geometría: el contorno se conserva si el GPS cae dentro");
