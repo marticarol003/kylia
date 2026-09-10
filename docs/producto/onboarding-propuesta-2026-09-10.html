@@ -1,0 +1,292 @@
+<title>Onboarding de Kylia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root{
+  --papel:#FBFAF7; --tarjeta:#FFFFFF; --tinta:#10201A; --suave:#5C6B62;
+  --verde:#013A27; --verde-claro:#2F6B4F; --tierra:#A8681C; --rojo:#B23B2E;
+  --linea:#E3E7E2; --linea-fuerte:#C9D1CA; --marca:#F1F4F0;
+  --sombra:0 1px 2px rgba(16,32,26,.05), 0 8px 24px -16px rgba(16,32,26,.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --papel:#0D1512; --tarjeta:#141F1A; --tinta:#E8EEE9; --suave:#93A39A;
+    --verde:#7FCFA6; --verde-claro:#9BDCBB; --tierra:#E0A75E; --rojo:#E88377;
+    --linea:#243029; --linea-fuerte:#33443A; --marca:#1A2721;
+    --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --papel:#0D1512; --tarjeta:#141F1A; --tinta:#E8EEE9; --suave:#93A39A;
+  --verde:#7FCFA6; --verde-claro:#9BDCBB; --tierra:#E0A75E; --rojo:#E88377;
+  --linea:#243029; --linea-fuerte:#33443A; --marca:#1A2721;
+  --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--papel);color:var(--tinta);font-family:"Source Serif 4",Georgia,serif;font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.envoltura{max-width:1180px;margin:0 auto;padding:0 24px 120px}
+.medida{max-width:70ch}
+h1,h2,h3,h4,.ui{font-family:"Plus Jakarta Sans",system-ui,sans-serif}
+h1{font-size:clamp(2rem,4.6vw,3.1rem);line-height:1.06;letter-spacing:-.03em;font-weight:800;margin:0 0 .4em;text-wrap:balance}
+h2{font-size:clamp(1.35rem,2.4vw,1.7rem);line-height:1.18;letter-spacing:-.02em;font-weight:800;margin:0;text-wrap:balance}
+h3{font-size:1.06rem;letter-spacing:-.01em;font-weight:700;margin:2.2em 0 .5em;text-wrap:balance}
+h4{font-size:.82rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--suave);margin:1.8em 0 .5em}
+p{margin:0 0 1em}
+strong{font-weight:600;color:var(--tinta)}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.87em}
+code{background:var(--marca);padding:.1em .38em;border-radius:4px;border:1px solid var(--linea)}
+header.portada{padding:72px 0 40px;border-bottom:2px solid var(--tinta);margin-bottom:8px}
+.sobretitulo{font-family:"Plus Jakarta Sans",sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--verde-claro);margin:0 0 18px}
+.entradilla{font-size:1.16rem;color:var(--suave);max-width:62ch;margin:0 0 26px}
+.fichas{display:flex;flex-wrap:wrap;gap:8px;font-family:"Plus Jakarta Sans",sans-serif;font-size:.78rem;font-weight:600}
+.ficha{padding:5px 11px;border-radius:999px;border:1px solid var(--linea-fuerte);color:var(--suave);background:var(--tarjeta)}
+.ficha.alerta{border-color:var(--rojo);color:var(--rojo)}
+section.bloque{padding:52px 0;border-bottom:1px solid var(--linea)}
+.tit{display:flex;gap:18px;align-items:baseline;margin-bottom:22px}
+.num{font-family:"JetBrains Mono",monospace;font-size:.82rem;font-weight:600;color:var(--verde-claro);padding-top:.35em;flex:0 0 auto;min-width:2.4em}
+.tabla-envoltura{overflow-x:auto;margin:20px 0;border:1px solid var(--linea);border-radius:12px;background:var(--tarjeta)}
+table{border-collapse:collapse;width:100%;font-family:"Plus Jakarta Sans",sans-serif;font-size:.83rem;line-height:1.45}
+th{text-align:left;font-weight:700;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--suave);padding:12px 14px;border-bottom:1px solid var(--linea-fuerte);white-space:nowrap;background:var(--marca)}
+td{padding:11px 14px;border-bottom:1px solid var(--linea);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+td.dato{font-weight:700}
+.num-col{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.sello{display:inline-block;font-family:"Plus Jakarta Sans",sans-serif;font-size:.68rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:5px;white-space:nowrap}
+.s-v1{background:color-mix(in srgb,var(--verde-claro) 18%,transparent);color:var(--verde-claro)}
+.s-v2{background:var(--marca);color:var(--suave)}
+.s-crit{background:color-mix(in srgb,var(--rojo) 14%,transparent);color:var(--rojo)}
+.s-imp{background:color-mix(in srgb,var(--tierra) 16%,transparent);color:var(--tierra)}
+.caja{border:1px solid var(--linea);border-radius:12px;padding:20px 22px;margin:20px 0;background:var(--tarjeta);box-shadow:var(--sombra)}
+.caja h4{margin-top:0}
+.caja.aviso{border-left:3px solid var(--tierra);background:color-mix(in srgb,var(--tierra) 5%,var(--tarjeta))}
+.caja.linea{border-left:3px solid var(--rojo);background:color-mix(in srgb,var(--rojo) 5%,var(--tarjeta))}
+.caja.si{border-left:3px solid var(--verde-claro);background:color-mix(in srgb,var(--verde-claro) 6%,var(--tarjeta))}
+.formula{font-family:"JetBrains Mono",monospace;font-size:.86rem;line-height:1.9;background:var(--marca);border:1px solid var(--linea);border-radius:10px;padding:16px 18px;margin:16px 0;overflow-x:auto;white-space:pre}
+ul,ol{margin:0 0 1em;padding-left:1.3em}
+li{margin-bottom:.42em}
+ul.limpia{list-style:none;padding-left:0}
+ul.limpia li{padding-left:1.5em;position:relative}
+ul.limpia li::before{content:"—";position:absolute;left:0;color:var(--verde-claro)}
+.correccion{border:1px solid var(--linea);border-left:3px solid var(--rojo);border-radius:12px;padding:20px 22px;margin:18px 0;background:var(--tarjeta)}
+.correccion .etiqueta{font-family:"Plus Jakarta Sans",sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--rojo);display:block;margin-bottom:8px}
+.correccion .antes{color:var(--suave);font-style:italic}
+.pantallas{display:grid;gap:14px;margin:22px 0}
+.pantalla{display:grid;grid-template-columns:auto 1fr;gap:18px;border:1px solid var(--linea);border-radius:12px;padding:18px 20px;background:var(--tarjeta)}
+.pantalla-n{font-family:"JetBrains Mono",monospace;font-weight:600;font-size:1.5rem;color:var(--linea-fuerte);line-height:1}
+.pantalla h3{margin:0 0 4px;font-size:1rem}
+.pantalla p{margin:0 0 .5em;font-size:.94rem}
+.pantalla .pregunta{font-family:"Plus Jakarta Sans",sans-serif;font-weight:700;color:var(--verde);font-size:.95rem}
+.meta{font-family:"Plus Jakarta Sans",sans-serif;font-size:.78rem;color:var(--suave);display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px}
+.meta b{color:var(--tinta);font-weight:700}
+footer{padding:48px 0 0;color:var(--suave);font-size:.9rem}
+@media (max-width:640px){body{font-size:16px}.envoltura{padding:0 16px 80px}.tit{flex-direction:column;gap:2px}.num{padding-top:0}.pantalla{grid-template-columns:1fr}}
+</style>
+
+<div class="envoltura">
+
+<header class="portada">
+  <p class="sobretitulo">V1 · para aprobar antes de implementar · 10 sept 2026</p>
+  <h1>El alta que descubre la finca sola</h1>
+  <p class="entradilla">Versión 1 del onboarding de Kylia, con las cuestiones agronómicas dudosas de la propuesta anterior corregidas y una frontera clara entre lo que entra ahora y lo que no.</p>
+  <div class="fichas">
+    <span class="ficha alerta">6 correcciones agronómicas</span>
+    <span class="ficha">V1 sin tocar los motores</span>
+    <span class="ficha">1 dependencia de backend</span>
+    <span class="ficha">Ningún fichero modificado</span>
+  </div>
+</header>
+
+<section class="bloque">
+  <div class="tit"><span class="num">01</span><h2>Correcciones agronómicas</h2></div>
+  <p class="medida">Repaso de mi propia propuesta. Seis cosas estaban mal o dichas con más seguridad de la que tienen. La primera es la grave.</p>
+
+  <div class="correccion">
+    <span class="etiqueta">Corrección 1 · grave · llevaba a abonar de más por diseño</span>
+    <p class="antes">Decía: «SIGPAC da la superficie oficial con un toque; desbloquea el pilar de abonado».</p>
+    <p>Un <strong>recinto de SIGPAC no es la superficie cultivada</strong>. En horticultura pequeña, un bancal de 440 m² vive dentro de un recinto que puede tener varias hectáreas. El plan de abonado escala <em>linealmente</em> con la superficie: coger el recinto entero como área cultivada multiplica los kg de nitrógeno por el mismo factor que se ha equivocado.</p>
+    <p style="margin-bottom:0"><strong>Corregido:</strong> SIGPAC aporta el <em>contorno</em> y la superficie del recinto como techo, nunca como área cultivada. La V1 pregunta siempre <em>«¿cultivas todo el recinto o una parte?»</em>, y si es una parte se usa el corte que ya sabe hacer <code>geo-parcela.js</code> — que además reescala por la superficie oficial, así que el reparto sale con la precisión del catastro. Sin esa confirmación, el plan de abonado no se calcula.</p>
+  </div>
+
+  <div class="correccion">
+    <span class="etiqueta">Corrección 2 · el vaso tampoco basta en aspersión</span>
+    <p class="antes">Decía: «vaso recto en medio del solape, 15 min, ×4 y ya está el caudal».</p>
+    <p>Un solo recipiente da la pluviometría <em>de ese punto</em>, no la del sistema. Muchos aspersores riegan en corona: cerca del emisor cae menos que a media distancia. Un punto puede irse al doble o a la mitad de la media.</p>
+    <p style="margin-bottom:0"><strong>Corregido:</strong> el método primario para <em>cualquier</em> sistema de emisores —goteo, microaspersión y aspersión— es el mismo y es geométrico: <strong>caudal del emisor dividido entre el marco que le toca</strong>. Es la fórmula que ya está construida y validada contra el bancal de Ferran. El recipiente pasa a ser <em>comprobación</em>, no medida: y si se usa en aspersión, con tres botes a distancias distintas y quedándose con la media.</p>
+  </div>
+
+  <div class="correccion">
+    <span class="etiqueta">Corrección 3 · me inventé una eficiencia</span>
+    <p class="antes">Decía: «la eficiencia real de inundación anda por 0,45–0,60».</p>
+    <p>Di un número sin fuente. Y sobre todo: <strong>el motor ya tiene riego por superficie</strong>. <code>surco</code> vale 0,60 y es exactamente la misma física — agua que avanza por gravedad sobre el suelo. Añadir una constante nueva a ojo para «inundación» habría sido inventar donde ya había un valor razonado.</p>
+    <p style="margin-bottom:0"><strong>Corregido:</strong> la V1 <strong>no toca <code>EFIC_RIEGO</code></strong>. «A manta o inundación» se ofrece como etiqueta del agricultor y se mapea a <code>surco</code>, diciéndolo. La microaspersión se queda fuera de la V1: no tengo un valor defendible y en huerta pequeña es rara. Entra cuando haya fuente.</p>
+  </div>
+
+  <div class="correccion">
+    <span class="etiqueta">Corrección 4 · el rendimiento por satélite no debería mandar sobre el nitrógeno</span>
+    <p class="antes">Decía: «rendimiento esperado, automático, de superficie + NDVI».</p>
+    <p>El rendimiento <strong>multiplica todo</strong> el balance de nutrientes. Sostenerlo sobre un NDVI de las primeras semanas —cuando el cultivo apenas cubre suelo— es construir el plan de abonado encima de la estimación más floja que tenemos. El propio módulo lo dice: es un valor por defecto, y el declarado manda.</p>
+    <p style="margin-bottom:0"><strong>Corregido:</strong> la V1 pregunta <em>«¿cuánto sacaste el año pasado de este campo?»</em> en la unidad que él usa —cajas, kilos, sacos—. Es un número que sí sabe, y es lo que pide el método MAPA. El estimador por satélite se queda como red de seguridad para quien no lo sepa, no como fuente principal.</p>
+  </div>
+
+  <div class="correccion">
+    <span class="etiqueta">Corrección 5 · «recarga completa» es falso en goteo</span>
+    <p class="antes">El código de hoy asume que el último riego dejó el suelo lleno.</p>
+    <p>En riego por superficie o aspersión eso es razonable. <strong>En goteo no</strong>: el goteo está diseñado para reponer poco y a menudo, y un riego típico no llena la zona radicular entera. Suponer que sí infravalora el déficit de partida y retrasa el primer aviso.</p>
+    <p style="margin-bottom:0"><strong>Corregido:</strong> cuando se conoce el caudal, el último riego <strong>no se supone: se calcula</strong> — <code>mm = caudal × minutos</code>, y el déficit queda donde toca. La recarga completa pasa a ser el respaldo de cuando no hay caudal. Esto es, además, lo que hace que medir el caudal valga la pena de verdad: no es solo pasar a minutos, es arrancar el balance bien.</p>
+  </div>
+
+  <div class="correccion">
+    <span class="etiqueta">Corrección 6 · dos cosas dichas con demasiada seguridad</span>
+    <p><strong>La textura de SoilGrids es un prior de zona a 250 m</strong>, no la de la parcela. Un píxel cubre la huerta entera y no ve ni el fondo de valle ni cuarenta años de enmiendas. Se usa —es mucho mejor que «franco» por defecto— pero el agricultor puede corregirla, y se enseña de dónde sale.</p>
+    <p style="margin-bottom:0"><strong>El 20 % de diferencia entre el primer gotero y el último</strong> lo presenté como si fuera un estándar. Es una regla de campo razonable, no una norma. Y añado el matiz que importa: con goteros <em>autocompensantes</em> la diferencia debería ser casi nula, así que si aparece no es presión — son goteros sucios.</p>
+  </div>
+</section>
+
+<section class="bloque">
+  <div class="tit"><span class="num">02</span><h2>Qué entra en la V1</h2></div>
+  <div class="medida">
+    <p>El criterio: la V1 <strong>no toca ningún motor</strong>, no crea ninguna tabla y no depende de nada que no exista ya. Todo lo que necesita permiso queda fuera.</p>
+  </div>
+
+  <div class="tabla-envoltura">
+  <table>
+    <thead><tr><th>Pieza</th><th>Por qué entra</th><th>Coste</th></tr></thead>
+    <tbody>
+      <tr><td class="dato">Invertir el orden: lugar antes que cultivo</td><td>Arranca SoilGrids, Open-Meteo y SIGPAC mientras sigue contestando</td><td>Reordenar pasos</td></tr>
+      <tr><td class="dato">Pantalla de descubrimiento</td><td>Enseña lo que Kylia ya sabe de su zona. Es lo que cambia la sensación del alta entera, y son datos que ya teníamos</td><td>Una pantalla nueva</td></tr>
+      <tr><td class="dato">Contorno SIGPAC + <strong>«¿todo el recinto o una parte?»</strong></td><td>Corrección 1. Sin esto el abonado nace mal</td><td>Reutiliza <code>sigpac.js</code> y <code>geo-parcela.js</code></td></tr>
+      <tr><td class="dato">Cosecha del año pasado</td><td>Corrección 4. Es lo que pide el método MAPA y él lo sabe</td><td>Una pregunta</td></tr>
+      <tr><td class="dato">Cultivo anterior + restos incorporados</td><td>Sin el crédito de N se abona de más. La migración ya existe</td><td>Dos toques · <strong>1 dependencia</strong></td></tr>
+      <tr><td class="dato">Último riego calculado con el caudal</td><td>Corrección 5</td><td>Unas líneas donde ya está el sembrado</td></tr>
+      <tr><td class="dato">«A manta» mapeado a <code>surco</code></td><td>Corrección 3, sin tocar el motor</td><td>Una etiqueta</td></tr>
+      <tr><td class="dato">Perfil de la finca por pilares</td><td>Un número global se lee como precisión</td><td>Cálculo en cliente</td></tr>
+      <tr><td class="dato">El caudal se pide fuera del alta</td><td>Se mide bien en el campo, no en la cocina</td><td>Una línea en el aviso de riego</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="caja aviso">
+    <h4>La única dependencia de la V1</h4>
+    <p style="margin-bottom:0"><code>cultivo_anterior</code> y <code>restos_incorporados</code> están migrados en <code>db/</code> y el motor de nutrición los acepta por <code>opts</code>, pero <strong><code>campo.js</code> no lee esas dos columnas</strong>, así que hoy el crédito de residuos es siempre 0. Son unas pocas líneas. <strong>No las he tocado.</strong></p>
+  </div>
+</section>
+
+<section class="bloque">
+  <div class="tit"><span class="num">03</span><h2>Qué NO entra, y por qué</h2></div>
+  <div class="tabla-envoltura">
+  <table>
+    <thead><tr><th>Pieza</th><th>Motivo</th><th>Cuándo</th></tr></thead>
+    <tbody>
+      <tr><td class="dato">Microaspersión como método propio</td><td>No tengo una eficiencia defendible y en huerta pequeña es rara. Inventarla sería el error de la corrección 3</td><td><span class="sello s-v2">V2</span> con fuente</td></tr>
+      <tr><td class="dato">Inundación como método propio</td><td>De momento se comporta como <code>surco</code>. Separarla solo tiene sentido si medimos que difieren</td><td><span class="sello s-v2">V2</span></td></tr>
+      <tr><td class="dato">AWC continua desde arcilla/arena</td><td>Bucketizar en tres clases tira información que SoilGrids ya nos da, pero es cambio de motor y la V1 no toca motores</td><td><span class="sello s-v2">V2</span></td></tr>
+      <tr><td class="dato">Ficha de procedencia por dato</td><td>Cabe en <code>preferencias jsonb</code> sin migración, pero no cambia ninguna decisión todavía</td><td><span class="sello s-v2">V2</span></td></tr>
+      <tr><td class="dato">Foto + IA para etiquetas y analíticas</td><td>Cara, y el cálculo por geometría ya resuelve el caso frecuente</td><td><span class="sello s-v2">V3</span></td></tr>
+      <tr><td class="dato">Técnico agrícola</td><td>Es un tercero: RGPD y <code>SESION_SECRET</code>, que sigue sin poner en Vercel</td><td><span class="sello s-v2">V3</span></td></tr>
+      <tr><td class="dato">Sectores dentro de una parcela</td><td>Modelo de datos nuevo. Ningún piloto lo ha necesitado</td><td><span class="sello s-v2">V3</span></td></tr>
+      <tr><td class="dato">Uniformidad primer/último gotero</td><td>Buena idea, pero es una segunda medición y la V1 tiene que caber en dos minutos</td><td><span class="sello s-v2">V2</span></td></tr>
+      <tr><td class="dato">Caducidad de los datos</td><td>Nada caduca hoy. Nadie lleva un año dentro todavía</td><td><span class="sello s-v2">V2</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="bloque">
+  <div class="tit"><span class="num">04</span><h2>El flujo de la V1</h2></div>
+  <p class="medida">Ocho pantallas. <strong>Cinco preguntan, tres no.</strong> Ninguna pide un número que un agricultor no sepa de memoria.</p>
+
+  <div class="pantallas">
+    <article class="pantalla"><div class="pantalla-n">1</div><div>
+      <h3>Bienvenida</h3>
+      <p class="pregunta">«Te ayuda a decidir cuándo regar sin cambiar tu forma de trabajar.»</p>
+      <div class="meta"><span><b>Ya existe</b></span></div></div></article>
+
+    <article class="pantalla"><div class="pantalla-n">2</div><div>
+      <h3>Dónde está</h3>
+      <p class="pregunta">«¿Dónde tienes el campo?»</p>
+      <p>GPS o municipio. Se adelanta al cultivo porque dispara todo lo de fondo.</p>
+      <div class="meta"><span><b>Obtiene:</b> lat/lon</span><span><b>Dispara:</b> SoilGrids · Open-Meteo · SIGPAC</span></div></div></article>
+
+    <article class="pantalla"><div class="pantalla-n">3</div><div>
+      <h3>Esto es tuyo, ¿verdad?</h3>
+      <p class="pregunta">«Hemos encontrado este recinto. ¿Cultivas todo o solo una parte?»</p>
+      <p>El recinto dibujado con su superficie oficial, más el suelo y la evaporación de hoy. <strong>Todo o una parte</strong> — y si es una parte, se corta en el mapa. Es la corrección 1 convertida en pantalla.</p>
+      <div class="meta"><span><b>Obtiene:</b> contorno · superficie <em>cultivada</em></span><span><b>Si no aparece:</b> se escribe a mano y el riego funciona igual</span></div></div></article>
+
+    <article class="pantalla"><div class="pantalla-n">4</div><div>
+      <h3>Qué hay plantado</h3>
+      <p class="pregunta">«¿Qué tienes plantado?» → «¿Cuándo lo plantaste?»</p>
+      <div class="meta"><span><b>Si no sabe la fecha:</b> «esta semana / hace 2-4 semanas / hace más de un mes»</span></div></div></article>
+
+    <article class="pantalla"><div class="pantalla-n">5</div><div>
+      <h3>Cómo riegas</h3>
+      <p class="pregunta">método → cada cuánto → cuánto rato → <strong>cuándo regaste por última vez</strong></p>
+      <p>Una cada vez. «A manta» entre las opciones, mapeada a surco.</p>
+      <div class="meta"><span><b>La última es la que ancla el balance</b></span></div></div></article>
+
+    <article class="pantalla"><div class="pantalla-n">6</div><div>
+      <h3>El primer aviso</h3>
+      <p class="pregunta">«Hoy no hace falta regar» · «Hoy toca regar: unos 30 minutos»</p>
+      <p><strong>Aquí termina lo obligatorio.</strong> Lo que viene después ya está pagado.</p></div></article>
+
+    <article class="pantalla"><div class="pantalla-n">7</div><div>
+      <h3>Dos cosas más y el abonado también funciona</h3>
+      <p class="pregunta">«¿Qué había antes en este campo?» · «¿Los restos se enterraron?» · «¿Cuánto sacaste el año pasado?»</p>
+      <p>Opcional y saltable. Las tres son las que desbloquean el plan de abonado entero, y las tres las sabe de memoria.</p>
+      <div class="meta"><span><b>Si lo salta:</b> queda pendiente y el pilar de abonado lo dice</span></div></div></article>
+
+    <article class="pantalla"><div class="pantalla-n">8</div><div>
+      <h3>Perfil y correo</h3>
+      <p class="pregunta">«Kylia conoce el 78 % de lo que podría saber de tu finca.»</p>
+      <p>Por pilares, con lo siguiente que más aportaría. Y el correo, con salida.</p></div></article>
+  </div>
+
+  <div class="caja si">
+    <h4>El caudal ya no está en el alta</h4>
+    <p style="margin-bottom:0">Aparece el primer día que Kylia dice «riega», con una línea debajo: <em>«mientras riegas, pon una botella bajo un gotero diez minutos y los próximos avisos salen en minutos exactos»</em>. Está de pie al lado de la instalación, no en la cocina. El cálculo por geometría y el modal ya están construidos y con tests.</p>
+  </div>
+</section>
+
+<section class="bloque">
+  <div class="tit"><span class="num">05</span><h2>Completitud, con los pesos justificados</h2></div>
+  <p class="medida">Los pesos que se pueden medir, están medidos. Los que no, van marcados como criterio.</p>
+  <div class="formula">Riego     ubicación 25  bloqueante
+          plantación 20  el reloj mal costó un 8,7 % de ETc
+          cultivo    20  bloqueante
+          suelo      15  flipa el veredicto en 6 de 12 casos probados
+          método     10  criterio
+          último riego 5  criterio
+          caudal      5  NO cambia el cuándo, solo el cuánto rato
+
+Abonado   superficie   30  el plan escala linealmente con ella
+          rendimiento  20  multiplica todo el balance
+          cultivo      20  fija la extracción
+          oferta suelo 15  automático, casi siempre presente
+          cult. anterior 10  criterio
+          manejo        5  criterio</div>
+  <div class="caja linea">
+    <h4>Sin dato bloqueante no hay porcentaje</h4>
+    <p style="margin-bottom:0">No se enseña «Riego 60 %»: se enseña <strong>«falta lo esencial»</strong>. Y nunca la palabra «precisión» cerca del número.</p>
+  </div>
+</section>
+
+<section class="bloque" style="border-bottom:none">
+  <div class="tit"><span class="num">06</span><h2>Orden de implementación</h2></div>
+  <ol>
+    <li><strong>Reordenar</strong> el alta y añadir la pantalla de descubrimiento. Sin dependencias.</li>
+    <li><strong>SIGPAC + «todo o una parte»</strong>. Es la corrección grave; hasta que no esté, el plan de abonado no debería calcularse solo.</li>
+    <li><strong>Último riego con caudal</strong> cuando se conoce.</li>
+    <li><strong>La dependencia de <code>campo.js</code></strong>: leer las dos columnas del cultivo anterior. Con tu visto bueno.</li>
+    <li><strong>Pantalla 7</strong> y perfil por pilares.</li>
+    <li><strong>La línea del caudal</strong> en el aviso de riego.</li>
+  </ol>
+  <p class="medida">Cada punto es un commit con sus tests. Los seis caben en una sesión, y ninguno toca <code>motor-riego.js</code> ni <code>_motor-nutricion.js</code>.</p>
+</section>
+
+<footer>
+  <p>Ningún fichero modificado. Esperando tu visto bueno para implementar en el orden de la sección 6.</p>
+</footer>
+
+</div>

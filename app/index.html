@@ -2227,6 +2227,13 @@
     }
     .alta p.alta-txt { margin: 0 0 22px; color: var(--subtle, #334155); line-height: 1.55; }
     .alta p.alta-nota { margin: 14px 0 0; font-size: .84rem; color: var(--muted); line-height: 1.5; }
+    /* Lo que Kylia ha averiguado sola: una lista, no una tarjeta por dato.
+       Son hechos y se leen mejor seguidos. */
+    .alta-desc { list-style: none; padding: 0; margin: 4px 0 0; display: flex; flex-direction: column; gap: 12px; }
+    .alta-desc li { display: flex; gap: 12px; align-items: flex-start; }
+    .alta-desc-ic { font-size: 1.25rem; line-height: 1.3; flex: 0 0 auto; }
+    .alta-desc b { display: block; font-weight: 700; color: var(--verde, #013A27); font-size: 1rem; line-height: 1.3; }
+    .alta-desc small { display: block; color: var(--muted); font-size: .82rem; line-height: 1.45; margin-top: 1px; }
     .alta-preg { font-weight: 700; margin: 22px 0 10px; color: var(--verde, #013A27); }
     /* Solo la PRIMERA pregunta del paso pierde el margen. Antes bastaba con
        :first-of-type, pero ahora cada pregunta vive en su propio div revelable
@@ -2304,9 +2311,42 @@
         <button type="button" class="alta-btn" data-ir="1">Empezar</button>
       </section>
 
-      <!-- 1 · Cultivo y cuándo -->
+      <!-- 1 · Lugar — ADELANTADO. Antes iba después del cultivo, y era un
+           desperdicio: es el dato que dispara SoilGrids, Open-Meteo y (en el
+           siguiente paso) SIGPAC. Pidiéndolo primero, esas consultas viajan
+           mientras el agricultor sigue contestando, y en el paso 2 ya están
+           las respuestas. Sin esto, la pantalla de descubrimiento sería una
+           pantalla de carga. -->
       <section class="alta-paso" data-paso="1">
         <button type="button" class="alta-atras" data-ir="0">‹ Atrás</button>
+        <p class="alta-preg">¿Dónde está el cultivo?</p>
+        <div class="alta-chips">
+          <button type="button" class="alta-chip ancho" id="alta-geo">Usar mi ubicación</button>
+          <button type="button" class="alta-chip ancho" id="alta-muni">Buscar mi municipio</button>
+        </div>
+        <input type="text" class="alta-input" id="alta-muni-txt" hidden
+               placeholder="Escribe el municipio y pulsa intro" style="margin-top:8px">
+        <p class="alta-estado" id="alta-lugar-estado"></p>
+        <button type="button" class="alta-btn" id="alta-b2" disabled data-ir="2">Seguir</button>
+      </section>
+
+      <!-- 2 · Lo que Kylia ya sabe de su zona ───────────────────────────
+           No pregunta nada. Existe para que el agricultor VEA que el trabajo
+           lo está haciendo la app y no él: son datos que ya teníamos y que
+           hasta ahora se usaban en silencio.
+           Si alguna consulta no llega, su línea no se pinta — nunca se
+           rellena con un valor plausible. -->
+      <section class="alta-paso" data-paso="2">
+        <button type="button" class="alta-atras" data-ir="1">‹ Atrás</button>
+        <p class="alta-preg" id="alta-desc-tit">Esto es lo que ya sabemos de tu zona</p>
+        <ul class="alta-desc" id="alta-desc"></ul>
+        <p class="alta-nota" id="alta-desc-pie">Buscando…</p>
+        <button type="button" class="alta-btn" data-ir="3">Seguir</button>
+      </section>
+
+      <!-- 3 · Cultivo y cuándo -->
+      <section class="alta-paso" data-paso="3">
+        <button type="button" class="alta-atras" data-ir="2">‹ Atrás</button>
         <p class="alta-preg">¿Qué tienes plantado ahora?</p>
         <div class="alta-chips" id="alta-cultivos">
           <button type="button" class="alta-chip" data-cultivo="tomate">Tomate</button>
@@ -2335,26 +2375,12 @@
         <input type="date" class="alta-input" id="alta-fecha" hidden style="margin-top:8px">
         <p class="alta-nota">Con una fecha aproximada nos vale para empezar. Se puede afinar luego.</p>
         </div>
-        <button type="button" class="alta-btn" id="alta-b1" disabled data-ir="2">Seguir</button>
+        <button type="button" class="alta-btn" id="alta-b1" disabled data-ir="4">Seguir</button>
       </section>
 
-      <!-- 2 · Lugar -->
-      <section class="alta-paso" data-paso="2">
-        <button type="button" class="alta-atras" data-ir="1">‹ Atrás</button>
-        <p class="alta-preg">¿Dónde está el cultivo?</p>
-        <div class="alta-chips">
-          <button type="button" class="alta-chip ancho" id="alta-geo">Usar mi ubicación</button>
-          <button type="button" class="alta-chip ancho" id="alta-muni">Buscar mi municipio</button>
-        </div>
-        <input type="text" class="alta-input" id="alta-muni-txt" hidden
-               placeholder="Escribe el municipio y pulsa intro" style="margin-top:8px">
-        <p class="alta-estado" id="alta-lugar-estado"></p>
-        <button type="button" class="alta-btn" id="alta-b2" disabled data-ir="3">Seguir</button>
-      </section>
-
-      <!-- 3 · Cómo riega -->
-      <section class="alta-paso" data-paso="3">
-        <button type="button" class="alta-atras" data-ir="2">‹ Atrás</button>
+      <!-- 4 · Cómo riega -->
+      <section class="alta-paso" data-paso="4">
+        <button type="button" class="alta-atras" data-ir="3">‹ Atrás</button>
         <p class="alta-preg">¿Cómo riegas normalmente?</p>
         <div class="alta-chips" id="alta-metodo">
           <button type="button" class="alta-chip" data-metodo="goteo">Goteo</button>
@@ -2402,7 +2428,7 @@
       </section>
 
       <!-- 4 · Primer resultado -->
-      <section class="alta-paso" data-paso="4">
+      <section class="alta-paso" data-paso="5">
         <div class="alta-veredicto" id="alta-veredicto">
           <h2 id="alta-v-tit">Calculando…</h2>
           <p id="alta-v-txt"></p>
@@ -2414,7 +2440,7 @@
       </section>
 
       <!-- 5 · Guardar (el correo, por fin) -->
-      <section class="alta-paso" data-paso="5">
+      <section class="alta-paso" data-paso="6">
         <h2>¿Quieres que Kylia se acuerde de tu campo y te avise cuando toque regar?</h2>
         <p class="alta-txt">Te mandamos un enlace para entrar desde cualquier móvil. Sin contraseñas.</p>
         <input type="email" class="alta-input" id="alta-email" placeholder="tu@correo.com" autocomplete="email">
@@ -6310,7 +6336,7 @@
         const menos = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
 
         function pintarPuntos() {
-          $("alta-puntos").innerHTML = [0,1,2,3,4,5]
+          $("alta-puntos").innerHTML = [0,1,2,3,4,5,6]
             .map(i => `<span class="alta-punto${i <= paso ? " on" : ""}"></span>`).join("");
         }
         function ir(n) {
@@ -6319,7 +6345,8 @@
             sec.classList.toggle("activo", Number(sec.dataset.paso) === n));
           pintarPuntos();
           caja.scrollTop = 0;
-          if (n === 4) primerAviso();
+          if (n === 2) pintarDescubrimiento();
+          if (n === 5) primerAviso();
         }
         // Selección de un grupo de chips: uno activo, y se guarda en A.
         function grupo(idGrupo, attr, campo, alTerminar) {
@@ -6382,24 +6409,82 @@
           if (A.lat != null && A.lon != null) leerSuelo();
         }
 
+        // ── Lo que Kylia averigua sola, en cuanto tiene el punto ──────────
         // EL SUELO NO SE PREGUNTA: se deduce del punto que acaba de dar.
-        // Estaba cableado a "franco" y esa suposición no es menor — el umbral de
-        // una lechuga pasa de 13,8 mm en franco a 7,4 en arenoso, y eso adelanta
-        // o retrasa el riego entre uno y tres días. Preguntarle la textura sería
-        // pedirle algo que la mayoría no sabe contestar; sus coordenadas ya la
-        // contienen. Va en paralelo: si tarda o falla, el alta no se entera y se
-        // sigue con el defecto declarado.
+        // Estaba cableado a "franco" y esa suposición no es menor — el umbral
+        // de una lechuga pasa de 13,8 mm en franco a 7,4 en arenoso, y eso
+        // adelanta o retrasa el riego entre uno y tres días. Preguntarle la
+        // textura sería pedirle algo que la mayoría no sabe contestar; sus
+        // coordenadas ya la contienen.
+        //
+        // Va en paralelo y en cuanto hay punto, no cuando se pulsa "seguir":
+        // así el paso 2 encuentra las respuestas puestas en vez de una
+        // pantalla de carga. Si algo falla, su línea no se pinta.
         let sueloPedido = null;
         function leerSuelo() {
           const clave = `${A.lat.toFixed(3)},${A.lon.toFixed(3)}`;
           if (sueloPedido === clave) return;
           sueloPedido = clave;
+          A.descSuelo = A.descClima = null;
+
           fetch(`/api/campo?vista=textura&lat=${A.lat.toFixed(5)}&lon=${A.lon.toFixed(5)}`,
                 { cache: "no-store" })
             .then(r => r.json())
-            .then(d => { if (d?.ok && d.textura) A.suelo = d.textura; })
-            .catch(() => {});
+            .then(d => {
+              if (!d?.ok || !d.textura) return;
+              A.suelo = d.textura;
+              A.descSuelo = d;
+            })
+            .catch(() => {})
+            .finally(pintarDescubrimiento);
+
+          // La ET₀ de hoy en su punto. Es UNA cifra y es la que mejor explica
+          // de qué va Kylia: "hoy tu campo pierde 4,6 mm". Se pide aquí con la
+          // misma forma de URL que cargarET0, pero sin histórico — durante el
+          // alta todavía no hay cfg de la que colgar aquella.
+          fetch(`https://api.open-meteo.com/v1/forecast`
+                + `?latitude=${A.lat.toFixed(5)}&longitude=${A.lon.toFixed(5)}`
+                + `&daily=et0_fao_evapotranspiration,precipitation_sum`
+                + `&past_days=0&forecast_days=1&timezone=auto`, { cache: "no-store" })
+            .then(r => r.json())
+            .then(d => {
+              const et0 = d?.daily?.et0_fao_evapotranspiration?.[0];
+              if (et0 == null) return;
+              A.descClima = { et0, lluvia: d?.daily?.precipitation_sum?.[0] ?? null };
+            })
+            .catch(() => {})
+            .finally(pintarDescubrimiento);
         }
+
+        const NOMBRE_SUELO = {
+          arenoso:   "arenoso — suelta el agua deprisa",
+          franco:    "franco — el término medio",
+          arcilloso: "arcilloso — retiene bien el agua",
+        };
+
+        // Pinta lo que haya llegado. Se llama cada vez que responde una
+        // consulta y al entrar en el paso, así que sirve para las dos cosas:
+        // rellenar según llegan y encontrarlo puesto si ya llegaron.
+        function pintarDescubrimiento() {
+          const ul = $("alta-desc"), pie = $("alta-desc-pie");
+          if (!ul) return;
+          const filas = [];
+          if (A.ciudad) filas.push(["📍", A.ciudad, "de tu ubicación"]);
+          const es = n => String(n).replace(".", ",");
+          if (A.descSuelo) filas.push(["🪨", `Suelo ${NOMBRE_SUELO[A.descSuelo.textura] || A.descSuelo.textura}`,
+                                        `${es(A.descSuelo.arcilla_pct)}% arcilla · ${es(A.descSuelo.arena_pct)}% arena · SoilGrids`]);
+          if (A.descClima) filas.push(["💧", `Hoy se evaporan ${es(A.descClima.et0.toFixed(1))} mm`,
+                                        "es el agua que tu cultivo tiene que reponer"]);
+          ul.innerHTML = filas.map(([ic, t, sub]) =>
+            `<li><span class="alta-desc-ic" aria-hidden="true">${ic}</span>`
+            + `<span><b>${esc(t)}</b><small>${esc(sub)}</small></span></li>`).join("");
+          // Nada que enseñar no se disfraza: se dice y se sigue. El riego
+          // funciona igual, solo con valores por defecto declarados.
+          pie.textContent = filas.length
+            ? "Todo esto lo hemos sacado de tus coordenadas. No hace falta que lo compruebes."
+            : "No hemos podido consultar tu zona ahora mismo. Puedes seguir: se usarán valores medios y se afinan después.";
+        }
+
         $("alta-geo").addEventListener("click", () => {
           $("alta-geo").classList.add("sel");
           lugarListo("Buscando dónde estás…");
@@ -6456,7 +6541,7 @@
         function revisar3() {
           $("alta-b3").disabled = !(A.metodo && A.cada && A.minutos && A.ultimo != null);
         }
-        $("alta-b3").addEventListener("click", () => { guardarAlta(); ir(4); });
+        $("alta-b3").addEventListener("click", () => { guardarAlta(); ir(5); });
 
         // ── guardar lo aprendido y sembrar el historial ──
         function guardarAlta() {
@@ -6600,9 +6685,9 @@
             : `<button type="button" class="alta-btn" id="alta-luego">Entendido</button>`;
           $("alta-regado")?.addEventListener("click", () => {
             addRiego(hoyISO(), null, { duracion: Number(A.minutos) });
-            ir(5);
+            ir(6);
           });
-          $("alta-luego")?.addEventListener("click", () => ir(5));
+          $("alta-luego")?.addEventListener("click", () => ir(6));
         }
 
         // ── paso 5 · el correo, por fin ──
@@ -6624,7 +6709,7 @@
           cerrar();
         });
         $("alta-saltar").addEventListener("click", cerrar);
-        $("alta-b4")?.addEventListener("click", () => ir(5));
+        $("alta-b4")?.addEventListener("click", () => ir(6));
 
         caja.addEventListener("click", ev => {
           const b = ev.target.closest("[data-ir]");

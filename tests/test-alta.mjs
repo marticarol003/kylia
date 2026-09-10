@@ -117,5 +117,53 @@ console.log("\n── el alta se pinta por encima de la app, no debajo ──");
 ok(/\.alta \{[\s\S]{0,400}z-index: 10000;/.test(app), "el alta está por encima del gate y de los modales");
 ok(/body\.alta-abierta \.fab-soporte/.test(app), "y los botones flotantes se esconden mientras está abierta");
 
+console.log("\n── V1 · el lugar va primero, y por un motivo ──");
+// El lugar dispara SoilGrids, Open-Meteo y (más adelante) SIGPAC. Pidiéndolo
+// antes que el cultivo, esas consultas viajan mientras el agricultor sigue
+// contestando y el paso 2 encuentra las respuestas puestas. Al revés, la
+// pantalla de descubrimiento sería una pantalla de carga.
+const paso = n => {
+  const i = app.indexOf(`data-paso="${n}"`);
+  const j = app.indexOf("</section>", i);
+  return i < 0 ? "" : app.slice(i, j);
+};
+ok(/¿Dónde está el cultivo\?/.test(paso(1)), "el paso 1 es el lugar");
+ok(/¿Qué tienes plantado ahora\?/.test(paso(3)), "y el cultivo baja al 3");
+ok(/¿Cómo riegas normalmente\?/.test(paso(4)), "el riego al 4");
+ok(/alta-veredicto/.test(paso(5)), "el primer aviso al 5");
+ok(/alta-email/.test(paso(6)), "y el correo al 6");
+ok(/\[0,1,2,3,4,5,6\]/.test(alta), "los puntos de progreso cuentan siete pantallas");
+
+console.log("\n── ninguna flecha 'atrás' apunta a donde no debe ──");
+// Un data-ir mal renumerado no da error: te manda a otra pantalla y parece
+// un fallo de diseño. Se comprueba la cadena entera.
+for (const [p, atras] of [[1, 0], [2, 1], [3, 2], [4, 3]])
+  ok(new RegExp(`class="alta-atras" data-ir="${atras}"`).test(paso(p)),
+     `el atrás del paso ${p} vuelve al ${atras}`);
+ok(/id="alta-b2" disabled data-ir="2"/.test(app), "el lugar sigue al descubrimiento");
+ok(/id="alta-b1" disabled data-ir="4"/.test(app), "el cultivo sigue al riego");
+ok(/guardarAlta\(\); ir\(5\)/.test(alta), "el riego lleva al primer aviso");
+ok(/\$\("alta-b4"\)\?\.addEventListener\("click", \(\) => ir\(6\)\)/.test(alta),
+   "y el 'Entendido' de reserva lleva al correo, no a la pantalla vieja");
+
+console.log("\n── la pantalla de descubrimiento no pregunta nada ──");
+ok(/data-paso="2"/.test(app) && /Esto es lo que ya sabemos de tu zona/.test(app),
+   "existe y se llama por lo que es");
+ok(!/alta-chip/.test(paso(2)), "no tiene ni un chip: no se le pide nada");
+ok(/if \(n === 2\) pintarDescubrimiento\(\);/.test(alta), "se pinta al entrar");
+ok(/\.finally\(pintarDescubrimiento\)/.test(alta),
+   "y también cuando responde cada consulta, así que da igual el orden de llegada");
+ok(/A\.descSuelo = A\.descClima = null;/.test(alta),
+   "al cambiar de punto se limpia lo anterior: no se enseña el suelo del pueblo de al lado");
+
+console.log("\n── y no rellena huecos con valores plausibles ──");
+ok(/if \(!d\?\.ok \|\| !d\.textura\) return;/.test(alta),
+   "sin textura no se guarda nada");
+ok(/if \(et0 == null\) return;/.test(alta), "sin ET₀ tampoco");
+ok(/No hemos podido consultar tu zona ahora mismo/.test(alta),
+   "si no llega nada se dice, y se deja seguir");
+ok(/se usarán valores medios y se afinan después/.test(alta),
+   "diciendo qué pasa entonces");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
