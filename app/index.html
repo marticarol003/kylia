@@ -2653,11 +2653,13 @@
       </div>
       <div class="config-field">
         <label id="caudal-label">Caudal de tu riego <span style="font-weight:400;color:var(--subtle)">(opcional)</span></label>
-        <p class="config-hint" id="caudal-hint"><strong>Truco del vaso:</strong> pon un vaso recto bajo un gotero o aspersor, riega 15&nbsp;min y mide los mm de agua que se acumulan. Multiplícalos por 4 → ese es tu caudal. Nos deja darte el riego en <strong>minutos</strong> en vez de en L/m². Si lo dejas vacío, lo estimamos.</p>
+        <p class="config-hint" id="caudal-hint">Pulsa <strong>Calcularlo</strong> y te lo sacamos con tres cosas que se ven mirando el bancal. Nos deja darte el riego en <strong>minutos</strong> en vez de en L/m². Si lo dejas vacío, lo estimamos.</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div id="wrap-caudal">
             <label for="input-caudal" class="sub">Caudal (L/m² en 1&nbsp;h)</label>
             <input type="number" id="input-caudal" min="0" step="0.5" inputmode="decimal" placeholder="Ej: 4">
+            <button type="button" class="btn-modal-cancel" id="abrir-caudal-calc"
+                    style="margin-top:6px;width:100%">Calcularlo</button>
           </div>
           <div id="wrap-regadera" hidden>
             <label for="input-capacidad-regadera" class="sub">Regadera (L)</label>
@@ -3068,6 +3070,97 @@
         <button class="btn-save" id="modal-feedback-enviar" type="button">Enviar</button>
       </div>
       <span id="modal-feedback-status" class="config-feedback" aria-live="polite" style="display:block;margin-top:8px;"></span>
+    </div>
+  </div>
+
+  <!-- Modal: sacar el caudal sin que haga falta saberlo ────────────────────
+       El caudal es EL número que no se puede preguntar de frente: nadie sabe de
+       memoria cuántos L/m²·h echa su instalación, y el campo vacío de arriba es
+       justo el "bua, esto no lo sé" que hay que evitar.
+
+       Pero sí se puede DEDUCIR de lo que cualquiera ve estando de pie en el
+       bancal: cada cuánto hay un gotero, cuántas mangueras hay y qué ancho tiene
+       el bancal. Con eso:
+
+           mm/h = (L/h que suelta un gotero) ÷ (separación goteros × separación mangueras)
+
+       Comprobado contra el caso de Ferran: 6 L/m·h, goteros cada 20 cm, dos
+       mangueras en un bancal de 1,1 m → 10,9 mm/h, que es exactamente el valor
+       que acabó en la base de datos.
+
+       Y si en la manguera no pone nada, la botella lo mide: es la única forma
+       honesta, la misma que corrigió el campo del padre de 15 a 5,4 mm/h. -->
+  <div id="modal-caudal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-caudal-titulo" hidden>
+    <div class="modal-card">
+      <h2 id="modal-caudal-titulo">¿Cuánta agua echa tu riego?</h2>
+      <p class="modal-hint">No hace falta que lo sepas. Contesta lo que veas mirando el bancal.</p>
+
+      <div id="cc-goteo">
+        <div class="config-field">
+          <label>¿Cada cuánto hay un gotero en la manguera?</label>
+          <div class="alta-chips" id="cc-sep">
+            <button type="button" class="alta-chip" data-sep="0.20">Un palmo · 20 cm</button>
+            <button type="button" class="alta-chip" data-sep="0.30">30 cm</button>
+            <button type="button" class="alta-chip" data-sep="0.40">Dos palmos · 40 cm</button>
+            <button type="button" class="alta-chip" data-sep="0.50">50 cm o más</button>
+          </div>
+        </div>
+        <div class="config-field">
+          <label>¿Cuántas mangueras hay por cada fila de plantas?</label>
+          <div class="alta-chips" id="cc-lineas">
+            <button type="button" class="alta-chip" data-lineas="1">Una</button>
+            <button type="button" class="alta-chip" data-lineas="2">Dos</button>
+            <button type="button" class="alta-chip" data-lineas="3">Tres o más</button>
+          </div>
+        </div>
+        <div class="config-field">
+          <label>De pasillo a pasillo, ¿qué ancho tiene el bancal?</label>
+          <div class="alta-chips" id="cc-ancho">
+            <button type="button" class="alta-chip" data-ancho="0.5">Medio metro</button>
+            <button type="button" class="alta-chip" data-ancho="1">Un metro</button>
+            <button type="button" class="alta-chip" data-ancho="1.5">Metro y medio</button>
+            <button type="button" class="alta-chip" data-ancho="2">Dos metros</button>
+          </div>
+        </div>
+        <div class="config-field">
+          <label>¿Pone algo en la manguera o en la caja?</label>
+          <div class="alta-chips" id="cc-q">
+            <button type="button" class="alta-chip" data-q="2">2 L/h por gotero</button>
+            <button type="button" class="alta-chip" data-q="4">4 L/h por gotero</button>
+            <button type="button" class="alta-chip" data-qm="6">6 L por metro</button>
+            <button type="button" class="alta-chip ancho" id="cc-no-pone">No pone nada / no lo veo</button>
+          </div>
+        </div>
+        <div class="config-field" id="cc-botella" hidden>
+          <label>Pon una botella de 1,5&nbsp;L vacía bajo un gotero y riega 10 minutos. ¿Cuánto se ha llenado?</label>
+          <div class="alta-chips" id="cc-bot">
+            <button type="button" class="alta-chip" data-bot="0.1">Un dedo</button>
+            <button type="button" class="alta-chip" data-bot="0.375">Un cuarto</button>
+            <button type="button" class="alta-chip" data-bot="0.75">Media</button>
+            <button type="button" class="alta-chip" data-bot="1.5">Entera o se ha salido</button>
+          </div>
+          <p class="modal-hint">Es lo único que no se puede mirar: hay que medirlo. Diez minutos y queda hecho para siempre.</p>
+        </div>
+      </div>
+
+      <div id="cc-aspersion" hidden>
+        <div class="config-field">
+          <label>Pon un vaso recto en medio de la zona mojada y riega 15 minutos. ¿Cuánta agua se ha acumulado?</label>
+          <div class="alta-chips" id="cc-vaso">
+            <button type="button" class="alta-chip" data-vaso="0.5">Medio centímetro</button>
+            <button type="button" class="alta-chip" data-vaso="1">Un centímetro</button>
+            <button type="button" class="alta-chip" data-vaso="2">Dos centímetros</button>
+            <button type="button" class="alta-chip" data-vaso="3">Tres o más</button>
+          </div>
+          <p class="modal-hint">En aspersión el vaso sí vale: el agua cae repartida sobre el suelo, que es justo lo que se quiere medir. Bajo un gotero no valdría — ahí el vaso recoge todo lo de un gotero y el número sale disparado.</p>
+        </div>
+      </div>
+
+      <p class="modal-hint" id="cc-resultado" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" id="cc-cancelar" type="button">Ahora no</button>
+        <button class="btn-save" id="cc-usar" type="button" disabled>Usar este caudal</button>
+      </div>
     </div>
   </div>
 
@@ -6359,6 +6452,26 @@
         function lugarListo(txt) {
           $("alta-lugar-estado").textContent = txt;
           $("alta-b2").disabled = !(A.lat != null && A.lon != null);
+          if (A.lat != null && A.lon != null) leerSuelo();
+        }
+
+        // EL SUELO NO SE PREGUNTA: se deduce del punto que acaba de dar.
+        // Estaba cableado a "franco" y esa suposición no es menor — el umbral de
+        // una lechuga pasa de 13,8 mm en franco a 7,4 en arenoso, y eso adelanta
+        // o retrasa el riego entre uno y tres días. Preguntarle la textura sería
+        // pedirle algo que la mayoría no sabe contestar; sus coordenadas ya la
+        // contienen. Va en paralelo: si tarda o falla, el alta no se entera y se
+        // sigue con el defecto declarado.
+        let sueloPedido = null;
+        function leerSuelo() {
+          const clave = `${A.lat.toFixed(3)},${A.lon.toFixed(3)}`;
+          if (sueloPedido === clave) return;
+          sueloPedido = clave;
+          fetch(`/api/campo?vista=textura&lat=${A.lat.toFixed(5)}&lon=${A.lon.toFixed(5)}`,
+                { cache: "no-store" })
+            .then(r => r.json())
+            .then(d => { if (d?.ok && d.textura) A.suelo = d.textura; })
+            .catch(() => {});
         }
         $("alta-geo").addEventListener("click", () => {
           $("alta-geo").classList.add("sel");
@@ -6427,10 +6540,11 @@
             metodoRiego: A.metodo,
             lat: A.lat, lon: A.lon,
             ciudad: A.ciudad || cfg.ciudad || null,
-            // El suelo no se pregunta: 'franco' es el término medio de la tabla
-            // de FAO-56 y equivocarse ahí mueve menos que cualquier otra cosa
-            // que podríamos preguntar. Se afina después.
-            suelo: cfg.suelo || "franco",
+            // Deducido de sus coordenadas vía SoilGrids (ver leerSuelo). Si esa
+            // consulta no llegó a tiempo o el píxel está enmascarado, 'franco'
+            // sigue siendo el término medio de la tabla de FAO-56 — pero ahora
+            // es el último recurso, no la única opción.
+            suelo: A.suelo || cfg.suelo || "franco",
           };
           saveConfig(cfgNuevo);
 
@@ -7008,7 +7122,18 @@
           hint.innerHTML  = 'En riego a surco te damos la lámina en L/m². La superficie nos ayuda a estimar el agua total.';
         } else {
           label.innerHTML = 'Caudal de tu riego <span style="font-weight:400;color:var(--subtle)">(opcional)</span>';
-          hint.innerHTML  = '<strong>Truco del vaso:</strong> pon un vaso recto bajo un gotero o aspersor, riega 15&nbsp;min y mide los mm de agua que se acumulan. Multiplícalos por 4 → ese es tu caudal. Nos deja darte el riego en <strong>minutos</strong> en vez de en L/m². Si lo dejas vacío, lo estimamos.';
+          // EL VASO NO VALE EN GOTEO, y hasta hoy era lo que se enseñaba para
+          // los dos métodos. Un vaso bajo un gotero recoge TODO lo que suelta ese
+          // gotero en los ~38 cm² del vaso, cuando ese gotero moja el marco
+          // entero (gotero × manguera). Con la geometría de Ferran son 10,9 mm/h
+          // reales contra 312 de lectura: el vaso sobreestima ×29, y el número
+          // que salga depende de lo ancho que sea el vaso, que no es una medida.
+          // Es la misma trampa que dio 15 mm/h en el campo del padre donde el
+          // cubo midió 5,4.
+          //
+          // En aspersión el vaso SÍ es correcto: ahí es un pluviómetro y el agua
+          // cae repartida sobre el suelo, que es justo lo que se quiere medir.
+          hint.innerHTML  = metodo === "aspersion" ? 'Pon un vaso recto en medio de la zona mojada, riega 15&nbsp;min y mide los milímetros que se acumulan. Multiplícalos por 4 → ese es tu caudal. Nos deja darte el riego en <strong>minutos</strong> en vez de en L/m². Si lo dejas vacío, lo estimamos.' : 'Pulsa <strong>Calcularlo</strong> y te lo sacamos con tres cosas que se ven mirando el bancal. Nos deja darte el riego en <strong>minutos</strong> en vez de en L/m². Si lo dejas vacío, lo estimamos.';
         }
       }
       // Single-select del grid de método de riego
@@ -7020,6 +7145,98 @@
           actualizarCamposCaudal(yaActivo ? null : btn.dataset.metodo);
         });
       });
+
+      // ── Caudal deducido de la geometría del bancal ───────────────────────
+      // Ver el porqué entero en el markup de #modal-caudal. Resumen: el caudal
+      // no se puede preguntar de frente, pero sí se deduce de lo que se ve.
+      (function () {
+        const modal = document.getElementById("modal-caudal");
+        if (!modal) return;
+        const C = {};                                  // respuestas
+        const $$ = id => document.getElementById(id);
+        const chips = (id, attr, campo, luego) => {
+          const g = $$(id); if (!g) return;
+          g.addEventListener("click", ev => {
+            const b = ev.target.closest(`[data-${attr}]`);
+            if (!b) return;
+            g.querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+            b.classList.add("sel");
+            C[campo] = Number(b.dataset[attr]);
+            luego && luego();
+            calcular();
+          });
+        };
+
+        // mm/h = L/h de un gotero ÷ (separación goteros × separación mangueras).
+        // Un L/h repartido sobre un m² es exactamente 1 mm/h, así que no hay
+        // ninguna constante de conversión que equivocar.
+        function caudalGoteo() {
+          const { sep, lineas, ancho } = C;
+          if (!sep || !lineas || !ancho) return null;
+          // Lo que suelta UN gotero: o viene por gotero, o por metro de manguera
+          // (entonces hay que multiplicarlo por la separación entre goteros), o
+          // se ha medido con la botella (litros en 10 min → ×6 = L/h).
+          const q = C.q != null ? C.q
+                  : C.qm != null ? C.qm * sep
+                  : C.bot != null ? C.bot * 6
+                  : null;
+          if (!q) return null;
+          const sepLineas = ancho / lineas;            // el bancal repartido entre sus mangueras
+          return q / (sep * sepLineas);
+        }
+        const caudalAspersion = () => C.vaso ? C.vaso * 10 * 4 : null;   // cm→mm en 15 min → /h
+
+        function calcular() {
+          const esAsp = !$$("cc-aspersion").hidden;
+          const mmh = esAsp ? caudalAspersion() : caudalGoteo();
+          const out = $$("cc-resultado"), btn = $$("cc-usar");
+          if (mmh == null) { out.textContent = ""; btn.disabled = true; return; }
+          // Fuera de rango no se ofrece: sería peor que el defecto. Los pilotos
+          // reales van de 5,4 a 15 mm/h en goteo; por encima de 60 hay un error
+          // de lectura casi seguro.
+          if (!(mmh > 0.5 && mmh < 80)) {
+            out.textContent = `Sale ${mmh.toFixed(1)} L/m²·h, que no es creíble. Repasa las respuestas.`;
+            btn.disabled = true; return;
+          }
+          C.mmh = Math.round(mmh * 10) / 10;
+          out.innerHTML = `Tu riego echa <strong>${C.mmh} L/m² cada hora</strong>. `
+            + (esAsp ? "" : `Cada gotero moja ${(C.ancho / C.lineas * C.sep * 10000).toFixed(0)} cm². `)
+            + "Con esto los avisos te salen en minutos.";
+          btn.disabled = false;
+        }
+
+        chips("cc-sep", "sep", "sep");
+        chips("cc-lineas", "lineas", "lineas");
+        chips("cc-ancho", "ancho", "ancho");
+        chips("cc-q", "q", "q", () => { C.qm = null; C.bot = null; $$("cc-botella").hidden = true; });
+        chips("cc-q", "qm", "qm", () => { C.q = null; C.bot = null; $$("cc-botella").hidden = true; });
+        chips("cc-bot", "bot", "bot", () => { C.q = null; C.qm = null; });
+        chips("cc-vaso", "vaso", "vaso");
+        $$("cc-no-pone").addEventListener("click", () => {
+          document.querySelectorAll("#cc-q .alta-chip").forEach(x => x.classList.remove("sel"));
+          $$("cc-no-pone").classList.add("sel");
+          C.q = null; C.qm = null;
+          $$("cc-botella").hidden = false;
+          calcular();
+        });
+
+        window.abrirCalcCaudal = () => {
+          const m = (document.querySelector("#metodo-riego-grid .btn-cultivo.activo")?.dataset.metodo)
+                    || cfg.metodoRiego || "goteo";
+          const esAsp = m === "aspersion";
+          $$("cc-goteo").hidden = esAsp;
+          $$("cc-aspersion").hidden = !esAsp;
+          modal.hidden = false;
+        };
+        $$("cc-cancelar").addEventListener("click", () => { modal.hidden = true; });
+        modal.addEventListener("click", ev => { if (ev.target === modal) modal.hidden = true; });
+        $$("cc-usar").addEventListener("click", () => {
+          const input = document.getElementById("input-caudal");
+          if (input && C.mmh) { input.value = C.mmh; input.dispatchEvent(new Event("input", { bubbles: true })); }
+          modal.hidden = true;
+        });
+        document.getElementById("abrir-caudal-calc")?.addEventListener("click", () => window.abrirCalcCaudal());
+      })();
 
       function inicializarSuelo() {
         document.querySelectorAll("#suelo-grid .btn-cultivo").forEach(btn => {

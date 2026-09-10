@@ -794,6 +794,37 @@ module.exports = async (req, res) => {
     catch (err) { console.error("[campo] pilotos:", err.message); return res.status(500).json({ ok: false, error: err.message }); }
   }
 
+  // "textura" tampoco lleva usuario: traduce un punto a la clase de suelo que el
+  // balance necesita (arenoso|franco|arcilloso). Es para el ALTA, donde todavía
+  // no hay usuario y el suelo estaba cableado a "franco" sin ningún dato — y esa
+  // suposición cambia el umbral casi a la mitad (7,4 mm en arenoso contra 13,8
+  // en franco para una lechuga), o sea que mueve el riego entre uno y tres días.
+  // No se le pregunta al agricultor: se deduce de sus coordenadas, que ya ha
+  // dado, con la MISMA consulta a SoilGrids que ya alimenta el abonado.
+  if (vista === "textura") {
+    const lat = Number(req.query?.lat), lon = Number(req.query?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) ||
+        Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+      return res.status(400).json({ ok: false, error: "lat/lon inválidos" });
+    }
+    try {
+      const o = await ofertaSuelo(lat, lon, null);
+      const t = o?.observado?.textura || null;
+      // Sin dato NO se devuelve "franco" disfrazado: se dice que no se sabe y el
+      // cliente decide (hoy: se queda con el defecto y lo dice).
+      return res.status(200).json({
+        ok: true, textura: t,
+        arcilla_pct: o?.observado?.arcilla_pct ?? null,
+        arena_pct: o?.observado?.arena_pct ?? null,
+        fuente: t ? "SoilGrids v2.0 (ISRIC), 250 m" : null,
+        motivo: t ? null : (o?.motivo || "sin_dato"),
+      });
+    } catch (err) {
+      console.warn("[campo] textura:", err.message);
+      return res.status(200).json({ ok: false, textura: null, motivo: "error" });
+    }
+  }
+
   const usuarioId = (req.query?.usuario_id || "").toString().trim();
   if (!ES_UUID.test(usuarioId)) return res.status(400).json({ error: "usuario_id inválido (UUID)" });
   if (!isConfigured()) return res.status(200).json({ ok: false, reason: "supabase_not_configured" });
