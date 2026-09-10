@@ -77,6 +77,20 @@ Se traduce **por fases y no con una regla de tres sobre el total** porque el
 calor no se reparte como los días: una fase de abril acumula mucho menos por día
 que la misma fase en julio, y aplanar eso deformaría la curva.
 
+### El pronóstico no es calor que ya haya caído
+
+`serieTermica` devuelve el ciclo **más 16 días de pronóstico**, y `curvaFenologica`
+los sumaba todos en `gddAcum`. Encontrado el 8-sep con datos de producción: el
+tomate de Ferran salía con 1.823 °C·día sobre un objetivo de 1.749 —"lista"—
+cuando lo acumulado de verdad eran 1.653 y le faltaba casi una semana. La ventana
+de madurez se adelantaba justo lo que durase el pronóstico.
+
+Y es un fallo que habría pasado por acierto: el agricultor cosecha cuando le
+conviene, así que "Kylia dijo lista y cosechó" se lee como un acierto aunque el
+número esté mal. Por eso la curva expone ahora `gddEn(fecha)` y `gddAcum` queda
+documentado como lo que es — el calor al final de la serie, pronóstico incluido.
+El riego nunca estuvo afectado: el balance pide el día fenológico fecha a fecha.
+
 ### Cuándo NO se usa
 
 `curvaFenologica()` devuelve `null` —y todo el motor vuelve al calendario, sin
@@ -204,11 +218,32 @@ acerca. El 30 de junio —seis días después de plantar— la fecha probable er
 
 ---
 
-## 7. Lo que falta
+## 7. Un tercer ciclo que NO sirve para validar (y por qué)
+
+El tomate de Ferran se cerró el 8-sep-2026, así que parece un tercer punto de
+validación. **No lo es, y conviene que quede escrito para que nadie lo cuente
+como tal.**
+
+`fecha_cosecha` en ese piloto es el día en que se RETIRÓ el cultivo, no el día en
+que la planta terminó su ciclo — es la regla del propio esquema para cultivos
+donde recolectar no quita la mata. Y el 8-sep el modelo iba por 1.653 de los
+1.749 °C·día: **al 94%**, con la madurez proyectada hacia el 17-sep.
+
+O sea que Ferran arrancó el cultivo antes de que el ciclo cerrara, que es lo
+normal a final de campaña en un tomate indeterminado. Comparar esas dos fechas no
+mide el error del modelo: mide cuándo decidió él acabar la temporada.
+
+**La regla:** solo valen como validación los ciclos donde `fecha_cosecha` marca
+madurez (cultivos que se arrancan al cosechar, como la cebolleta, o cosecha en
+una sola pasada). En los indeterminados hace falta capturar aparte la fecha de la
+PRIMERA recolección, que hoy no se registra en ningún sitio.
+
+## 8. Lo que falta
 
 1. **Cerrar la validación con la serie de cosechas de este otoño.** Con 5-6
    ciclos y varios cultivos esto pasa de "dos casos que concuerdan" a un RMSE
-   publicable, como se hizo con pyfao56.
+   publicable, como se hizo con pyfao56. Ojo con el §7: no todos los cierres
+   cuentan.
 2. **Corregir con el satélite.** El cron escribe NDVI y OSAVI desde el 1-ago: la
    meseta de esa curva y el inicio de su caída **son** la señal de madurez
    observada. Predecir por calor y corregir por satélite es el peldaño que
