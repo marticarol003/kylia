@@ -6541,8 +6541,14 @@
         // "lechuga" incluido), así que mirar cfg diría que todo el mundo tiene
         // campo. Lo que de verdad distingue a alguien nuevo es si ALGUNA VEZ se
         // ha guardado algo — el mismo criterio que ya usa `eraPrimerUso`.
+        // ?alta=1 lo abre siempre, aunque ya tengas campo. Es para poder
+        // enseñarlo y para volver a probarlo sin tener que borrar el móvil —
+        // sin esto, el alta solo se puede ver una vez en la vida por dispositivo,
+        // que es justo la pantalla que más falta hace repasar.
+        const params = new URLSearchParams(location.search);
+        const forzada = params.get("alta") === "1";
         const sinCampo = !localStorage.getItem("kylia_config");
-        if (sinCampo && !new URLSearchParams(location.search).has("acceso")) window.abrirAlta();
+        if (forzada || (sinCampo && !params.has("acceso"))) window.abrirAlta();
       })();
 
       // ── Borrar la cuenta ─────────────────────────────────────────────────

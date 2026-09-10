@@ -33,8 +33,10 @@ ok(/const sinCampo = !localStorage\.getItem\("kylia_config"\);/.test(alta),
    "el criterio es si se guardó algo ALGUNA VEZ, no lo que diga cfg");
 ok(/`cfg` arranca con valores por defecto/.test(alta),
    "y queda escrito el porqué: cfg trae un cultivo por defecto y miraría mal a todo el mundo");
-ok(/!new URLSearchParams\(location\.search\)\.has\("acceso"\)/.test(alta),
+ok(/!params\.has\("acceso"\)/.test(alta),
    "quien viene de su enlace de correo no pasa por el alta");
+ok(/const forzada = params\.get\("alta"\) === "1";/.test(alta),
+   "?alta=1 la abre siempre: sin eso solo se puede ver una vez por dispositivo, y es la pantalla que más falta hace repasar");
 
 console.log("\n── seis pantallas, una pregunta cada vez ──");
 for (const n of [0,1,2,3,4,5]) ok(new RegExp(`data-paso="${n}"`).test(app), `existe la pantalla ${n}`);
