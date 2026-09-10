@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<title>L'aigua de la ceba tendra — El Tros de l'Uri</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+<!--
+  Informe de tancament del pilot de ceba tendra d'Oriol (El Tros de l'Uri, La Selva).
+  VERSIÓ EN CATALÀ — és la que se li envia a ell. La castellana es queda per a ús intern.
+  Datos de /api/campo?vista=reveal el 9-sep-2026, piloto cerrado el 12-ago.
+
+  Diseñado para IMPRIMIRSE: A4, un solo tema, sin modo oscuro. El PDF se genera
+  con scripts/informe-a-pdf.mjs. Vive en docs/, excluido del despliegue.
+
+  ⚠️ El caudal (15 mm/h) viene del truco del vaso del 1-jul. Es más fiable que el
+  de Ferran, pero el titular depende de él igual.
+-->
+<style>
+:root {
+  --verde:   #013A27;
+  --verde-2: #0B5A3F;
+  --agua:    #2C5F7C;
+  --agua-cl: #DCE9F0;
+  --exceso:  #A8681C;
+  --tinta:   #101A16;
+  --gris:    #55655E;
+  --tenue:   #8A9A93;
+  --linea:   #DDE6E0;
+  --papel:   #FFFFFF;
+  --crema:   #F4F7F4;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  color: var(--tinta);
+  background: var(--papel);
+  font-size: 10.5pt;
+  line-height: 1.55;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+@page { size: A4; margin: 12mm 15mm; }
+
+.hoja { max-width: 180mm; margin: 0 auto; }
+.salto { break-before: page; page-break-before: always; }
+
+/* ── Cabecera ─────────────────────────────────────────── */
+.sello {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 7.5pt; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--verde);
+  padding-bottom: 10px; border-bottom: 2px solid var(--verde);
+}
+h1 {
+  font-family: Fraunces, Georgia, serif; font-weight: 600;
+  font-size: 27pt; line-height: 1.05; letter-spacing: -.02em;
+  margin: 16px 0 8px;
+}
+.lead { margin: 0; font-size: 11pt; color: var(--gris); max-width: 105mm; }
+
+.ficha {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 1px; background: var(--linea);
+  border: 1px solid var(--linea); margin: 16px 0 0;
+}
+.ficha div { background: var(--papel); padding: 7px 9px; }
+.ficha dt {
+  font-size: 6.5pt; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--tenue); margin-bottom: 1px;
+}
+.ficha dd { margin: 0; font-size: 9.5pt; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ── El titular ───────────────────────────────────────── */
+.hero {
+  margin: 20px 0 0; padding: 22px 24px;
+  background: var(--crema); border: 1px solid var(--linea);
+}
+.hero-fila { display: flex; align-items: flex-end; gap: 26px; }
+.hero-num {
+  font-family: Fraunces, Georgia, serif; font-weight: 700;
+  font-size: 58pt; line-height: .85; letter-spacing: -.035em;
+  color: var(--verde); font-variant-numeric: tabular-nums;
+}
+.hero-txt { padding-bottom: 5px; }
+.hero-txt .g { font-size: 15pt; font-weight: 700; line-height: 1.15; }
+.hero-txt .p { font-size: 9.5pt; color: var(--gris); margin-top: 2px; }
+
+/* ── La barra ─────────────────────────────────────────── */
+.barra-bloque { margin-top: 22px; }
+.barra-tit {
+  font-size: 7.5pt; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--tenue); margin-bottom: 8px;
+}
+.pista {
+  display: flex; height: 46px; border: 1px solid var(--linea);
+  overflow: hidden; font-variant-numeric: tabular-nums;
+}
+.seg { display: flex; align-items: center; justify-content: center; color: #fff; }
+.seg.pedia  { background: var(--agua); }
+.seg.sobro  { background: var(--exceso); }
+.seg b { font-size: 11pt; }
+.seg small { font-size: 7.5pt; opacity: .85; display: block; text-align: center; }
+.pista-pie {
+  display: flex; justify-content: space-between;
+  font-size: 8pt; color: var(--gris); margin-top: 6px;
+}
+
+/* ── Equivalencia ─────────────────────────────────────── */
+.equiv {
+  margin-top: 20px; padding: 16px 20px;
+  border-left: 4px solid var(--verde); background: var(--crema);
+}
+.equiv .n {
+  font-family: Fraunces, Georgia, serif; font-weight: 700;
+  font-size: 20pt; color: var(--verde); line-height: 1;
+}
+.equiv .t { font-size: 10pt; color: var(--gris); margin-top: 4px; }
+
+/* ── Dos cifras ───────────────────────────────────────── */
+.dos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 20px; }
+.caja { border: 1px solid var(--linea); padding: 14px 16px; }
+.caja .k {
+  font-size: 6.8pt; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--tenue);
+}
+.caja .v {
+  font-family: Fraunces, Georgia, serif; font-weight: 700;
+  font-size: 25pt; line-height: 1.05; margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.caja .s { font-size: 8.5pt; color: var(--gris); margin-top: 2px; }
+
+/* ── Página 2 ─────────────────────────────────────────── */
+h2 {
+  font-family: Fraunces, Georgia, serif; font-weight: 600;
+  font-size: 16pt; line-height: 1.2; margin: 0 0 8px;
+}
+p.txt { margin: 0 0 10px; color: var(--gris); max-width: 150mm; }
+p.txt strong { color: var(--tinta); }
+
+table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 4px; }
+th, td { padding: 4px 8px; text-align: right; font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+thead th {
+  font-size: 6.8pt; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--tenue); border-bottom: 1px solid var(--linea);
+}
+tbody td { border-bottom: 1px solid #EFF3F0; }
+tbody tr.tot td { border-top: 1.5px solid var(--linea); border-bottom: 0; font-weight: 700; }
+.mini { display: inline-block; height: 9px; vertical-align: middle; }
+.mini.a { background: var(--exceso); }
+.mini.k { background: var(--agua); }
+
+.cautelas { margin-top: 14px; border: 1px solid var(--linea); padding: 13px 18px; }
+.cautelas h3 {
+  font-size: 8pt; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--exceso); margin: 0 0 10px;
+}
+.cautelas ul { margin: 0; padding-left: 16px; }
+.cautelas li { font-size: 8.5pt; color: var(--gris); margin-bottom: 5px; }
+.cautelas li b { color: var(--tinta); }
+
+footer {
+  margin-top: 20px; padding-top: 10px; border-top: 1px solid var(--linea);
+  font-size: 7.5pt; color: var(--tenue);
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ PÁGINA 1 ═══════════════ -->
+<div class="hoja">
+
+  <div class="sello">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(45)"/>
+      <path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(225)"/>
+      <circle cx="12" cy="12" r="2.4"/>
+    </svg>
+    Kylia · tancament de pilot
+  </div>
+
+  <h1>L'aigua de la ceba tendra</h1>
+  <p class="lead">
+    Durant 50 dies la Kylia va calcular cada matí, en silenci, quanta aigua
+    demanava el teu cultiu. Tu vas regar com regues sempre. Això és la diferència.
+  </p>
+
+  <dl class="ficha">
+    <div><dt>Finca</dt><dd>El Tros de l'Uri</dd></div>
+    <div><dt>Cultiu</dt><dd>Ceba tendra</dd></div>
+    <div><dt>Parcel·la</dt><dd>380 m²</dd></div>
+    <div><dt>Reg</dt><dd>Aspersió</dd></div>
+    <div><dt>Cicle</dt><dd>24 juny – 12 ag.</dd></div>
+  </dl>
+
+  <div class="hero">
+    <div class="hero-fila">
+      <div class="hero-num">46</div>
+      <div class="hero-txt">
+        <div class="g">metres cúbics de més</div>
+        <div class="p">46.208 litres · el <b>34 %</b> de tota l'aigua que vas tirar</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="barra-bloque">
+    <div class="barra-tit">Els 136,8 m³ que vas aplicar, repartits</div>
+    <div class="pista">
+      <div class="seg pedia" style="width:66.2%">
+        <div style="text-align:center">
+          <b>90,6 m³</b>
+          <small>el que el cultiu demanava</small>
+        </div>
+      </div>
+      <div class="seg sobro" style="width:33.8%">
+        <div style="text-align:center">
+          <b>46,2 m³</b>
+          <small>de més</small>
+        </div>
+      </div>
+    </div>
+    <div class="pista-pie">
+      <span>Cada franja, a escala</span>
+      <span>136,8 m³ aplicats en total</span>
+    </div>
+  </div>
+
+  <div class="equiv">
+    <div class="n">8 hores d'aspersor</div>
+    <div class="t">
+      És el que va sobrar, mesurat amb la teva pròpia instal·lació: a 15 mm/h sobre
+      380 m², l'aspersor tira 5,7 m³ per hora. Vuit hores de més repartides per l'estiu.
+    </div>
+  </div>
+
+  <div class="dos">
+    <div class="caja">
+      <div class="k">Vegades que vas regar</div>
+      <div class="v">13</div>
+      <div class="s">La Kylia n'hauria regat <b>12</b>. Gairebé les mateixes.</div>
+    </div>
+    <div class="caja">
+      <div class="k">Aigua per reg</div>
+      <div class="v">27,7 <span style="font-size:11pt">L/m²</span></div>
+      <div class="s">Kylia: <b>19,9 L/m²</b>. Aquí és on hi ha la diferència.</div>
+    </div>
+  </div>
+
+  <footer>
+    Kylia · balanç hídric FAO-56 sobre el clima diari de la teva parcel·la. El càlcul es fa sense veure els teus regs reals.
+  </footer>
+</div>
+
+<!-- ═══════════════ PÁGINA 2 ═══════════════ -->
+<div class="hoja salto">
+
+  <div class="sello">L'aigua de la ceba tendra · pàgina 2</div>
+
+  <h2 style="margin-top:18px">No regues més vegades. Regues massa cada vegada.</h2>
+  <p class="txt">
+    Aquesta és la troballa, i és una bona notícia: <strong>el teu calendari està
+    bé</strong>. Vas regar 13 vegades i el cultiu en demanava 12. No cal canviar la
+    rutina — dilluns i dijous continuen sent els dies. El que sobra és la
+    <strong>durada de cada sessió</strong>: vas tirar 27,7 L/m² de mitjana quan en
+    calien 19,9. Traduït al teu aspersor: passes d'uns <strong>111 minuts per reg a
+    79</strong>, és a dir <strong>mitja hora menys cada vegada</strong>.
+  </p>
+
+  <h2 style="font-size:13pt; margin-top:18px">Setmana a setmana</h2>
+  <table>
+    <thead>
+      <tr><th>Setmana</th><th>Vas tirar</th><th>En calien</th><th style="width:42%">&nbsp;</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>22 – 28 juny</td><td>0,0</td><td>0,0</td><td style="text-align:left"><i class="mini a" style="width:0"></i></td></tr>
+      <tr><td>29 juny – 5 jul.</td><td>45,0</td><td>0,0</td><td style="text-align:left"><i class="mini a" style="width:56%"></i></td></tr>
+      <tr><td>6 – 12 jul.</td><td>45,0</td><td>19,4</td><td style="text-align:left"><i class="mini a" style="width:56%"></i><br><i class="mini k" style="width:24%"></i></td></tr>
+      <tr><td>13 – 19 jul.</td><td>60,0</td><td>36,8</td><td style="text-align:left"><i class="mini a" style="width:75%"></i><br><i class="mini k" style="width:46%"></i></td></tr>
+      <tr><td>20 – 26 jul.</td><td>60,0</td><td>53,7</td><td style="text-align:left"><i class="mini a" style="width:75%"></i><br><i class="mini k" style="width:67%"></i></td></tr>
+      <tr><td>27 jul. – 2 ag.</td><td>60,0</td><td>39,5</td><td style="text-align:left"><i class="mini a" style="width:75%"></i><br><i class="mini k" style="width:49%"></i></td></tr>
+      <tr><td>3 – 9 ag.</td><td>60,0</td><td>66,6</td><td style="text-align:left"><i class="mini a" style="width:75%"></i><br><i class="mini k" style="width:83%"></i></td></tr>
+      <tr><td>10 – 12 ag.</td><td>30,0</td><td>22,4</td><td style="text-align:left"><i class="mini a" style="width:37%"></i><br><i class="mini k" style="width:28%"></i></td></tr>
+      <tr class="tot"><td>Total</td><td>360,0</td><td>238,4</td><td style="text-align:left; font-weight:400; font-size:8pt; color:var(--gris)">
+        <i class="mini a" style="width:14px"></i> el que vas tirar &nbsp; <i class="mini k" style="width:14px"></i> el que en calia</td></tr>
+    </tbody>
+  </table>
+  <p class="txt" style="font-size:8.5pt; margin-top:6px">Tot en litres per metre quadrat.</p>
+
+  <p class="txt">
+    Fixa't en la setmana del <strong>3 al 9 d'agost</strong>: allà la Kylia n'hauria
+    tirat <strong>més</strong> que tu (66,6 contra 60). No sobra aigua sempre — sobra
+    al principi del cicle, quan la planta encara era petita i el sòl tenia reserva.
+  </p>
+
+  <div class="cautelas">
+    <h3>El que aquest informe no pot demostrar</h3>
+    <ul>
+      <li><b>El cabal no s'ha tornat a mesurar.</b> Els 15 mm/h surten del got de
+        l'1 de juliol. L'aigua que vas aplicar es calcula multiplicant minuts per
+        cabal, així que si el real fos menor, l'excés també.</li>
+      <li><b>El càlcul va a favor teu, no del nostre.</b> El model de la Kylia
+        buida el sòl una mica més ràpid que l'estàndard FAO-56, o sigui que s'atribueix més
+        regs dels que dispararia la referència. L'estalvi és un mínim.</li>
+      <li><b>De quanta aigua demana el cultiu n'estem segurs; del dia exacte, menys.</b>
+        La demanda està validada contra l'estàndard internacional sense error
+        apreciable. Encertar el dia de regar és més difícil: en una prova sobre 60
+        finestres, la Kylia i la referència coincidien el 62 % de les vegades.</li>
+      <li><b>No vam mesurar collita.</b> Aquest pilot va mesurar aigua. No sabem si
+        amb menys reg hauries collit més o menys quilos, i no ho insinuarem.</li>
+    </ul>
+  </div>
+
+  <footer>
+    Pilot tancat el 12 d'agost del 2026, dia en què va començar la collita · 50 dies mesurats · cobertura del registre 100 %.
+  </footer>
+</div>
+
+</body>
+</html>
