@@ -43,12 +43,18 @@ ok(/data-cal-dia="\$\{f\}"/.test(app),
    "cada día tocable lleva su fecha en el propio botón");
 ok(/abrirModalRiego\(btn\.dataset\.calDia\)/.test(app),
    "y al tocarlo se abre el registro con esa fecha");
-ok(/fechaEl\.value = fecha && fecha <= hoy \? fecha : hoy/.test(app),
+ok(/riegoPendiente = fecha && fecha <= hoy \? fecha : hoy/.test(app),
    "nunca por delante de hoy: esto registra lo que pasó, no lo que va a pasar");
-ok(/const esHoy = fechaEl\.value === hoy;/.test(app) && /litrosEl\.value = esHoy && sugerido != null/.test(app),
-   "la cantidad sugerida solo se ofrece al apuntar HOY — en un día pasado sería un número inventado");
-ok(/Apuntando el riego del \$\{fechaEl\.value\}/.test(app),
-   "y en un día pasado el modal dice qué día está apuntando, para no equivocarse");
+// Apuntar un riego es el gesto MÁS FRECUENTE de la app y pedía tres cosas: la
+// cantidad en L/m² (justo el número que nadie sabe), la franja del día (que no
+// decide nada) y la duración. Ahora es un toque, y lo que se apunta sale de lo
+// que ya sabemos.
+ok(!/modal-riego-litros/.test(app) && !/modal-riego-franja/.test(app),
+   "el formulario de cantidad y franja ya no existe");
+ok(/¿Regaste \$\{cuando\}\?/.test(app),
+   "queda una confirmación de un toque, para que un roce en el calendario no invente un riego");
+ok(/el \$\{formatearFechaCorta\(riegoPendiente\)\}/.test(app),
+   "y en un día pasado dice qué día está apuntando, para no equivocarse");
 
 console.log("\n── detalles que se rompen solos si no se fijan ──");
 ok(/rej\.dataset\.enganchado/.test(app),

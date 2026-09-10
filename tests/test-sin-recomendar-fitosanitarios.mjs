@@ -45,8 +45,15 @@ ok(!/productoCriterio: \{ tipo: "plaga"/.test(app),
    "y ya nada genera una recomendación con criterio de plaga");
 
 console.log("── lo que SÍ se queda: registrar lo aplicado ──");
-ok(/data-tipo="plaga"/.test(app),
-   "el agricultor puede seguir apuntando que ha visto una plaga (observación, no receta)");
+// La observación suelta de "he visto una plaga" vivía en el wizard de la
+// jornada, que se retiró el 10-sep por decisión del usuario (era ruido en lo
+// alto de la pantalla). Lo que protege el compromiso NO era esa observación,
+// sino que se pueda registrar lo APLICADO — con su producto, su dosis y su
+// plazo de seguridad, que es lo que exige el cuaderno.
+ok(!/data-tipo="plaga"/.test(app),
+   "el wizard de la jornada ya no está (retirado el 10-sep), y con él su observación de plaga");
+ok(/modal-apl-dosis/.test(app) && /modal-apl-plazo/.test(app),
+   "pero registrar lo aplicado sigue: producto, dosis y plazo de seguridad");
 ok(/modal-aplicacion|registrarAplicacion|aplicaciones/.test(app),
    "y registrar una aplicación: es la base del cuaderno RD 1051/2022");
 const catalogo = require(join(RAIZ, "data", "productos.json"));
