@@ -2165,6 +2165,61 @@
       background: var(--verde, #013A27); transition: width .4s ease;
     }
     .madurez-nota { margin: 0; font-size: .8rem; color: var(--muted); line-height: 1.45; }
+    /* ── Calendario de la parcela ────────────────────────────────────
+       El registro y la campaña en la misma rejilla. Un mes de un vistazo:
+       lo que apuntaste, lo que Kylia decía, y dónde está la parcela dentro
+       de su ciclo. Tocar un día pasado abre el registro con esa fecha —
+       apuntar lo de ayer no debería costar más que apuntar lo de hoy. */
+    .cal-cab {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; margin-bottom: 12px;
+    }
+    .cal-mes {
+      font-size: 1rem; font-weight: 700; text-transform: capitalize;
+      color: var(--verde, #013A27);
+    }
+    .cal-nav { display: flex; gap: 6px; }
+    .cal-nav button {
+      width: 30px; height: 30px; border: 1px solid #e6e6e6; background: #fff;
+      border-radius: 8px; font: inherit; font-size: 1rem; line-height: 1;
+      cursor: pointer; color: var(--verde, #013A27);
+    }
+    .cal-nav button:disabled { opacity: .35; cursor: default; }
+    .cal-dow, .cal-rej { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-dow span {
+      text-align: center; font-size: .62rem; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+      padding-bottom: 4px;
+    }
+    .cal-dia {
+      position: relative; aspect-ratio: 1; border-radius: 7px;
+      background: #f4f7f4; border: 1px solid transparent;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 1px; font-size: .72rem; color: var(--subtle, #334155);
+      padding: 0; font-family: inherit; cursor: default;
+    }
+    .cal-dia.vacio { background: transparent; }
+    .cal-dia.futuro { background: #fafcfa; color: #b9c6be; }
+    .cal-dia.hoy { border-color: var(--verde, #013A27); font-weight: 700; }
+    .cal-dia.ciclo { background: #eaf1ec; }
+    .cal-dia.madurez { background: #fdf3e2; }
+    .cal-dia.tocable { cursor: pointer; }
+    .cal-dia.tocable:active { transform: scale(.94); }
+    .cal-dia .n { line-height: 1; }
+    .cal-marcas { display: flex; gap: 2px; height: 6px; align-items: center; }
+    .cal-pt { width: 5px; height: 5px; border-radius: 50%; }
+    .cal-pt.riego { background: #2C5F7C; }
+    .cal-pt.aplic { background: #6B8E23; }
+    .cal-pt.pedia { background: #A8681C; }
+    .cal-hito {
+      position: absolute; top: 2px; right: 3px; font-size: .5rem; line-height: 1;
+    }
+    .cal-leyenda {
+      display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px;
+      font-size: .72rem; color: var(--muted);
+    }
+    .cal-leyenda span { display: flex; align-items: center; gap: 5px; }
+    .cal-pie { margin: 10px 0 0; font-size: .74rem; color: var(--muted); line-height: 1.45; }
   </style>
 </head>
 <body>
@@ -2480,6 +2535,26 @@
       <div class="ind-detalle-panel" id="det-suelo"></div>
 
       <div class="riego-registro" id="riego-registro"></div>
+    </section>
+
+    <!-- Calendario: registro + campaña en la misma rejilla -->
+    <section class="card" id="card-calendario" aria-label="Calendario de la parcela" hidden>
+      <div class="cal-cab">
+        <span class="cal-mes" id="cal-mes"></span>
+        <span class="cal-nav">
+          <button type="button" id="cal-ant" aria-label="Mes anterior">‹</button>
+          <button type="button" id="cal-sig" aria-label="Mes siguiente">›</button>
+        </span>
+      </div>
+      <div class="cal-dow"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+      <div class="cal-rej" id="cal-rejilla"></div>
+      <div class="cal-leyenda">
+        <span><i class="cal-pt riego"></i> regaste</span>
+        <span><i class="cal-pt aplic"></i> aplicaste algo</span>
+        <span><i class="cal-pt pedia"></i> el cultivo pedía agua</span>
+        <span>🌱 plantación · 🍅 lista · ✂️ cosecha</span>
+      </div>
+      <p class="cal-pie" id="cal-pie"></p>
     </section>
 
     <!-- Tus últimos riegos -->
@@ -3743,6 +3818,7 @@
       renderIndicadores();
       renderHoy();
       renderRiegoRegistro();
+      renderCalendario();
       renderRecomendaciones();
     }
 
@@ -5884,9 +5960,19 @@
           } catch (_) { return; }
           // Sin respuesta útil el bloque se queda como está (oculto): una fecha a
           // medias en la pantalla principal es peor que no decir nada.
-          if (!d?.ok || !d.madurez) { bloque.hidden = true; return; }
+          if (!d?.ok || !d.madurez) {
+            window.__madurez = null;
+            window.__fechaCosecha = d?.fecha_cosecha || null;
+            renderCalendario();
+            bloque.hidden = true; return;
+          }
 
           const m = d.madurez;
+          // El calendario pinta la ventana y el día de la cosecha; se los deja
+          // aquí en vez de volver a pedirlos, que es la misma consulta.
+          window.__madurez = m;
+          window.__fechaCosecha = d.fecha_cosecha || null;
+          renderCalendario();
           elFase.textContent = d.fase ? `fase ${d.fase}` : "";
           const pct = Math.round((m.fraccion ?? 0) * 100);
           elProg.style.width = `${Math.max(2, Math.min(100, pct))}%`;
@@ -6374,6 +6460,7 @@
       renderHoy();
       renderRiegoRegistro();
       renderHistorialRiegos();
+      renderCalendario();
       renderRecomendaciones();
       cargarAnalisisIA();
     }
@@ -6401,8 +6488,147 @@
     // Alias mantenido por compatibilidad con manejadores antiguos
     const borrarRiego = borrarUltimoRiego;
 
+    // ─── Calendario de la parcela ─────────────────────────────────────────────
+    // El registro y la campaña en la misma rejilla. Tres capas sobre los mismos
+    // días:
+    //   · lo que APUNTASTE      → riegos y aplicaciones
+    //   · lo que KYLIA DECÍA    → los días en que el suelo bajaba del umbral
+    //   · dónde está el CULTIVO → plantación, ventana de madurez, cosecha
+    //
+    // Y una cosa que parece menor y no lo es: tocar un día pasado abre el
+    // registro con ESA fecha. Apuntar lo de ayer no debería costar más que
+    // apuntar lo de hoy — si cuesta más, no se apunta.
+    let calMes = null;   // primer día del mes que se está mirando
+
+    const DOW_LUNES = d => (d.getDay() + 6) % 7;   // lunes = 0
+    const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+    // Los días en que Kylia habría regado, según el mismo contrafactual que usa
+    // el reveal. Se calcula sobre la serie de clima que ya está cargada; sin
+    // serie o sin cultivo, simplemente no se pinta esa capa.
+    function diasQueKyliaPedia() {
+      const plant = cfg.fechaPlantacion;
+      const cultivoId = (cfg.cultivos || [])[0] || null;
+      if (!plant || !cultivoId || !Array.isArray(ultimoET0) || !ultimoET0.length) return new Set();
+      try {
+        const serie = ultimoET0.filter(d => d.date >= plant).sort((a, b) => a.date.localeCompare(b.date));
+        const sim = MOTOR.simularKylia(serie, {
+          suelo: cfg.suelo, cultivoId, metodoRiego: cfg.metodoRiego, fechaPlantacion: plant,
+        });
+        const dias = new Set();
+        let previo = 0;
+        for (const p of sim.puntos || []) {
+          if (p.acum_l_m2 > previo + 0.05) dias.add(p.date);
+          previo = p.acum_l_m2;
+        }
+        return dias;
+      } catch (_) { return new Set(); }
+    }
+
+    function renderCalendario() {
+      const caja = document.getElementById("card-calendario");
+      if (!caja) return;
+      const rej = document.getElementById("cal-rejilla");
+      // Sin fecha de plantación el calendario no tiene de qué hablar: no hay
+      // ciclo, ni madurez, ni contrafactual. Mejor no enseñar una rejilla vacía.
+      if (!cfg.fechaPlantacion) { caja.hidden = true; return; }
+
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+      if (!calMes) calMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+
+      document.getElementById("cal-mes").textContent =
+        calMes.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+
+      const plant   = cfg.fechaPlantacion;
+      const cosecha = window.__fechaCosecha || null;   // la deja la vista de madurez del servidor
+      const pedia   = diasQueKyliaPedia();
+      const riegoEn = new Set(riegos.map(r => r.date));
+      const aplicEn = new Set(aplicaciones.map(a => a.date));
+      const mad     = window.__madurez || null;   // lo deja pintarMadurez
+
+      const primero = new Date(calMes.getFullYear(), calMes.getMonth(), 1);
+      const ndias   = new Date(calMes.getFullYear(), calMes.getMonth() + 1, 0).getDate();
+      let html = "";
+      for (let i = 0; i < DOW_LUNES(primero); i++) html += `<div class="cal-dia vacio"></div>`;
+
+      for (let d = 1; d <= ndias; d++) {
+        const fecha = new Date(calMes.getFullYear(), calMes.getMonth(), d);
+        const f = iso(fecha);
+        const futuro = fecha > hoy;
+        const enCiclo = f >= plant && (!cosecha || f <= cosecha);
+        const enMadurez = mad && mad.estado === "en_curso" && f >= mad.desde && f <= mad.hasta;
+
+        const clases = ["cal-dia"];
+        if (enCiclo) clases.push("ciclo");
+        if (enMadurez) clases.push("madurez");
+        if (futuro) clases.push("futuro");
+        if (f === iso(hoy)) clases.push("hoy");
+        if (!futuro && enCiclo) clases.push("tocable");
+
+        let hito = "";
+        if (f === plant) hito = "🌱";
+        else if (cosecha && f === cosecha) hito = "✂️";
+        else if (mad && mad.probable === f) hito = "🍅";
+
+        let marcas = "";
+        if (riegoEn.has(f)) marcas += `<i class="cal-pt riego"></i>`;
+        if (aplicEn.has(f)) marcas += `<i class="cal-pt aplic"></i>`;
+        if (pedia.has(f))   marcas += `<i class="cal-pt pedia"></i>`;
+
+        const tag = (!futuro && enCiclo) ? "button" : "div";
+        const attr = tag === "button" ? ` type="button" data-cal-dia="${f}"` : "";
+        html += `<${tag} class="${clases.join(" ")}"${attr}>`
+             +  (hito ? `<span class="cal-hito">${hito}</span>` : "")
+             +  `<span class="n">${d}</span>`
+             +  `<span class="cal-marcas">${marcas}</span>`
+             +  `</${tag}>`;
+      }
+      rej.innerHTML = html;
+
+      // Un pie que diga algo útil sobre el mes que se está mirando.
+      const delMes = f => f.startsWith(`${calMes.getFullYear()}-${String(calMes.getMonth() + 1).padStart(2, "0")}`);
+      const nR = [...riegoEn].filter(delMes).length;
+      const nP = [...pedia].filter(delMes).length;
+      const pie = document.getElementById("cal-pie");
+      pie.textContent = nR || nP
+        ? `Este mes: regaste ${nR} día${nR === 1 ? "" : "s"}` +
+          (nP ? ` y el cultivo pidió agua ${nP}.` : ".") +
+          (!futuroMes() ? " Toca un día para apuntar un riego con esa fecha." : "")
+        : "Toca un día para apuntar un riego con esa fecha.";
+
+      // El botón de mes siguiente no pasa del mes actual: el calendario registra
+      // lo que ha pasado, no lo que va a pasar.
+      document.getElementById("cal-sig").disabled = futuroMes();
+      engancharCalendario();
+      caja.hidden = false;
+    }
+    // Los manejadores se enganchan una vez, por delegación: la rejilla se
+    // vuelve a pintar entera en cada refresco y unos listeners por día se
+    // quedarían huérfanos en cada render.
+    function engancharCalendario() {
+      const rej = document.getElementById("cal-rejilla");
+      if (!rej || rej.dataset.enganchado) return;
+      rej.dataset.enganchado = "1";
+      rej.addEventListener("click", (ev) => {
+        const btn = ev.target.closest("[data-cal-dia]");
+        if (btn) abrirModalRiego(btn.dataset.calDia);
+      });
+      document.getElementById("cal-ant")?.addEventListener("click", () => moverCalendario(-1));
+      document.getElementById("cal-sig")?.addEventListener("click", () => moverCalendario(1));
+    }
+
+    function futuroMes() {
+      const hoy = new Date();
+      return calMes && calMes.getFullYear() === hoy.getFullYear() && calMes.getMonth() === hoy.getMonth();
+    }
+    function moverCalendario(n) {
+      if (!calMes) return;
+      calMes = new Date(calMes.getFullYear(), calMes.getMonth() + n, 1);
+      renderCalendario();
+    }
+
     // ─── Modal de registro de riego ───────────────────────────────────────────
-    function abrirModalRiego() {
+    function abrirModalRiego(fecha = null) {
       const modal     = document.getElementById("modal-riego");
       const fechaEl   = document.getElementById("modal-riego-fecha");
       const litrosEl  = document.getElementById("modal-riego-litros");
@@ -6410,12 +6636,18 @@
       const hoy       = new Date().toISOString().slice(0, 10);
       const sugerido  = litrosSugeridosHoy();
 
-      fechaEl.value = hoy;
+      // `fecha` llega del calendario al tocar un día pasado. El sugerido se
+      // calcula para HOY, así que solo se ofrece cuando se registra hoy: en un
+      // día de la semana pasada sería un número inventado.
+      fechaEl.value = fecha && fecha <= hoy ? fecha : hoy;
       fechaEl.max   = hoy;
-      litrosEl.value = sugerido != null ? sugerido : "";
-      sugerEl.textContent = sugerido != null
-        ? `Sugerido por la app: ${sugerido} L/m² (compensa lo evaporado).`
-        : "Si lo prefieres, puedes dejarlo vacío.";
+      const esHoy = fechaEl.value === hoy;
+      litrosEl.value = esHoy && sugerido != null ? sugerido : "";
+      sugerEl.textContent = !esHoy
+        ? `Apuntando el riego del ${fechaEl.value}.`
+        : sugerido != null
+          ? `Sugerido por la app: ${sugerido} L/m² (compensa lo evaporado).`
+          : "Si lo prefieres, puedes dejarlo vacío.";
       document.getElementById("modal-riego-duracion").value = "";
       modal.querySelectorAll("#modal-riego-franja .jornada-chip").forEach(b => b.classList.remove("activo"));
       modal.hidden = false;
@@ -6504,6 +6736,7 @@
       addAplicacion(entrada);
       cerrarModalAplicacion();
       renderHistorialAplicaciones();
+      renderCalendario();
       renderHoy();
     }
 
