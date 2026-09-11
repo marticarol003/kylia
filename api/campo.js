@@ -782,16 +782,23 @@ async function vistaComparativa(req, res, u) {
   // manda). Sin duración (cantidad apuntada a mano) → el valor guardado, que es
   // idéntico en ambos escenarios de la banda.
   const lm2DeRiego = (r, caudal) =>
-    laminaRiego(r.cantidad_l_m2, r.duracion_min ?? null, caudal) ?? 0;
+    laminaRiego(r.cantidad_l_m2, r.duracion_min ?? null, caudal);
 
   const bajoPorDia = {}, altoPorDia = {};
-  let nRiegosPadre = 0;
+  let nRiegosPadre = 0, sinCantidad = 0;
   (riegos || []).forEach(r => {
     const f = dia(r.fecha_local);
     if (!f || (inicio && f < inicio)) return;
     nRiegosPadre++;
-    bajoPorDia[f] = (bajoPorDia[f] || 0) + lm2DeRiego(r, caudalBajo);
-    altoPorDia[f] = (altoPorDia[f] || 0) + lm2DeRiego(r, caudalAlto);
+    const bajo = lm2DeRiego(r, caudalBajo);
+    // UN RIEGO SIN CANTIDAD NO SON CERO LITROS. Aquí había un `?? 0`, así que un
+    // riego apuntado sin cifra ni duración entraba como "no echó nada" y el
+    // padre salía gastando menos de lo que gastó — o sea, inflando el ahorro que
+    // se le enseña. Es el mismo defecto que se corrigió en el reveal, en su
+    // tercera copia. Se cuentan aparte y se declaran.
+    if (bajo == null) { sinCantidad++; return; }
+    bajoPorDia[f] = (bajoPorDia[f] || 0) + bajo;
+    altoPorDia[f] = (altoPorDia[f] || 0) + (lm2DeRiego(r, caudalAlto) ?? 0);
   });
 
   let accBajo = 0, accAlto = 0;
@@ -822,6 +829,9 @@ async function vistaComparativa(req, res, u) {
     // Para el caso "Kylia aún no regaría" / datos escasos: el % de ahorro no es
     // significativo si la lámina de Kylia es 0 o hay muy pocos días.
     riegos_padre: nRiegosPadre,
+    // De esos, cuántos no se pueden cuantificar. Sin esto, los que se apuntaron
+    // sin cifra desaparecían del total como si no se hubiera regado.
+    riegos_sin_cantidad: sinCantidad || null,
     dias: dias.length,
   };
 

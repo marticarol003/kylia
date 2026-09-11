@@ -89,5 +89,35 @@ ok(/filter\(x => x\.et0 != null\)/.test(db), "los días sin ET₀ se descartan")
 ok(/archive-api\.open-meteo\.com/.test(db), "y para lo pasado también manda el archivo");
 ok(/UN DATO QUE FALTA NO ES UN CERO/.test(db), "con el porqué escrito también aquí");
 
+console.log("\n── el barrido: CUATRO copias del mismo defecto ──");
+// Ciclo 8. El `?? 0` sobre la ET₀ no estaba en un sitio: estaba en los cuatro
+// que cargan clima. Arreglar campo.js el 11-sep no bastaba, y arreglar dos
+// tampoco. Este test recorre los cuatro para que no vuelva por el que quede.
+const FUENTES = [
+  ["api/campo.js",      readFileSync(join(RAIZ, "api", "campo.js"), "utf8")],
+  ["api/diario-b.js",   readFileSync(join(RAIZ, "api", "diario-b.js"), "utf8")],
+  ["app/index.html",    readFileSync(join(RAIZ, "app", "index.html"), "utf8")],
+];
+for (const [nombre, txt] of FUENTES) {
+  ok(!/et0_fao_evapotranspiration\?\.\[i\] \?\? 0/.test(txt),
+     `${nombre}: ninguna ET₀ ausente convertida en cero`);
+  ok(!/et0: vals\[i\] \?\? 0/.test(txt), `${nombre}: ni en la forma corta`);
+}
+const appTxt = FUENTES[2][1];
+ok(/\.filter\(d => d\.et0 != null\)/.test(appTxt), "la app descarta los días sin ET₀ del histórico");
+ok(/\.filter\(x => x\.et0 != null\)/.test(appTxt), "y también los del pronóstico del calendario");
+
+console.log("\n── y un riego sin cantidad no son cero litros, en los tres sitios ──");
+// Misma forma, tercera copia: en la comparativa del campo del padre un `?? 0`
+// hacía desaparecer del total los riegos apuntados sin cifra, inflando el
+// ahorro que se le enseña.
+const campoTxt = FUENTES[0][1];
+ok(!/laminaRiego\(r\.cantidad_l_m2, r\.duracion_min \?\? null, caudal\) \?\? 0/.test(campoTxt),
+   "la comparativa ya no cuenta como 0 un riego sin cantidad");
+ok(/riegos_sin_cantidad: sinCantidad \|\| null/.test(campoTxt), "los declara aparte");
+const revealTxt = readFileSync(join(RAIZ, "api", "_reveal.js"), "utf8");
+ok((revealTxt.match(/riegos_sin_cantidad/g) || []).length >= 2,
+   "y el reveal los declara en sus dos ramas");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

@@ -4840,13 +4840,15 @@
         if (!res.ok) return;
         const d = await res.json();
         const t = d?.daily?.time || [];
+        // Mismo criterio que cargarET0: un día sin ET₀ no es un día sin
+        // evaporación, es un día que no sabemos. Se descarta.
         pronosticoET0 = t.map((date, i) => ({
           date,
-          et0:    d.daily.et0_fao_evapotranspiration?.[i] ?? 0,
+          et0:    d.daily.et0_fao_evapotranspiration?.[i],
           lluvia: d.daily.precipitation_sum?.[i] ?? 0,
           tmax:   d.daily.temperature_2m_max?.[i] ?? null,
           tmin:   d.daily.temperature_2m_min?.[i] ?? null,
-        }));
+        })).filter(x => x.et0 != null);
       } catch (_) { pronosticoET0 = null; }
     }
 
@@ -4918,10 +4920,17 @@
         // detrás toda la campaña). Ver FAO_GDD en assets/js/motor-riego.js.
         const tmx   = data?.daily?.temperature_2m_max || [];
         const tmn   = data?.daily?.temperature_2m_min || [];
+        // ⚠️ NADA DE `?? 0` SOBRE LA ET₀. Es el defecto que costó dos informes
+        // de piloto publicados con cifras falsas: la API devuelve null en los
+        // días que ya no recuerda, y contarlos como cero es decir que ese día el
+        // cultivo no gastó agua. UN DATO QUE FALTA NO ES UN CERO — el día se
+        // descarta, y el motor ya declara cuánta cobertura de clima tuvo.
+        // La lluvia sí cae a 0: no llover es un dato, no medir no lo es, pero
+        // llegado aquí el día ya trae ET₀, así que el hueco es solo de lluvia.
         ultimoET0 = dates.map((date, i) => ({
-          date, et0: vals[i] ?? 0, lluvia: lluv[i] ?? 0,
+          date, et0: vals[i], lluvia: lluv[i] ?? 0,
           tmax: tmx[i] ?? null, tmin: tmn[i] ?? null,
-        }));
+        })).filter(d => d.et0 != null);
       } catch (_) {
         ultimoET0 = null;
       }
