@@ -92,5 +92,17 @@ const hueco = dias.length > 1
 ok(hueco === null || (hueco >= 2 && hueco <= 5),
    `y el hueco entre ellos es de ${hueco} días, coherente con una lechuga en franco`);
 
+console.log("\n── el caudal se pide cuando es gratis pedirlo ──");
+// En el alta, "¿cuál es tu caudal?" es un "no lo sé". Aquí está de pie al lado
+// del riego y a punto de abrirlo: medirlo no le cuesta ni un viaje.
+ok(/pon una botella bajo un gotero diez minutos/.test(app),
+   "la acción de regar invita a medir el caudal");
+ok(/\(Number\(cfg\.caudal\) > 0\) \? null/.test(app),
+   "y solo a quien no lo tiene: al que ya lo midió no se le vuelve a pedir");
+ok(/accion-pie/.test(app) && /border-top: 1px dashed/.test(app),
+   "va un escalón por debajo de la razón: es una oferta, no una tarea");
+ok(/cambia el\n *\/\/ veredicto en 16 de 48 casos probados/.test(app),
+   "y queda escrito por qué importa, que no es solo hablarle en minutos");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

@@ -318,5 +318,70 @@ ok(NUTRI2.creditoResiduosN("pimiento", false) === 0,
 ok(NUTRI2.creditoResiduosN(null, true) === 0,
    "sin cultivo anterior tampoco se inventa");
 
+console.log("\n── V1 · el perfil dice lo que Kylia SABE, no lo que acierta ──");
+// Condición del usuario: el porcentaje no puede leerse como precisión.
+ok(/Lo que Kylia sabe de tu campo/.test(alta), "el título habla de saber, no de acertar");
+ok(/No es un porcentaje de acierto/.test(alta), "y se desmiente explícitamente");
+ok(!/precisi[óo]n/i.test(alta.slice(alta.indexOf("function pintarPerfil"), alta.indexOf("// ── paso 6"))),
+   "la palabra 'precisión' no aparece en ninguna parte del perfil");
+// El CSS del perfil, solo. Las barras son sobrias a propósito: un "78%" en
+// tamaño titular se lee como precisión por mucho que la nota lo desmienta.
+const cssPerfil = app.slice(app.indexOf(".alta-perfil {"), app.indexOf(".perfil-nota"));
+ok(/\.perfil-pct[^}]*font-size: \.9rem/.test(cssPerfil),
+   "el porcentaje va al tamaño del texto, no de titular");
+ok(!/font-size: *[2-9](\.\d+)?rem/.test(cssPerfil), "no hay ningún número gigante en el perfil");
+ok(/Es cuánto conoce Kylia de tu campo/.test(alta), "se explica qué significa de verdad");
+
+console.log("\n── por pilares, no un número global ──");
+ok(/completitud\("riego"\)/.test(alta) && /completitud\("abonado"\)/.test(alta),
+   "riego y abonado van por separado: quien solo quiere riego puede estar completo con el abonado a cero");
+ok(/const BLOQUEANTES = new Set/.test(alta) && /falta lo esencial/.test(alta),
+   "sin un dato bloqueante no se da porcentaje: un número alto con un agujero crítico invita a confiar");
+ok(/\(y\.peso \* y\.hueco\) - \(x\.peso \* x\.hueco\)/.test(alta),
+   "el 'siguiente dato' es el que más desbloquea, no el que más pesa en abstracto");
+
+console.log("\n── el peso del caudal, corregido con medidas ──");
+// En la propuesta le puse 5 diciendo que "solo sirve para pasar de milímetros a
+// minutos". Es falso: sin él el último riego se supone recarga completa, y esa
+// suposición cambia el veredicto en 16 de 48 combinaciones probadas (33%).
+const pesos = alta.slice(alta.indexOf("const PESOS = {"), alta.indexOf("const TIENE_EXTRA"));
+const pesoDe = k => Number((pesos.match(new RegExp(`\\["${k}",\\s*(\\d+)`)) || [])[1]);
+ok(pesoDe("caudal") === 15, `el caudal pesa ${pesoDe("caudal")}, no 5`);
+ok(pesoDe("caudal") >= pesoDe("metodoRiego") + pesoDe("riegoMinutos"),
+   "y pesa más que el método y el rato juntos");
+ok(/flipa el veredicto en 16 de 48 casos probados/.test(pesos),
+   "con la medida al lado, no 'porque sí'");
+ok(/criterio:/.test(pesos),
+   "y lo que NO se ha podido medir va marcado como criterio, para que se note la diferencia");
+
+console.log("\n── los pesos suman 100 en los dos pilares ──");
+// Si no suman, el porcentaje deja de ser interpretable.
+for (const pilar of ["riego", "abonado"]) {
+  const ini = pesos.indexOf(pilar + ": [");
+  const bloque = pesos.slice(ini, pesos.indexOf("\n          ]", ini));
+  const suma = [...bloque.matchAll(/",\s*(\d+),/g)].reduce((t, m) => t + Number(m[1]), 0);
+  ok(suma === 100, `${pilar}: los pesos suman ${suma}`);
+}
+
+console.log("\n── la comprobación que respalda ese 15 ──");
+// Se rehace aquí con el motor: sembrar con el agua REAL (caudal × rato) frente
+// a suponer recarga completa cambia el veredicto en un tercio de los casos.
+const MOT2 = require(join(RAIZ, "assets", "js", "motor-riego.js"));
+const h2 = new Date(), i2 = d => new Date(h2.getTime() - d * 86400000).toISOString().slice(0, 10);
+let distintos = 0, casos = 0;
+for (const [cult, edad, et0] of [["lechuga", 21, 4.6], ["tomate", 45, 5.2], ["cebolla", 60, 4.2], ["pimiento", 50, 5.0]])
+  for (const cada of [2, 3]) for (const cau of [5.4, 10.9, 15]) for (const min of [30, 60]) {
+    const cl = []; for (let d = edad; d >= 0; d--) cl.push({ date: i2(d), et0, lluvia: 0, tmax: 28, tmin: 16 });
+    const fs2 = []; for (let d = edad; d >= cada; d -= cada) fs2.push(i2(d));
+    const o = { suelo: "franco", cultivoId: cult, metodoRiego: "goteo", fechaPlantacion: i2(edad) };
+    const con = MOT2.balanceHidrico(cl, fs2.map(f => ({ date: f, litros: Math.round(cau * (min / 60) * 10) / 10 })), o);
+    let neto = 0; for (const d of cl) neto += MOT2.kcDelDia(cult, MOT2.diasEntre(i2(edad), new Date(`${d.date}T12:00:00`))) * d.et0;
+    const lam = Math.max(1, Math.round((neto / fs2.length / MOT2.EFIC_RIEGO.goteo) * 10) / 10);
+    const sin = MOT2.balanceHidrico(cl, fs2.map((f, k) => ({ date: f, litros: k === fs2.length - 1 ? null : lam })), o);
+    casos++; if ((con.Dr > con.raw) !== (sin.Dr > sin.raw)) distintos++;
+  }
+ok(distintos / casos > 0.25,
+   `conocer el caudal cambia el veredicto en ${distintos} de ${casos} casos (${Math.round(100 * distintos / casos)}%): no es solo pasar mm a minutos`);
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
