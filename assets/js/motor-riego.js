@@ -110,10 +110,29 @@
   // por encima de ~2 h la orden deja de ser ejecutable y se parte en tandas.
   const RIEGO_MAX_MIN = 120;
 
+  // ⚠️⚠️ EL AGUJERO QUE MÁS VECES HA MORDIDO EN ESTE FICHERO: Number(null) es 0.
+  // Y Number("") también, y Number([]) también, y Number(false) también.
+  //
+  // Lleva CUATRO defectos distintos, todos encontrados en la auditoría del
+  // 11-sep y todos con la misma forma — alguien escribe la comprobación a mano
+  // en su función y se le cuela el null:
+  //   · gradosDia    lo documenta desde el 8-sep (un día sin dato = día a 0 °C)
+  //   · laminaRiego  "sin cantidad" salía como 0 mm en vez de null
+  //   · sanearSerie  el primer intento usaba Number.isFinite(Number(x)): no
+  //                  filtraba nada, así que el saneado no saneaba
+  //   · zrDelDia     zrDelDia("tomate", null) daba 0,20 m en vez del fallback
+  //
+  // Por eso está aquí arriba y la usan TODAS. Escribirla a mano otra vez es
+  // pedir el quinto.
+  const finito = x => x != null && x !== "" && typeof x !== "boolean"
+                      && !Array.isArray(x) && Number.isFinite(Number(x));
+
   // Kc del día por interpolación lineal entre fases (inicial→desarrollo→media→final).
   function kcDelDia(cultivoId, diasDesdePlantacion) {
     const k = FAO_KC[cultivoId];
-    if (!k || diasDesdePlantacion == null) return 1; // fallback: ETc = ET₀
+    // `!Number.isFinite` y no `== null`: un NaN colado aquí devolvía Kc NaN y
+    // envenenaba la ETc de todos los días siguientes.
+    if (!k || !finito(diasDesdePlantacion)) return 1; // fallback: ETc = ET₀
     const [Li, Ld, Lm, Lf] = k.L;
     const d = Math.max(0, diasDesdePlantacion);
     if (d < Li)                return k.ini;
@@ -127,7 +146,7 @@
   // explicar en pantalla por qué el Kc es el que es. Misma partición que kcDelDia.
   function faseDelDia(cultivoId, dias) {
     const k = FAO_KC[cultivoId];
-    if (!k || dias == null) return null;
+    if (!k || !finito(dias)) return null;
     const [Li, Ld, Lm] = k.L;
     const d = Math.max(0, dias);
     if (d < Li)           return "inicial";
@@ -141,7 +160,9 @@
   // o sin fecha → ZR_M fijo (comportamiento legacy).
   function zrDelDia(cultivoId, dias) {
     const k = FAO_KC[cultivoId];
-    if (!k || !k.zr || dias == null) return ZR_M;
+    // Sin días válidos, la raíz de referencia. Un NaN aquí salía como zr NaN y
+    // de ahí a TAW = NaN, RAW = NaN y el balance entero perdido.
+    if (!k || !k.zr || !finito(dias)) return ZR_M;
     const diasCrec = k.L[0] + k.L[1];
     const f = Math.min(1, Math.max(0, dias) / diasCrec);
     return k.zr[0] + (k.zr[1] - k.zr[0]) * f;
@@ -177,7 +198,7 @@
   // que el número que reciben ya no es un día de calendario.
   function diasFenologicos(cultivoId, gddAcum) {
     const k = FAO_KC[cultivoId], g = FAO_GDD[cultivoId];
-    if (!k || !g || gddAcum == null || !Number.isFinite(Number(gddAcum))) return null;
+    if (!k || !g || !finito(gddAcum)) return null;
     let resto = Math.max(0, Number(gddAcum)), dias = 0;
     for (let f = 0; f < 4; f++) {
       if (resto >= g.gdd[f]) { resto -= g.gdd[f]; dias += k.L[f]; continue; }
@@ -398,11 +419,15 @@
     const awc = reconocido ? SUELO_AWC[suelo] : SUELO_AWC_DEFAULT;
     const zr  = zrDelDia(cultivoId, dias);
     let p     = FAO_KC[cultivoId]?.p ?? P_AGOTAMIENTO;
-    if (etcMmDia != null && Number.isFinite(Number(etcMmDia))) {
+    if (finito(etcMmDia)) {
       p = Math.min(0.8, Math.max(0.1, p + 0.04 * (5 - Number(etcMmDia))));
     }
-    const taw = 1000 * awc * zr;
-    return { taw, raw: p * taw, awc, p, sueloReconocido: reconocido };
+    // Red de seguridad: si algo de lo anterior se fuera a NaN, aquí se para. Un
+    // TAW no finito convierte el balance en NaN y la decisión en una mentira.
+    const zrOk = Number.isFinite(zr) && zr > 0 ? zr : ZR_M;
+    const pOk  = Number.isFinite(p) && p > 0 ? p : P_AGOTAMIENTO;
+    const taw = 1000 * awc * zrOk;
+    return { taw, raw: pOk * taw, awc, p: pOk, sueloReconocido: reconocido };
   }
 
   // ── Saneado de la entrada ─────────────────────────────────────────
@@ -421,13 +446,6 @@
   //
   // La regla: UN DATO QUE FALTA NO ES UN CERO. El día sin ET₀ se descarta —no
   // hay demanda que calcular— y lo que no es un número finito no entra.
-  // ⚠️ Number(null) es 0. Y Number("") también, y Number([]) también. Este
-  // fichero ya lleva TRES agujeros distintos por eso mismo: gradosDia lo
-  // documenta desde el 8-sep, laminaRiego lo tuvo hasta hoy, y el primer intento
-  // de este mismo saneado lo repitió —`Number.isFinite(Number(null))` es true,
-  // así que no filtraba nada—. Un solo sitio, y que no vuelva a pasar.
-  const finito = x => x != null && x !== "" && typeof x !== "boolean"
-                      && !Array.isArray(x) && Number.isFinite(Number(x));
 
   function sanearSerie(serie) {
     // Dedupe por fecha: una serie con el mismo día repetido contaba su ETc dos
@@ -480,9 +498,22 @@
     return out;
   }
 
+  // Días entre una fecha y otra. Devuelve null —no NaN— cuando la fecha no es
+  // una fecha, porque un NaN aquí se propaga a TODO: zrDelDia(NaN) da zr NaN,
+  // aguaSuelo da TAW y RAW NaN, y el balance entero sale NaN. En la ronda
+  // adversarial eso pasaba en el 7,4% de los escenarios.
+  //
+  // Y acepta un timestamp completo, no solo YYYY-MM-DD: "2026-05-01T00:00:00Z"
+  // daba NaN porque se le pegaba un segundo "T12:00:00" detrás. Eso no es un
+  // caso rebuscado — es lo que llega si una columna de fecha vuelve como
+  // timestamp.
   function diasEntre(fechaIso, hasta) {
     if (!fechaIso) return null;
-    return Math.round((hasta - new Date(`${fechaIso}T12:00:00`)) / 86400000);
+    const f = String(fechaIso).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return null;
+    const desde = new Date(`${f}T12:00:00`);
+    if (Number.isNaN(desde.getTime()) || Number.isNaN(new Date(hasta).getTime())) return null;
+    return Math.round((hasta - desde) / 86400000);
   }
 
   // Balance hídrico FAO-56 sobre una serie diaria. Réplica del bucle del frontend:
@@ -623,6 +654,19 @@
       }
 
       const neto  = puedeFiarse ? Dr - prevista : Dr;
+
+      // "Regar hoy ~0 L/m²" es una orden absurda, y salía sola: cuando la lluvia
+      // prevista casi cubre el déficit, lo que queda por regar se redondea a
+      // cero y la app mandaba abrir el riego para echar nada. Por debajo de
+      // PE_MIN_MM —el mismo umbral con el que el motor decide que una lluvia no
+      // llega a infiltrar— no hay riego que dar: es esperar a la lluvia.
+      if (neto < PE_MIN_MM) {
+        return {
+          nivel: "media", cantidad_l_m2: null, lluvia_prevista_mm: Math.round(prevista * 10) / 10,
+          texto: `Esperar a la lluvia · se prevén ${r0(prevista)} mm en 48 h y el déficit es de ${r0(Dr)} mm`,
+        };
+      }
+
       const bruto = Math.round((neto / efic) * 10) / 10;
       return {
         nivel: "alta",
@@ -648,7 +692,12 @@
   // Siempre devuelve también `mm` para trazabilidad (todo el motor habla en mm).
   function presentarRiego(mmBruto, opts = {}) {
     const { metodoRiego, caudalMmh, areaM2, capacidadRegaderaL } = opts;
-    const mm = Math.max(0, Number(mmBruto) || 0);
+    // `Number(Infinity) || 0` es Infinity, así que esto salía en pantalla como
+    // "Infinity min · mejor en Infinity tandas de NaN min". Y un caudal
+    // minúsculo daba "600000000000 min en 5000000000 tandas", que es finito
+    // pero igual de inservible.
+    const bruto = Number(mmBruto);
+    const mm = Number.isFinite(bruto) ? Math.max(0, bruto) : 0;
     const r0 = (x) => Math.round(x);
     const r1 = (x) => Math.round(x * 10) / 10;
 
@@ -664,9 +713,14 @@
       return { unidad: "l_m2", valor: r0(mm), mm: r1(mm), texto: `${r0(mm)} L/m²` };
     }
 
-    const caudal = Number(caudalMmh) || CAUDAL_DEFAULT_MMH[metodoRiego];
+    const caudalDado = Number(caudalMmh);
+    // Por debajo de 0,1 mm/h no hay instalación de riego, hay un error de
+    // tecleo: con 1e-9 salían 600.000 millones de minutos.
+    const caudal = (Number.isFinite(caudalDado) && caudalDado >= 0.1)
+      ? caudalDado : CAUDAL_DEFAULT_MMH[metodoRiego];
     if (caudal > 0) {
       const min = (mm / caudal) * 60;
+      if (!Number.isFinite(min)) return { unidad: "l_m2", valor: r0(mm), mm: r1(mm), texto: `${r0(mm)} L/m²` };
       // Tope PRÁCTICO de sesión, no agronómico: cuando el déficit se ha acumulado
       // (o el caudal es bajo) la lámina bruta sale en sesiones de horas — el bancal
       // de las 33, con 5,4 mm/h, pidió 331 min de una tacada el 28-jul. Un
