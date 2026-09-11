@@ -45,12 +45,44 @@ const FACTOR_MAX      = 1.15;
 function r3(x) { return Math.round((Number(x) || 0) * 1000) / 1000; }
 function r2(x) { return Math.round((Number(x) || 0) * 100) / 100; }
 
-// Factor de vigor a partir del NDVI. Relativo y acotado; solo con canopy formado.
-function factorVigor(ndvi) {
+// Factor de vigor a partir del NDVI. Relativo y acotado.
+//
+// ⚠️ TENÍA UN ESCALÓN, y encima lo hacía NO MONÓTONO. La regla vieja era "por
+// debajo de NDVI 0,40 no se ajusta (factor 1); por encima, proporcional". Pero
+// 0,40/0,80 = 0,5, que el suelo recorta a 0,60 — así que:
+//
+//     NDVI 0,39 → 2,64 t      NDVI 0,50 → 1,66 t
+//     NDVI 0,40 → 1,58 t      NDVI 0,39 rendía MÁS que 0,50
+//
+// Un salto del 40% por una centésima, y un cultivo más verde rindiendo menos
+// que uno menos verde. Y eso multiplica TODO el plan de abonado.
+//
+// La causa no era el clamp: era la pregunta. "¿Tiene canopy?" no se contesta con
+// un umbral de NDVI, se contesta con la FENOLOGÍA — un cultivo recién plantado
+// tiene NDVI bajo por pequeño, no por mal rinde, y eso lo sabe la fase, no el
+// índice. Así que la puerta la abre la fase y, una vez abierta, el factor es
+// monótono en NDVI de principio a fin.
+//
+//   fase: "inicial" | "desarrollo" | "media" | "final" (de faseDelDia del motor)
+//   Sin fase conocida NO se ajusta: no se penaliza a ciegas.
+const FASES_CON_CANOPY = new Set(["media", "final"]);
+
+function factorVigor(ndvi, fase = null) {
   const v = Number(ndvi);
-  if (!(v >= NDVI_CANOPY_MIN)) return { factor: 1, aplicado: false };
+  const valido = ndvi != null && ndvi !== "" && Number.isFinite(v) && v >= -1 && v <= 1;
+  if (!valido) return { factor: 1, aplicado: false, motivo: "sin NDVI válido" };
+  if (!FASES_CON_CANOPY.has(fase)) {
+    return { factor: 1, aplicado: false,
+             motivo: fase ? `en fase ${fase} el NDVI mide tamaño, no rinde` : "sin fase conocida" };
+  }
+  // Sin más puertas por debajo: una segunda condición sobre el NDVI devolvía el
+  // escalón por otro lado (0,39 → factor 1, 0,40 → factor 0,60). Y no hace
+  // falta, porque el suelo del clamp ya acota lo que puede pasar: por debajo de
+  // NDVI 0,48 el factor es 0,60 y no baja más, pase lo que pase. Un cultivo en
+  // fase media con el NDVI por los suelos o está fallando o trae una nube — en
+  // los dos casos, abonar un 40% menos es el error barato.
   const f = Math.min(FACTOR_MAX, Math.max(FACTOR_MIN, v / NDVI_SANO));
-  return { factor: r2(f), aplicado: true };
+  return { factor: r2(f), aplicado: true, motivo: null };
 }
 
 // Rendimiento esperado (t) de la parcela.
@@ -60,12 +92,20 @@ function factorVigor(ndvi) {
 function rendimientoEsperadoT(cultivoId, areaM2, opts = {}) {
   const ref  = RINDE_REF_T_HA[cultivoId];
   const area = Number(areaM2);
-  if (!ref || !(area > 0)) {
+  if (!ref || !Number.isFinite(area) || !(area > 0)) {
     return { disponible: false, motivo: `Sin rinde de referencia para '${cultivoId}' o sin superficie.` };
+  }
+  // Cien hectáreas no son una huerta. Por encima de ahí hay un error de unidad
+  // casi seguro (m² tecleados como ha, o al revés), y el rendimiento multiplica
+  // todo el plan de abonado: mejor no dar plan que darlo mil veces más grande.
+  const AREA_MAX_M2 = 1e6;
+  if (area > AREA_MAX_M2) {
+    return { disponible: false,
+             motivo: `Superficie de ${Math.round(area)} m² (${r2(area / 10000)} ha): revisa la unidad.` };
   }
 
   const baseT = ref * (area / 10000);
-  const { factor, aplicado } = factorVigor(opts.ndvi);
+  const { factor, aplicado, motivo: motivoVigor } = factorVigor(opts.ndvi, opts.fase || null);
   const rendT = baseT * factor;
 
   return {
@@ -76,6 +116,7 @@ function rendimientoEsperadoT(cultivoId, areaM2, opts = {}) {
     rinde_ref_t_ha: ref,
     factor_vigor: factor,
     vigor_aplicado: aplicado,
+    vigor_motivo: motivoVigor || null,
     ndvi: aplicado ? r2(opts.ndvi) : null,
     fuente: aplicado
       ? "Rinde de referencia (afinable) × factor de vigor NDVI (relativo, acotado)"

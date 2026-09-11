@@ -206,19 +206,51 @@
       .sort((a, b) => a.date.localeCompare(b.date));
     if (!dias.length || dias[0].date > plant) return null;
 
+    // ⚠️ UN DÍA QUE FALTA NO ES UN DÍA SIN CALOR. Antes se sumaba solo lo que
+    // hubiera en la serie, así que un hueco se tragaba su calor en silencio: con
+    // 15 días ausentes de 41, el acumulado caía de 492 a 300 °C·día. El cultivo
+    // parecía 15 días más joven, el Kc bajaba y Kylia regaba de menos — que es
+    // justo el defecto que este bloque vino a arreglar, reaparecido por la otra
+    // puerta.
+    //
+    // Un hueco CORTO se rellena interpolando entre los días conocidos, que es
+    // gap-filling estándar y con error acotado. Uno largo no: ahí se devuelve
+    // null y todo el motor vuelve al reloj de calendario, que es honesto.
+    const HUECO_MAX_DIAS = 3;
+    const unDia = 86400000;
+    const completos = [];
+    for (let i = 0; i < dias.length; i++) {
+      completos.push(dias[i]);
+      if (i === dias.length - 1) break;
+      const a = new Date(`${dias[i].date}T12:00:00Z`), b = new Date(`${dias[i + 1].date}T12:00:00Z`);
+      const faltan = Math.round((b - a) / unDia) - 1;
+      if (faltan <= 0) continue;
+      if (faltan > HUECO_MAX_DIAS) return null;      // serie rota: mejor calendario
+      for (let k = 1; k <= faltan; k++) {
+        const f = (k) / (faltan + 1);
+        completos.push({
+          date: new Date(a.getTime() + k * unDia).toISOString().slice(0, 10),
+          tmax: Number(dias[i].tmax) + (Number(dias[i + 1].tmax) - Number(dias[i].tmax)) * f,
+          tmin: Number(dias[i].tmin) + (Number(dias[i + 1].tmin) - Number(dias[i].tmin)) * f,
+          rellenado: true,
+        });
+      }
+    }
+
     const mapa = new Map();
     let acum = 0;
-    for (const d of dias) {
+    for (const d of completos) {
       acum += gradosDia(d.tmax, d.tmin, g.tbase);
       mapa.set(d.date, { gdd: acum, dias: diasFenologicos(cultivoId, acum) });
     }
-    const ultima = dias[dias.length - 1].date;
+    const dias2 = completos;
+    const ultima = dias2[dias2.length - 1].date;
     const ult    = mapa.get(ultima);
     // Ritmo de los últimos 7 días, para estirar la curva a los días de pronóstico
     // que el balance sí tiene y la serie térmica no. Sin esto habría un salto
     // justo en el día de hoy, que es el que se enseña en pantalla.
-    const atras  = mapa.get(dias[Math.max(0, dias.length - 8)].date);
-    const pasos  = Math.max(1, Math.min(7, dias.length - 1));
+    const atras  = mapa.get(dias2[Math.max(0, dias2.length - 8)].date);
+    const pasos  = Math.max(1, Math.min(7, dias2.length - 1));
     const ritmo  = Math.max(0, (ult.dias - atras.dias) / pasos);
     const ritmoGdd = Math.max(0, (ult.gdd - atras.gdd) / pasos);
 
@@ -359,14 +391,93 @@
   // serie (`model.py`: io.p = sorted([0.1, io.pbase+0.04*(5.0-io.ETc), 0.8])[1])—.
   // Ojo: p NO entra en la recursión del agotamiento, solo mueve el UMBRAL (RAW).
   function aguaSuelo(suelo, cultivoId = null, dias = null, etcMmDia = null) {
-    const awc = SUELO_AWC[suelo] ?? SUELO_AWC_DEFAULT;
+    // Un suelo que no está en la tabla cae a franco, que es el término medio —
+    // pero se DICE, para que un "Franco" con mayúscula o un typo no se convierta
+    // en una suposición invisible: el AWC va de 0,08 a 0,16, casi el doble.
+    const reconocido = Object.prototype.hasOwnProperty.call(SUELO_AWC, suelo);
+    const awc = reconocido ? SUELO_AWC[suelo] : SUELO_AWC_DEFAULT;
     const zr  = zrDelDia(cultivoId, dias);
     let p     = FAO_KC[cultivoId]?.p ?? P_AGOTAMIENTO;
     if (etcMmDia != null && Number.isFinite(Number(etcMmDia))) {
       p = Math.min(0.8, Math.max(0.1, p + 0.04 * (5 - Number(etcMmDia))));
     }
     const taw = 1000 * awc * zr;
-    return { taw, raw: p * taw, awc, p };
+    return { taw, raw: p * taw, awc, p, sueloReconocido: reconocido };
+  }
+
+  // ── Saneado de la entrada ─────────────────────────────────────────
+  // UN SOLO SITIO, y a propósito. Hasta el 11-sep cada rama se defendía sola —
+  // o no se defendía— y el motor tragaba cosas que producían decisiones
+  // silenciosamente falsas. Las tres que más dolían, todas reproducidas:
+  //
+  //   · litros = NaN o texto  → Dr = NaN, y decisionRiego responde
+  //     "Todo en orden · déficit NaN mm". Con el balance corrupto, Kylia
+  //     TRANQUILIZA. Es el peor modo de fallo posible.
+  //   · litros negativos      → Dr sube: un riego SECA el suelo (32,2 → 50,2).
+  //   · et0 = null            → contaba como 0, o sea un día en el que el
+  //     cultivo no gastó agua (32,2 → 18,4 con tres días sin dato). Es el mismo
+  //     defecto que costó dos informes de piloto publicados mal, pero aquí
+  //     dentro, donde lo hereda cualquiera que llame al motor.
+  //
+  // La regla: UN DATO QUE FALTA NO ES UN CERO. El día sin ET₀ se descarta —no
+  // hay demanda que calcular— y lo que no es un número finito no entra.
+  // ⚠️ Number(null) es 0. Y Number("") también, y Number([]) también. Este
+  // fichero ya lleva TRES agujeros distintos por eso mismo: gradosDia lo
+  // documenta desde el 8-sep, laminaRiego lo tuvo hasta hoy, y el primer intento
+  // de este mismo saneado lo repitió —`Number.isFinite(Number(null))` es true,
+  // así que no filtraba nada—. Un solo sitio, y que no vuelva a pasar.
+  const finito = x => x != null && x !== "" && typeof x !== "boolean"
+                      && !Array.isArray(x) && Number.isFinite(Number(x));
+
+  function sanearSerie(serie) {
+    // Dedupe por fecha: una serie con el mismo día repetido contaba su ETc dos
+    // veces (32,2 → 34,3 con un día triplicado). Manda la última aparición, que
+    // es la lectura más fresca cuando se mezclan archivo y pronóstico.
+    const porFecha = new Map();
+    for (const d of serie || []) {
+      if (!d || typeof d.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) continue;
+      if (!finito(d.et0)) continue;                 // sin ET₀ no hay día que calcular
+      const et0 = Math.max(0, Number(d.et0));       // una ET₀ negativa no existe
+      const ll  = finito(d.lluvia) ? Math.max(0, Number(d.lluvia)) : 0;
+      porFecha.set(d.date, { ...d, et0, lluvia: ll });
+    }
+    return [...porFecha.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // Cuántos días FALTAN entre el primero y el último de la serie.
+  //
+  // Esto importa más de lo que parece, y se descubrió auditando el propio
+  // arreglo de arriba: descartar un día sin ET₀ y contarlo como cero dan EL
+  // MISMO déficit — en los dos casos el cultivo no gasta agua ese día. O sea que
+  // sanear la entrada no arregla el problema de fondo, solo deja de tragar
+  // basura. Lo único que lo arregla es DECIR que la serie está incompleta, para
+  // que quien publique un número sepa sobre cuánto clima real se ha calculado.
+  //
+  // Es exactamente lo que faltaba el 11-sep: dos informes de piloto salieron con
+  // el 39% y el 29% de su campaña sin clima, y nada en el resultado lo decía.
+  function huecosDeSerie(orden) {
+    if (orden.length < 2) return { dias: orden.length, faltan: 0, cobertura: orden.length ? 1 : 0 };
+    const a = new Date(`${orden[0].date}T12:00:00Z`);
+    const b = new Date(`${orden[orden.length - 1].date}T12:00:00Z`);
+    const esperados = Math.round((b - a) / 86400000) + 1;
+    const faltan = Math.max(0, esperados - orden.length);
+    return { dias: orden.length, faltan, cobertura: esperados > 0 ? orden.length / esperados : 0 };
+  }
+
+  // Riegos: fecha válida y lámina finita y NO negativa. Un `litros` nulo sigue
+  // significando "regó y no sabemos cuánto" (recarga completa), que es distinto
+  // de un dato roto.
+  function sanearRiegos(riegos) {
+    const out = [];
+    for (const r of riegos || []) {
+      if (!r || typeof r.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) continue;
+      if (r.litros == null) { out.push({ date: r.date, litros: null }); continue; }
+      if (!finito(r.litros)) continue;              // NaN, Infinity, "mucha"…
+      const l = Number(r.litros);
+      if (l < 0) continue;                          // un riego no puede restar agua
+      out.push({ ...r, litros: l });
+    }
+    return out;
   }
 
   function diasEntre(fechaIso, hasta) {
@@ -400,36 +511,50 @@
     // riego cuantificado borraba sus mm y el día pasaba a recarga completa; delante,
     // se perdía el null). Silencioso y no reproducible; ahora es determinista.
     const riegoNeto = {};
-    (riegos || []).forEach(r => {
+    sanearRiegos(riegos).forEach(r => {
       if (r.litros == null)          { riegoNeto[r.date] = null; return; }
       if (riegoNeto[r.date] === null) return;                    // ya hay un null ese día
       riegoNeto[r.date] = (riegoNeto[r.date] || 0) + r.litros * efic;
     });
 
-    const orden = [...(serie || [])].sort((a, b) => a.date.localeCompare(b.date));
+    const orden = sanearSerie(serie);
     let Dr = 0, etcAcum = 0, et0Acum = 0, lluviaAcum = 0;
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     for (const dia of orden) {
       const dias = diaFen(dia.date, new Date(`${dia.date}T12:00:00`));
       // ETc primero: el umbral (RAW) depende de ella por el ajuste de p.
       const kc  = kcDelDia(cultivoId, dias);
-      const etc = kc * (dia.et0 ?? 0);
+      const etc = kc * dia.et0;               // ya saneado: siempre número ≥ 0
       ({ taw, raw } = aguaSuelo(suelo, cultivoId, dias, etc));  // raíz creciente + p por ETc
       if (dia.date in riegoNeto) {
         const r = riegoNeto[dia.date];
         Dr = r === null ? 0 : Math.max(0, Dr - r);
       }
-      const pll = Math.max(0, dia.lluvia ?? 0);
-      const pe  = pll >= PE_MIN_MM ? pll : 0;               // lluvia efectiva
+      const pe = dia.lluvia >= PE_MIN_MM ? dia.lluvia : 0;   // lluvia efectiva
       Dr = Math.min(taw, Math.max(0, Dr + etc - pe));
-      etcAcum += etc; et0Acum += (dia.et0 ?? 0); lluviaAcum += pe;
+      etcAcum += etc; et0Acum += dia.et0; lluviaAcum += pe;
     }
 
     const ultimaISO = orden.length ? orden[orden.length - 1].date : new Date().toISOString().slice(0, 10);
     const ultima    = new Date(`${ultimaISO}T12:00:00`);
     const diasFin   = diaFen(ultimaISO, ultima);
+    // Plantación POSTERIOR al último día del balance: todavía no hay cultivo en
+    // la tierra. Antes se devolvía un balance normal con kc de fase inicial, o
+    // sea que Kylia podía mandar regar un campo sin plantar. Se dice lo que hay.
+    const sinPlantar = diasFin != null && diasFin < 0;
+    const cob = huecosDeSerie(orden);
     return {
-      Dr, taw, raw, efic,
+      Dr: sinPlantar ? 0 : Dr, taw, raw, efic, sinPlantar,
+      // Sobre cuánto clima REAL se ha calculado esto. Un balance con cobertura
+      // 0,61 no es un balance del que se pueda publicar un ahorro.
+      diasSerie: cob.dias, diasSinClima: cob.faltan,
+      coberturaClima: Math.round(cob.cobertura * 1000) / 1000,
+      // Y los extremos: huecosDeSerie solo ve los agujeros de EN MEDIO — si
+      // faltan los últimos días, el tramo simplemente se encoge y no hay nada
+      // que contar. El que llama sí sabe hasta cuándo esperaba tener clima, así
+      // que se le dan las fechas para que lo compruebe.
+      desdeSerie: orden.length ? orden[0].date : null,
+      hastaSerie: ultimaISO,
       kcActual: kcDelDia(cultivoId, diasFin),
       etcAcum, et0Acum, lluviaAcum,
       sinFenologia: !fechaPlantacion,
@@ -448,7 +573,15 @@
   //   0.75·RAW ≤ Dr   → vigilar (media)
   //   Dr < 0.75·RAW   → todo en orden (baja)
   function decisionRiego(bal, opts = {}) {
-    const { Dr, raw, taw, efic } = bal;
+    const { Dr, raw, taw, efic } = bal || {};
+    // NO SE DECIDE SOBRE UN BALANCE ROTO. Con Dr = NaN, `NaN >= raw` es false y
+    // se caía por las dos ramas hasta "Todo en orden · déficit NaN mm": el peor
+    // modo de fallo imaginable, porque TRANQUILIZA con los datos corrompidos.
+    // Ahora se dice que no se sabe, que es lo único honesto.
+    if (![Dr, raw, taw, efic].every(x => Number.isFinite(Number(x))) || raw <= 0 || efic <= 0) {
+      return { nivel: "desconocido", cantidad_l_m2: null,
+               texto: "No se puede calcular el riego: faltan datos del balance." };
+    }
     const r0 = (x) => Math.round(x);
 
     // Lluvia efectiva PREVISTA en la ventana corta. Mismo criterio que el balance
@@ -463,11 +596,18 @@
     // previsión que da un modelo. De ahí la ventana corta y las dos guardas de
     // abajo. No se usa la ET₀ prevista para regar de MÁS: eso sería adelantar
     // agua sobre un pronóstico, y FAO-56 ya lo recoge el día que el calor llega.
+    // TOPE DE CORDURA. Sin él, un valor corrupto en el pronóstico cancelaba el
+    // riego: con lluvia = 1.000.000 la app decía "esperar a la lluvia · se
+    // prevén 1000000 mm en 48 h". El récord diario de España anda por 800 mm, y
+    // por encima de 200 en 48 h el dato es basura, no un temporal. Un dato
+    // absurdo se descarta; no se deja que decida.
+    const LLUVIA_MAX_DIA_MM = 200;
     const prevista = (opts.lluviaPrevista || [])
       .slice(0, VENTANA_PRONOSTICO_DIAS)
       .reduce((s, d) => {
-        const mm = Math.max(0, Number(d && d.lluvia) || 0);
-        return s + (mm >= PE_MIN_MM ? mm : 0);
+        const v = Number(d && d.lluvia);
+        if (!Number.isFinite(v) || v < 0 || v > LLUVIA_MAX_DIA_MM) return s;
+        return s + (v >= PE_MIN_MM ? v : 0);
       }, 0);
 
     if (Dr >= raw) {
@@ -555,9 +695,21 @@
   // el `cantidad_l_m2` que se guardó entonces se desfasa. Sin duración o sin
   // caudal (p. ej. regadera por cubos) → la lámina guardada tal cual.
   function laminaRiego(cantidadGuardada, duracionMin, caudalMmh) {
-    const caudal = Number(caudalMmh);
-    if (duracionMin != null && caudal > 0) return Math.round((caudal * duracionMin / 60) * 10) / 10;
-    return cantidadGuardada ?? null;
+    const caudal = Number(caudalMmh), min = Number(duracionMin);
+    // `duracionMin > 0`, no `!= null`. Con `!= null`, una duración de 0 —que es
+    // lo que llega de la base de datos cuando el campo existe pero nadie lo
+    // rellenó— devolvía 0 mm y BORRABA del balance un riego que sí tenía su
+    // cantidad apuntada. Y una duración negativa devolvía una lámina negativa,
+    // que aguas abajo secaba el suelo. Ninguna de las dos es una duración.
+    if (Number.isFinite(min) && min > 0 && caudal > 0) {
+      return Math.round((caudal * min / 60) * 10) / 10;
+    }
+    // Y aquí otra vez el mismo agujero que vigila gradosDia: Number(null) es 0,
+    // así que un riego SIN cantidad habría devuelto 0 mm en vez de null —
+    // "regó y no sabemos cuánto" convertido en "no echó nada".
+    if (cantidadGuardada == null || cantidadGuardada === "") return null;
+    const c = Number(cantidadGuardada);
+    return Number.isFinite(c) ? c : null;
   }
 
   // Simula el manejo del riego "según Kylia" sobre una serie climática: cada día,
@@ -575,7 +727,7 @@
     const efic = EFIC_RIEGO[metodoRiego] ?? EFIC_DEFAULT;
     const curva = termico ? curvaFenologica(cultivoId, serieTermica || serie, fechaPlantacion) : null;
 
-    const orden = [...(serie || [])].sort((a, b) => a.date.localeCompare(b.date));
+    const orden = sanearSerie(serie);
     let Dr = 0, acum = 0;
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     const puntos = [];
@@ -584,19 +736,21 @@
       const dias = tf == null ? diasEntre(fechaPlantacion, new Date(`${dia.date}T12:00:00`)) : tf;
       // ETc primero: el umbral (RAW) depende de ella por el ajuste de p.
       const kc  = kcDelDia(cultivoId, dias);
-      const etc = kc * (dia.et0 ?? 0);
+      const etc = kc * dia.et0;               // ya saneado
       ({ taw, raw } = aguaSuelo(suelo, cultivoId, dias, etc));  // raíz creciente + p por ETc
       // Decisión de la mañana: con el déficit que arrastra de ayer (misma regla que decisionRiego).
       if (Dr >= raw) { acum += Dr / efic; Dr = 0; }   // riego bruto = Dr/efic → repone Dr neto
-      const pll = Math.max(0, dia.lluvia ?? 0);
-      const pe  = pll >= PE_MIN_MM ? pll : 0;               // lluvia efectiva
+      const pe = dia.lluvia >= PE_MIN_MM ? dia.lluvia : 0;   // lluvia efectiva
       Dr = Math.min(taw, Math.max(0, Dr + etc - pe));
       puntos.push({ date: dia.date, acum_l_m2: Math.round(acum * 10) / 10 });
     }
     // deficitFinal: agua que Kylia tenía "en cola" al corte (aún no regada porque
     // el depósito no llegó al umbral). Honestidad del reveal: comparar acumulados
     // a igual fecha favorece al que riega menos a menudo; este dato lo explicita.
+    const cobS = huecosDeSerie(orden);
     return { puntos, total: Math.round(acum * 10) / 10, taw, raw, efic,
+             diasSerie: cobS.dias, diasSinClima: cobS.faltan,
+             coberturaClima: Math.round(cobS.cobertura * 1000) / 1000,
              modoFenologia: curva ? "termico" : "calendario",
              deficitFinal: Math.round((Dr / efic) * 10) / 10 };
   }
@@ -605,6 +759,7 @@
     FAO_KC, FAO_GDD, SUELO_AWC, ZR_M, P_AGOTAMIENTO, PE_MIN_MM, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
     VENTANA_PRONOSTICO_DIAS,
     kcDelDia, faseDelDia, zrDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia,
+    sanearSerie, sanearRiegos, huecosDeSerie,
     gradosDia, gddDelCiclo, diasFenologicos, curvaFenologica, ventanaMadurez, normalesMensuales,
   };
 

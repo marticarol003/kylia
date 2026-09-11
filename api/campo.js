@@ -463,7 +463,11 @@ async function vistaCuaderno(req, res, u) {
   let rendEstimado = null;
   if (rendOnboarding == null && cultivo) {
     const ndvi = await ultimoNdvi(u.id);
-    rendEstimado = rendimientoEsperadoT(cultivo, u.area_m2, { ndvi });
+    // La FASE decide si el NDVI significa rinde. En fase inicial un cultivo
+    // tiene el índice bajo por pequeño, no por ir mal, y penalizarlo ahí movía
+    // los kilos de nitrógeno de todo el plan. Ver factorVigor.
+    const fase = faseDelDia(cultivo, diasDesde(u.fecha_plantacion));
+    rendEstimado = rendimientoEsperadoT(cultivo, u.area_m2, { ndvi, fase });
   }
   const rendT = rendOnboarding != null
     ? rendOnboarding

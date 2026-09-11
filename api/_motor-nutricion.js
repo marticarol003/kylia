@@ -130,10 +130,27 @@ function necesidadNutrientes(cultivoId, rendimientoT, ofertaSuelo, opts = {}) {
     return { disponible: false, motivo: `Sin coeficientes de extracción para '${cultivoId}'.` };
   }
   const rend = Number(rendimientoT);
-  if (!(rend > 0)) {
+  // `!(rend > 0)` NO caza Infinity: `Infinity > 0` es true, y el plan salía con
+  // "Infinity kg" de nitrógeno. Y `Number(null)` es 0, que sí cae aquí por poco.
+  if (!Number.isFinite(rend) || rend <= 0) {
     return {
       disponible: false,
       motivo: "Falta el rendimiento esperado (t) para calcular la extracción del cultivo.",
+    };
+  }
+
+  // TECHO DE PLAUSIBILIDAD. Sin él, 1.000 t declaradas en 440 m² daban 68.227 kg
+  // N/ha — mil veces lo que admite la normativa de zonas vulnerables, y sin que
+  // nada chillara. El rendimiento lo teclea una persona y es el término que
+  // MULTIPLICA todo el balance, así que un cero de más no puede pasar callando.
+  // El listón: 300 t/ha, muy por encima de cualquier hortícola al aire libre
+  // (el tomate de referencia de MAPA son 60), así que solo salta con errores.
+  const RENDIMIENTO_MAX_T_HA = 300;
+  const areaHa = Number(opts.area_m2) > 0 ? Number(opts.area_m2) / 10000 : null;
+  if (areaHa && rend / areaHa > RENDIMIENTO_MAX_T_HA) {
+    return {
+      disponible: false,
+      motivo: `Rendimiento de ${r1(rend / areaHa)} t/ha: imposible en horticultura. Revisa la cifra o la superficie.`,
     };
   }
 
@@ -154,14 +171,24 @@ function necesidadNutrientes(cultivoId, rendimientoT, ofertaSuelo, opts = {}) {
   const porNutriente = {};
   for (const n of ["N", "P2O5", "K2O"]) {
     const extraccion = ext[n] * rend;
-    const aporte     = ofertaConocida ? (Number(oferta[n]) || 0) : 0;
+    // OJO CON LA DIFERENCIA ENTRE 0 Y DESCONOCIDO. ofertaSuelo() devuelve
+    // SIEMPRE P₂O₅ y K₂O a null y lo dice con todas las letras: "desconocidos
+    // declarados, no cero disfrazado" — no se leen desde el espacio. Aquí
+    // `Number(null) || 0` los convertía en 0 y el plan salía informando
+    // "aporte del suelo: 0 kg" para los dos. El número de la necesidad es el
+    // mismo (sin aporte conocido se pide la extracción bruta), pero lo que se
+    // AFIRMA no: decir que el suelo aporta cero fósforo es una afirmación, y no
+    // la tenemos.
+    const crudo     = oferta ? oferta[n] : null;
+    const conocido  = ofertaConocida && crudo != null && crudo !== "" && Number.isFinite(Number(crudo));
+    const aporte    = conocido ? Number(crudo) : 0;
     // Colchón y crédito de residuos son términos de nitrógeno; P₂O₅/K₂O no los llevan.
     const colchon    = n === "N" ? colchonN : 0;
     const credito    = n === "N" ? creditoN : 0;
     const necesidad  = Math.max(0, extraccion + colchon - aporte - credito);
     porNutriente[n] = {
       extraccion_kg: r1(extraccion),
-      aporte_suelo_kg: ofertaConocida ? r1(aporte) : null,
+      aporte_suelo_kg: conocido ? r1(aporte) : null,   // null = no se sabe, ≠ 0
       necesidad_kg: r1(necesidad),
     };
     if (n === "N" && balanceNCompleto) {
