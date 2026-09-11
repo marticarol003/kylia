@@ -2736,6 +2736,10 @@
            un dedo al sol; trazar un contorno cerrado, no. -->
       <div class="mapa-pie">
         <button type="button" class="btn-riego" id="btn-anadir-cultivo">+ Añadir cultivo</button>
+        <!-- Segunda parcela: otro recinto de SIGPAC. Nace oculto y solo aparece
+             cuando ya hay un recinto con el que comparar — a quien tiene una
+             sola finca no se le enseña un concepto que no necesita. -->
+        <button type="button" class="btn-riego" id="btn-anadir-parcela" hidden>+ Añadir parcela</button>
         <span class="mapa-libres" id="mapa-libres"></span>
       </div>
 
@@ -3688,6 +3692,11 @@
           : (libres > 10 ? `${libres.toLocaleString("es-ES")} m² sin repartir` : "");
       }
 
+      // El botón de parcela nueva solo si ya hay un recinto de SIGPAC: sin
+      // referencia no hay con qué comparar y no se podría evitar duplicarla.
+      const btnP = document.getElementById("btn-anadir-parcela");
+      if (btnP) btnP.hidden = !zonasGuardadas().some(z => z.referencia);
+
       const activa = lista.find(p => (p.id || null) === zonaActiva) || lista[0];
       document.getElementById("mapa-sub").textContent = lista.length > 1
         ? `${lista.length} cultivos · toca uno para verlo`
@@ -3707,6 +3716,11 @@
             if (++fallos > 2 && !mapaCampo.hasLayer(osm)) { mapaCampo.removeLayer(esri); osm.addTo(mapaCampo); }
           });
           esri.addTo(mapaCampo);
+          // Tocar fuera de los contornos solo hace algo cuando se está buscando
+          // una parcela nueva; si no, es un toque perdido.
+          mapaCampo.on("click", ev => {
+            if (esperandoParcela) nuevaParcelaEn(ev.latlng.lat, ev.latlng.lng);
+          });
         }
         capasCampo.forEach(c => mapaCampo.removeLayer(c));
         capasCampo = [];
@@ -3725,7 +3739,7 @@
             },
           }).addTo(mapaCampo);
           capa.bindTooltip(p.etiqueta, { permanent: false, direction: "center" });
-          capa.on("click", () => { if (!esActiva) cambiarZona(p.id || null); });
+          capa.on("click", () => { if (!esperandoParcela && !esActiva) cambiarZona(p.id || null); });
           capasCampo.push(capa);
           bounds = bounds ? bounds.extend(capa.getBounds()) : capa.getBounds();
         });
@@ -3742,8 +3756,16 @@
     // Aquí solo va la parte de dedo.
     let ecGeom = null, ecTiradores = [], ecCapa = null, ecRecinto = null, ecCabe = false;
 
+    // La parcela sobre la que se añade un cultivo: la del cultivo que se está
+    // mirando. Antes devolvía siempre la PRIMERA, así que con dos parcelas el
+    // cultivo nuevo caía en la equivocada sin avisar.
     function zonaConRecinto() {
-      for (const z of zonasGuardadas()) if (z.geometria) return z;
+      const zonas = zonasGuardadas();
+      if (zonaActiva) {
+        const suya = zonas.find(z => (z.siembras || []).some(s => s.id === zonaActiva));
+        if (suya?.geometria) return suya;
+      }
+      for (const z of zonas) if (z.geometria) return z;
       return cfgFinca.parcela ? { geometria: cfgFinca.parcela, superficie_m2: cfgFinca.areaParcela,
                                   siembras: [], referencia: null } : null;
     }
@@ -3755,8 +3777,63 @@
       return Math.max(0, (Number(z.superficie_m2) || 0) - usado);
     }
 
-    function abrirEditorCultivo() {
-      const z = zonaConRecinto();
+    // ─── Añadir otra parcela ──────────────────────────────────────────────
+    // El modelo de dos niveles (finca → parcelas → cultivos) ya existía: las
+    // zonas son recintos de SIGPAC y cada una lleva sus siembras. Lo único que
+    // faltaba era la puerta desde la pantalla principal.
+    let esperandoParcela = false;
+    function pedirOtraParcela() {
+      if (!mapaCampo) return;
+      esperandoParcela = true;
+      document.getElementById("mapa-libres").textContent =
+        "Toca en el mapa dónde está tu otra parcela. Puedes alejar con los dedos.";
+      document.getElementById("btn-anadir-parcela").disabled = true;
+      // Se aleja para que quepa otra finca que puede estar a un kilómetro.
+      mapaCampo.setZoom(Math.max(13, mapaCampo.getZoom() - 3));
+    }
+
+    async function nuevaParcelaEn(lat, lon) {
+      const pie = document.getElementById("mapa-libres");
+      pie.textContent = "Buscando el recinto…";
+      try {
+        const r = await fetch(`/api/sigpac?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`, { cache: "no-store" });
+        const d = await r.json();
+        if (!d?.parcela || !(d.superficie_m2 > 0)) {
+          pie.textContent = "Ahí no hay ningún recinto registrado. Prueba otra vez sobre tu campo.";
+          return;
+        }
+        const zonas = zonasGuardadas();
+        // La misma parcela dos veces no: se avisa en vez de duplicarla.
+        if (zonas.some(z => z.referencia === d.referencia)) {
+          pie.textContent = "Esa parcela ya la tienes.";
+          return;
+        }
+        zonas.push({
+          referencia: d.referencia, superficie_m2: d.superficie_m2, uso: d.uso || null,
+          geometria: d.parcela,
+          // Nace VACÍA, sin cultivo. Meter uno por defecto sería inventarle un
+          // cultivo que no ha dicho, y ese cultivo entra en el balance.
+          siembras: [],
+        });
+        localStorage.setItem(ZONAS_KEY, JSON.stringify(zonas));
+        renderZonasTabs();
+        // DESPUÉS de repintar: renderZonasTabs vuelve a escribir este pie con
+        // los metros libres y se comía la confirmación.
+        pie.textContent = `Parcela de ${d.superficie_m2.toLocaleString("es-ES")} m² añadida. Ahora dinos qué tienes plantado.`;
+        // Y directo a poner su cultivo: una parcela sin cultivo no calcula nada.
+        abrirEditorCultivo(d.referencia);
+      } catch (_) {
+        pie.textContent = "No hemos podido consultar SIGPAC ahora mismo.";
+      } finally {
+        esperandoParcela = false;
+        document.getElementById("btn-anadir-parcela").disabled = false;
+      }
+    }
+
+    function abrirEditorCultivo(refForzada = null) {
+      const z = refForzada
+        ? zonasGuardadas().find(x => x.referencia === refForzada)
+        : zonaConRecinto();
       if (!z?.geometria) return;
       ecRecinto = z;
       const libres = metrosLibres(z);
@@ -5770,7 +5847,7 @@
       if (bal.Dr >= bal.raw) {
         const dias  = bal.diasDesdeUltimoRiego;
         const desde = (ctx.riegos || []).length
-          ? `el último riego registrado${dias != null ? ` (hace ${dias} días)` : ""}`
+          ? `el último riego registrado${dias != null ? ` (hace ${dias} día${dias === 1 ? "" : "s"})` : ""}`
           : "la última imagen del satélite";
         return { et0: bal.Dr, raw: bal.raw, desde };
       }
@@ -8761,7 +8838,8 @@
       ecGrupo("ec-cada",   "cada",   "cada",   () => ecRevelar("ec-q-rato"));
       ecGrupo("ec-rato",   "min",    "minutos", () => ecRevelar("ec-q-ultimo"));
       ecGrupo("ec-ultimo", "ult",    "ultimo");
-      document.getElementById("btn-anadir-cultivo")?.addEventListener("click", abrirEditorCultivo);
+      document.getElementById("btn-anadir-cultivo")?.addEventListener("click", () => abrirEditorCultivo());
+      document.getElementById("btn-anadir-parcela")?.addEventListener("click", pedirOtraParcela);
       document.getElementById("ec-cancelar")?.addEventListener("click", cerrarEditorCultivo);
       document.getElementById("ec-guardar")?.addEventListener("click", guardarCultivoNuevo);
 

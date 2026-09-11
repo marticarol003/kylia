@@ -160,5 +160,38 @@ ok(ofrecidos.every(m => MOT.EFIC_RIEGO[m] != null),
 ok(MOT.EFIC_RIEGO.surco < MOT.EFIC_RIEGO.goteo,
    `y no dan igual: surco ${MOT.EFIC_RIEGO.surco} contra goteo ${MOT.EFIC_RIEGO.goteo}`);
 
+console.log("\n── segunda parcela: finca → parcelas → cultivos ──");
+// El modelo de dos niveles ya existía (las zonas son recintos de SIGPAC y cada
+// una lleva sus siembras). Lo que faltaba era la puerta desde la pantalla
+// principal.
+ok(/id="btn-anadir-parcela"[^>]*hidden/.test(app), "el botón nace oculto");
+ok(/btnP\.hidden = !zonasGuardadas\(\)\.some\(z => z\.referencia\)/.test(app),
+   "y solo aparece si ya hay un recinto: a quien tiene una finca no se le enseña el concepto");
+ok(/if \(esperandoParcela\) nuevaParcelaEn\(ev\.latlng\.lat, ev\.latlng\.lng\)/.test(app),
+   "tocar fuera de los contornos solo hace algo mientras se busca parcela");
+ok(/mapaCampo\.setZoom\(Math\.max\(13, mapaCampo\.getZoom\(\) - 3\)\)/.test(app),
+   "y se aleja el mapa: la otra finca puede estar a un kilómetro");
+
+console.log("\n── no se duplica ni se inventa ──");
+ok(/if \(zonas\.some\(z => z\.referencia === d\.referencia\)\)/.test(app),
+   "la misma parcela dos veces se avisa, no se duplica");
+ok(/Ahí no hay ningún recinto registrado/.test(app),
+   "tocar donde no hay recinto se dice");
+ok(/siembras: \[\],/.test(app) && /Meter uno por defecto sería inventarle un\n\s+\/\/ cultivo/.test(app),
+   "la parcela nueva nace SIN cultivo: meter uno por defecto lo metería en el balance");
+ok(/abrirEditorCultivo\(d\.referencia\)/.test(app),
+   "y se lleva directo a ponerle cultivo, porque sin él no calcula nada");
+
+console.log("\n── el cultivo nuevo cae en la parcela que se está mirando ──");
+// zonaConRecinto devolvía siempre la PRIMERA: con dos parcelas, el cultivo
+// nuevo caía en la equivocada sin avisar.
+ok(/const suya = zonas\.find\(z => \(z\.siembras \|\| \[\]\)\.some\(s => s\.id === zonaActiva\)\)/.test(app),
+   "se busca la parcela del cultivo activo");
+ok(/function abrirEditorCultivo\(refForzada = null\)/.test(app),
+   "y se puede forzar una, que es lo que hace la parcela recién creada");
+
+console.log("\n── detalles de lengua ──");
+ok(/hace \$\{dias\} día\$\{dias === 1 \? "" : "s"\}/.test(app), "no dice 'hace 1 días'");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
