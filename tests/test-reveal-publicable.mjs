@@ -50,6 +50,27 @@ ok(/No se puede comparar/.test(dRoto.veredicto), "y el veredicto lo dice en la l
 const dBien = RV.dimAguaDesdeContrafactual(riegos, cfBien);
 ok(dBien.publicable === true && dBien.ahorro_pct != null, "con el clima entero sí se publica");
 
+console.log("\n── un riego físicamente imposible no es agua, es un dato mal metido ──");
+// Ciclo 13. El suelo que más agua guarda de toda la tabla de Kylia —arcilloso
+// con tomate a raíz completa— son 112 mm. Por encima de 150 L/m² en un día no
+// hay riego hortícola: es un caudal equivocado, unos minutos de más, o el cron
+// de pauta fija escribiendo sobre un `riego_auto_min` con un cero de sobra
+// (1.100 L/m² con 6.000 min a 11 mm/h). El balance lo absorbe sin quejarse
+// —Dr se acota a [0, TAW]— así que no se ve hasta que el agua se SUMA aquí.
+const conAbsurdo = riegos.map((r, i) => i === 40 ? { ...r, l_m2: 1100 } : r);
+const dAbsurdo = RV.dimAguaDesdeContrafactual(conAbsurdo, cfBien);
+ok(dAbsurdo.publicable === false, "con un riego de 1.100 L/m² el informe NO se publica");
+ok(/dato mal metido/.test(dAbsurdo.motivo_no_publicable), "y se dice que es un dato, no agua");
+ok(new RegExp(dia(40)).test(dAbsurdo.motivo_no_publicable),
+   `se señala el día concreto (${dia(40)}) para poder ir a corregirlo`);
+ok(dAbsurdo.ahorro_pct === null && dAbsurdo.aplicada_l_m2 === null,
+   "y las cifras tampoco salen: 1.100 L/m² en un día inflarían el ahorro solo");
+// Lo justo por debajo del corte sigue publicándose: no es una guarda que se
+// coma riegos grandes de verdad (un riego de asiento, un lavado de sales).
+const dAlto = RV.dimAguaDesdeContrafactual(
+  riegos.map((r, i) => i === 40 ? { ...r, l_m2: 140 } : r), cfBien);
+ok(dAlto.publicable === true, "140 L/m² —grande pero posible— sigue siendo publicable");
+
 console.log("\n── la cobertura se mide contra la ventana ESPERADA ──");
 // Este es el segundo fallo, y era MÍO: la primera versión medía la serie contra
 // sí misma (primer día → último), así que los huecos del principio y del final

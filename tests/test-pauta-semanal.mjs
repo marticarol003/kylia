@@ -70,6 +70,38 @@ mismo(fechasDePauta({ desde: "2026-08-03", tope: "2026-08-09", diasSemana: [7] }
 mismo(fechasDePauta({ desde: "2026-08-03", tope: "2026-08-09", diasSemana: [1, 2, 3, 4, 5, 6, 7] }, []).length === 7
         ? [7] : [0], [7], "los 7 días de la semana caben, sin repetir ni saltar");
 
+console.log("── el relleno está ACOTADO: esto escribe agua que nadie confirma ──");
+// Ciclo 13 de la auditoría (11-sep-2026). `fechasDePauta` recorría desde la
+// fecha ancla hasta hoy sin tope. Medido antes del arreglo:
+//
+//   riego_auto_desde = 2020-01-01, pauta lun+jue → 699 filas de una sentada
+//   riego_auto_desde = 0001-01-01                → 105.696 filas y 1,8 s
+//
+// Y cada fila es "agua aplicada" en el cuaderno del agricultor y en el reveal
+// del piloto. Un cero de más en una columna de la base de datos reescribía la
+// historia de riego de una parcela.
+const HOY = "2026-09-11";
+const largo = fechasDePauta({ desde: "2020-01-01", tope: HOY, cada: 0, diasSemana: [1, 4] }, []);
+ok(largo.length === 40, `una fecha ancla de 2020 rellena 40 días, no 699 (salen ${largo.length})`);
+ok(largo[largo.length - 1] > largo[0], "y salen en orden ascendente, como antes");
+ok(largo[largo.length - 1] === "2026-09-10",
+   "el recorte se queda con los días RECIENTES: son los que el balance de hoy necesita");
+
+const t0 = Date.now();
+const absurda = fechasDePauta({ desde: "0001-01-01", tope: HOY, cada: 0, diasSemana: [1] }, []);
+ok(absurda.length === 40 && Date.now() - t0 < 200,
+   "y una fecha imposible se resuelve al instante en vez de recorrer dos milenios");
+
+ok(fechasDePauta({ desde: "garbage", tope: HOY, cada: 0, diasSemana: [1] }, []).length === 0,
+   "una fecha que no es una fecha no entra en el bucle");
+ok(fechasDePauta({ desde: "2026-10-01", tope: HOY, cada: 0, diasSemana: [1] }, []).length === 0,
+   "ni una fecha ancla posterior a hoy");
+
+// Y lo que NO puede cambiar: el caso real del piloto sale exactamente igual.
+const real = fechasDePauta({ desde: "2026-08-06", tope: HOY, cada: 0, diasSemana: [1, 4] }, []);
+ok(real.length === 11 && real[0] === "2026-08-06" && real[10] === "2026-09-10",
+   "la cebolleta de El Tros de l'Uri (lun+jue desde el 6-ago) sigue dando sus 11 días");
+
 console.log("── guardas de integridad del piloto ──");
 const diarioB = readFileSync(join(RAIZ, "api", "diario-b.js"), "utf8");
 ok(/fecha_cosecha/.test(diarioB) && /d <= tope/.test(diarioB),

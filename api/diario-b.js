@@ -117,22 +117,48 @@ const NOMBRE_DIA = ["", "lunes", "martes", "miércoles", "jueves", "viernes", "s
 //   • cada N           → "cada N días desde el ancla" (programador de goteo)
 // La semanal manda si viene, porque un patrón lun+jue es 3-4-3-4 días y no cabe
 // en un intervalo fijo.
+// Tope de relleno por corrida. Esto ESCRIBE agua en el cuaderno del agricultor,
+// y la escribe sin que nadie la confirme: cuantas más filas de golpe, más lejos
+// llega un error antes de que alguien lo vea. Con una pauta de dos días por
+// semana, 40 filas son cinco meses de riego — de sobra para el autocurado que
+// justifica el relleno (si una corrida se cayó, la siguiente la repone), y poco
+// para un `riego_auto_desde` mal puesto.
+//
+// Medido: con `desde = 2020-01-01` y pauta lunes+jueves, esto insertaba 699
+// riegos inventados de una sentada, todos contados luego como agua aplicada en
+// el reveal del piloto. Con "0001-01-01" eran 105.696 y 1,8 s solo de calcularlo.
+const MAX_RELLENO_POR_CORRIDA = 40;
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
 function fechasDePauta({ desde, tope, cada, diasSemana }, yaRegistradas) {
+  // Una fecha que no es una fecha no entra en el bucle. `"garbage" <= "2026-…"`
+  // es false y se salvaba de casualidad; "0001-01-01" no.
+  if (!FECHA_ISO.test(String(desde || "")) || !FECHA_ISO.test(String(tope || ""))) return [];
+  if (desde > tope) return [];
+
   const yaHay  = new Set(yaRegistradas || []);
   const semana = new Set((Array.isArray(diasSemana) ? diasSemana : [])
     .map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 7));
   const nuevos = [];
 
+  // Se recorre HACIA ATRÁS desde el tope: si hay que recortar, lo que se queda
+  // son los días recientes, que es lo que el balance de hoy necesita. Recortar
+  // por delante dejaría el relleno anclado en 2020 y sin llegar nunca a hoy.
   if (semana.size) {
-    for (let d = desde; d <= tope; d = sumarDias(d, 1)) {
+    for (let d = tope; d >= desde && nuevos.length < MAX_RELLENO_POR_CORRIDA; d = sumarDias(d, -1)) {
       if (semana.has(diaSemanaISO(d)) && !yaHay.has(d)) nuevos.push(d);
     }
   } else if (cada > 0) {
+    // La pauta "cada N días" está anclada en `desde`, así que las fechas válidas
+    // hay que contarlas desde ahí; lo que se recorta es el principio.
+    const todas = [];
     for (let d = desde; d <= tope; d = sumarDias(d, cada)) {
-      if (!yaHay.has(d)) nuevos.push(d);
+      if (!yaHay.has(d)) todas.push(d);
+      if (todas.length > 20000) break;          // freno duro ante una fecha absurda
     }
+    return todas.slice(-MAX_RELLENO_POR_CORRIDA);
   }
-  return nuevos;
+  return nuevos.reverse();
 }
 
 // Materializa los riegos de un piloto de PAUTA FIJA. Dos casos:

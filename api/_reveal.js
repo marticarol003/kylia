@@ -172,6 +172,20 @@ function dimAgua(riegosReales, riegosKylia, contrafactual) {
   if (sinCifra.length && sinCifra.length > enPeriodo.length * 0.2) {
     razones.push(`${sinCifra.length} de ${enPeriodo.length} riegos están apuntados sin cantidad`);
   }
+  // UN RIEGO FÍSICAMENTE IMPOSIBLE NO ES UN RIEGO: ES UN DATO MAL METIDO.
+  // El suelo que más agua guarda de toda la tabla de Kylia —arcilloso con tomate
+  // a raíz completa— son 112 mm. Por encima de 150 L/m² en UN día no hay riego
+  // hortícola que valga: es un caudal equivocado, unos minutos de más, o un cron
+  // de pauta fija escribiendo sobre un `riego_auto_min` con un cero de sobra.
+  // El balance lo absorbe sin quejarse (Dr se acota a [0, TAW]), así que el daño
+  // no se ve hasta aquí, donde el agua se SUMA para publicarla.
+  const RIEGO_MAX_DIA_L_M2 = 150;
+  const absurdos = realesEnPeriodo.filter(r => Number(r.l_m2) > RIEGO_MAX_DIA_L_M2);
+  if (absurdos.length) {
+    razones.push(`hay ${absurdos.length} riego${absurdos.length === 1 ? "" : "s"} de más de `
+                 + `${RIEGO_MAX_DIA_L_M2} L/m² (el ${absurdos[0].dia}, ${r0(absurdos[0].l_m2)}): `
+                 + "es un dato mal metido, no agua");
+  }
   if (!(aguaKylia >= 5)) razones.push("la lámina de referencia es demasiado pequeña para un porcentaje");
   if (aguaReal > 0 && aguaReal < 5) razones.push("el agua registrada es demasiado poca para un porcentaje");
   const publicable = razones.length === 0;
@@ -318,6 +332,20 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
   // Con cualquiera de los dos lados diminuto el porcentaje se dispara y deja de
   // significar nada: 400 contra 0,1 daba "exceso del 399.900%", y 0,5 contra 400
   // daba "ahorro del −79.900%".
+  // UN RIEGO FÍSICAMENTE IMPOSIBLE NO ES UN RIEGO: ES UN DATO MAL METIDO.
+  // El suelo que más agua guarda de toda la tabla de Kylia —arcilloso con tomate
+  // a raíz completa— son 112 mm. Por encima de 150 L/m² en UN día no hay riego
+  // hortícola que valga: es un caudal equivocado, unos minutos de más, o un cron
+  // de pauta fija escribiendo sobre un `riego_auto_min` con un cero de sobra.
+  // El balance lo absorbe sin quejarse (Dr se acota a [0, TAW]), así que el daño
+  // no se ve hasta aquí, donde el agua se SUMA para publicarla.
+  const RIEGO_MAX_DIA_L_M2 = 150;
+  const absurdos = realesEnPeriodo.filter(r => Number(r.l_m2) > RIEGO_MAX_DIA_L_M2);
+  if (absurdos.length) {
+    razones.push(`hay ${absurdos.length} riego${absurdos.length === 1 ? "" : "s"} de más de `
+                 + `${RIEGO_MAX_DIA_L_M2} L/m² (el ${absurdos[0].dia}, ${r0(absurdos[0].l_m2)}): `
+                 + "es un dato mal metido, no agua");
+  }
   if (!(aguaKylia >= 5)) razones.push("la lámina de referencia es demasiado pequeña para un porcentaje");
   if (aguaReal > 0 && aguaReal < 5) razones.push("el agua registrada es demasiado poca para un porcentaje");
   const publicable = razones.length === 0;
