@@ -93,8 +93,15 @@ ok(/config\.modo === "demo"/.test(iife), "que se restaura al bajar");
 console.log("── no se satura la red al escribir ──");
 ok(/clearTimeout\(subidaPendiente\)/.test(app) && /setTimeout\(\(\) => \{/.test(app),
    "la subida va con retardo: el panel guarda en cada tecla y sin esto un nombre serían 15 peticiones");
+// Tres sitios, y los tres son lo mismo: cambió la finca o cambiaron las zonas.
+// El tercero es guardar un cultivo nuevo dibujado en el mapa, que crea una
+// siembra — o sea, un cambio de zonas por otra puerta. Si aparece un cuarto,
+// que salte: subirConfig desde cualquier sitio es la vía rápida a saturar la red.
 const llamadas = (app.match(/subirConfig\(\);/g) || []).length;
-ok(llamadas === 2, `se sube al cambiar la finca y al cambiar las zonas, y en ningún otro sitio (${llamadas})`);
+ok(llamadas === 3, `se sube al cambiar la finca, al cambiar las zonas y al añadir un cultivo (${llamadas})`);
+const trasGuardar = app.slice(app.indexOf("function guardarCultivoNuevo"), app.indexOf("function cambiarZona"));
+ok(/subirConfig\(\);/.test(trasGuardar),
+   "y el cultivo nuevo viaja al servidor: si no, el cron mediría una parcela que allí no existe");
 ok(!/subirConfig\(\)[\s\S]{0,80}arranque|restaurarSiVacio[\s\S]{0,200}subirConfig/.test(app),
    "no se sube al arrancar: solo cuando el agricultor cambia algo");
 

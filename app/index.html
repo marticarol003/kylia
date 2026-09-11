@@ -745,7 +745,18 @@
     .mapa-titulo { font-weight: 700; font-size: .78rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
     .mapa-sub { font-size: .8rem; color: var(--muted); text-align: right; }
     .mapa-campo { height: 220px; border-radius: 12px; overflow: hidden; background: var(--border); }
-    .mapa-campo .leaflet-pane, .mapa-campo .leaflet-control { z-index: auto; }
+    .mapa-pie { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+    .mapa-libres { font-size: .78rem; color: var(--muted); }
+    .editor-fila { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .editor-acciones { display: flex; gap: 8px; margin-top: 10px; }
+    .editor-acciones button { flex: 1; }
+    /* Las esquinas que se arrastran. Grandes a propósito: el objetivo es un dedo
+       en un móvil al sol, no un ratón. */
+    .tirador {
+      width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 3px solid var(--verde, #013A27);
+      box-shadow: 0 1px 4px rgba(0,0,0,.4); cursor: move;
+    }
+
     .accion-razon { font-size: .82rem; color: var(--muted); line-height: 1.45; }
     /* La invitación a medir el caudal: un escalón por debajo de la razón, para
        que no compita con la acción. Es una oferta, no una tarea. */
@@ -2260,9 +2271,12 @@
       height: 230px; border-radius: 12px; overflow: hidden; margin-top: 8px;
       border: 1.5px solid var(--border); background: var(--border);
     }
-    /* Leaflet se pinta con z-index propios (400-700). Dentro del alta, que va en
-       10000, hay que subirlos o los controles quedan por debajo del overlay. */
-    .alta-mapa .leaflet-pane, .alta-mapa .leaflet-control { z-index: auto; }
+    /* NO tocar el z-index de los panes de Leaflet. Lo intenté "por si acaso" con
+       el alta en 10000, y no hacía falta: los panes viven DENTRO del contenedor
+       del mapa, que es su propio contexto de apilado, así que no compiten con
+       nada de fuera. Aplanarlos sí rompe lo de dentro — el pane del polígono
+       (400) pasaba por encima del de los marcadores (600) y los tiradores
+       dejaban de responder al dedo. */
     .alta-perfil { border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 20px; }
     .perfil-tit { font-weight: 700; color: var(--verde, #013A27); margin: 0 0 12px; font-size: .95rem; }
     .perfil-fila { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; }
@@ -2554,6 +2568,15 @@
           <p class="alta-nota">Los restos enterrados devuelven nitrógeno al suelo. Saberlo evita abonar de más.</p>
         </div>
 
+        <div id="alta-q-mas" hidden>
+          <p class="alta-preg">¿Tienes algo más plantado en este mismo campo?</p>
+          <div class="alta-chips" id="alta-mas">
+            <button type="button" class="alta-chip" data-mas="0">No, solo esto</button>
+            <button type="button" class="alta-chip" data-mas="1">Sí, hay más</button>
+          </div>
+          <p class="alta-nota" id="alta-mas-nota">Cada cultivo necesita su propio riego y su propio abonado, así que Kylia los lleva por separado.</p>
+        </div>
+
         <button type="button" class="alta-btn" id="alta-b6" disabled>Guardar</button>
         <button type="button" class="alta-btn fantasma" id="alta-saltar-abonado">No me acuerdo, seguir</button>
       </section>
@@ -2705,6 +2728,31 @@
         <span class="mapa-sub" id="mapa-sub"></span>
       </div>
       <div id="mapa-campo" class="mapa-campo"></div>
+
+      <!-- Añadir un cultivo: nace un cuadrilátero dentro del recinto y se
+           arrastran las cuatro esquinas hasta cuadrarlo con el bancal. No se
+           dibuja de cero — arrastrar cuatro puntos es lo que se puede hacer con
+           un dedo al sol; trazar un contorno cerrado, no. -->
+      <div class="mapa-pie">
+        <button type="button" class="btn-riego" id="btn-anadir-cultivo">+ Añadir cultivo</button>
+        <span class="mapa-libres" id="mapa-libres"></span>
+      </div>
+
+      <div id="editor-cultivo" hidden>
+        <div class="editor-fila">
+          <select id="ec-cultivo" class="alta-input" style="margin:0"></select>
+          <select id="ec-cuando" class="alta-input" style="margin:0">
+            <option value="5">Plantado esta semana</option>
+            <option value="21" selected>Hace 2–4 semanas</option>
+            <option value="50">Hace más de un mes</option>
+          </select>
+        </div>
+        <p class="alta-nota" id="ec-nota">Arrastra las cuatro esquinas hasta cuadrar tu bancal.</p>
+        <div class="editor-acciones">
+          <button type="button" class="btn-modal-cancel" id="ec-cancelar">Cancelar</button>
+          <button type="button" class="btn-save" id="ec-guardar">Guardar cultivo</button>
+        </div>
+      </div>
     </section>
 
     <!-- Banner de bienvenida primer uso (se inserta dinámicamente) -->
@@ -3576,6 +3624,18 @@
       if (!lista.length) { caja.hidden = true; return; }
       caja.hidden = false;
 
+      // Si en el alta dijo que tiene más cultivos, aquí se le recuerda. Se borra
+      // en cuanto añade uno.
+      const quiereMas = localStorage.getItem("kylia_quiere_mas_cultivos") === "1";
+      const libresEl = document.getElementById("mapa-libres");
+      if (libresEl) {
+        const z = zonaConRecinto();
+        const libres = z ? metrosLibres(z) : 0;
+        libresEl.textContent = quiereMas && libres > 10
+          ? `Dijiste que tienes más: te quedan ${libres.toLocaleString("es-ES")} m² sin repartir.`
+          : (libres > 10 ? `${libres.toLocaleString("es-ES")} m² sin repartir` : "");
+      }
+
       const activa = lista.find(p => (p.id || null) === zonaActiva) || lista[0];
       document.getElementById("mapa-sub").textContent = lista.length > 1
         ? `${lista.length} cultivos · toca uno para verlo`
@@ -3620,6 +3680,140 @@
         if (bounds?.isValid()) mapaCampo.fitBounds(bounds, { padding: [18, 18] });
         setTimeout(() => mapaCampo.invalidateSize(), 60);
       }).catch(() => { caja.hidden = true; });
+    }
+
+    // ─── Añadir un cultivo dibujando su trozo ────────────────────────────
+    // Todo el cálculo lo hace geo-parcela.js, que ya estaba escrito y probado:
+    // rectanguloCentrado nace con la forma del recinto, moverVertice rechaza el
+    // vértice que cruza un lado (una "pajarita" tiene un área que no es la del
+    // terreno, y esa cifra acaba en los kg de abono) y areaM2 mide lo dibujado.
+    // Aquí solo va la parte de dedo.
+    let ecGeom = null, ecTiradores = [], ecCapa = null, ecRecinto = null;
+
+    function zonaConRecinto() {
+      for (const z of zonasGuardadas()) if (z.geometria) return z;
+      return cfgFinca.parcela ? { geometria: cfgFinca.parcela, superficie_m2: cfgFinca.areaParcela,
+                                  siembras: [], referencia: null } : null;
+    }
+
+    // Los metros del recinto que aún no tiene ningún cultivo. Es el techo: la
+    // suma de los trozos no puede pasar de lo que confirmó que cultiva.
+    function metrosLibres(z) {
+      const usado = (z.siembras || []).reduce((t, x) => t + (Number(x.area_m2) || 0), 0);
+      return Math.max(0, (Number(z.superficie_m2) || 0) - usado);
+    }
+
+    function abrirEditorCultivo() {
+      const z = zonaConRecinto();
+      if (!z?.geometria) return;
+      ecRecinto = z;
+      const libres = metrosLibres(z);
+      if (libres < 10) {
+        document.getElementById("mapa-libres").textContent =
+          "Ya has repartido todo el recinto entre tus cultivos.";
+        return;
+      }
+      // Nace ocupando la mitad de lo libre: se ve entero y hay poco que
+      // arrastrar. El agricultor lo ajusta desde ahí.
+      ecGeom = window.KyliaGeo?.rectanguloCentrado(z.geometria, Math.min(libres, libres * 0.5 + 1))?.geometria
+               || window.KyliaGeo?.rectanguloCentrado(z.geometria, libres)?.geometria;
+      if (!ecGeom) return;
+
+      const sel = document.getElementById("ec-cultivo");
+      sel.innerHTML = CULTIVOS.map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join("");
+      document.getElementById("editor-cultivo").hidden = false;
+      document.getElementById("btn-anadir-cultivo").hidden = true;
+      pintarEditor();
+    }
+
+    function pintarEditor() {
+      if (!mapaCampo || !ecGeom || typeof L === "undefined") return;
+      if (ecCapa) mapaCampo.removeLayer(ecCapa);
+      ecTiradores.forEach(t => mapaCampo.removeLayer(t));
+      ecTiradores = [];
+
+      ecCapa = L.geoJSON(ecGeom, { style: { color: "#B23B2E", weight: 3, fillOpacity: 0.3 } })
+                .addTo(mapaCampo);
+      // anilloExterior YA devuelve el anillo SIN el punto de cierre repetido, así
+      // que aquí no hay que recortar nada: recortando salían tres esquinas de
+      // cuatro y la cuarta no se podía mover.
+      const anillo = window.KyliaGeo.anilloExterior(ecGeom);
+      anillo.forEach(([lon, lat], i) => {
+        const t = L.marker([lat, lon], {
+          draggable: true,
+          // El ancla se le dice a Leaflet, no se apaña con un margen de CSS: si
+          // no, la zona que responde al dedo queda desplazada del círculo.
+          icon: L.divIcon({ className: "tirador", iconSize: [20, 20], iconAnchor: [10, 10] }),
+        }).addTo(mapaCampo);
+        t.on("drag", ev => moverEsquina(i, ev.latlng, t));
+        ecTiradores.push(t);
+      });
+      mapaCampo.fitBounds(ecCapa.getBounds(), { padding: [30, 30] });
+      actualizarNotaEditor();
+    }
+
+    function moverEsquina(i, latlng, tirador) {
+      const r = window.KyliaGeo.moverVertice(ecGeom, i, [latlng.lng, latlng.lat]);
+      if (!r.ok) {
+        // Se cruza consigo mismo: el vértice vuelve donde estaba. No se corrige
+        // por detrás — el área de una "pajarita" no es la del terreno.
+        const a = window.KyliaGeo.anilloExterior(ecGeom)[i];
+        tirador.setLatLng([a[1], a[0]]);
+        document.getElementById("ec-nota").textContent = "Ese punto cruza otro lado. Prueba por otro sitio.";
+        return;
+      }
+      ecGeom = r.geometria;
+      if (ecCapa) { mapaCampo.removeLayer(ecCapa); }
+      ecCapa = L.geoJSON(ecGeom, { style: { color: "#B23B2E", weight: 3, fillOpacity: 0.3 } }).addTo(mapaCampo);
+      actualizarNotaEditor();
+    }
+
+    function actualizarNotaEditor() {
+      const area = Math.round(window.KyliaGeo.areaM2(window.KyliaGeo.anilloExterior(ecGeom)));
+      const libres = metrosLibres(ecRecinto);
+      const nota = document.getElementById("ec-nota");
+      const btn  = document.getElementById("ec-guardar");
+      // LO QUE SABEMOS manda: el trozo no puede pasarse de los metros que
+      // quedan sin repartir. Si se pasa, no se recorta en silencio — se dice.
+      const cabe = area > 0 && area <= libres;
+      btn.disabled = !cabe;
+      nota.textContent = cabe
+        ? `${area.toLocaleString("es-ES")} m² de los ${libres.toLocaleString("es-ES")} que te quedan libres.`
+        : `Te has pasado: ${area.toLocaleString("es-ES")} m² y solo quedan ${libres.toLocaleString("es-ES")} sin repartir.`;
+    }
+
+    function cerrarEditorCultivo() {
+      document.getElementById("editor-cultivo").hidden = true;
+      document.getElementById("btn-anadir-cultivo").hidden = false;
+      if (ecCapa) { mapaCampo?.removeLayer(ecCapa); ecCapa = null; }
+      ecTiradores.forEach(t => mapaCampo?.removeLayer(t));
+      ecTiradores = []; ecGeom = null;
+      pintarMapaCampo();
+    }
+
+    function guardarCultivoNuevo() {
+      if (!ecGeom || !ecRecinto) return;
+      const area = Math.round(window.KyliaGeo.areaM2(window.KyliaGeo.anilloExterior(ecGeom)));
+      if (!(area > 0) || area > metrosLibres(ecRecinto)) return;
+      const hace = Number(document.getElementById("ec-cuando").value);
+      const d = new Date(); d.setDate(d.getDate() - hace);
+
+      const zonas = zonasGuardadas();
+      let z = zonas.find(x => x.referencia === ecRecinto.referencia);
+      if (!z) { z = { ...ecRecinto, siembras: ecRecinto.siembras || [] }; zonas.push(z); }
+      z.siembras = z.siembras || [];
+      z.siembras.push({
+        id: uuidZona(),
+        cultivo: document.getElementById("ec-cultivo").value,
+        area_m2: area,
+        fechaPlantacion: d.toISOString().slice(0, 10),
+        geometria: ecGeom,
+      });
+      localStorage.setItem(ZONAS_KEY, JSON.stringify(zonas));
+      localStorage.removeItem("kylia_quiere_mas_cultivos");
+      cerrarEditorCultivo();
+      renderZonasTabs();
+      subirConfig();
     }
 
     function cambiarZona(id) {
@@ -6987,8 +7181,14 @@
           // pantallas seguidas y dejaría de informar de nada.
           const c = completitud("riego");
           el.hidden = false;
-          el.innerHTML = `Kylia ya sabe el <b>${c.pct}%</b> de tu campo`
-            + ` <i><span style="width:${c.pct}%"></span></i>`;
+          // "El 100% de tu campo" es falso por dos lados: es solo el pilar de
+          // RIEGO, y con varios cultivos Kylia conoce uno. La palabra que
+          // sobraba era "campo". Y al llegar arriba se quita el número: un 100%
+          // se lee como omnisciencia por mucho que la letra pequeña lo matice.
+          el.innerHTML = c.pct >= 100
+            ? `Kylia ya puede decirte cuándo regar <i><span style="width:100%"></span></i>`
+            : `Kylia sabe el <b>${c.pct}%</b> de lo que necesita para regar`
+              + ` <i><span style="width:${c.pct}%"></span></i>`;
         }
 
         function pintarPerfil() {
@@ -7017,12 +7217,13 @@
           };
           caja.hidden = false;
           caja.innerHTML =
-              `<p class="perfil-tit">Lo que Kylia sabe de tu campo</p>`
+              `<p class="perfil-tit">Lo que Kylia sabe de este cultivo</p>`
             + barra("Riego", r) + barra("Abonado", a)
             + (sig && COMO[sig.clave]
                 ? `<p class="perfil-sig"><b>Lo que más te aportaría:</b> ${esc(COMO[sig.clave])}</p>` : "")
-            + `<p class="perfil-nota">No es un porcentaje de acierto. Es cuánto conoce Kylia de tu campo:`
-            + ` cuanto más completo, más se ajustan los avisos a él.</p>`;
+            + `<p class="perfil-nota">No es un porcentaje de acierto. Es cuánto sabe Kylia`
+            + ` de lo que necesita para cada cosa: cuanto más completo, más se ajustan los avisos.`
+            + ` Si tienes más cultivos, cada uno lleva el suyo.</p>`;
         }
 
         // ── paso 6 · lo que falta para el abonado ────────────────────────
@@ -7034,7 +7235,12 @@
           revelar("alta-q-restos");
           revisar6();
         });
-        grupo("alta-restos", "restos", "restos", revisar6);
+        grupo("alta-restos", "restos", "restos", () => { revelar("alta-q-mas"); revisar6(); });
+        grupo("alta-mas", "mas", "hayMas", () => {
+          $("alta-mas-nota").textContent = A.hayMas === "1"
+            ? "Al terminar te llevamos al mapa para marcar dónde está cada uno."
+            : "Cada cultivo necesita su propio riego y su propio abonado, así que Kylia los lleva por separado.";
+        });
         function revisar6() {
           $("alta-b6").disabled = !(A.cultivoAnterior && A.restos != null);
         }
@@ -7282,6 +7488,11 @@
         });
 
         function cerrar() {
+          // Si ha dicho que tiene más cultivos, se marca para que la pantalla
+          // principal le ofrezca añadirlos. No se hace DENTRO del alta a
+          // propósito: dibujar un contorno es algo que se hace sentado y con
+          // calma, y el alta tiene que terminar en dos minutos.
+          if (A.hayMas === "1") { try { localStorage.setItem("kylia_quiere_mas_cultivos", "1"); } catch (_) {} }
           caja.hidden = true;
           document.body.classList.remove("alta-abierta");
           document.body.style.overflow = "";
@@ -8333,6 +8544,10 @@
       document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
 
       // Selector de zona (delegación: las pestañas se repintan al guardar).
+      document.getElementById("btn-anadir-cultivo")?.addEventListener("click", abrirEditorCultivo);
+      document.getElementById("ec-cancelar")?.addEventListener("click", cerrarEditorCultivo);
+      document.getElementById("ec-guardar")?.addEventListener("click", guardarCultivoNuevo);
+
       document.getElementById("zonas-tabs").addEventListener("click", (e) => {
         const t = e.target.closest?.("[data-zona]");
         if (t) cambiarZona(t.dataset.zona || null);

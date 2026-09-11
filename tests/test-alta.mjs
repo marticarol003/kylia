@@ -320,7 +320,8 @@ ok(NUTRI2.creditoResiduosN(null, true) === 0,
 
 console.log("\n── V1 · el perfil dice lo que Kylia SABE, no lo que acierta ──");
 // Condición del usuario: el porcentaje no puede leerse como precisión.
-ok(/Lo que Kylia sabe de tu campo/.test(alta), "el título habla de saber, no de acertar");
+ok(/Lo que Kylia sabe de este cultivo/.test(alta),
+   "el título habla de saber, no de acertar — y de ESTE cultivo, porque puede haber más");
 ok(/No es un porcentaje de acierto/.test(alta), "y se desmiente explícitamente");
 ok(!/precisi[óo]n/i.test(alta.slice(alta.indexOf("function pintarPerfil"), alta.indexOf("// ── paso 6"))),
    "la palabra 'precisión' no aparece en ninguna parte del perfil");
@@ -330,7 +331,10 @@ const cssPerfil = app.slice(app.indexOf(".alta-perfil {"), app.indexOf(".perfil-
 ok(/\.perfil-pct[^}]*font-size: \.9rem/.test(cssPerfil),
    "el porcentaje va al tamaño del texto, no de titular");
 ok(!/font-size: *[2-9](\.\d+)?rem/.test(cssPerfil), "no hay ningún número gigante en el perfil");
-ok(/Es cuánto conoce Kylia de tu campo/.test(alta), "se explica qué significa de verdad");
+ok(/Es cuánto sabe Kylia\s*\n?\s*\+ ` de lo que necesita para cada cosa/.test(alta)
+   || /Es cuánto sabe Kylia/.test(alta), "se explica qué significa de verdad");
+ok(/Si tienes más cultivos, cada uno lleva el suyo/.test(alta),
+   "y se avisa de que el perfil es por cultivo, no de la finca entera");
 
 console.log("\n── por pilares, no un número global ──");
 ok(/completitud\("riego"\)/.test(alta) && /completitud\("abonado"\)/.test(alta),
@@ -411,8 +415,16 @@ ok(/if \(recintoPedido === clave\) return;/.test(alta),
 
 console.log("\n── el avance se ve durante todo el alta ──");
 ok(/id="alta-avance"/.test(app), "hay una línea de avance");
-ok(/Kylia ya sabe el <b>\$\{c\.pct\}%<\/b> de tu campo/.test(alta),
-   "dice lo que Kylia SABE, con el mismo lenguaje que el perfil final");
+// "El 100% de tu campo" es falso por dos lados: es solo el pilar de riego, y
+// con varios cultivos Kylia conoce uno.
+ok(/Kylia sabe el <b>\$\{c\.pct\}%<\/b> de lo que necesita para regar/.test(alta),
+   "la línea dice QUÉ cubre: lo que necesita para regar, no 'tu campo'");
+ok(/Kylia ya puede decirte cuándo regar/.test(alta),
+   "y al llegar arriba se quita el número: un 100% se lee como omnisciencia");
+// El único "% de tu campo" que queda es el comentario que explica por qué se
+// quitó, así que se busca en lo que se PINTA, no en el código.
+const pintado = [...alta.matchAll(/innerHTML\s*=\s*([\s\S]{0,400}?);/g)].map(m => m[1]).join("\n");
+ok(!/% de tu campo/.test(pintado), "no queda ningún '% de tu campo' en lo que se enseña");
 ok(/if \(paso === 0\) \{ el\.hidden = true; return; \}/.test(alta),
    "en la bienvenida no sale: todavía no hay nada que contar");
 ok(/Aquí NO se aplica la regla de "sin dato bloqueante no hay número"/.test(alta),
@@ -426,6 +438,17 @@ ok(/const previo = localStorage\.getItem\(STORAGE_KEY\) \? cfg : \{\};/.test(alt
 const defs = app.slice(app.indexOf("const DEFAULTS = {"), app.indexOf("const NDVI_HISTORY_DAYS"));
 ok(/ciudad:\s+"Barcelona"/.test(defs) && /cultivos:\s+\["lechuga"\]/.test(defs),
    "(los defaults que lo provocaban siguen ahí, así que el guard hace falta)");
+
+console.log("\n── ¿hay más cultivos en este campo? ──");
+ok(/¿Tienes algo más plantado en este mismo campo\?/.test(app), "se pregunta");
+ok(/Cada cultivo necesita su propio riego y su propio abonado/.test(app),
+   "y se dice por qué importa");
+ok(/localStorage\.setItem\("kylia_quiere_mas_cultivos", "1"\)/.test(alta),
+   "si dice que sí queda marcado al cerrar el alta");
+ok(/Al terminar te llevamos al mapa para marcar dónde está cada uno/.test(alta),
+   "y se le avisa de dónde va a pasar");
+ok(!/editor-cultivo/.test(alta),
+   "el dibujo NO está dentro del alta: eso se hace sentado, y el alta dura dos minutos");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
