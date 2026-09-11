@@ -2832,6 +2832,10 @@
             <label for="input-capacidad-regadera" class="sub">Regadera (L)</label>
             <input type="number" id="input-capacidad-regadera" min="0" step="1" inputmode="numeric" placeholder="Ej: 10">
           </div>
+          <div id="wrap-tarifa">
+            <label for="input-tarifa" class="sub">Precio del agua (€/m³)</label>
+            <input type="number" id="input-tarifa" min="0" step="0.01" inputmode="decimal" placeholder="Ej: 0,20">
+          </div>
           <div id="wrap-area">
             <label for="input-area" class="sub">Superficie (m²)</label>
             <input type="number" id="input-area" min="0" step="1" inputmode="numeric" placeholder="Ej: 500">
@@ -3295,6 +3299,10 @@
       suelo:               null,  // arenoso | franco | arcilloso (FAO-56 TAW/RAW)
       fechaPlantacion:     null,  // YYYY-MM-DD — fase fenológica → Kc
       caudal:              null,  // L/m²·h del sistema → riego en minutos
+      // €/m³. Es lo ÚNICO que le falta al reveal para traducir el exceso de agua
+      // a euros: dimCoste en _reveal.js ya hace la cuenta y devuelve null con el
+      // motivo "falta la tarifa". Nadie la pedía.
+      tarifaAgua:          null,
       riegoMinutos:        null,  // el rato que suele tener el riego puesto
       areaParcela:         null,  // m² → regaderas / litros totales
       capacidadRegadera:   null,  // L por regadera
@@ -7877,6 +7885,7 @@
           suelo:             sueloSel ? sueloSel.dataset.suelo : (nuevoCfg.suelo ?? null),
           fechaPlantacion:   (fechaPlant && fechaPlant.value) ? fechaPlant.value : (nuevoCfg.fechaPlantacion ?? null),
           caudal:            numCfg("input-caudal",              nuevoCfg.caudal),
+          tarifaAgua:        numCfg("input-tarifa",              nuevoCfg.tarifaAgua),
           areaParcela:       numCfg("input-area",                nuevoCfg.areaParcela),
           capacidadRegadera: numCfg("input-capacidad-regadera",  nuevoCfg.capacidadRegadera),
         };
@@ -7903,6 +7912,7 @@
             suelo:                nuevoCfg.suelo || null,
             fecha_plantacion:     nuevoCfg.fechaPlantacion || null,
             caudal:               nuevoCfg.caudal ?? null,
+            tarifa_agua:          nuevoCfg.tarifaAgua ?? null,
             area_m2:              nuevoCfg.areaParcela ?? null,
             capacidad_regadera:   nuevoCfg.capacidadRegadera ?? null,
             origen:               localStorage.getItem("kylia_origen"),
@@ -8125,6 +8135,7 @@
         if (fp) fp.value = cfgFinca.fechaPlantacion || "";
         const setNum = (id, v) => { const el = document.getElementById(id); if (el) el.value = (v != null ? v : ""); };
         setNum("input-caudal",              cfgFinca.caudal);
+        setNum("input-tarifa",              cfgFinca.tarifaAgua);
         setNum("input-area",                cfgFinca.areaParcela);
         setNum("input-capacidad-regadera",  cfgFinca.capacidadRegadera);
         actualizarBotonAreaParcela();
