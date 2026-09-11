@@ -152,6 +152,36 @@ for (const met of ["goteo", "aspersion", "surco"]) {
   }
 }
 
+console.log("\n── CICLO 9 · una orden de 38 tandas no es una orden ──");
+// Partir en tandas hace ejecutable un riego largo. Pero "38 tandas de 118 min"
+// son 75 horas y es tan inútil como los 4.500 minutos que venía a arreglar.
+const corto = M.presentarRiego(10, { metodoRiego: "goteo", caudalMmh: 11 });
+ok(!/tandas/.test(corto.texto) || corto.fraccionar.sesiones <= 6, "un riego normal no se parte, o se parte poco");
+const largo = M.presentarRiego(300, { metodoRiego: "goteo", caudalMmh: 4 });
+ok(largo.caudalInsuficiente === true, "uno imposible se declara como problema de caudal");
+ok(!/tandas/.test(largo.texto), "y no se le ofrecen 38 tandas");
+ok(/no da para reponer/.test(largo.texto), "se le dice lo que pasa de verdad");
+// PERO no se diagnostica la instalación con un caudal que nos hemos inventado.
+const sinCaudal = M.presentarRiego(300, { metodoRiego: "goteo" });
+ok(sinCaudal.caudalEstimado === true, "sin caudal declarado, se marca que es una suposición");
+ok(sinCaudal.caudalInsuficiente !== true, "y NO se culpa a su instalación");
+ok(/no sabemos el tuyo: mídelo/.test(sinCaudal.texto), "se le pide que lo mida, que es lo que resuelve la cuenta");
+ok(M.presentarRiego(50, { metodoRiego: "goteo", caudalMmh: 11 }).fraccionar.sesiones <= 6,
+   "y con un caudal real de goteo (11 mm/h) un déficit grande sigue siendo ejecutable");
+
+console.log("\n── un cultivo por debajo de su Tbase no acumula nada, y se dice ──");
+// Un tomate (Tbase 10 °C) plantado en diciembre sale eternamente "recién
+// plantado". El modelo térmico hace lo correcto —ese cultivo no se desarrolla—
+// pero decir "modo térmico" y callar que el contador está parado engaña.
+const frio = mk("2026-12-01", 90, () => ({ et0: 0.8, lluvia: 2, tmax: 9, tmin: 2 }));
+const bFrio = M.balanceHidrico(frio, [], { ...OPT, fechaPlantacion: "2026-12-01" });
+ok(bFrio.gddAcum === 0, "un tomate en diciembre no acumula un solo grado-día");
+ok(bFrio.sinAcumularCalor === true, "y el balance lo declara");
+const bCalor = M.balanceHidrico(serie, [], OPT);
+ok(bCalor.sinAcumularCalor === false, "en mayo, no");
+const pocosDias = M.balanceHidrico(frio.slice(0, 5), [], { ...OPT, fechaPlantacion: "2026-12-01" });
+ok(pocosDias.sinAcumularCalor === false, "y con menos de dos semanas no se declara: aún no significa nada");
+
 function readApp() {
   return require("fs").readFileSync(join(RAIZ, "app", "index.html"), "utf8");
 }

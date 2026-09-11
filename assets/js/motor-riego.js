@@ -109,6 +109,11 @@
   // Sesión de riego máxima de una tacada (min). Tope operativo, no agronómico:
   // por encima de ~2 h la orden deja de ser ejecutable y se parte en tandas.
   const RIEGO_MAX_MIN = 120;
+  // Y cuántas tandas caben en un día de trabajo. Por encima de esto la orden
+  // deja de ser una orden: lo que falla es el caudal, no el riego de hoy.
+  // Medio día de riego. Por debajo de eso, partir en tandas sigue siendo una
+  // orden ejecutable; por encima, lo que falla es el caudal.
+  const SESIONES_MAX = 6;
 
   // ⚠️⚠️ EL AGUJERO QUE MÁS VECES HA MORDIDO EN ESTE FICHERO: Number(null) es 0.
   // Y Number("") también, y Number([]) también, y Number(false) también.
@@ -688,6 +693,12 @@
       // Al último día DEL BALANCE, no al final de la serie térmica: esa suele
       // llevar pronóstico y sumaría calor que todavía no ha caído.
       gddAcum: curva ? Math.round(curva.gddEn(ultimaISO) ?? curva.gddAcum) : null,
+      // Un cultivo por debajo de su Tbase no acumula NADA y se queda en el día 0
+      // del eje para siempre: un tomate (Tbase 10 °C) plantado en diciembre sale
+      // eternamente "recién plantado", con Kc de fase inicial. El modelo térmico
+      // está haciendo lo correcto —ese cultivo no se desarrolla— pero decir
+      // "modo térmico" y callar que el contador está parado engaña. Se declara.
+      sinAcumularCalor: !!curva && (curva.gddEn(ultimaISO) ?? curva.gddAcum) <= 0 && orden.length >= 14,
       faseActual: faseDelDia(cultivoId, diasFin),
     };
   }
@@ -809,8 +820,8 @@
     const caudalDado = Number(caudalMmh);
     // Por debajo de 0,1 mm/h no hay instalación de riego, hay un error de
     // tecleo: con 1e-9 salían 600.000 millones de minutos.
-    const caudal = (Number.isFinite(caudalDado) && caudalDado >= 0.1)
-      ? caudalDado : CAUDAL_DEFAULT_MMH[metodoRiego];
+    const caudalEstimado = !(Number.isFinite(caudalDado) && caudalDado >= 0.1);
+    const caudal = caudalEstimado ? CAUDAL_DEFAULT_MMH[metodoRiego] : caudalDado;
     if (caudal > 0) {
       const min = (mm / caudal) * 60;
       if (!Number.isFinite(min)) return { unidad: "l_m2", valor: r0(mm), mm: r1(mm), texto: `${r0(mm)} L/m²` };
@@ -824,6 +835,29 @@
       if (min > RIEGO_MAX_MIN) {
         const sesiones = Math.ceil(min / RIEGO_MAX_MIN);
         const porSesion = Math.round(min / sesiones);
+        // Partir en tandas hace ejecutable una orden larga. Pero a partir de
+        // cierto número deja de serlo otra vez: "38 tandas de 118 min" son 75
+        // horas de riego y es tan inútil como los 4.500 minutos que venía a
+        // arreglar. Cuando hace falta más de un día entero de riego, el problema
+        // no es el riego de hoy — es que la instalación no da para ese cultivo,
+        // y eso es lo que hay que decirle.
+        if (sesiones > SESIONES_MAX) {
+          // OJO CON CULPAR A LA INSTALACIÓN. Si el caudal no lo ha declarado él,
+          // el que estamos usando es el POR DEFECTO de la tabla —4 mm/h en
+          // goteo— y decirle "tu instalación no da" sería un diagnóstico sacado
+          // de un número que nos hemos inventado nosotros. Con un caudal
+          // estimado, lo que toca es pedirle que lo mida: son diez minutos y
+          // cambia esta cuenta entera.
+          return { unidad: "min", valor: r0(min), mm: r1(mm),
+                   fraccionar: { sesiones, min_por_sesion: porSesion },
+                   caudalInsuficiente: !caudalEstimado,
+                   caudalEstimado,
+                   texto: caudalEstimado
+                     ? `Salen ${r0(min / 60)} h de riego, y eso es mucho. Estamos suponiendo `
+                       + `${caudal} L/m²·h porque no sabemos el tuyo: mídelo y esta cuenta cambia.`
+                     : `Harían falta ${r0(min / 60)} h de riego: tu instalación no da para reponer `
+                       + `${r0(mm)} L/m² de una vez. Riega lo que puedas hoy y sigue mañana.` };
+        }
         return { unidad: "min", valor: r0(min), mm: r1(mm),
                  fraccionar: { sesiones, min_por_sesion: porSesion },
                  texto: `${r0(min)} min · mejor en ${sesiones} tandas de ${porSesion} min` };
