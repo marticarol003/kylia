@@ -163,7 +163,12 @@ async function vistaHoy(res, u) {
 
   const opts = { suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
                  metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
-                 serieTermica: termica };
+                 serieTermica: termica,
+                 // La ventana viene de FUERA a propósito: medir la cobertura de
+                 // la serie contra la propia serie hace invisibles justo los
+                 // huecos que importan, los de los extremos.
+                 ventana: { desde: u.fecha_plantacion ? String(u.fecha_plantacion).slice(0, 10) : (serie[0]?.date || null),
+                            hasta: hoy } };
   const presOpts = { metodoRiego: u.metodo_riego, caudalMmh: u.caudal,
                      areaM2: u.area_m2, capacidadRegaderaL: u.capacidad_regadera };
 
@@ -178,12 +183,18 @@ async function vistaHoy(res, u) {
   const presHoy = decHoy.nivel === "alta" ? presentarRiego(decHoy.cantidad_l_m2, presOpts) : null;
   const climaHoy = serie[corte] || {};
 
+  // El PRÓXIMO riego se proyecta con las mismas reglas que el de hoy, incluida
+  // la lluvia que se espera para ESE día. Hasta el 11-sep esta proyección no
+  // recibía pronóstico —solo el de hoy lo recibía— y anunciaba un riego para el
+  // jueves aunque el miércoles cayeran 20 mm. El correo del piloto lo repetía
+  // tal cual ("Próximo riego previsto: 14/09").
   let proximo = null;
   for (let i = corte + 1; i < serie.length; i++) {
     const b = balanceHidrico(serie.slice(0, i + 1), riegos, opts);
-    if (decisionRiego(b).nivel === "alta") {
+    const d = decisionRiego(b, { lluviaPrevista: serie.slice(i + 1) });
+    if (d.nivel === "alta") {
       proximo = { fecha: serie[i].date,
-                  presentacion: presentarRiego(decisionRiego(b).cantidad_l_m2, presOpts),
+                  presentacion: presentarRiego(d.cantidad_l_m2, presOpts),
                   Dr: Number(b.Dr.toFixed(1)) };
       break;
     }
@@ -245,6 +256,16 @@ async function vistaHoy(res, u) {
       texto: decHoy.texto, presentacion: presHoy,
       deficit_mm: Number(balHoy.Dr.toFixed(1)), umbral_mm: Number(balHoy.raw.toFixed(1)),
       et0: Number((climaHoy.et0 ?? 0).toFixed(1)), lluvia: Number((climaHoy.lluvia ?? 0).toFixed(1)),
+      // DE QUÉ DÍA SON ESOS NÚMEROS. `serie` puede no llegar hasta hoy: si el
+      // pronóstico falla y solo responde el archivo, el último día con dato va
+      // seis días por detrás (RETRASO_ARCHIVO) y el balance se queda ahí. El
+      // déficit sale corto —le faltan los días sin contar— y eso empuja hacia
+      // "no toca regar", que es la dirección que no se nota. Antes esto se
+      // devolvía como si fuera de hoy y nadie podía saberlo.
+      clima_fecha: climaHoy.date || null,
+      clima_al_dia: climaHoy.date === hoy,
+      cobertura_clima: balHoy.coberturaClima ?? null,
+      dias_sin_clima: balHoy.diasSinClima ?? null,
     },
     desglose, proximo, riegos_recientes: recientes,
   });

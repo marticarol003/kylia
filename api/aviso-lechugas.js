@@ -101,7 +101,23 @@ const boton = (txt) => `<p style="margin:16px 0 0;"><a href="${CAMPO_URL}" style
 
 function emailManana(data) {
   const h = data.hoy;
-  if (h.regar && h.presentacion) {
+  // `h.regar` manda. Antes la condición era `h.regar && h.presentacion`, y el
+  // día que la presentación no se pudiera calcular (sin caudal fiable, área
+  // rara) el correo caía a la rama de abajo y llegaba con el asunto "✅ hoy no
+  // toca regar" — justo el día que tocaba, y solo se envía los días que toca.
+  if (h.regar) {
+    if (!h.presentacion) {
+      return {
+        subject: "💧 Kylia · hoy toca regar",
+        texto: `💧 Kylia — HOY TOCA REGAR las lechugas: ${h.deficit_mm} mm (umbral ${h.umbral_mm}). ` +
+               `No he podido traducirlo a minutos de aspersor; abre el campo y apúntalo: ${CAMPO_URL}`,
+        html: htmlBase("💧 Hoy toca regar", `
+          <p style="font-size:1.4rem;font-weight:800;color:#013A27;margin:0 0 10px;">${h.deficit_mm} L/m²</p>
+          <p style="margin:0 0 6px;">El suelo lleva un déficit de <b>${h.deficit_mm} mm</b> y el umbral para regar es <b>${h.umbral_mm} mm</b>.</p>
+          <p style="color:#5a685a;font-size:0.9rem;margin:0;">No he podido pasarlo a minutos de aspersor: falta el caudal medido.</p>
+          ${boton("Abrir el campo")}`),
+      };
+    }
     return {
       subject: `💧 Kylia · hoy riega ${h.presentacion.texto}`,
       texto: `💧 Kylia — HOY TOCA REGAR las lechugas: ${h.presentacion.texto} de aspersor (${h.presentacion.mm} mm). ` +
@@ -153,16 +169,12 @@ function emailMediodia(data, riego) {
       <p style="margin:0;">Si se regó, regístralo (1 toque). Si no, aún se está a tiempo esta tarde.</p>
       ${boton("Abrir y registrar")}`),
   };
-  if (!h.regar && riego) return {
-    subject: "ℹ️ Kylia · consta un riego que no tocaba",
-    texto: `ℹ️ Kylia — hoy no tocaba regar las lechugas pero consta un riego (${detalle}). Si fue un error de registro, se puede borrar con la ✕ en ${CAMPO_URL}`,
-    html: htmlBase("ℹ️ Riego fuera de pauta", `<p style="margin:0;">Hoy no tocaba regar pero consta un riego (<b>${detalle}</b>). Si fue un error de registro, se puede borrar con la ✕ en la lista.</p>`),
-  };
-  return {
-    subject: "✅ Kylia · hoy no tocaba y no se regó",
-    texto: `✅ Kylia — hoy no tocaba regar las lechugas y no consta riego. Suelo con reserva (déficit ${h.deficit_mm} de ${h.umbral_mm} mm).`,
-    html: htmlBase("✅ Todo en orden", `<p style="margin:0;">Hoy no tocaba regar y no consta ningún riego. El suelo sigue con reserva (déficit ${h.deficit_mm} de ${h.umbral_mm} mm).</p>`),
-  };
+  // Aquí había dos ramas más, para los días en que NO tocaba regar. Nunca se
+  // ejecutaron: el handler corta antes esos días y no manda nada. Eran dos
+  // correos que solo existían en el código, y leerlas hacía pensar que el padre
+  // recibía un aviso cuando registra un riego fuera de pauta. No lo recibe, y
+  // tampoco debería: eso se ve en la lista del campo, con su ✕ para borrarlo.
+  return null;
 }
 
 // ── Push web (canal principal) ───────────────────────────────────
@@ -220,7 +232,7 @@ async function enviarEmail({ to, subject, html }) {
   if (!res.ok) throw new Error(`resend ${res.status}`);
 }
 
-module.exports = async (req, res) => {
+const handler = async (req, res) => {
   if (process.env.AVISO_TOKEN) {
     const token = (req.query?.token || req.headers["x-aviso-token"] || "").toString();
     if (token !== process.env.AVISO_TOKEN) return res.status(401).json({ error: "no autorizado" });
@@ -235,7 +247,45 @@ module.exports = async (req, res) => {
   try {
     const data = await decisionDeHoy(req);
 
-    // Solo se avisa los días que TOCA REGAR: si hoy no toca, no se envía nada por
+    // ── Antes de callar, comprobar que el silencio significa algo ──
+    //
+    // Este endpoint solo habla los días que toca regar. Eso convierte el
+    // silencio en información ("hoy no hace falta"), y por eso el silencio hay
+    // que ganárselo: si la decisión no es fiable, callar es MENTIR, porque el
+    // padre lee la ausencia de correo como "todo en orden".
+    //
+    // Dos casos en los que no se puede callar, y ninguno se detectaba:
+
+    // 1 · El motor dice que no puede calcular. `regar` es false, igual que un
+    //     día tranquilo, y hasta hoy salía por la misma puerta.
+    if (data.hoy?.nivel === "desconocido") {
+      return res.status(500).json({ ok: false, fase, error: "el motor no puede decidir el riego de hoy",
+                                    texto: data.hoy?.texto || null });
+    }
+
+    // 2 · El clima no llega hasta hoy. Si el pronóstico falla y solo responde el
+    //     archivo de Open-Meteo, la serie se queda seis días por detrás y al
+    //     balance le faltan seis días de ETc. Medido sobre el tomate del piloto
+    //     (franco, regado hace una semana): con el clima al día son 40,8 mm y
+    //     "Regar ~45 L/m²"; con seis días menos, 6,3 mm y "Todo en orden". Es un
+    //     falso negativo silencioso, la dirección que no se nota nunca.
+    //
+    //     Un día de retraso se tolera (el pronóstico del día puede no estar aún
+    //     publicado a las 06:45 y el balance apenas se mueve). Más, no.
+    //     Lo que se mide aquí es el RETRASO DE LA COLA, no el total de huecos:
+    //     un agujero de tres días en julio ya está integrado en el déficit y no
+    //     invalida la decisión de hoy; que falten los tres últimos, sí.
+    const retraso = data.hoy?.clima_fecha
+      ? Math.round((Date.parse(`${hoyISO()}T00:00:00Z`) - Date.parse(`${data.hoy.clima_fecha}T00:00:00Z`)) / 86400000)
+      : null;
+    if (data.hoy?.clima_al_dia === false && retraso != null && retraso > 1) {
+      return res.status(500).json({ ok: false, fase,
+        error: `el clima solo llega al ${data.hoy.clima_fecha} (${retraso} días de retraso): la decisión de hoy no es fiable`,
+        cobertura: data.hoy.cobertura_clima ?? null,
+        dias_sin_clima: data.hoy.dias_sin_clima ?? null });
+    }
+
+    // Con la decisión ya ganada: los días que no toca regar no se envía nada por
     // ningún canal (menos ruido para el padre). No es un fallo de entrega → 200,
     // así el curl -fsS del workflow no rompe.
     if (!data.hoy?.regar) {
@@ -247,6 +297,11 @@ module.exports = async (req, res) => {
     const email = fase === "manana"
       ? emailManana(data)
       : emailMediodia(data, await riegoDeHoy());
+    if (!email) {
+      const salida = { ok: true, fase, dry, omitido: true, motivo: "nada que decir en esta fase" };
+      console.log("[aviso-lechugas]", JSON.stringify(salida));
+      return res.status(200).json(salida);
+    }
 
     const porPush     = await destinatariosPush();
     const porWhatsapp = destinatariosWhatsapp();
@@ -286,3 +341,9 @@ module.exports = async (req, res) => {
     return res.status(500).json({ ok: false, error: err.message });
   }
 };
+
+module.exports = handler;
+// Los constructores de correo salen aparte para poder probarlos sin red: son
+// donde vivía la contradicción de "toca regar" / "hoy no toca regar".
+module.exports.emailManana = emailManana;
+module.exports.emailMediodia = emailMediodia;
