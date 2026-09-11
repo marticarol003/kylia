@@ -109,7 +109,16 @@ function dimAgua(riegosReales, riegosKylia, contrafactual) {
   const desde = decisiones[0].dia;
   const hasta = decisiones[decisiones.length - 1].dia;
 
-  const realesEnPeriodo = riegosReales.filter(r => r.dia && r.dia >= desde);
+  // ── Riegos con cantidad CONOCIDA vs riegos apuntados sin cifra ──
+  // `suma()` hacía Number(null) || 0, así que un riego sin cantidad contaba
+  // como CERO LITROS: el agricultor regaba cuatro veces y el informe contaba
+  // dos, inflando o desinflando el ahorro según cayera. Ahora se separan y se
+  // declaran, que es lo único honesto: sabemos que regó, no cuánto.
+  const finito = x => x != null && x !== "" && Number.isFinite(Number(x));
+  const conCifra = r => finito(r.l_m2) && Number(r.l_m2) >= 0;
+  const enPeriodo       = riegosReales.filter(r => r.dia && r.dia >= desde);
+  const realesEnPeriodo = enPeriodo.filter(conCifra);
+  const sinCifra        = enPeriodo.filter(r => !conCifra(r));
   const realesAntes     = riegosReales.filter(r => r.dia && r.dia < desde);
 
   // Lámina que Kylia habría aplicado = suma de las decisiones "alta" (regar hoy).
@@ -155,10 +164,25 @@ function dimAgua(riegosReales, riegosKylia, contrafactual) {
     serie.push({ date: d, kylia_l_m2: r1(accK), real_l_m2: r1(accR) });
   }
 
-  const excesoPct = aguaKylia > 0 ? r0((exceso / aguaKylia) * 100) : null;
+  // Mismo criterio de publicabilidad que en el contrafactual, con lo que aplica
+  // aquí: esta rama no usa serie de clima (sale de recomendaciones_log), así que
+  // no hay cobertura que mirar, pero sí riegos sin cifra y denominadores
+  // diminutos.
+  const razones = [];
+  if (sinCifra.length && sinCifra.length > enPeriodo.length * 0.2) {
+    razones.push(`${sinCifra.length} de ${enPeriodo.length} riegos están apuntados sin cantidad`);
+  }
+  if (!(aguaKylia >= 5)) razones.push("la lámina de referencia es demasiado pequeña para un porcentaje");
+  if (aguaReal > 0 && aguaReal < 5) razones.push("el agua registrada es demasiado poca para un porcentaje");
+  const publicable = razones.length === 0;
+  const cobertura = null;                      // esta rama no simula clima
+
+  const excesoPct = publicable && aguaKylia > 0 ? r0((exceso / aguaKylia) * 100) : null;
   let veredicto;
   if (aguaReal === 0) {
     veredicto = "No registraste riegos en el periodo medido.";
+  } else if (!publicable) {
+    veredicto = `No se puede comparar tu riego con el de Kylia: ${razones.join("; ")}.`;
   } else if (exceso > 0.5) {
     veredicto = `Aplicaste ~${r0(exceso)} L/m² más que la lámina FAO-56` +
                 (excesoPct != null ? ` (+${excesoPct}%)` : "") + " que Kylia habría recomendado.";
@@ -173,9 +197,19 @@ function dimAgua(riegosReales, riegosKylia, contrafactual) {
     titulo: "Agua aplicada vs recomendada",
     disponible: true,
     periodo: { desde, hasta },
-    aplicada_l_m2:    r1(aguaReal),
-    recomendada_l_m2: r1(aguaKylia),
-    exceso_l_m2:      r1(exceso),
+    // Si no es publicable, las cifras comparadas TAMPOCO salen: dejarlas ahí es
+    // invitar a que alguien las copie al informe sin leer el motivo.
+    publicable,
+    motivo_no_publicable: publicable ? null : razones.join("; "),
+    cobertura_clima: cobertura,
+    dias_sin_clima: null,
+    riegos_sin_cantidad: sinCifra.length
+      ? { n: sinCifra.length, de: enPeriodo.length,
+          nota: "Apuntados como riego pero sin cantidad ni duración: sabemos que regó, no cuánto. NO cuentan como 0 L/m²." }
+      : null,
+    aplicada_l_m2:    publicable ? r1(aguaReal) : null,
+    recomendada_l_m2: publicable ? r1(aguaKylia) : null,
+    exceso_l_m2:      publicable ? r1(exceso) : null,
     exceso_pct:       excesoPct,
     dias_regado_real:  new Set(realesEnPeriodo.map(r => r.dia)).size,
     dias_regar_kylia:  kyliaAlta.length,
@@ -206,7 +240,13 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
   const desde = puntos[0].date;
   const hasta = puntos[puntos.length - 1].date;
 
-  const realesEnPeriodo = riegosReales.filter(r => r.dia && r.dia >= desde);
+  // Mismo criterio que dimAgua: un riego apuntado SIN cantidad no es un riego de
+  // cero litros. Se separa y se declara.
+  const finito2 = x => x != null && x !== "" && Number.isFinite(Number(x));
+  const conCifra2 = r => finito2(r.l_m2) && Number(r.l_m2) >= 0;
+  const enPeriodo       = riegosReales.filter(r => r.dia && r.dia >= desde);
+  const realesEnPeriodo = enPeriodo.filter(conCifra2);
+  const sinCifra        = enPeriodo.filter(r => !conCifra2(r));
   const realesAntes     = riegosReales.filter(r => r.dia && r.dia < desde);
 
   // Lámina diaria de Kylia = diferencias del acumulado del contrafactual.
@@ -251,11 +291,44 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
     serie.push({ date: d, kylia_l_m2: r1(accK), real_l_m2: r1(accR) });
   }
 
-  const excesoPct = aguaKylia > 0 ? r0((exceso / aguaKylia) * 100) : null;   // cuánto MÁS que Kylia
-  const ahorroPct = aguaReal  > 0 ? r0((exceso / aguaReal)  * 100) : null;   // % del agua real ahorrable
+  // ── ¿Se puede PUBLICAR un porcentaje con esto? ──────────────────
+  //
+  // Esta es la comprobación que faltaba el 10-sep-2026 y que costó dos informes
+  // de piloto enviados con cifras falsas. El contrafactual salía de una serie de
+  // clima con el 39% y el 29% de la campaña a cero —la API de pronóstico solo
+  // guarda ~64 días de pasado y devolvía null, que se convertía en "ese día no
+  // se evaporó nada"—. Kylia "no tenía que regar" esos días, su lámina salía
+  // baja y aparecía un ahorro que no existía: 34% publicado contra −1% real.
+  //
+  // El motor ya declara su cobertura desde la auditoría del 11-sep. Aquí se usa,
+  // y cuando no llega, EL PORCENTAJE NO SE CALCULA. No se marca como poco
+  // fiable y se deja ahí para que alguien lo copie: no está.
+  const COBERTURA_MIN = 0.95;
+  const cobertura = cf.coberturaClima != null ? Number(cf.coberturaClima) : null;
+  const razones = [];
+  if (cobertura != null && cobertura < COBERTURA_MIN) {
+    razones.push(`el contrafactual se calculó con el ${r0(cobertura * 100)}% del clima del periodo`
+                 + (cf.diasSinClima ? ` (faltan ${cf.diasSinClima} días)` : ""));
+  }
+  if (sinCifra.length && sinCifra.length > enPeriodo.length * 0.2) {
+    razones.push(`${sinCifra.length} de ${enPeriodo.length} riegos están apuntados sin cantidad`);
+  }
+  // Con una lámina de referencia diminuta, el porcentaje se dispara y deja de
+  // significar nada: 400 L/m² contra 0,1 daban "exceso del 399.900%".
+  // Con cualquiera de los dos lados diminuto el porcentaje se dispara y deja de
+  // significar nada: 400 contra 0,1 daba "exceso del 399.900%", y 0,5 contra 400
+  // daba "ahorro del −79.900%".
+  if (!(aguaKylia >= 5)) razones.push("la lámina de referencia es demasiado pequeña para un porcentaje");
+  if (aguaReal > 0 && aguaReal < 5) razones.push("el agua registrada es demasiado poca para un porcentaje");
+  const publicable = razones.length === 0;
+
+  const excesoPct = publicable && aguaKylia > 0 ? r0((exceso / aguaKylia) * 100) : null;
+  const ahorroPct = publicable && aguaReal  > 0 ? r0((exceso / aguaReal)  * 100) : null;
   let veredicto;
   if (aguaReal === 0) {
     veredicto = "No registraste riegos en el periodo medido.";
+  } else if (!publicable) {
+    veredicto = `No se puede comparar tu riego con el de Kylia: ${razones.join("; ")}.`;
   } else if (exceso > 0.5) {
     veredicto = `Aplicaste ~${r0(exceso)} L/m² más que la lámina FAO-56` +
                 (ahorroPct != null ? ` (ahorrarías ${ahorroPct}%)` : "") + " que Kylia habría aplicado.";
@@ -270,9 +343,20 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
     disponible: true,
     metodo: "contrafactual-fao56",
     periodo: { desde, hasta },
-    aplicada_l_m2:    r1(aguaReal),
-    recomendada_l_m2: r1(aguaKylia),
-    exceso_l_m2:      r1(exceso),
+    // Si no es publicable, las cifras comparadas TAMPOCO salen: dejarlas ahí es
+    // invitar a que alguien las copie al informe sin leer el motivo. Es el error
+    // que se cometió el 10-sep con los dos pilotos.
+    publicable,
+    motivo_no_publicable: publicable ? null : razones.join("; "),
+    cobertura_clima: cobertura,
+    dias_sin_clima: cf.diasSinClima ?? null,
+    riegos_sin_cantidad: sinCifra.length
+      ? { n: sinCifra.length, de: enPeriodo.length,
+          nota: "Apuntados como riego pero sin cantidad ni duración: sabemos que regó, no cuánto. NO cuentan como 0 L/m²." }
+      : null,
+    aplicada_l_m2:    publicable ? r1(aguaReal) : null,
+    recomendada_l_m2: publicable ? r1(aguaKylia) : null,
+    exceso_l_m2:      publicable ? r1(exceso) : null,
     exceso_pct:       excesoPct,
     ahorro_pct:       ahorroPct,
     dias_regado_real: new Set(realesEnPeriodo.map(r => r.dia)).size,

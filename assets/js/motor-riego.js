@@ -473,13 +473,36 @@
   //
   // Es exactamente lo que faltaba el 11-sep: dos informes de piloto salieron con
   // el 39% y el 29% de su campaña sin clima, y nada en el resultado lo decía.
-  function huecosDeSerie(orden) {
-    if (orden.length < 2) return { dias: orden.length, faltan: 0, cobertura: orden.length ? 1 : 0 };
-    const a = new Date(`${orden[0].date}T12:00:00Z`);
-    const b = new Date(`${orden[orden.length - 1].date}T12:00:00Z`);
-    const esperados = Math.round((b - a) / 86400000) + 1;
+  //
+  // ⚠️ Y LA VENTANA SE PASA DESDE FUERA, o esto no sirve para nada. La primera
+  // versión medía la serie contra SÍ MISMA: primer día a último día. Con eso,
+  // los huecos del principio y del final son INVISIBLES — al descartar los días
+  // sin dato la serie simplemente empieza más tarde y no queda agujero que
+  // contar.
+  //
+  // Y ese es justo el caso real: en el reveal de Ferran los 29 días sin ET₀ eran
+  // los MÁS ANTIGUOS (la API de pronóstico solo guarda ~64 días de pasado), así
+  // que la cobertura calculada contra sí misma daba 1,000 y la guarda no habría
+  // parado nada. Lo comprobé reproduciendo el caso: publicable=true, ahorro
+  // publicado, exactamente el fallo que la guarda venía a impedir.
+  //
+  // Quien llama SÍ sabe qué ventana esperaba cubrir (plantación → corte). Se la
+  // pasa, y entonces la cobertura mide lo que tiene que medir.
+  function huecosDeSerie(orden, ventana = null) {
+    const d0 = ventana?.desde && /^\d{4}-\d{2}-\d{2}$/.test(ventana.desde)
+      ? (orden.length && orden[0].date < ventana.desde ? orden[0].date : ventana.desde)
+      : (orden.length ? orden[0].date : null);
+    const d1 = ventana?.hasta && /^\d{4}-\d{2}-\d{2}$/.test(ventana.hasta)
+      ? (orden.length && orden[orden.length - 1].date > ventana.hasta ? orden[orden.length - 1].date : ventana.hasta)
+      : (orden.length ? orden[orden.length - 1].date : null);
+    if (!d0 || !d1) return { dias: orden.length, faltan: 0, cobertura: orden.length ? 1 : 0 };
+    const esperados = Math.round(
+      (new Date(`${d1}T12:00:00Z`) - new Date(`${d0}T12:00:00Z`)) / 86400000) + 1;
+    if (!Number.isFinite(esperados) || esperados <= 0) {
+      return { dias: orden.length, faltan: 0, cobertura: orden.length ? 1 : 0 };
+    }
     const faltan = Math.max(0, esperados - orden.length);
-    return { dias: orden.length, faltan, cobertura: esperados > 0 ? orden.length / esperados : 0 };
+    return { dias: orden.length, faltan, cobertura: Math.min(1, orden.length / esperados) };
   }
 
   // Riegos: fecha válida y lámina finita y NO negativa. Un `litros` nulo sigue
@@ -525,7 +548,7 @@
   // Devuelve { Dr, taw, raw, efic, kcActual, etcAcum, et0Acum, lluviaAcum, sinFenologia }.
   function balanceHidrico(serie, riegos, opts = {}) {
     const { suelo, cultivoId = null, metodoRiego, fechaPlantacion = null,
-            serieTermica = null, termico = true } = opts;
+            serieTermica = null, termico = true, ventana = null } = opts;
     const efic = EFIC_RIEGO[metodoRiego] ?? EFIC_DEFAULT;
     // Reloj del cultivo: calor si se puede, calendario si no. curvaFenologica
     // devuelve null en cuanto falta algo, y entonces esto se comporta EXACTAMENTE
@@ -573,7 +596,7 @@
     // la tierra. Antes se devolvía un balance normal con kc de fase inicial, o
     // sea que Kylia podía mandar regar un campo sin plantar. Se dice lo que hay.
     const sinPlantar = diasFin != null && diasFin < 0;
-    const cob = huecosDeSerie(orden);
+    const cob = huecosDeSerie(orden, ventana);
     return {
       Dr: sinPlantar ? 0 : Dr, taw, raw, efic, sinPlantar,
       // Sobre cuánto clima REAL se ha calculado esto. Un balance con cobertura
@@ -777,7 +800,7 @@
   // es bruta: lo que sale del aspersor/regadera, antes de pérdidas).
   function simularKylia(serie, opts = {}) {
     const { suelo, cultivoId = null, metodoRiego, fechaPlantacion = null,
-            serieTermica = null, termico = true } = opts;
+            serieTermica = null, termico = true, ventana = null } = opts;
     const efic = EFIC_RIEGO[metodoRiego] ?? EFIC_DEFAULT;
     const curva = termico ? curvaFenologica(cultivoId, serieTermica || serie, fechaPlantacion) : null;
 
@@ -801,8 +824,10 @@
     // deficitFinal: agua que Kylia tenía "en cola" al corte (aún no regada porque
     // el depósito no llegó al umbral). Honestidad del reveal: comparar acumulados
     // a igual fecha favorece al que riega menos a menudo; este dato lo explicita.
-    const cobS = huecosDeSerie(orden);
+    const cobS = huecosDeSerie(orden, ventana);
     return { puntos, total: Math.round(acum * 10) / 10, taw, raw, efic,
+             desdeSerie: orden.length ? orden[0].date : null,
+             hastaSerie: orden.length ? orden[orden.length - 1].date : null,
              diasSerie: cobS.dias, diasSinClima: cobS.faltan,
              coberturaClima: Math.round(cobS.cobertura * 1000) / 1000,
              modoFenologia: curva ? "termico" : "calendario",

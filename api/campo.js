@@ -629,6 +629,13 @@ async function revealDeUsuario(u) {
           suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
           metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
           serieTermica: termica,
+          // LA VENTANA QUE SE ESPERABA CUBRIR. Sin esto, la cobertura de clima
+          // se mide contra la propia serie y los huecos del PRINCIPIO son
+          // invisibles: los 29 días sin ET₀ del reveal de Ferran quedaban fuera
+          // por delante, la serie empezaba más tarde y la cobertura daba 1,000.
+          // Con la ventana declarada, da 0,67 y el informe se niega a publicar
+          // un porcentaje.
+          ventana: { desde: dias[0].date, hasta: corte },
         });
         contrafactual = { puntos: sim.puntos, total: sim.total, deficitFinal: sim.deficitFinal };
       }
