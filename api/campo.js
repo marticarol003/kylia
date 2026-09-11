@@ -52,24 +52,74 @@ function diasDesde(fechaIso) {
 const cacheClima = new Map();
 const CLIMA_TTL_MS = 30 * 60 * 1000;
 
+// ⚠️ DOS COSAS QUE COSTARON UN INFORME PUBLICADO MAL (11-sep-2026).
+//
+// 1. El endpoint de PRONÓSTICO solo guarda ~64 días de pasado real. Con
+//    past_days=92 devuelve el array entero, pero los días más viejos vienen a
+//    `null`. Aquí se hacía `?? 0`, así que 39 días del ciclo de Ferran entraron
+//    al balance como "ese día no se evaporó nada". Por eso su reveal decía que
+//    Kylia no habría regado hasta el 12 de julio: para el modelo, el tomate
+//    pasó un mes sin gastar agua. UN DATO QUE FALTA NO ES UN CERO. Ahora el día
+//    se descarta y el balance simplemente no lo cuenta.
+//
+// 2. Para lo retrospectivo manda el ARCHIVO (ERA5), que es para lo que está.
+//    El pronóstico cubre lo reciente y lo que viene. Es el mismo reparto que ya
+//    hacía serieTermica para la temperatura desde el 8-sep; esto lo alinea.
+const RETRASO_ARCHIVO = 6;   // el archivo va unos días por detrás del presente
+const ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive";
+
+// Un día solo entra si trae ET0. Sin ella no hay demanda que calcular, y
+// rellenarla con cero es peor que no tenerla: se traga el déficit en silencio.
+function diasConDato(d) {
+  return (d?.time || []).map((date, i) => ({
+    date,
+    et0:    d.et0_fao_evapotranspiration?.[i],
+    lluvia: d.precipitation_sum?.[i] ?? 0,
+    tmax:   d.temperature_2m_max?.[i] ?? null,
+    tmin:   d.temperature_2m_min?.[i] ?? null,
+  })).filter(x => x.et0 != null);
+}
+
+const DIARIO = "daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min";
+
 async function climaSerie(lat, lon, desde) {
   const past = desde ? Math.min(92, Math.max(1, diasDesde(desde) + 1)) : 30;
   const clave = `${Number(lat).toFixed(3)},${Number(lon).toFixed(3)},${past}`;
   const hit = cacheClima.get(clave);
   if (hit && Date.now() - hit.t < CLIMA_TTL_MS) return hit.serie;
 
-  const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}`
-    + `&daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min`
-    + `&past_days=${past}&forecast_days=7&timezone=Europe%2FMadrid`;
-  const res = await fetchConTimeout(url);
-  if (!res.ok) throw new Error(`open-meteo ${res.status}`);
-  const d = (await res.json()).daily || {};
-  const serie = (d.time || []).map((date, i) => ({
-    date, et0: d.et0_fao_evapotranspiration?.[i] ?? 0, lluvia: d.precipitation_sum?.[i] ?? 0,
-    // Temperatura: el reloj fenológico del motor. Va en la MISMA llamada, así que
-    // no cuesta una petición más (ver FAO_GDD en assets/js/motor-riego.js).
-    tmax: d.temperature_2m_max?.[i] ?? null, tmin: d.temperature_2m_min?.[i] ?? null,
-  }));
+  const hoy = hoyISO();
+  const tareas = [fetchConTimeout(
+    `${OPEN_METEO}?latitude=${lat}&longitude=${lon}&${DIARIO}`
+    + `&past_days=${past}&forecast_days=7&timezone=Europe%2FMadrid`)];
+
+  // Si el ciclo se sale de lo que el pronóstico recuerda, el archivo cubre la
+  // cola. Sin esto, esos días desaparecen de la serie y el balance arranca tarde.
+  const ini = desde ? String(desde).slice(0, 10) : null;
+  if (ini && past > 60) {
+    const fin = new Date(Date.now() - RETRASO_ARCHIVO * 86400000).toISOString().slice(0, 10);
+    tareas.push(fetchConTimeout(
+      `${ARCHIVE_URL}?latitude=${lat}&longitude=${lon}&${DIARIO}`
+      + `&start_date=${ini}&end_date=${fin < ini ? ini : fin}&timezone=Europe%2FMadrid`));
+  }
+
+  const respuestas = await Promise.all(tareas.map(t => t.catch(() => null)));
+  if (!respuestas[0]?.ok && !respuestas[1]?.ok) throw new Error("open-meteo sin respuesta");
+
+  const partes = [];
+  for (const r of respuestas) {
+    if (!r?.ok) { partes.push([]); continue; }
+    try { partes.push(diasConDato((await r.json()).daily || {})); }
+    catch (_) { partes.push([]); }
+  }
+
+  // El PRONÓSTICO manda en el solape: es la lectura más fresca del mismo día, y
+  // es la única que cubre hoy y lo que viene.
+  const mapa = new Map();
+  for (const d of partes[1] || []) mapa.set(d.date, d);
+  for (const d of partes[0] || []) mapa.set(d.date, d);
+  const serie = [...mapa.values()].sort((a, b) => a.date.localeCompare(b.date));
+
   cacheClima.set(clave, { t: Date.now(), serie });
   return serie;
 }
@@ -864,3 +914,8 @@ module.exports = async (req, res) => {
 // Reutilizado por api/informe-cientifico.js: reconstruye el reveal en servidor
 // a partir del usuario, sin confiar en números que vengan del cliente.
 module.exports.revealDeUsuario = revealDeUsuario;
+
+// Expuestas para los tests: la frontera entre "no hay dato" y "cero" es
+// justo lo que rompió dos informes publicados, y tiene que quedar fijada.
+module.exports.diasConDato = diasConDato;
+module.exports.climaSerie  = climaSerie;

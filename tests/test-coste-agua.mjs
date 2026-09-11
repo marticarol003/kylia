@@ -49,18 +49,19 @@ const ferranJson = JSON.parse(leer("docs", "pilotos", "reveal-ferran-2026-09-10.
 ok(ferranJson.informe.dimensiones.agua.exceso_l_m2 < 0,
    "y el reveal real de Ferran confirma que no hubo exceso");
 
-console.log("\n── el informe de Oriol dice de dónde sale cada euro ──");
+console.log("\n── ningún informe lleva euros ahora mismo, y es a propósito ──");
+// El 11-sep se descubrió que los dos reveals publicados se calcularon con días
+// de ET0 puestos a cero (ver tests/test-clima-sin-ceros.mjs). Con el clima real
+// del archivo, NINGUNO de los dos pilotos ahorró agua: Oriol acertó (-1%) y
+// Ferran regó de menos (-12%). Así que el bloque de euros de Oriol, que salía
+// de un exceso de 46,2 m³ que no existe, está retirado hasta que se regeneren
+// los reveals desde el servidor.
 for (const f of ["informe-oriol-2026-08.html", "informe-oriol-2026-08-ca.html"]) {
   const inf = leer("docs", "pilotos", f);
-  ok(/46,2 m³/.test(inf), `${f}: parte de los m³ medidos`);
-  ok(/0,20 €\/m³/.test(inf) && /9,20 €/.test(inf), `${f}: la tabla por tarifa`);
-  ok(/1\.215 m³/.test(inf), `${f}: y la proporción por hectárea, que es la que se mantiene`);
-  ok(/no sabemos qué pagas|no sabem què pagues/i.test(inf),
-     `${f}: se dice que el precio no lo sabemos, en vez de poner uno`);
+  ok(!/€\/m³/.test(inf), `${f}: sin tabla de tarifas`);
 }
-const esp = leer("docs", "pilotos", "informe-oriol-2026-08.html");
-ok(/sería deshonesto vendértelo como argumento/.test(esp),
-   "y que en 380 m² el dinero no es el argumento: 9 € harían parecer que Kylia no vale la pena");
+ok(/NO se puede enviar/.test(leer("docs", "pilotos", "RETIRADO-oriol-2026-09-11.md")),
+   "y queda escrito por qué no se puede enviar");
 
 console.log("\n── el informe de Ferran NO lleva euros ──");
 const ferranHtml = leer("docs", "pilotos", "informe-ferran-2026-09-ca.html");
