@@ -87,7 +87,10 @@ ok(/function metrosLibres/.test(app), "se calculan los metros del recinto sin re
 ok(/const cabe = area > 0 && area <= libres;/.test(app),
    "el trozo no puede pasarse de lo que queda libre");
 ok(/Te has pasado: /.test(app), "y si se pasa se dice, no se recorta en silencio");
-ok(/btn\.disabled = !cabe;/.test(app), "con el botón de guardar apagado mientras no cabe");
+// Desde que además se pregunta la rutina, el botón lo decide revisarEditor()
+// mirando las dos cosas: que el trozo quepa Y que la rutina esté contestada.
+ok(/ecCabe = cabe;\n\s+revisarEditor\(\);/.test(app),
+   "con el botón de guardar apagado mientras no cabe");
 
 console.log("\n── el ancla del tirador se le dice a Leaflet ──");
 ok(/iconAnchor: \[10, 10\]/.test(app),
@@ -114,6 +117,48 @@ ok(GEO.anilloExterior(cuad).length === 4,
    "un cuadrilátero da CUATRO esquinas, no cinco: anilloExterior ya quita el cierre");
 ok(GEO.rectanguloCentrado(cuad, 5000)?.area_m2 === 5000,
    "rectanguloCentrado nace con los metros que se le piden");
+
+console.log("\n── un cultivo nuevo se da de alta como en el onboarding ──");
+// Sin su rutina, un cultivo recién añadido no tiene historial, y sin historial
+// no hay balance: su primer aviso no diría nada. Las preguntas son las mismas
+// que las del alta, y por el mismo motivo.
+for (const [id, q] of [["ec-metodo", "cómo riega"], ["ec-cada", "cada cuánto"],
+                       ["ec-rato", "cuánto rato"], ["ec-ultimo", "cuándo regó por última vez"]])
+  ok(new RegExp(`id="${id}"`).test(app), `pregunta ${q}`);
+ok(/btn\.disabled = !\(ecCabe && ecR\.metodo && ecR\.cada && ecR\.minutos && ecR\.ultimo != null\)/.test(app),
+   "y no se guarda sin ellas: el área sola ya no basta");
+ok(/ecRevelar\("ec-q-cada"\)/.test(app) && /ecRevelar\("ec-q-rato"\)/.test(app),
+   "una pregunta cada vez, igual que en el alta");
+
+console.log("\n── y siembra con la MISMA función que el alta ──");
+// Estaba dentro del alta; se sacó fuera para que las dos puertas no se separen.
+ok(/function reconstruirRiegos\(r, clima\)/.test(app), "la función vive fuera del alta");
+ok((app.match(/reconstruirRiegos\(\{/g) || []).length === 2,
+   "y la llaman exactamente dos sitios: el alta y añadir cultivo");
+ok(/localStorage\.setItem\(`kylia_riegos_\$\{id\}`/.test(app),
+   "el historial va a la clave de ESA parcela");
+
+console.log("\n── cada cultivo con su propio riego ──");
+// Un bancal a manta y otro a goteo no se riegan igual, y el método decide la
+// eficiencia de aplicación: de 0,60 a 0,90.
+ok(/metodoRiego: ecR\.metodo,/.test(app), "el método se guarda en la siembra");
+ok(/metodoRiego:     p\.metodoRiego  \|\| cfgFinca\.metodoRiego/.test(app),
+   "configEfectiva usa el suyo, y cae al de la finca si no lo tiene");
+ok(/metodoRiego: parcela\.metodoRiego \|\| cfgFinca\.metodoRiego/.test(app),
+   "y ctxDe igual, para las acciones de todas las parcelas");
+ok(/metodo_riego:     s\.metodoRiego \|\| base\.metodoRiego/.test(app),
+   "también viaja al servidor: allí se calcula su propio balance");
+ok(/siguen heredando\n\s+\/\/ el de la finca/.test(app),
+   "los cultivos de antes no tienen el campo y siguen como estaban");
+
+console.log("\n── la eficiencia de cada método, con el motor real ──");
+const MOT = (await import("module")).createRequire(import.meta.url)(join(RAIZ, "assets", "js", "motor-riego.js"));
+const ofrecidos = [...app.matchAll(/id="ec-metodo"[\s\S]{0,600}?<\/div>/g)][0][0]
+  .match(/data-metodo="(\w+)"/g).map(m => m.replace(/data-metodo="|"/g, ""));
+ok(ofrecidos.every(m => MOT.EFIC_RIEGO[m] != null),
+   `los ${ofrecidos.length} métodos que se ofrecen tienen eficiencia en el motor (${ofrecidos.join(", ")})`);
+ok(MOT.EFIC_RIEGO.surco < MOT.EFIC_RIEGO.goteo,
+   `y no dan igual: surco ${MOT.EFIC_RIEGO.surco} contra goteo ${MOT.EFIC_RIEGO.goteo}`);
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

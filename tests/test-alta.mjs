@@ -68,11 +68,16 @@ ok(primer.indexOf("await cargarET0()") < primer.indexOf("sembrarHistorial()"),
    "se siembra DESPUÉS de tener el clima: la lámina sale de la ETc real, no de una tabla");
 ok(/SU CULTIVO ESTÁ VIVO/.test(alta),
    "y el razonamiento está escrito donde se usa");
-ok(/neto \+= MOTOR\.kcDelDia\(A\.cultivo, dias\) \* \(d\.et0 \?\? 0\)/.test(alta),
+// El sembrado se sacó del alta el 11-sep para compartirlo con "añadir cultivo":
+// un cultivo nuevo sin historial no tiene balance y su primer aviso no vale
+// nada, así que las dos puertas tienen que sembrar IGUAL.
+const siembra = app.slice(app.indexOf("function reconstruirRiegos"), app.indexOf("// ── El alta: los dos primeros minutos"));
+ok(/reconstruirRiegos\(\{/.test(alta), "el alta llama a la función compartida, no tiene la suya");
+ok(/neto \+= MOTOR\.kcDelDia\(r\.cultivo, dias\) \* \(d\.et0 \?\? 0\)/.test(siembra),
    "la ETc se calcula con el mismo motor que todo lo demás");
-ok(/if \(ll >= MOTOR\.PE_MIN_MM\) neto -= ll;/.test(alta),
+ok(/if \(ll >= MOTOR\.PE_MIN_MM\) neto -= ll;/.test(siembra),
    "y se descuenta la lluvia que llegó a infiltrar");
-ok(/estimado: true/.test(alta),
+ok(/estimado: true/.test(siembra),
    "los riegos sembrados van marcados: no son un registro real y no se disfrazan de tal");
 
 console.log("\n── el primer aviso sigue a los días desde su último riego, no a una lámina inventada ──");
@@ -81,7 +86,7 @@ console.log("\n── el primer aviso sigue a los días desde su último riego, 
 // consejo era una constante disfrazada de cálculo.
 // Sigue siendo el respaldo cuando no hay caudal; con caudal se calcula (ver más
 // abajo, "con caudal no se supone"). Antes era la única vía.
-ok(/i === fechas\.length - 1 \? null : lamina/.test(alta),
+ok(/i === fechas\.length - 1 \? null : lamina/.test(siembra),
    "sin caudal, el último riego sembrado entra como recarga completa: es la premisa que dice el comentario");
 ok(!/saveConfig\(\{ \.\.\.cfg, caudal \}\)/.test(alta),
    "y NO se escribe un caudal deducido: no es una medida, es la suposición despejada");
@@ -223,13 +228,13 @@ console.log("\n── V1 · con caudal no se supone: se calcula ──");
 // "Recarga completa" es razonable en superficie y aspersión, pero en GOTEO es
 // falsa: el goteo repone poco y a menudo, y un riego típico no llena la zona
 // radicular. Suponer que sí infravalora el déficit y retrasa el primer aviso.
-ok(/const mmPorRiego = \(caudal > 0 && Number\(A\.minutos\) > 0\)/.test(alta),
+ok(/const mmPorRiego = \(caudal > 0 && Number\(r\.minutos\) > 0\)/.test(siembra),
    "con caudal y rato se calculan los milímetros de cada riego");
-ok(/Math\.round\(caudal \* \(Number\(A\.minutos\) \/ 60\) \* 10\) \/ 10/.test(alta),
+ok(/Math\.round\(caudal \* \(Number\(r\.minutos\) \/ 60\) \* 10\) \/ 10/.test(siembra),
    "caudal × rato, sin más magia");
-ok(/litros: mmPorRiego != null/.test(alta) && /: \(i === fechas\.length - 1 \? null : lamina\)/.test(alta),
+ok(/litros: mmPorRiego != null/.test(siembra) && /: \(i === fechas\.length - 1 \? null : lamina\)/.test(siembra),
    "y la recarga completa queda como respaldo de cuando NO se sabe el caudal");
-ok(/en goteo es FALSA/.test(alta),
+ok(/en goteo es FALSA/.test(siembra),
    "el sesgo de esa suposición queda escrito donde se toma, no en un documento aparte");
 
 console.log("\n── el caudal se ofrece, nunca se exige ──");

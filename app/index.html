@@ -2749,6 +2749,45 @@
           </select>
         </div>
         <p class="alta-nota" id="ec-nota">Arrastra las cuatro esquinas hasta cuadrar tu bancal.</p>
+
+        <!-- Las MISMAS preguntas del alta, y por el mismo motivo: cada cultivo
+             tiene su propio balance, y sin su rutina no hay de dónde sacarlo.
+             Heredar el riego de la finca sería suponer que todos los bancales se
+             riegan igual, y no es verdad ni en fincas pequeñas. -->
+        <p class="alta-preg" style="font-size:.95rem">¿Cómo riegas este cultivo?</p>
+        <div class="alta-chips" id="ec-metodo">
+          <button type="button" class="alta-chip" data-metodo="goteo">Goteo</button>
+          <button type="button" class="alta-chip" data-metodo="aspersion">Aspersión</button>
+          <button type="button" class="alta-chip" data-metodo="manguera">Manguera</button>
+          <button type="button" class="alta-chip" data-metodo="surco">A manta o surco</button>
+        </div>
+        <div id="ec-q-cada" hidden>
+          <p class="alta-preg" style="font-size:.95rem">¿Cada cuánto?</p>
+          <div class="alta-chips" id="ec-cada">
+            <button type="button" class="alta-chip" data-cada="1">Todos los días</button>
+            <button type="button" class="alta-chip" data-cada="2">Cada 2–3 días</button>
+            <button type="button" class="alta-chip" data-cada="5">Una o dos veces por semana</button>
+          </div>
+        </div>
+        <div id="ec-q-rato" hidden>
+          <p class="alta-preg" style="font-size:.95rem">¿Cuánto rato?</p>
+          <div class="alta-chips" id="ec-rato">
+            <button type="button" class="alta-chip" data-min="15">15 min</button>
+            <button type="button" class="alta-chip" data-min="30">30 min</button>
+            <button type="button" class="alta-chip" data-min="45">45 min</button>
+            <button type="button" class="alta-chip" data-min="60">1 hora</button>
+          </div>
+        </div>
+        <div id="ec-q-ultimo" hidden>
+          <p class="alta-preg" style="font-size:.95rem">¿Cuándo regaste este cultivo por última vez?</p>
+          <div class="alta-chips" id="ec-ultimo">
+            <button type="button" class="alta-chip" data-ult="0">Hoy</button>
+            <button type="button" class="alta-chip" data-ult="1">Ayer</button>
+            <button type="button" class="alta-chip" data-ult="3">Hace 2–3 días</button>
+            <button type="button" class="alta-chip" data-ult="7">Hace más</button>
+          </div>
+        </div>
+
         <div class="editor-acciones">
           <button type="button" class="btn-modal-cancel" id="ec-cancelar">Cancelar</button>
           <button type="button" class="btn-save" id="ec-guardar">Guardar cultivo</button>
@@ -3385,6 +3424,7 @@
             id: s.id,
             etiqueta: `${nombreCultivo(s.cultivo)} · ${(s.area_m2 || 0).toLocaleString("es-ES")} m²`,
             cultivo: s.cultivo, area_m2: s.area_m2, fechaPlantacion: s.fechaPlantacion,
+            metodoRiego: s.metodoRiego || null, riegoMinutos: s.riegoMinutos ?? null,
             // El contorno propio si la zona se partió; el del recinto entero si
             // ese cultivo lo ocupa solo; ninguno si comparte recinto sin partir
             // (ahí la medida del satélite saldría mezclada, ver renderZonas).
@@ -3420,6 +3460,14 @@
         fechaPlantacion: p.fechaPlantacion || null,
         areaParcela:     p.area_m2 ?? null,
         parcela:         p.geometria || null,
+        // El riego de ESTE cultivo si lo tiene; el de la finca si no. Un bancal
+        // a manta y otro a goteo no se riegan igual, y el método decide la
+        // eficiencia de aplicación (de 0,60 a 0,90): dársela a todos por igual
+        // era suponer algo que no se había preguntado. Los cultivos dados de
+        // alta antes de que esto existiera no tienen el campo y siguen heredando
+        // el de la finca, que es lo que hacían.
+        metodoRiego:     p.metodoRiego  || cfgFinca.metodoRiego || null,
+        riegoMinutos:    p.riegoMinutos ?? cfgFinca.riegoMinutos ?? null,
       };
     }
 
@@ -3692,7 +3740,7 @@
     // vértice que cruza un lado (una "pajarita" tiene un área que no es la del
     // terreno, y esa cifra acaba en los kg de abono) y areaM2 mide lo dibujado.
     // Aquí solo va la parte de dedo.
-    let ecGeom = null, ecTiradores = [], ecCapa = null, ecRecinto = null;
+    let ecGeom = null, ecTiradores = [], ecCapa = null, ecRecinto = null, ecCabe = false;
 
     function zonaConRecinto() {
       for (const z of zonasGuardadas()) if (z.geometria) return z;
@@ -3725,9 +3773,15 @@
 
       const sel = document.getElementById("ec-cultivo");
       sel.innerHTML = CULTIVOS.map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join("");
+      ecR = {}; ecCabe = false;
+      for (const g of ["ec-metodo", "ec-cada", "ec-rato", "ec-ultimo"])
+        document.getElementById(g)?.querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+      for (const q of ["ec-q-cada", "ec-q-rato", "ec-q-ultimo"])
+        document.getElementById(q).hidden = true;
       document.getElementById("editor-cultivo").hidden = false;
       document.getElementById("btn-anadir-cultivo").hidden = true;
       pintarEditor();
+      revisarEditor();
     }
 
     function pintarEditor() {
@@ -3776,14 +3830,42 @@
       const area = Math.round(window.KyliaGeo.areaM2(window.KyliaGeo.anilloExterior(ecGeom)));
       const libres = metrosLibres(ecRecinto);
       const nota = document.getElementById("ec-nota");
-      const btn  = document.getElementById("ec-guardar");
       // LO QUE SABEMOS manda: el trozo no puede pasarse de los metros que
       // quedan sin repartir. Si se pasa, no se recorta en silencio — se dice.
       const cabe = area > 0 && area <= libres;
-      btn.disabled = !cabe;
+      ecCabe = cabe;
+      revisarEditor();
       nota.textContent = cabe
         ? `${area.toLocaleString("es-ES")} m² de los ${libres.toLocaleString("es-ES")} que te quedan libres.`
         : `Te has pasado: ${area.toLocaleString("es-ES")} m² y solo quedan ${libres.toLocaleString("es-ES")} sin repartir.`;
+    }
+
+    // Las respuestas del editor. Mismo patrón de chips que el alta, y una
+    // pregunta cada vez: soltarlas todas de golpe es un muro.
+    let ecR = {};
+    function ecGrupo(id, attr, campo, luego) {
+      const g = document.getElementById(id);
+      if (!g) return;
+      g.addEventListener("click", ev => {
+        const b = ev.target.closest(`[data-${attr}]`);
+        if (!b) return;
+        g.querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+        b.classList.add("sel");
+        ecR[campo] = b.dataset[attr];
+        luego && luego();
+        revisarEditor();
+      });
+    }
+    function ecRevelar(id) {
+      const e = document.getElementById(id);
+      if (e) e.hidden = false;
+    }
+    function revisarEditor() {
+      const btn = document.getElementById("ec-guardar");
+      if (!btn) return;
+      // El área manda igual que antes; ahora además hace falta la rutina, porque
+      // sin ella el cultivo nace sin balance.
+      btn.disabled = !(ecCabe && ecR.metodo && ecR.cada && ecR.minutos && ecR.ultimo != null);
     }
 
     function cerrarEditorCultivo() {
@@ -3806,18 +3888,106 @@
       let z = zonas.find(x => x.referencia === ecRecinto.referencia);
       if (!z) { z = { ...ecRecinto, siembras: ecRecinto.siembras || [] }; zonas.push(z); }
       z.siembras = z.siembras || [];
+      const id = uuidZona();
+      const cultivo = document.getElementById("ec-cultivo").value;
+      const plantado = d.toISOString().slice(0, 10);
       z.siembras.push({
-        id: uuidZona(),
-        cultivo: document.getElementById("ec-cultivo").value,
-        area_m2: area,
-        fechaPlantacion: d.toISOString().slice(0, 10),
-        geometria: ecGeom,
+        id, cultivo, area_m2: area, fechaPlantacion: plantado, geometria: ecGeom,
+        // Su propio riego. No se hereda el de la finca: suponer que todos los
+        // bancales se riegan igual es falso hasta en fincas pequeñas, y de aquí
+        // sale la eficiencia con la que se convierte el agua aplicada en agua
+        // que llega a la raíz (de 0,60 a 0,90 según el método).
+        metodoRiego: ecR.metodo,
+        riegoMinutos: Number(ecR.minutos) || null,
       });
       localStorage.setItem(ZONAS_KEY, JSON.stringify(zonas));
+
+      // Y su historial, con la MISMA función que usa el alta. Sin esto el
+      // cultivo nace sin balance y su primer aviso no dice nada.
+      const suyos = reconstruirRiegos({
+        cultivo, plantado, cada: ecR.cada, minutos: ecR.minutos,
+        ultimo: ecR.ultimo, metodo: ecR.metodo, caudal: Number(cfgFinca.caudal) || 0,
+      }, ultimoET0);
+      try { localStorage.setItem(`kylia_riegos_${id}`, JSON.stringify(suyos)); } catch (_) {}
       localStorage.removeItem("kylia_quiere_mas_cultivos");
       cerrarEditorCultivo();
       renderZonasTabs();
+      // Las acciones del día también: acaba de aparecer un cultivo con su
+      // propio balance, y con él la parcela principal deja de contar aparte.
+      renderHoy();
       subirConfig();
+    }
+
+    // ─── Reconstruir el historial de riegos de una rutina ────────────────
+    // Vive FUERA del alta porque la usan dos sitios: el alta y añadir un cultivo
+    // nuevo. Un cultivo recién añadido sin historial no tiene balance, y su
+    // primer aviso no vale nada — así que las dos puertas tienen que sembrar
+    // igual. Duplicar esto sería garantizar que se separen.
+    //
+    // ⚠️ LO DIFÍCIL NO SON LAS FECHAS, ES CUÁNTA AGUA LLEVA CADA RIEGO. Y no se
+    // le puede preguntar: nadie sabe de memoria cuántos milímetros echa su
+    // goteo. Se deduce de un hecho que sí tenemos: SU CULTIVO ESTÁ VIVO. Quien
+    // lleva tres semanas regando cada dos días y tiene la planta en pie está
+    // cubriendo, más o menos, lo que la planta gasta.
+    //
+    //   r = { cultivo, plantado, cada, minutos, ultimo, metodo, caudal }
+    //   clima = la serie de ET₀/lluvia ya cargada
+    function reconstruirRiegos(r, clima) {
+      const menosDias = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+      const cada = Math.max(1, Number(r.cada));
+      const fin  = menosDias(Number(r.ultimo));
+      const fechas = [];
+      for (let f = fin; f >= r.plantado; ) {
+        fechas.push(f);
+        const d = new Date(`${f}T12:00:00`); d.setDate(d.getDate() - cada);
+        f = d.toISOString().slice(0, 10);
+      }
+      fechas.reverse();
+      if (!fechas.length) return [];
+
+      // Lo que el cultivo ha gastado de verdad en ese tramo, descontando la
+      // lluvia que llegó a infiltrar.
+      let neto = 0;
+      for (const d of (clima || [])) {
+        if (d.date < r.plantado || d.date > fin) continue;
+        const dias = MOTOR.diasEntre(r.plantado, new Date(`${d.date}T12:00:00`));
+        neto += MOTOR.kcDelDia(r.cultivo, dias) * (d.et0 ?? 0);
+        const ll = Math.max(0, d.lluvia ?? 0);
+        if (ll >= MOTOR.PE_MIN_MM) neto -= ll;
+      }
+      const efic   = MOTOR.EFIC_RIEGO[r.metodo] ?? MOTOR.EFIC_DEFAULT;
+      const lamina = Math.max(1, Math.round((Math.max(0, neto) / fechas.length / efic) * 10) / 10);
+
+      // CON CAUDAL CONOCIDO no se supone nada: se calcula. `caudal × rato` son
+      // los milímetros que de verdad echa cada vez, y el balance sale de su
+      // agua. Si su rutina se queda corta, se ve — que es lo que queremos.
+      //
+      // SIN CAUDAL hay que suponer, y el último riego va como RECARGA COMPLETA
+      // (litros:null): si su rutina cubre la demanda, el día que regó por última
+      // vez el suelo estaba lleno.
+      //   ⚠️ Es una suposición con sesgo conocido: en goteo es FALSA. El goteo
+      //   repone poco y a menudo, así que un riego típico no llena la zona
+      //   radicular. Infravalora el déficit y retrasa el primer aviso. Es el
+      //   precio de no saber el caudal, y la razón de más peso para medirlo.
+      //
+      // El reparto plano de los anteriores tampoco es inocente: Kc sube a lo
+      // largo del ciclo, los del principio sobran (y el sobrante se tira, porque
+      // el déficit se recorta en 0) y los del final se quedan cortos. Con lámina
+      // plana en TODOS, el primer aviso salía "RIEGA" en 14 de 16 casos
+      // probados, incluso diciendo que había regado hoy. Por eso el último manda.
+      const caudal = Number(r.caudal) || 0;
+      const mmPorRiego = (caudal > 0 && Number(r.minutos) > 0)
+        ? Math.round(caudal * (Number(r.minutos) / 60) * 10) / 10
+        : null;
+
+      return fechas.map((f, i) => ({
+        date: f,
+        litros: mmPorRiego != null
+          ? mmPorRiego                                   // su agua, medida
+          : (i === fechas.length - 1 ? null : lamina),   // supuesta
+        duracion: Number(r.minutos) || null,
+        estimado: true,
+      }));
     }
 
     // Las parcelas que de verdad hay que tener en cuenta. La "parcela principal"
@@ -4573,7 +4743,10 @@
       return {
         cfg: { ...cfgFinca, cultivos: parcela.cultivo ? [parcela.cultivo] : [],
                fechaPlantacion: parcela.fechaPlantacion || null,
-               areaParcela: parcela.area_m2 ?? null, parcela: parcela.geometria || null },
+               areaParcela: parcela.area_m2 ?? null, parcela: parcela.geometria || null,
+               // Igual que configEfectiva: el riego propio si lo tiene.
+               metodoRiego: parcela.metodoRiego || cfgFinca.metodoRiego || null,
+               riegoMinutos: parcela.riegoMinutos ?? cfgFinca.riegoMinutos ?? null },
         riegos: rs,
         ndmi: null,
       };
@@ -6502,7 +6675,9 @@
             // De la finca: dónde está, qué suelo tiene y con qué riega. Lo que
             // cambia entre cultivos (cuál, cuándo y cuántos metros) va arriba.
             suelo:            base.suelo || null,
-            metodo_riego:     base.metodoRiego || null,
+            // El de la siembra si lo tiene: el servidor calcula su propio balance
+            // y con el método de la finca le daría otra eficiencia.
+            metodo_riego:     s.metodoRiego || base.metodoRiego || null,
             caudal:           base.caudal ?? null,
             origen:           localStorage.getItem("kylia_origen"),
           });
@@ -7437,67 +7612,11 @@
         // de menos, esa desviación no se ve el primer día. Se ve en cuanto empieza
         // a apuntar riegos de verdad, y entonces el número se corrige solo.
         function sembrarHistorial() {
-          const cada = Math.max(1, Number(A.cada));
-          const fin  = menos(Number(A.ultimo));
-          const fechas = [];
-          for (let f = fin; f >= A.plantado; ) {
-            fechas.push(f);
-            const d = new Date(`${f}T12:00:00`); d.setDate(d.getDate() - cada);
-            f = d.toISOString().slice(0, 10);
-          }
-          fechas.reverse();
-          if (!fechas.length) { riegos = []; saveRiegos(riegos); return; }
-
-          // Lo que el cultivo ha gastado de verdad en ese tramo, descontando la
-          // lluvia que llegó a infiltrar.
-          let neto = 0;
-          for (const d of (ultimoET0 || [])) {
-            if (d.date < A.plantado || d.date > fin) continue;
-            const dias = MOTOR.diasEntre(A.plantado, new Date(`${d.date}T12:00:00`));
-            neto += MOTOR.kcDelDia(A.cultivo, dias) * (d.et0 ?? 0);
-            const ll = Math.max(0, d.lluvia ?? 0);
-            if (ll >= MOTOR.PE_MIN_MM) neto -= ll;
-          }
-          const efic = MOTOR.EFIC_RIEGO[A.metodo] ?? MOTOR.EFIC_DEFAULT;
-          const lamina = Math.max(1, Math.round((Math.max(0, neto) / fechas.length / efic) * 10) / 10);
-
-          // ── Cuánta agua lleva cada riego sembrado ───────────────────────
-          //
-          // CON CAUDAL CONOCIDO no se supone nada: se calcula. `caudal × rato`
-          // son los milímetros que de verdad echa cada vez, y el balance sale
-          // de su agua, no de una premisa. Si su rutina se queda corta, se ve —
-          // que es justo lo que queremos que se vea.
-          //
-          // SIN CAUDAL hay que suponer, y entonces el último riego va como
-          // RECARGA COMPLETA (litros:null). El porqué: la premisa es "el cultivo
-          // está vivo ⇒ su rutina cubre la demanda", y si eso es cierto, el día
-          // que regó por última vez el suelo estaba lleno.
-          //
-          //   ⚠️ Y es una suposición con sesgo conocido: en goteo es FALSA. El
-          //   goteo está diseñado para reponer poco y a menudo, así que un riego
-          //   típico no llena la zona radicular entera. Suponer que sí
-          //   infravalora el déficit de partida y retrasa el primer aviso. Es el
-          //   precio de no saber el caudal, y la razón de más peso para medirlo.
-          //
-          // El reparto plano de los riegos anteriores tampoco es inocente: Kc
-          // sube a lo largo del ciclo, los del principio sobran (y el sobrante
-          // se tira, porque el déficit se recorta en 0) y los del final se
-          // quedan cortos. Con lámina plana en TODOS, el residuo superaba el
-          // umbral y el primer aviso salía "RIEGA" en 14 de 16 casos probados,
-          // incluso diciendo que había regado hoy. Por eso el último manda.
-          const caudal = Number(cfg.caudal) || Number(A.caudal) || 0;
-          const mmPorRiego = (caudal > 0 && Number(A.minutos) > 0)
-            ? Math.round(caudal * (Number(A.minutos) / 60) * 10) / 10
-            : null;
-
-          riegos = fechas.map((f, i) => ({
-            date: f,
-            litros: mmPorRiego != null
-              ? mmPorRiego                                   // su agua, medida
-              : (i === fechas.length - 1 ? null : lamina),   // supuesta
-            duracion: Number(A.minutos),
-            estimado: true,
-          }));
+          riegos = reconstruirRiegos({
+            cultivo: A.cultivo, plantado: A.plantado, cada: A.cada,
+            minutos: A.minutos, ultimo: A.ultimo, metodo: A.metodo,
+            caudal: Number(cfg.caudal) || Number(A.caudal) || 0,
+          }, ultimoET0);
           saveRiegos(riegos);
 
           // NO se deduce el caudal. Se hacía —lámina entre los minutos que él
@@ -8638,6 +8757,10 @@
       document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
 
       // Selector de zona (delegación: las pestañas se repintan al guardar).
+      ecGrupo("ec-metodo", "metodo", "metodo", () => ecRevelar("ec-q-cada"));
+      ecGrupo("ec-cada",   "cada",   "cada",   () => ecRevelar("ec-q-rato"));
+      ecGrupo("ec-rato",   "min",    "minutos", () => ecRevelar("ec-q-ultimo"));
+      ecGrupo("ec-ultimo", "ult",    "ultimo");
       document.getElementById("btn-anadir-cultivo")?.addEventListener("click", abrirEditorCultivo);
       document.getElementById("ec-cancelar")?.addEventListener("click", cerrarEditorCultivo);
       document.getElementById("ec-guardar")?.addEventListener("click", guardarCultivoNuevo);
