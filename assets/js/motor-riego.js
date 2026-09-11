@@ -336,6 +336,8 @@
     const g = FAO_GDD[cultivoId];
     if (!g || objetivo == null || gddAcum == null) return null;
 
+    // Ojo: sin desdeISO esto toma el día UTC, que a partir de las 22:00 en España
+    // ya es "mañana". Quien llama debería pasar su día; se deja el aviso aquí.
     const hoy = desdeISO || new Date().toISOString().slice(0, 10);
     if (gddAcum >= objetivo) {
       return { estado: "lista", desde: hoy, probable: hoy, hasta: hoy, dias_restantes: 0,
@@ -343,7 +345,17 @@
     }
 
     const prev = new Map((pronostico || []).filter(d => d && d.date).map(d => [d.date, d]));
-    const sumar = (f, n) => { const d = new Date(`${f}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+    // UTC de punta a punta. Construir la fecha en hora LOCAL y luego imprimirla
+    // con toISOString() (que es UTC) desplaza el día en los husos por encima de
+    // UTC+12: en Kiritimati la ventana de madurez salía dos días antes. En
+    // España no se nota —UTC+1/+2, el mediodía local sigue siendo el mismo día
+    // en UTC— pero esto corre EN EL NAVEGADOR del agricultor, y una fecha no
+    // puede depender de dónde esté mirando.
+    const sumar = (f, n) => {
+      const d = new Date(`${f}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    };
 
     let acum = gddAcum, fecha = hoy, n = 0, usadoPronostico = 0;
     while (acum < objetivo && n < 400) {

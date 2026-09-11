@@ -132,7 +132,14 @@ function cuadernoFertilizacion(necesidad, opts = {}) {
     const pendiente = r3(Math.max(0, kg - puesto));
     const exceso    = puesto > kg ? r3(puesto - kg) : 0;
 
-    const precio = precios[n] == null ? null : Number(precios[n]);
+    // Un precio tiene que ser un número finito y NO negativo. `== null` dejaba
+    // pasar NaN y texto: `Number(NaN)` seguía adelante, r2 lo convertía en 0
+    // —hace `Number(x) || 0`— y el nitrógeno, que es el grueso del plan, salía
+    // costando 0 € con el total declarado COMPLETO. Y un precio negativo daba
+    // un coste total de −26,90 €: abonar te salía a devolver dinero.
+    const pBruto = precios[n];
+    const precio = (pBruto != null && pBruto !== "" && Number.isFinite(Number(pBruto)) && Number(pBruto) >= 0)
+      ? Number(pBruto) : null;
     // El coste es el de lo que FALTA, no el de la necesidad total: lo ya echado
     // ya está pagado.
     const coste  = precio == null ? null : r2(pendiente * precio);
@@ -160,7 +167,10 @@ function cuadernoFertilizacion(necesidad, opts = {}) {
     disponible: true,
     cultivo: necesidad.cultivo,
     fecha: opts.fecha || new Date().toISOString().slice(0, 10),
-    superficie_m2: opts.superficie_m2 ?? null,
+    // Una superficie negativa o absurda se copiaba tal cual al encabezado del
+    // cuaderno: "−5 m²" impreso en un documento que es registro legal.
+    superficie_m2: (Number.isFinite(Number(opts.superficie_m2)) && Number(opts.superficie_m2) > 0)
+      ? Number(opts.superficie_m2) : null,
     oferta_conocida: necesidad.oferta_conocida,
     lineas,
     // Cómo repartir el abonado en el tiempo (aumenta la eficiencia, MAPA).

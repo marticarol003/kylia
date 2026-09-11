@@ -112,6 +112,46 @@ const pSuave = M.aguaSuelo("franco", "tomate", 60, 1).p;
 ok(pSeco < pSuave, `con más demanda evaporativa el cultivo sufre antes: p ${pSeco.toFixed(2)} vs ${pSuave.toFixed(2)}`);
 ok(pSeco >= 0.1 && pSuave <= 0.8, "y p se queda dentro del rango de la Tabla 22 de FAO-56");
 
+console.log("\n── CICLO 6 · el coste del cuaderno no puede mentir ──");
+const N = require(join(RAIZ, "api", "_motor-nutricion.js"));
+const C = require(join(RAIZ, "api", "_motor-cuaderno-fert.js"));
+const nec = N.necesidadNutrientes("tomate", 2, null, { area_m2: 440 });
+// `precios[n] == null ? null : Number(...)` dejaba pasar NaN y texto. Luego r2
+// hace `Number(x) || 0`, así que el NITRÓGENO —el grueso del plan— salía
+// costando 0 € y el total se declaraba COMPLETO.
+for (const malo of [NaN, "caro", -5, Infinity, null, ""]) {
+  const cu = C.cuadernoFertilizacion(nec, { superficie_m2: 440, metodo_riego: "goteo",
+                                            precios: { N: malo, P2O5: 1, K2O: 1 } });
+  const lN = cu.lineas.find(l => l.nutriente === "N");
+  ok(lN.coste_eur === null, `precio del N = ${JSON.stringify(malo)} → su coste es null, no 0`);
+  ok(cu.coste_parcial === true, `   ...y el total se declara PARCIAL`);
+}
+const bueno = C.cuadernoFertilizacion(nec, { superficie_m2: 440, metodo_riego: "goteo" });
+ok(bueno.coste_parcial === false && bueno.coste_total_eur > 0, "con precios buenos, total completo");
+ok(C.cuadernoFertilizacion(nec, { superficie_m2: 440, metodo_riego: "goteo",
+     precios: { N: -5, P2O5: 1, K2O: 1 } }).coste_total_eur >= 0,
+   "y el coste total nunca es negativo: abonar no te devuelve dinero");
+
+console.log("\n── una superficie imposible no se imprime en el cuaderno ──");
+// Es un registro con valor legal (RD 1051/2022): "−5 m²" no puede salir ahí.
+for (const sup of [-5, 0, NaN, null, "grande"])
+  ok(C.cuadernoFertilizacion(nec, { superficie_m2: sup, metodo_riego: "goteo" }).superficie_m2 === null,
+     `superficie ${JSON.stringify(sup)} → null, no se imprime`);
+ok(C.cuadernoFertilizacion(nec, { superficie_m2: 440, metodo_riego: "goteo" }).superficie_m2 === 440,
+   "y una buena sí");
+
+console.log("\n── el reparto siempre cuadra con lo pendiente ──");
+for (const met of ["goteo", "aspersion", "surco"]) {
+  for (const ya of [null, { N: 0.5 }, { N: 5 }]) {
+    const cu = C.cuadernoFertilizacion(nec, { superficie_m2: 440, metodo_riego: met, ya_aplicado: ya });
+    for (const l of cu.lineas || []) {
+      const suma = (l.reparto || []).reduce((t, x) => t + x.kg, 0);
+      ok(Math.abs(suma - l.pendiente_kg) < 0.01,
+         `${l.nutriente}/${met}/${ya ? "con fondo hecho" : "sin fondo"}: los tramos suman ${suma.toFixed(2)} = pendiente ${l.pendiente_kg}`);
+    }
+  }
+}
+
 function readApp() {
   return require("fs").readFileSync(join(RAIZ, "app", "index.html"), "utf8");
 }
