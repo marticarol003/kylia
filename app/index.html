@@ -2243,6 +2243,20 @@
     /* Perfil: barras sobrias. Deliberadamente SIN un número grande arriba —
        un "78%" en titular se lee como precisión por mucho que la nota lo
        desmienta. Dos pilares con su barra y ya. */
+    .alta-avance {
+      margin: 20px 0 0; text-align: center; font-size: .8rem; color: var(--muted);
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .alta-avance b { color: var(--verde, #013A27); font-variant-numeric: tabular-nums; }
+    .alta-avance i { display: block; width: 54px; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+    .alta-avance i span { display: block; height: 100%; background: var(--verde, #013A27); transition: width .3s ease; }
+    .alta-mapa {
+      height: 230px; border-radius: 12px; overflow: hidden; margin-top: 8px;
+      border: 1.5px solid var(--border); background: var(--border);
+    }
+    /* Leaflet se pinta con z-index propios (400-700). Dentro del alta, que va en
+       10000, hay que subirlos o los controles quedan por debajo del overlay. */
+    .alta-mapa .leaflet-pane, .alta-mapa .leaflet-control { z-index: auto; }
     .alta-perfil { border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 20px; }
     .perfil-tit { font-weight: 700; color: var(--verde, #013A27); margin: 0 0 12px; font-size: .95rem; }
     .perfil-fila { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; }
@@ -2346,6 +2360,16 @@
         <input type="text" class="alta-input" id="alta-muni-txt" hidden
                placeholder="Escribe el municipio y pulsa intro" style="margin-top:8px">
         <p class="alta-estado" id="alta-lugar-estado"></p>
+
+        <!-- EL PUNTO EXACTO. Sin esto, quien busca por municipio le daba a Kylia
+             el centro del pueblo: el recinto de SIGPAC que salía era de otro, y
+             el satélite medía tejados. El GPS tampoco basta — se da de alta en
+             casa, no en el campo. -->
+        <div id="alta-q-mapa" hidden>
+          <p class="alta-preg">Toca dónde está tu campo</p>
+          <div id="alta-mapa" class="alta-mapa"></div>
+          <p class="alta-nota" id="alta-mapa-nota">Mueve el mapa y toca tu parcela. Cuanto más fino, mejor mide el satélite.</p>
+        </div>
         <button type="button" class="alta-btn" id="alta-b2" disabled data-ir="2">Seguir</button>
       </section>
 
@@ -2544,6 +2568,10 @@
         <p class="alta-nota">Puedes borrar tu cuenta y todos tus datos cuando quieras, desde la propia app.</p>
       </section>
 
+      <!-- Lo que Kylia sabe, EN VIVO. Sin esto, el agricultor contesta a ciegas
+           y el porcentaje solo aparecía al final, cuando ya no puede hacer nada
+           con esa información. Aquí ve subir lo que aporta cada respuesta. -->
+      <p class="alta-avance" id="alta-avance" hidden></p>
       <div class="alta-puntos" id="alta-puntos" aria-hidden="true"></div>
     </div>
   </div>
@@ -6445,6 +6473,7 @@
         }
         function ir(n) {
           paso = n;
+          pintarAvance();
           caja.querySelectorAll(".alta-paso").forEach(sec =>
             sec.classList.toggle("activo", Number(sec.dataset.paso) === n));
           pintarPuntos();
@@ -6464,6 +6493,7 @@
             b.classList.add("sel");
             A[campo] = b.dataset[attr];
             alTerminar && alTerminar();
+            pintarAvance();
           });
         }
 
@@ -6493,6 +6523,7 @@
           A.plantado = menos(Number(b.dataset.hace));
           $("alta-fecha").hidden = true;
           revisar1();
+          pintarAvance();   // no pasa por grupo(): hay que repintar a mano
         });
         $("alta-fecha-btn").addEventListener("click", () => {
           const f = $("alta-fecha");
@@ -6501,9 +6532,11 @@
         $("alta-fecha").addEventListener("change", ev => {
           if (!ev.target.value) return;
           A.plantado = ev.target.value;
+          pintarAvance();
           $("alta-cuando").querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
           $("alta-fecha-btn").classList.add("sel");
           revisar1();
+          pintarAvance();
         });
         function revisar1() { $("alta-b1").disabled = !(A.cultivo && A.plantado); }
 
@@ -6511,7 +6544,61 @@
         function lugarListo(txt) {
           $("alta-lugar-estado").textContent = txt;
           $("alta-b2").disabled = !(A.lat != null && A.lon != null);
-          if (A.lat != null && A.lon != null) leerSuelo();
+          if (A.lat == null || A.lon == null) return;
+          mostrarMapa();
+          // SoilGrids y la ET₀ valen igual con el punto aproximado: son de zona.
+          // El RECINTO no: ese depende del metro exacto, así que espera a que él
+          // toque. Ver pedirRecinto.
+          leerSuelo();
+        }
+
+        // ── El punto exacto del campo ─────────────────────────────────────
+        // Buscar por municipio deja el punto en el centro del pueblo, y el GPS
+        // dice dónde ESTÁ él, que en un alta suele ser su casa. Con cualquiera
+        // de los dos, el recinto de SIGPAC que sale puede ser de otro y el
+        // satélite acaba midiendo tejados. Un toque en el mapa lo arregla.
+        let mapaAlta = null, marcaAlta = null;
+        function mostrarMapa() {
+          $("alta-q-mapa").hidden = false;
+          cargarLeaflet().then(() => {
+            if (typeof L === "undefined") return;
+            if (!mapaAlta) {
+              mapaAlta = L.map("alta-mapa", { zoomControl: true, attributionControl: false })
+                          .setView([A.lat, A.lon], 16);
+              // Mismo tile que el mapa de ajustes, con la misma caída a OSM.
+              const esri = L.tileLayer(
+                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                { maxZoom: 19 });
+              const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 });
+              let fallos = 0;
+              esri.on("tileerror", () => {
+                if (++fallos > 2 && !mapaAlta.hasLayer(osm)) { mapaAlta.removeLayer(esri); osm.addTo(mapaAlta); }
+              });
+              esri.addTo(mapaAlta);
+              marcaAlta = L.marker([A.lat, A.lon]).addTo(mapaAlta);
+              mapaAlta.on("click", ev => fijarPunto(ev.latlng.lat, ev.latlng.lng));
+            } else {
+              mapaAlta.setView([A.lat, A.lon], 16);
+              marcaAlta.setLatLng([A.lat, A.lon]);
+            }
+            // Leaflet mide mal si el contenedor estaba oculto al crearse.
+            setTimeout(() => mapaAlta.invalidateSize(), 60);
+          }).catch(() => {
+            // Sin mapa no se bloquea a nadie: se sigue con el punto aproximado
+            // y se dice qué se pierde.
+            $("alta-mapa-nota").textContent =
+              "No hemos podido cargar el mapa. Seguimos con el punto aproximado: el riego funciona igual, pero el satélite medirá menos fino.";
+          });
+        }
+
+        function fijarPunto(lat, lon) {
+          A.lat = lat; A.lon = lon;
+          A.puntoExacto = true;
+          marcaAlta?.setLatLng([lat, lon]);
+          $("alta-mapa-nota").textContent = "Ahí es. Si te has pasado, toca otra vez.";
+          leerSuelo();
+          pedirRecinto();
+          pintarAvance();
         }
 
         // ── Lo que Kylia averigua sola, en cuanto tiene el punto ──────────
@@ -6539,6 +6626,7 @@
               if (!d?.ok || !d.textura) return;
               A.suelo = d.textura;
               A.descSuelo = d;
+              pintarAvance();      // el suelo pesa 15: la barra se mueve al llegar
             })
             .catch(() => {})
             .finally(pintarDescubrimiento);
@@ -6567,6 +6655,20 @@
           // dar el recinto entero por cultivado multiplica los kg de nitrógeno por
           // el mismo factor que te has equivocado. Por eso aquí solo se guarda como
           // referencia; lo que se cultiva lo confirma él en el paso siguiente.
+          pedirRecinto();
+        }
+
+        // Solo con el punto TOCADO. Con el centro del pueblo saldría un recinto
+        // que no es suyo, y enseñárselo como "tu campo" es peor que no enseñar
+        // nada: de ahí sale la superficie con la que se calculan los kilos.
+        let recintoPedido = null;
+        function pedirRecinto() {
+          if (!A.puntoExacto) return;
+          const clave = `${A.lat.toFixed(5)},${A.lon.toFixed(5)}`;
+          if (recintoPedido === clave) return;
+          recintoPedido = clave;
+          A.descRecinto = null;
+          A.areaCultivada = null;
           fetch(`/api/sigpac?lat=${A.lat.toFixed(6)}&lon=${A.lon.toFixed(6)}`, { cache: "no-store" })
             .then(r => r.json())
             .then(d => {
@@ -6634,6 +6736,7 @@
           const techo = A.descRecinto?.superficie_m2;
           const pasa = v > 0 && (!techo || v <= techo);
           A.areaCultivada = pasa ? v : null;
+          pintarAvance();
           $("alta-area-nota").textContent = (v > 0 && techo && v > techo)
             ? `El recinto entero son ${techo.toLocaleString("es-ES")} m². No puedes cultivar más que eso.`
             : "Aproximado vale. Con esto salen los kilos del abonado; el riego funciona igual sin ello.";
@@ -6728,19 +6831,45 @@
         };
         // Los datos que no viven en cfg se resuelven aparte.
         const TIENE_EXTRA = {
-          __rendimiento: () => Number(cfg.areaParcela) > 0,   // el estimador necesita superficie
-          __ofertaSuelo: () => !!A.descSuelo || !!cfg.suelo,
-          __cultivoAnt:  () => !!A.cultivoAnterior,
+          __rendimiento: d => Number(d.areaParcela) > 0,   // el estimador necesita superficie
+          __ofertaSuelo: d => !!d.suelo,
+          __cultivoAnt:  () => !!A.cultivoAnterior || !!cfg.cultivoAnterior,
         };
         const BLOQUEANTES = new Set(["lat", "cultivos", "fechaPlantacion", "areaParcela"]);
 
+        // Lo que se sabe AHORA MISMO. Durante el alta, `cfg` no se escribe hasta
+        // el paso 4, así que mirarla sola dejaría la barra congelada justo en
+        // los pasos en los que él está contestando. Se leen las respuestas en
+        // curso y se cae a cfg para lo que ya estuviera guardado.
+        function enCurso() {
+          // OJO CON LOS DEFAULTS. `cfg` arranca con Barcelona y "lechuga"
+          // puestos, así que caer a cfg sin más daba un 40% a quien no había
+          // contestado todavía nada: contaba como sabido lo que es un relleno.
+          // Solo se hereda de cfg si ALGUNA VEZ se guardó algo — el mismo
+          // criterio que decide si el alta se abre.
+          const previo = localStorage.getItem(STORAGE_KEY) ? cfg : {};
+          const o = (a, b) => a ?? b ?? null;
+          return {
+            lat:             o(A.lat, previo.lat),
+            cultivos:        A.cultivo ? [A.cultivo] : (previo.cultivos || []),
+            fechaPlantacion: o(A.plantado, previo.fechaPlantacion),
+            suelo:           o(A.suelo, previo.suelo),
+            caudal:          o(A.caudal, previo.caudal),
+            metodoRiego:     o(A.metodo, previo.metodoRiego),
+            riegoMinutos:    o(A.minutos, previo.riegoMinutos),
+            areaParcela:     o(A.areaCultivada, previo.areaParcela),
+            manejo:          o(null, previo.manejo),
+          };
+        }
+
         function completitud(pilar) {
+          const d = enCurso();
           let hay = 0, total = 0, falta = [];
           for (const [clave, peso, porque] of PESOS[pilar]) {
             total += peso;
-            const v = TIENE_EXTRA[clave] ? TIENE_EXTRA[clave]()
-                    : (clave === "cultivos" ? (cfg.cultivos || []).length > 0
-                                            : cfg[clave] != null && cfg[clave] !== "");
+            const v = TIENE_EXTRA[clave] ? TIENE_EXTRA[clave](d)
+                    : (clave === "cultivos" ? (d.cultivos || []).length > 0
+                                            : d[clave] != null && d[clave] !== "");
             if (v) hay += peso; else falta.push({ clave, peso, porque });
           }
           falta.sort((a, b) => b.peso - a.peso);
@@ -6749,6 +6878,26 @@
           // que no dar número.
           const roto = falta.some(f => BLOQUEANTES.has(f.clave));
           return { pct: Math.round(100 * hay / total), falta, roto };
+        }
+
+        // La línea de avance. Solo el pilar de RIEGO: es lo que el alta está
+        // construyendo, y meter el abonado aquí sería enseñar un número bajo por
+        // algo que todavía no se le ha preguntado. El perfil completo, con los
+        // dos pilares, va al final.
+        function pintarAvance() {
+          const el = $("alta-avance");
+          if (!el) return;
+          // En la bienvenida no hay nada que contar todavía.
+          if (paso === 0) { el.hidden = true; return; }
+          // Aquí NO se aplica la regla de "sin dato bloqueante no hay número".
+          // Esa regla protege al perfil final, donde un porcentaje alto con un
+          // agujero invita a confiar. Durante el alta faltan cosas por
+          // definición: si se aplicara, la línea diría lo mismo en cuatro
+          // pantallas seguidas y dejaría de informar de nada.
+          const c = completitud("riego");
+          el.hidden = false;
+          el.innerHTML = `Kylia ya sabe el <b>${c.pct}%</b> de tu campo`
+            + ` <i><span style="width:${c.pct}%"></span></i>`;
         }
 
         function pintarPerfil() {
@@ -6836,6 +6985,7 @@
           const v = Number(String(ev.target.value).replace(",", "."));
           const pasa = v > 0.5 && v < 80;
           A.caudal = pasa ? v : null;
+          pintarAvance();
           $("alta-caudal-nota").textContent = (ev.target.value && !pasa)
             ? "Ese número no es creíble para un riego. Déjalo vacío y lo medimos luego."
             : "Si no lo tienes a mano, sáltalo: se mide en diez minutos cuando estés regando.";
@@ -6872,7 +7022,7 @@
             suelo: A.suelo || cfg.suelo || "franco",
           };
           saveConfig(cfgNuevo);
-
+          pintarAvance();
         }
 
         // Los riegos que ya ha hecho, reconstruidos con SU rutina: desde la

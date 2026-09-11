@@ -383,5 +383,49 @@ for (const [cult, edad, et0] of [["lechuga", 21, 4.6], ["tomate", 45, 5.2], ["ce
 ok(distintos / casos > 0.25,
    `conocer el caudal cambia el veredicto en ${distintos} de ${casos} casos (${Math.round(100 * distintos / casos)}%): no es solo pasar mm a minutos`);
 
+console.log("\n── el punto exacto del campo, no el del pueblo ──");
+// Buscar por municipio deja el punto en el centro del pueblo, y el GPS dice
+// dónde ESTÁ él, que en un alta suele ser su casa. Con cualquiera de los dos,
+// el recinto de SIGPAC que sale puede ser de otro y el satélite mide tejados.
+ok(/id="alta-mapa"/.test(app) && /Toca dónde está tu campo/.test(app),
+   "hay un mapa para tocar la parcela");
+ok(/cargarLeaflet\(\)\.then/.test(alta),
+   "reutiliza el cargador de Leaflet que ya existía, con su SRI");
+ok(/World_Imagery/.test(alta) && /openstreetmap/.test(alta),
+   "y el mismo tile de satélite con su caída a OSM");
+ok(/mapaAlta\.on\("click", ev => fijarPunto\(ev\.latlng\.lat, ev\.latlng\.lng\)\)/.test(alta),
+   "tocar el mapa fija el punto");
+ok(/A\.puntoExacto = true;/.test(alta), "y lo marca como exacto");
+ok(/invalidateSize/.test(alta),
+   "se invalida el tamaño: Leaflet mide mal si el contenedor estaba oculto al crearse");
+ok(/No hemos podido cargar el mapa/.test(alta) && /el riego funciona igual/.test(alta),
+   "si Leaflet no carga no se bloquea a nadie, y se dice qué se pierde");
+
+console.log("\n── el recinto SOLO con el punto tocado ──");
+ok(/function pedirRecinto\(\) \{\n\s+if \(!A\.puntoExacto\) return;/.test(alta),
+   "sin punto exacto no se pide SIGPAC: con el centro del pueblo saldría un recinto que no es suyo");
+ok(/A\.descRecinto = null;\n\s+A\.areaCultivada = null;/.test(alta),
+   "y al mover el punto se tira el recinto anterior Y su superficie: son de otra parcela");
+ok(/if \(recintoPedido === clave\) return;/.test(alta),
+   "no se repite la consulta si el punto no ha cambiado");
+
+console.log("\n── el avance se ve durante todo el alta ──");
+ok(/id="alta-avance"/.test(app), "hay una línea de avance");
+ok(/Kylia ya sabe el <b>\$\{c\.pct\}%<\/b> de tu campo/.test(alta),
+   "dice lo que Kylia SABE, con el mismo lenguaje que el perfil final");
+ok(/if \(paso === 0\) \{ el\.hidden = true; return; \}/.test(alta),
+   "en la bienvenida no sale: todavía no hay nada que contar");
+ok(/Aquí NO se aplica la regla de "sin dato bloqueante no hay número"/.test(alta),
+   "y no se aplica la regla del perfil final: durante el alta faltan cosas por definición");
+
+console.log("\n── y no cuenta los valores por defecto como sabidos ──");
+// cfg arranca con Barcelona y "lechuga" puestos. Caer a cfg sin más daba un 40%
+// a quien no había contestado nada.
+ok(/const previo = localStorage\.getItem\(STORAGE_KEY\) \? cfg : \{\};/.test(alta),
+   "solo se hereda de cfg si alguna vez se guardó algo");
+const defs = app.slice(app.indexOf("const DEFAULTS = {"), app.indexOf("const NDVI_HISTORY_DAYS"));
+ok(/ciudad:\s+"Barcelona"/.test(defs) && /cultivos:\s+\["lechuga"\]/.test(defs),
+   "(los defaults que lo provocaban siguen ahí, así que el guard hace falta)");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
