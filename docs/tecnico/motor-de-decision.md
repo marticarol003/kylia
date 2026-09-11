@@ -196,6 +196,14 @@ con datos del piloto e IRTA/Ruralcat):
 | Pimiento | 0.60 | 1.05 | 0.90 | 30 / 35 / 40 / 20 |
 | Berenjena | 0.60 | 1.05 | 0.90 | 30 / 40 / 40 / 20 |
 | Calabacín | 0.50 | 0.95 | 0.75 | 25 / 35 / 25 / 15 |
+| Cebolla tierna | 0.75 | 1.05 | 1.00 | 15 / 25 / 20 / 10 |
+
+> **Cebolla tierna / cebolleta** (añadida 29-jun-2026, es uno de los pilotos):
+> trasplantada y cosechada verde, así que no bulbifica ni se seca y `Kc_fin`
+> sigue ~1.00. `Kc_med` sube a 1.05 por clima seco interior (RHmin ≈ 35%, FAO-56
+> ec. 70) y `Kc_ini` a 0.75 por la aspersión frecuente, que moja la superficie.
+> Las L son EXACTAMENTE las de la Tabla 11 para plantación de abril/mayo — no
+> están "comprimidas por el calor": de eso se encarga el reloj térmico (§3.2f).
 
 Interpolación lineal de Kc durante la fase de desarrollo (Kc_ini → Kc_med) y la
 fase final (Kc_med → Kc_fin), según FAO-56.
@@ -235,8 +243,18 @@ RAW = p × TAW                           (agua fácilmente disponible, mm)
   fallback fijo 0.30 m (comportamiento legacy).
 - `p` fracción de agotamiento sin estrés **por cultivo** (FAO-56 Tabla 22):
   espinaca 0.20, lechuga/cebolla/pimiento 0.30, tomate 0.40, col/berenjena 0.45,
-  calabacín 0.50. Sin cultivo → 0.45. (El ajuste por ETc, p_aj = p + 0.04·(5 − ETc),
-  queda como refinamiento futuro.)
+  calabacín 0.50. Sin cultivo → 0.45.
+- **Ajuste de `p` por demanda evaporativa — IMPLEMENTADO el 30-jul-2026** (esta
+  nota decía "refinamiento futuro" hasta la auditoría del 11-sep, que encontró
+  la divergencia). La nota al pie de la Tabla 22 dice que sus valores valen para
+  ETc ≈ 5 mm/día y hay que corregirlos:
+  ```
+  p_aj = p_tabla + 0.04 × (5 − ETc)        acotado a [0.1 , 0.8]
+  ```
+  Con mucha demanda el suelo no entrega el caudal que la planta pide aunque le
+  quede agua, así que el cultivo sufre ANTES (p baja). Es lo que hace pyfao56 de
+  serie, nuestra referencia de validación. `p` NO entra en la recursión del
+  agotamiento: solo mueve el umbral RAW.
 
 #### c) Balance hídrico diario (agotamiento de la zona radicular)
 ```
@@ -247,8 +265,75 @@ Dr,i = Dr,i-1 − (P − RO)i − Ii + ETc,i        (acotado a [0, TAW])
   a la zona radicular; criterio conservador, FAO-56 cap. 8) y el exceso sobre
   TAW − Dr se pierde por percolación (el clamp de Dr a [0, TAW] lo descarta).
 - `Ii` riego neto aplicado el día i = L/m² registrados × eficiencia del sistema
-  (goteo ≈ 0.90, aspersión ≈ 0.75).
+  (goteo 0.90, aspersión 0.75, regadera 0.85, manguera 0.70, surco 0.60).
 - `Dr` es el déficit acumulado en mm.
+- **`ETc` va corregida por estrés hídrico — IMPLEMENTADO el 11-sep-2026.**
+  FAO-56 ec. 84: por encima de RAW el suelo no entrega lo que la planta pide y
+  la transpiración cae linealmente hasta cero en el punto de marchitez.
+  ```
+  Ks = (TAW − Dr) / (TAW − RAW)      acotado a [0,1];  Ks = 1 si Dr ≤ RAW
+  ETc_aj = Ks × Kc × ET0
+  ```
+  Hasta esa fecha el motor calculaba `ETc = Kc × ET0` SIEMPRE, también con el
+  depósito vacío, lo cual es físicamente imposible. Medido sobre un tomate en
+  franco regado 10 mm cada 7 días durante 90: **416 mm de ETc sin Ks contra 201
+  con Ks**. Y esa cifra se le enseña al agricultor ("el cultivo ha consumido
+  unos X mm"). La validación contra pyfao56 no se ve afectada: se hizo en
+  condiciones bien regadas, donde Ks = 1.
+
+#### f) El reloj del cultivo: calor, no calendario
+
+**Implementado el 8-sep-2026.** Las `L` de la tabla de arriba son DÍAS, y los
+días solo miden bien el desarrollo si plantas cuando plantaba la tabla que los
+publicó. FAO-56 da esas longitudes atadas a una fecha y una región
+("Mediterranean, April"); usarlas para otra fecha de plantación es un error de
+unidad, no de tabla.
+
+El caso que lo destapó: la cebolleta del piloto de Palafolls, plantada el
+24-jun-2026 y cosechada el 12-ago → 49 días. El calendario decía 70, o sea el 2
+de septiembre: **21 días tarde**. Con la temperatura real de su campo, la misma
+suma térmica que acumuló en 49 días de verano necesita 70 plantando el 1 de
+mayo, que es justo la fecha de referencia de FAO. Los dos números eran
+correctos; lo que estaba mal era contarlos en días.
+
+```
+GDD del día = max(0, (Tmax + Tmin)/2 − Tbase)      [media simple]
+```
+
+Las `L` siguen siendo el EJE de la curva Kc; lo que cambia es el reloj que
+avanza sobre ese eje. `diasFenologicos(cultivo, gdd)` traduce calor acumulado a
+día del eje, fase por fase — no con una regla de tres sobre el total, porque el
+calor no se reparte igual que los días.
+
+Tbase y GDD por fase salen de integrar 21 años de temperatura real sobre las
+fases de la Tabla 11 (`scripts/derivar-gdd.mjs`, reproducible). Tbase por
+cultivo: Pereira & Paredes (2025). Detalle completo en
+`docs/tecnico/fenologia-termica.md`.
+
+**Si falta cualquier pieza —tabla térmica, fecha de plantación, temperaturas, o
+la serie no llega a la plantación— se vuelve al calendario** y el motor se
+comporta exactamente como antes del 8-sep. Mejor calendario honesto que
+termómetro a medias. El balance lo declara en `modoFenologia`.
+
+#### g) Lo que el balance DECLARA además del número
+
+Añadido en la auditoría del 11-sep-2026, después de que dos informes de piloto
+salieran publicados con cifras falsas sin que nada en el resultado lo dijera:
+
+| Campo | Qué dice |
+|---|---|
+| `coberturaClima` | qué fracción de la ventana esperada traía clima real |
+| `diasSinClima` | cuántos días faltan |
+| `desdeSerie` / `hastaSerie` | los extremos, para cazar huecos que la cobertura no ve |
+| `diasEstres` | días con Ks < 1 (transpiración por debajo del potencial) |
+| `lluviaUtilAcum` | la lluvia que se QUEDÓ en la zona radicular; el resto percoló |
+| `cicloCompletado` / `diasTrasCiclo` | si el ciclo ya está cumplido y por cuánto |
+| `sinPlantar` | la plantación es posterior al último día del balance |
+| `sinAcumularCalor` | el cultivo está por debajo de su Tbase y el reloj no avanza |
+| `modoFenologia` | `termico` o `calendario` |
+
+La regla que los une: **el motor nunca decide callando lo que no sabe.** Un
+número sin su cobertura es un número que alguien va a publicar.
 
 #### d) Regla de decisión
 ```
@@ -264,9 +349,23 @@ Estados de la `card-hoy` (sustituyen al 30/15 fijo):
 | 0.75·RAW ≤ Dr < RAW | "Revisar el riego" (atención) |
 | Dr < 0.75·RAW | "Todo en orden" |
 
-Ajuste por lluvia prevista (se conserva la lógica actual, ahora sobre Dr/RAW):
-si la lluvia prevista cubre el déficit hasta RAW → posponer; si lo cubre en
-parte → riego reducido; horario tarde-noche / mañana según Tªmáx.
+**Ajuste por lluvia prevista** (48 h, `opts.lluviaPrevista`). El motor es más
+estricto de lo que decía esta sección hasta el 11-sep-2026: no basta con que la
+lluvia devuelva el suelo a RAW, tiene que **cubrir el déficit ENTERO**.
+
+```
+puedeFiarse = prevista > 0  Y  Dr < 0.9 · TAW
+prevista ≥ Dr        → esperar a la lluvia (no se riega)
+0 < prevista < Dr    → riego reducido: neto = Dr − prevista
+neto < PE_MIN_MM     → esperar a la lluvia (regar 0,3 mm no es regar)
+```
+
+Dos razones para la asimetría: posponer dejando el suelo justo en RAW es
+posponer al día siguiente, porque RAW es el umbral de disparo; y un pronóstico
+que falla con Dr cerca de TAW no se corrige con otro riego, la planta ya ha
+pasado por estrés. De ahí el corte de `0.9 · TAW`: **con el suelo casi vacío no
+se apuesta al pronóstico.** El horario ("mañana temprano" si Tªmáx > 33 °C, si
+no "tarde-noche") lo pone la capa de presentación de `/app`, no el motor.
 
 #### e) Datos nuevos que requiere (onboarding)
 1. **Fecha de plantación/transplante** por cultivo → fase fenológica → Kc.
