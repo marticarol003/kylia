@@ -100,6 +100,11 @@
   const EFIC_RIEGO    = { goteo: 0.90, aspersion: 0.75, manguera: 0.70, surco: 0.60, regadera: 0.85 };
   const EFIC_DEFAULT  = 0.85;
   const VENTANA_PRONOSTICO_DIAS = 2;  // 48 h: lo único que un modelo acierta con la lluvia de verano
+  // Cotas de cordura de la regadera. No son agronómicas: son el tamaño a partir
+  // del cual hablar de regaderas deja de tener sentido y el número que sale solo
+  // puede venir de un dato roto.
+  const AREA_MAX_REGADERA_M2 = 5000;   // media hectárea a mano ya es irreal
+  const CAP_MAX_REGADERA_L   = 100;    // por encima es un depósito, no una regadera
 
   // Pluviometría/caudal por defecto del sistema (mm/hora = L/m² por hora), para
   // convertir la lámina a minutos cuando el agricultor no declara el suyo.
@@ -814,9 +819,16 @@
     const r1 = (x) => Math.round(x * 10) / 10;
 
     if (metodoRiego === "regadera") {
-      if (areaM2 > 0 && capacidadRegaderaL > 0) {
-        const litros = mm * areaM2;                       // L para todo el bancal
-        const n = litros / capacidadRegaderaL;
+      // `areaM2 > 0` deja pasar Infinity, y entonces `0 × Infinity` es NaN: la
+      // pantalla decía "NaN regaderas (NaN L)". Salía 1 de cada 40.000 escenarios
+      // adversariales del ciclo 14, y por ahí se cuela cualquier área rota que
+      // llegue de la base de datos o del alta. Se exige número, y número posible:
+      // 100 ha no se riegan con una regadera, y 1.000 L no es una regadera.
+      const area = finito(areaM2) ? Number(areaM2) : 0;
+      const cap  = finito(capacidadRegaderaL) ? Number(capacidadRegaderaL) : 0;
+      if (area > 0 && area <= AREA_MAX_REGADERA_M2 && cap > 0 && cap <= CAP_MAX_REGADERA_L) {
+        const litros = mm * area;                         // L para todo el bancal
+        const n = litros / cap;
         const nTxt = n >= 10 ? r0(n) : r1(n);
         return { unidad: "regaderas", valor: nTxt, mm: r1(mm),
                  litrosTotales: r0(litros),
@@ -917,7 +929,13 @@
     const curva = termico ? curvaFenologica(cultivoId, serieTermica || serie, fechaPlantacion) : null;
 
     const orden = sanearSerie(serie);
-    let Dr = 0, acum = 0;
+    // `etcAcum` es la ETc DE ESTA SIMULACIÓN, con su propio Ks. No vale mirar la
+    // del balance sin riego para compararla: ese suelo pasa sed, Ks lo frena y da
+    // una ETc mucho menor (416 mm contra 201 en el caso del ciclo 5). Kylia riega
+    // antes del estrés, así que aquí Ks ≈ 1 y el cultivo gasta lo que pide.
+    // Con ella se puede comprobar la ley que sí se sostiene siempre: el riego
+    // neto nunca supera lo que el cultivo ha evaporado.
+    let Dr = 0, acum = 0, etcAcum = 0;
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     const puntos = [];
     for (const dia of orden) {
@@ -932,6 +950,7 @@
       // tomate, −6,9% en lechuga sobre arenoso). Va igualmente: los dos lados de
       // la comparación tienen que calcularse con la misma física.
       const etc = etcPot * ksEstres(Dr, taw, raw);
+      etcAcum += etc;
       // Decisión de la mañana: con el déficit que arrastra de ayer (misma regla que decisionRiego).
       if (Dr >= raw) { acum += Dr / efic; Dr = 0; }   // riego bruto = Dr/efic → repone Dr neto
       const pe = dia.lluvia >= PE_MIN_MM ? dia.lluvia : 0;   // lluvia efectiva
@@ -943,6 +962,7 @@
     // a igual fecha favorece al que riega menos a menudo; este dato lo explicita.
     const cobS = huecosDeSerie(orden, ventana);
     return { puntos, total: Math.round(acum * 10) / 10, taw, raw, efic,
+             etcAcum: Math.round(etcAcum * 100) / 100,
              desdeSerie: orden.length ? orden[0].date : null,
              hastaSerie: orden.length ? orden[orden.length - 1].date : null,
              diasSerie: cobS.dias, diasSinClima: cobS.faltan,

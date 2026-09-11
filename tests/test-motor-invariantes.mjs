@@ -176,14 +176,65 @@ let contraejemplo = null;
 for (let i = 0; i < 3000 && !contraejemplo; i++) {
   const { serie, opt } = escenario(false);
   const a = M.simularKylia(serie, opt), b = M.simularKylia(serie.map(x => ({ ...x, et0: x.et0 * 1.5 })), opt);
-  if (b.total < a.total - 1e-9) contraejemplo = { a, b };
+  if (b.total < a.total - 1e-9) contraejemplo = { a, b, serie, opt };
 }
 ok(contraejemplo !== null, "existe al menos un caso en que más ET₀ da MENOS agua regada");
+
+// ⚠️ AQUÍ ESTABA MAL EL TEST, NO EL MOTOR. Hasta el ciclo 14 esto exigía que
+// sumando el déficit en cola la monotonía volviera, y a 40.000 escenarios dos
+// semillas de cinco lo rompían. El motor tiene razón: en un suelo que rebosa, la
+// demanda extra ABRE HUECO que atrapa lluvia que antes se perdía por debajo de
+// la raíz. Contraejemplo mínimo, berenjena sobre arenoso (TAW 21,7 mm) con 68,3
+// mm de lluvia en diez días:
+//
+//   con lluvia → 11,8 mm de riego con la ET₀ base, 10,9 con la ET₀ ×1,5
+//   sin lluvia → 23,8 y 33,1: la monotonía vuelve, intacta
+//
+// Es FAO-56 haciendo lo que debe: `Dr = min(taw, …)` es percolación profunda, y
+// el agua que percola no vuelve. Escribir "más calor ⇒ más riego" como ley es
+// olvidarse de que el suelo tiene fondo.
 if (contraejemplo) {
-  const { a, b } = contraejemplo;
-  ok(b.total + b.deficitFinal >= a.total + a.deficitFinal - 1e-9,
-     `y sumando el agua en cola al corte la monotonía vuelve (${(a.total + a.deficitFinal).toFixed(1)} → ${(b.total + b.deficitFinal).toFixed(1)})`);
+  const { a, b, serie, opt } = contraejemplo;
+  const sinLluvia = s => s.map(x => ({ ...x, lluvia: 0 }));
+  const seca = M.simularKylia(sinLluvia(serie), opt);
+  const secaCaliente = M.simularKylia(sinLluvia(serie).map(x => ({ ...x, et0: x.et0 * 1.5 })), opt);
+  ok(secaCaliente.total + secaCaliente.deficitFinal >= seca.total + seca.deficitFinal - 1e-9,
+     `el mismo caso SIN lluvia sí es monótono (${(seca.total + seca.deficitFinal).toFixed(1)} → ${(secaCaliente.total + secaCaliente.deficitFinal).toFixed(1)}): la causa es la lluvia que se perdía`);
+  // La lluvia es NECESARIA para que el contraejemplo exista. No hace falta que
+  // llueva más que el TAW entero —basta con que un día caiga sobre un suelo casi
+  // lleno y parte percole—, así que exigir eso era una aserción más fuerte que el
+  // mecanismo: a 40.000 escenarios la rompían dos semillas más, y otra vez era el
+  // test y no el motor. Lo que sí se sostiene siempre: sin lluvia no hay caso.
+  const lluviaBruta = serie.reduce((t, d) => t + (Number(d.lluvia) || 0), 0);
+  ok(lluviaBruta > 0,
+     `el contraejemplo tiene lluvia (${lluviaBruta.toFixed(0)} mm): es condición necesaria, quitarla lo deshace`);
+  ok(M.simularKylia(sinLluvia(serie), opt).total <= secaCaliente.total + 1e-9,
+     "y sin ella el orden se respeta también en el agua regada, no solo en la suma");
 }
+
+// La ley que SÍ se sostiene siempre, y es más fuerte: no se puede regar más agua
+// de la que el cultivo ha evaporado. El riego solo repone lo que la ETc se llevó;
+// la lluvia únicamente resta.
+console.log("\n── el riego nunca supera lo que el cultivo ha gastado ──");
+// El riego solo repone lo que la ETc se llevó; la lluvia únicamente resta. Así
+// que el agua NETA regada no puede pasar de la ETc acumulada, nunca.
+//
+// Ojo con la referencia, que es donde me equivoqué al escribirlo: hay que usar
+// la ETc DE LA PROPIA SIMULACIÓN, no la del balance sin riego. Ese suelo pasa
+// sed, Ks frena la transpiración y su ETc sale mucho más baja (416 mm contra
+// 201 en el caso del ciclo 5), así que la comparación daba falsos positivos.
+let excedidos = 0, probados = 0, peorMargen = 0;
+for (let i = 0; i < 6000; i++) {
+  const { serie, opt } = escenario(false);
+  const sim = M.simularKylia(serie, opt);
+  if (!Number.isFinite(sim.total) || !Number.isFinite(sim.etcAcum)) continue;
+  probados++;
+  const margen = sim.total * sim.efic - sim.etcAcum;
+  if (margen > 1e-6) excedidos++;
+  if (margen > peorMargen) peorMargen = margen;
+}
+ok(excedidos === 0,
+   `riego neto ≤ ETc de la simulación en los ${probados} escenarios (peor margen ${peorMargen.toFixed(6)} mm)`);
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

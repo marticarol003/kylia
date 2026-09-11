@@ -151,5 +151,18 @@ ok(M.aguaSuelo("Franco").sueloReconocido === false, "'Franco' con mayúscula NO"
 ok(M.aguaSuelo("marciano").sueloReconocido === false, "ni un suelo inventado");
 ok(M.aguaSuelo("marciano").awc === M.SUELO_AWC.franco, "pero el valor que se usa sigue siendo el de franco");
 
+console.log("── la regadera, con áreas imposibles ──");
+// Ciclo 14. `areaM2 > 0` deja pasar Infinity, y `0 × Infinity` es NaN: la
+// pantalla decía "NaN regaderas (NaN L)". Salía 1 de cada 40.000 escenarios
+// adversariales, o sea: por ahí entra cualquier área rota que llegue del alta.
+const reg = (mm, area, cap) => M.presentarRiego(mm, { metodoRiego: "regadera", areaM2: area, capacidadRegaderaL: cap });
+ok(!/NaN/.test(reg(0, Infinity, 10).texto), "área infinita ya no da 'NaN regaderas (NaN L)'");
+ok(reg(0, Infinity, 10).unidad === "l_m2", "se cae a L/m², que siempre se puede decir");
+ok(reg(10, "33", "10").texto === "33 regaderas (330 L)", "y un área que llega como texto se sigue entendiendo");
+ok(reg(10, 33, 10).texto === "33 regaderas (330 L)", "el caso real del bancal no cambia");
+ok(reg(10, 1e9, 10).unidad === "l_m2", "cien mil hectáreas no se riegan a regadera: se dice en L/m²");
+ok(reg(10, 33, 1000).unidad === "l_m2", "ni 1.000 L es una regadera: eso es un depósito");
+ok(reg(10, 33, 100).unidad === "regaderas", "100 L sí (una carretilla con bidón), y sigue contando");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
