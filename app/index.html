@@ -5011,6 +5011,28 @@
       const alerta = calcularAlertaRiego(ctx);
       const bal    = calcularBalanceHidrico(ctx);
       const cerca  = !alerta && bal && bal.Dr >= 0.75 * bal.raw;
+
+      // EL CICLO YA CUMPLIDO. El balance no sabe de cosechas: sigue acumulando
+      // déficit sobre tierra que puede estar vacía, y una lechuga a 120 días
+      // salía con "regar hoy". Ya pasó en producción con el campo de 440 m², que
+      // recibió órdenes de riego un mes después de arrancarlo.
+      //
+      // Kylia no puede saber si el cultivo sigue ahí —eso solo lo sabe él— así
+      // que no se calla el riego ni se lo inventa: se pregunta. Tres semanas de
+      // margen, porque las longitudes de FAO son orientativas y pasarse unos
+      // días no significa nada.
+      if (bal?.cicloCompletado && bal.diasTrasCiclo >= 21) {
+        acc.push({
+          id: parcela?.id ? `cosecha-${parcela.id}` : "cosecha",
+          parcelaId: parcela?.id || null,
+          icono: "🍂", verbo: "¿Sigue ahí" + (deQuien ? deQuien.replace(" · ", " ") : " el cultivo") + "?",
+          urgente: false,
+          detalle: `${bal.diasTrasCiclo} días pasado el ciclo`,
+          razon: "Si ya lo arrancaste, dínoslo y dejamos de calcular riego sobre tierra vacía.",
+          onClick: () => document.getElementById("btn-config")?.click(),
+        });
+        return acc;   // y no se manda regar mientras no se sepa
+      }
       if (alerta || cerca) {
         const mm = Math.round(bal && bal.Dr > 0 ? bal.Dr : (alerta ? alerta.et0 : 0));
         const eq = fmtRiegoCon(mm, ctx.cfg);

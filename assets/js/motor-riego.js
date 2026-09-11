@@ -530,6 +530,31 @@
   // daba NaN porque se le pegaba un segundo "T12:00:00" detrás. Eso no es un
   // caso rebuscado — es lo que llega si una columna de fecha vuelve como
   // timestamp.
+  // ── Coeficiente de estrés hídrico Ks (FAO-56 ec. 84) ──────────────
+  // Hasta la auditoría del 11-sep el motor calculaba ETc = Kc · ET₀ SIEMPRE,
+  // también con el suelo agotado. Eso es físicamente imposible: una planta con
+  // el depósito vacío no transpira a pleno ritmo, cierra estomas.
+  //
+  // Lo medido sobre un tomate en franco regado 10 mm cada 7 días (90 días):
+  //     ETc sin Ks   416 mm        ETc con Ks   200 mm       −52%
+  //
+  // Y ese número NO se queda dentro: la app le dice al agricultor "el cultivo ha
+  // consumido unos X mm". Se le estaba enseñando el doble de lo que su cultivo
+  // pudo consumir.
+  //
+  //     Ks = (TAW − Dr) / (TAW − RAW)      acotado a [0, 1]
+  //
+  // Por encima de RAW el suelo no entrega el caudal que la planta pide y la
+  // transpiración cae linealmente hasta 0 en el punto de marchitez (Dr = TAW).
+  // POR DEBAJO DE RAW, Ks = 1 y NADA cambia — que es la condición en la que se
+  // validó el motor contra pyfao56 (ETc RMSE 0.000), así que esa validación
+  // sigue en pie tal cual.
+  function ksEstres(Dr, taw, raw) {
+    if (!(taw > raw) || !finito(Dr)) return 1;
+    if (Dr <= raw) return 1;
+    return Math.max(0, Math.min(1, (taw - Dr) / (taw - raw)));
+  }
+
   function diasEntre(fechaIso, hasta) {
     if (!fechaIso) return null;
     const f = String(fechaIso).slice(0, 10);
@@ -572,21 +597,31 @@
     });
 
     const orden = sanearSerie(serie);
-    let Dr = 0, etcAcum = 0, et0Acum = 0, lluviaAcum = 0;
+    let Dr = 0, etcAcum = 0, et0Acum = 0, lluviaAcum = 0, lluviaUtilAcum = 0, diasEstres = 0;
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     for (const dia of orden) {
       const dias = diaFen(dia.date, new Date(`${dia.date}T12:00:00`));
       // ETc primero: el umbral (RAW) depende de ella por el ajuste de p.
       const kc  = kcDelDia(cultivoId, dias);
-      const etc = kc * dia.et0;               // ya saneado: siempre número ≥ 0
-      ({ taw, raw } = aguaSuelo(suelo, cultivoId, dias, etc));  // raíz creciente + p por ETc
+      const etcPot = kc * dia.et0;            // ya saneado: siempre número ≥ 0
+      ({ taw, raw } = aguaSuelo(suelo, cultivoId, dias, etcPot));  // raíz creciente + p por ETc
+      // Estrés: con el suelo por debajo del umbral la planta no transpira todo
+      // lo que pide la atmósfera. Ks vale 1 mientras esté bien regada.
+      const ks  = ksEstres(Dr, taw, raw);
+      const etc = etcPot * ks;
+      if (ks < 1) diasEstres++;
       if (dia.date in riegoNeto) {
         const r = riegoNeto[dia.date];
         Dr = r === null ? 0 : Math.max(0, Dr - r);
       }
       const pe = dia.lluvia >= PE_MIN_MM ? dia.lluvia : 0;   // lluvia efectiva
+      // De la lluvia que infiltra, solo se QUEDA la que cabe en el déficit: el
+      // resto percola por debajo de la raíz. Contar los 180 mm de una tormenta
+      // como agua aprovechada sobre un suelo de 86 mm de capacidad es falso, y
+      // ese número sale en los informes.
+      const lluviaUtil = Math.min(pe, Math.max(0, Dr + etc));
       Dr = Math.min(taw, Math.max(0, Dr + etc - pe));
-      etcAcum += etc; et0Acum += dia.et0; lluviaAcum += pe;
+      etcAcum += etc; et0Acum += dia.et0; lluviaAcum += pe; lluviaUtilAcum += lluviaUtil;
     }
 
     const ultimaISO = orden.length ? orden[orden.length - 1].date : new Date().toISOString().slice(0, 10);
@@ -596,9 +631,28 @@
     // la tierra. Antes se devolvía un balance normal con kc de fase inicial, o
     // sea que Kylia podía mandar regar un campo sin plantar. Se dice lo que hay.
     const sinPlantar = diasFin != null && diasFin < 0;
+    // ── ¿El ciclo ya ha terminado? ──────────────────────────────────
+    // El balance no sabe de cosechas: sigue acumulando déficit sobre tierra
+    // vacía. Una lechuga a 120 días (ciclo ~75) salía con Kc 0,95 y "regar hoy".
+    // Ya pasó en producción —el campo de 440 m² recibía órdenes de riego un mes
+    // después de arrancarlo— y se parcheó en la vista de hoy con fecha_cosecha.
+    // Pero ese parche solo protege a UN consumidor, y la fecha de cosecha casi
+    // nunca está puesta: nadie la rellena hasta que cosecha.
+    //
+    // El motor no puede decidir si hay que dejar de regar —eso depende de si el
+    // agricultor ha arrancado el cultivo o no, y de eso no sabe nada— pero sí
+    // puede DECIR que el ciclo está cumplido, para que quien enseñe el aviso lo
+    // tenga en cuenta en vez de descubrirlo por su cuenta.
+    const cicloDias = FAO_KC[cultivoId] ? FAO_KC[cultivoId].L.reduce((a, b) => a + b, 0) : null;
+    const cicloCompletado = cicloDias != null && diasFin != null && diasFin >= cicloDias;
     const cob = huecosDeSerie(orden, ventana);
     return {
       Dr: sinPlantar ? 0 : Dr, taw, raw, efic, sinPlantar,
+      cicloCompletado,
+      // Cuánto se ha pasado del ciclo. A los pocos días no significa nada (las
+      // longitudes de FAO son orientativas); a los 45 significa que ahí ya no
+      // hay cultivo que regar.
+      diasTrasCiclo: cicloCompletado ? Math.round(diasFin - cicloDias) : 0,
       // Sobre cuánto clima REAL se ha calculado esto. Un balance con cobertura
       // 0,61 no es un balance del que se pueda publicar un ahorro.
       diasSerie: cob.dias, diasSinClima: cob.faltan,
@@ -611,6 +665,10 @@
       hastaSerie: ultimaISO,
       kcActual: kcDelDia(cultivoId, diasFin),
       etcAcum, et0Acum, lluviaAcum,
+      // La que de verdad se quedó en la zona radicular; el resto percoló.
+      lluviaUtilAcum: Math.round(lluviaUtilAcum * 10) / 10,
+      // Días en los que el cultivo transpiró por debajo de su potencial.
+      diasEstres,
       sinFenologia: !fechaPlantacion,
       // Trazabilidad: en qué reloj se ha calculado todo esto.
       modoFenologia: curva ? "termico" : "calendario",
@@ -813,8 +871,13 @@
       const dias = tf == null ? diasEntre(fechaPlantacion, new Date(`${dia.date}T12:00:00`)) : tf;
       // ETc primero: el umbral (RAW) depende de ella por el ajuste de p.
       const kc  = kcDelDia(cultivoId, dias);
-      const etc = kc * dia.et0;               // ya saneado
-      ({ taw, raw } = aguaSuelo(suelo, cultivoId, dias, etc));  // raíz creciente + p por ETc
+      const etcPot = kc * dia.et0;            // ya saneado
+      ({ taw, raw } = aguaSuelo(suelo, cultivoId, dias, etcPot));  // raíz creciente + p por ETc
+      // Mismo Ks que el balance. Aquí casi nunca actúa —Kylia riega antes de
+      // llegar al estrés— y por eso el contrafactual apenas se mueve (−0,6% en
+      // tomate, −6,9% en lechuga sobre arenoso). Va igualmente: los dos lados de
+      // la comparación tienen que calcularse con la misma física.
+      const etc = etcPot * ksEstres(Dr, taw, raw);
       // Decisión de la mañana: con el déficit que arrastra de ayer (misma regla que decisionRiego).
       if (Dr >= raw) { acum += Dr / efic; Dr = 0; }   // riego bruto = Dr/efic → repone Dr neto
       const pe = dia.lluvia >= PE_MIN_MM ? dia.lluvia : 0;   // lluvia efectiva
@@ -837,7 +900,7 @@
   return {
     FAO_KC, FAO_GDD, SUELO_AWC, ZR_M, P_AGOTAMIENTO, PE_MIN_MM, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
     VENTANA_PRONOSTICO_DIAS,
-    kcDelDia, faseDelDia, zrDelDia, aguaSuelo, diasEntre, balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia,
+    kcDelDia, faseDelDia, zrDelDia, aguaSuelo, ksEstres, diasEntre, balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia,
     sanearSerie, sanearRiegos, huecosDeSerie,
     gradosDia, gddDelCiclo, diasFenologicos, curvaFenologica, ventanaMadurez, normalesMensuales,
   };

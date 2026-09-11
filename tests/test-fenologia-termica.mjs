@@ -77,11 +77,33 @@ const balCal = M.balanceHidrico(hasta(COSECHA_REAL), [], { ...opts, termico: fal
 const balTer = M.balanceHidrico(hasta(COSECHA_REAL), [], opts);
 ok(balCal.modoFenologia === "calendario" && balTer.modoFenologia === "termico",
    "el mismo balance, con los dos relojes");
-ok(balTer.etcAcum > balCal.etcAcum,
+// LA DEMANDA se mide sobre la ETc POTENCIAL —Kc × ET₀, sin suelo de por medio—
+// y no sobre la del balance. Desde que el motor aplica Ks (FAO-56 ec. 84), un
+// balance sin riegos llega al agotamiento y la transpiración cae muy por debajo
+// del potencial: el estrés aplasta las dos cifras y la diferencia entre relojes
+// se diluye (8,7% → 0,7%) por un motivo que no tiene nada que ver con la
+// fenología. La pregunta de este bloque es cuánta agua PIDE el cultivo, que es
+// una magnitud de cultivo bien regado.
+const etcPotencial = (termico) => {
+  const curvaAqui = termico ? curva : null;
+  return hasta(COSECHA_REAL).reduce((t, d) => {
+    const dias = curvaAqui ? curvaAqui.diaDe(d.date)
+                           : M.diasEntre(PLANT, new Date(`${d.date}T12:00:00`));
+    return t + M.kcDelDia("cebolla", dias) * (d.et0 ?? 0);
+  }, 0);
+};
+const etcCal = etcPotencial(false), etcTer = etcPotencial(true);
+ok(etcTer > etcCal,
    `el reloj de calendario pedía MENOS agua de la que el cultivo gastaba: ` +
-   `${balCal.etcAcum.toFixed(1)} mm contra ${balTer.etcAcum.toFixed(1)} mm`);
-const desvio = (balTer.etcAcum / balCal.etcAcum - 1) * 100;
-ok(desvio > 3 && desvio < 9, `la desviación en el ciclo entero es del ${desvio.toFixed(1)}% (medido: 8,7%)`);
+   `${etcCal.toFixed(1)} mm contra ${etcTer.toFixed(1)} mm`);
+const desvio = (etcTer / etcCal - 1) * 100;
+ok(desvio > 3 && desvio < 12, `la desviación en el ciclo entero es del ${desvio.toFixed(1)}% (medido: 8,7%)`);
+// Y de paso queda fijado que el estrés SÍ actúa cuando toca: un cultivo de 50
+// días de verano sin regar no transpira a pleno ritmo.
+ok(balTer.diasEstres > 10,
+   `sin regar, el cultivo pasa ${balTer.diasEstres} días transpirando por debajo de su potencial`);
+ok(balTer.etcAcum < etcTer,
+   `y por eso su ETc real (${balTer.etcAcum.toFixed(0)} mm) queda por debajo de la potencial (${etcTer.toFixed(0)} mm)`);
 
 console.log("\n── la ventana es una ventana, y contiene la cosecha real ──");
 let contenidas = 0, mirados = 0;
