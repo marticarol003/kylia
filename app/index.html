@@ -740,6 +740,12 @@
     .accion.urgente .accion-verbo { color: #B23B2E; }
     .accion.bloqueo .accion-verbo { color: #A8681C; }
     .accion-detalle { font-weight: 600; font-size: .95rem; color: var(--text); }
+    .card-mapa { padding: 14px; }
+    .mapa-cab { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; gap: 10px; }
+    .mapa-titulo { font-weight: 700; font-size: .78rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+    .mapa-sub { font-size: .8rem; color: var(--muted); text-align: right; }
+    .mapa-campo { height: 220px; border-radius: 12px; overflow: hidden; background: var(--border); }
+    .mapa-campo .leaflet-pane, .mapa-campo .leaflet-control { z-index: auto; }
     .accion-razon { font-size: .82rem; color: var(--muted); line-height: 1.45; }
     /* La invitación a medir el caudal: un escalón por debajo de la razón, para
        que no compita con la acción. Es una oferta, no una tarea. */
@@ -2686,6 +2692,21 @@
     <!-- Selector de zona: solo aparece si el agricultor tiene más de una -->
     <div class="zonas-tabs" id="zonas-tabs" role="tablist" aria-label="Tus zonas de cultivo" hidden></div>
 
+    <!-- Tu campo, visto desde arriba ────────────────────────────────────────
+         Hasta ahora la parcela solo se veía dentro de Ajustes, que es donde se
+         CONFIGURA, no donde se mira. Y con varios cultivos, el selector de
+         pestañas obliga a acordarse de cuál es cuál por el nombre.
+         Con el contorno delante, tocar el trozo es más directo que leer una
+         pestaña: se ve cuál es cuál. Nace oculta; si no hay contorno guardado
+         no se enseña un mapa vacío. -->
+    <section class="card card-mapa" id="card-mapa" aria-label="Tu campo" hidden>
+      <div class="mapa-cab">
+        <span class="mapa-titulo">Tu campo</span>
+        <span class="mapa-sub" id="mapa-sub"></span>
+      </div>
+      <div id="mapa-campo" class="mapa-campo"></div>
+    </section>
+
     <!-- Banner de bienvenida primer uso (se inserta dinámicamente) -->
     <div id="welcome-banner" class="welcome-banner" hidden>
       <h3>👋 Bienvenido a Kylia <span class="piloto-badge">Piloto</span></h3>
@@ -3520,6 +3541,7 @@
     // config efectiva y recalcula todo: el riego de hoy, los tiles, el satélite
     // y el plan de abonado, cada uno con el cultivo y la superficie de esa zona.
     function renderZonasTabs() {
+      pintarMapaCampo();   // el mapa y las pestañas enseñan lo mismo: van juntos
       const cont = document.getElementById("zonas-tabs");
       if (!cont) return;
       const lista = parcelasDisponibles();
@@ -3529,6 +3551,75 @@
         <button type="button" class="zona-tab" role="tab"
                 aria-selected="${(p.id || null) === zonaActiva}"
                 data-zona="${p.id || ""}">${esc(p.etiqueta)}</button>`).join("");
+    }
+
+    // ─── El campo visto desde arriba ─────────────────────────────────────
+    // Pinta el contorno de cada parcela con cultivo y deja tocarlo para
+    // seleccionarla. No duplica el selector: lo hace entendible — con dos
+    // bancales, "Lechuga · 440 m²" en una pestaña no dice CUÁL de los dos es.
+    let mapaCampo = null, capasCampo = [];
+    const COLOR_ZONA = ["#2F6B4F", "#A8681C", "#2C5F7C", "#7A3E8F", "#6B8E23"];
+
+    function pintarMapaCampo() {
+      const caja = document.getElementById("card-mapa");
+      if (!caja) return;
+      const todas = parcelasDisponibles().filter(p => p.geometria);
+      // La "parcela principal" es la finca entera. Si ya hay siembras con su
+      // propio contorno, dibujarla además pinta el recinto encima de sus
+      // propios trozos: un cuarto polígono que se superpone a los otros tres y
+      // que al tocar cualquier sitio selecciona el de arriba. Con siembras
+      // dibujadas, la principal sobra en el mapa (en las pestañas se queda: eso
+      // es otra cosa y no se toca).
+      const conTrozos = todas.some(p => p.id);
+      const lista = conTrozos ? todas.filter(p => p.id) : todas;
+      // Sin ningún contorno guardado no se enseña un mapa vacío.
+      if (!lista.length) { caja.hidden = true; return; }
+      caja.hidden = false;
+
+      const activa = lista.find(p => (p.id || null) === zonaActiva) || lista[0];
+      document.getElementById("mapa-sub").textContent = lista.length > 1
+        ? `${lista.length} cultivos · toca uno para verlo`
+        : (activa.area_m2 ? `${activa.area_m2.toLocaleString("es-ES")} m²` : "");
+
+      cargarLeaflet().then(() => {
+        if (typeof L === "undefined") { caja.hidden = true; return; }
+        if (!mapaCampo) {
+          mapaCampo = L.map("mapa-campo", { zoomControl: false, attributionControl: false,
+                                            dragging: true, scrollWheelZoom: false });
+          const esri = L.tileLayer(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            { maxZoom: 19 });
+          const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 });
+          let fallos = 0;
+          esri.on("tileerror", () => {
+            if (++fallos > 2 && !mapaCampo.hasLayer(osm)) { mapaCampo.removeLayer(esri); osm.addTo(mapaCampo); }
+          });
+          esri.addTo(mapaCampo);
+        }
+        capasCampo.forEach(c => mapaCampo.removeLayer(c));
+        capasCampo = [];
+
+        let bounds = null;
+        lista.forEach((p, i) => {
+          const esActiva = (p.id || null) === (activa.id || null);
+          const capa = L.geoJSON(p.geometria, {
+            style: {
+              color: COLOR_ZONA[i % COLOR_ZONA.length],
+              weight: esActiva ? 3 : 2,
+              // La activa se rellena; las demás van en contorno. Así se ve
+              // cuál estás mirando sin tener que leer nada.
+              fillOpacity: esActiva ? 0.35 : 0.08,
+              dashArray: esActiva ? null : "4 4",
+            },
+          }).addTo(mapaCampo);
+          capa.bindTooltip(p.etiqueta, { permanent: false, direction: "center" });
+          capa.on("click", () => { if (!esActiva) cambiarZona(p.id || null); });
+          capasCampo.push(capa);
+          bounds = bounds ? bounds.extend(capa.getBounds()) : capa.getBounds();
+        });
+        if (bounds?.isValid()) mapaCampo.fitBounds(bounds, { padding: [18, 18] });
+        setTimeout(() => mapaCampo.invalidateSize(), 60);
+      }).catch(() => { caja.hidden = true; });
     }
 
     function cambiarZona(id) {
