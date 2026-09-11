@@ -2474,8 +2474,43 @@
         </div>
       </section>
 
-      <!-- 5 · Guardar (el correo, por fin) -->
+      <!-- 6 · Lo que falta para el abonado ──────────────────────────────
+           SALTABLE. Va DESPUÉS del primer aviso a propósito: aquí ya ha visto
+           para qué sirve Kylia, así que dos preguntas más se las gana. Antes
+           habrían sido dos preguntas a un desconocido.
+
+           Son exactamente las dos que le faltan al crédito de residuos del
+           método MAPA, y las dos las sabe de memoria. Sin ellas el crédito es 0
+           y se abona de más: un pimiento anterior con los restos enterrados
+           deja 135 kg N/ha, de los que el motor cuenta el 60%. -->
       <section class="alta-paso" data-paso="6">
+        <p class="alta-preg">¿Qué había plantado antes en este campo?</p>
+        <div class="alta-chips" id="alta-cult-ant">
+          <button type="button" class="alta-chip" data-ant="tomate">Tomate</button>
+          <button type="button" class="alta-chip" data-ant="lechuga">Lechuga</button>
+          <button type="button" class="alta-chip" data-ant="cebolla">Cebolla</button>
+          <button type="button" class="alta-chip" data-ant="pimiento">Pimiento</button>
+          <button type="button" class="alta-chip" data-ant="brassica">Col o coliflor</button>
+          <button type="button" class="alta-chip" data-ant="calabacin">Calabacín</button>
+          <button type="button" class="alta-chip" data-ant="berenjena">Berenjena</button>
+          <button type="button" class="alta-chip" data-ant="espinaca">Espinaca</button>
+        </div>
+
+        <div id="alta-q-restos" hidden>
+          <p class="alta-preg">Cuando lo quitaste, ¿los restos se quedaron en la tierra?</p>
+          <div class="alta-chips" id="alta-restos">
+            <button type="button" class="alta-chip" data-restos="1">Sí, se enterraron</button>
+            <button type="button" class="alta-chip" data-restos="0">No, se retiraron</button>
+          </div>
+          <p class="alta-nota">Los restos enterrados devuelven nitrógeno al suelo. Saberlo evita abonar de más.</p>
+        </div>
+
+        <button type="button" class="alta-btn" id="alta-b6" disabled>Guardar</button>
+        <button type="button" class="alta-btn fantasma" id="alta-saltar-abonado">No me acuerdo, seguir</button>
+      </section>
+
+      <!-- 5 · Guardar (el correo, por fin) -->
+      <section class="alta-paso" data-paso="7">
         <h2>¿Quieres que Kylia se acuerde de tu campo y te avise cuando toque regar?</h2>
         <p class="alta-txt">Te mandamos un enlace para entrar desde cualquier móvil. Sin contraseñas.</p>
         <input type="email" class="alta-input" id="alta-email" placeholder="tu@correo.com" autocomplete="email">
@@ -6372,7 +6407,7 @@
 
         window.__A = A;   // sonda para los tests de navegador
         function pintarPuntos() {
-          $("alta-puntos").innerHTML = [0,1,2,3,4,5,6]
+          $("alta-puntos").innerHTML = [0,1,2,3,4,5,6,7]
             .map(i => `<span class="alta-punto${i <= paso ? " on" : ""}"></span>`).join("");
         }
         function ir(n) {
@@ -6628,6 +6663,45 @@
         // seguir se enciende con las cuatro preguntas de siempre. A quien no lo
         // sepa se le manda a medirlo cuando esté de pie al lado del riego, que
         // es donde se mide bien.
+        // ── paso 6 · lo que falta para el abonado ────────────────────────
+        // Las dos preguntas viajan por la ruta que YA existe: /api/log valida
+        // cultivo_anterior contra su lista y campo.js ya llama a
+        // creditoResiduosN con ellas. No hacía falta tocar el backend — solo
+        // faltaba que alguien las preguntara desde /app.
+        grupo("alta-cult-ant", "ant", "cultivoAnterior", () => {
+          revelar("alta-q-restos");
+          revisar6();
+        });
+        grupo("alta-restos", "restos", "restos", revisar6);
+        function revisar6() {
+          $("alta-b6").disabled = !(A.cultivoAnterior && A.restos != null);
+        }
+        $("alta-b6").addEventListener("click", () => { guardarAbonado(); ir(7); });
+        $("alta-saltar-abonado").addEventListener("click", () => ir(7));
+
+        // Se manda por registroUsuario, que es lo que escribe las COLUMNAS de
+        // usuarios (subirConfig solo guarda la foto en config_app). Va con el
+        // resto del perfil porque el alta nunca había creado esa fila: hasta
+        // ahora solo nacía al dar el correo.
+        function guardarAbonado() {
+          if (!A.cultivoAnterior || A.restos == null) return;
+          try {
+            window.kyliaSync?.registroUsuario({
+              cultivo_anterior:    A.cultivoAnterior,
+              restos_incorporados: A.restos === "1",
+              cultivos:            [A.cultivo],
+              lat: A.lat, lon: A.lon, ciudad: A.ciudad || null,
+              parcela:             A.descRecinto?.geometria || null,
+              area_m2:             A.areaCultivada ?? null,
+              suelo:               A.suelo || null,
+              metodo_riego:        A.metodo || null,
+              caudal:              A.caudal ?? null,
+              fecha_plantacion:    A.plantado || null,
+              origen:              localStorage.getItem("kylia_origen"),
+            });
+          } catch (_) { /* el campo ya está guardado en el móvil */ }
+        }
+
         grupo("alta-sabe-caudal", "sabe", "sabeCaudal", () => {
           const lo_sabe = A.sabeCaudal === "1";
           $("alta-caudal-campo").hidden = !lo_sabe;

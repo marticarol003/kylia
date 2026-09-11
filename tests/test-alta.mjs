@@ -23,7 +23,8 @@ import { dirname, join } from "path";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
-const app = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+const leer = (...q) => readFileSync(join(RAIZ, ...q), "utf8");
+const app = leer("app", "index.html");
 const alta = app.slice(app.indexOf("// ── El alta: los dos primeros minutos"),
                        app.indexOf("// ── Borrar la cuenta ──"));
 
@@ -135,8 +136,8 @@ ok(/¿Dónde está el cultivo\?/.test(paso(1)), "el paso 1 es el lugar");
 ok(/¿Qué tienes plantado ahora\?/.test(paso(3)), "y el cultivo baja al 3");
 ok(/¿Cómo riegas normalmente\?/.test(paso(4)), "el riego al 4");
 ok(/alta-veredicto/.test(paso(5)), "el primer aviso al 5");
-ok(/alta-email/.test(paso(6)), "y el correo al 6");
-ok(/\[0,1,2,3,4,5,6\]/.test(alta), "los puntos de progreso cuentan siete pantallas");
+ok(/alta-email/.test(paso(7)), "y el correo al 7 (el 6 es el del abonado, añadido después)");
+// (el recuento definitivo se comprueba más abajo, con el paso del abonado ya dentro)
 
 console.log("\n── ninguna flecha 'atrás' apunta a donde no debe ──");
 // Un data-ir mal renumerado no da error: te manda a otra pantalla y parece
@@ -266,6 +267,56 @@ const supuesto = MOT.balanceHidrico(clima,
   { suelo: "franco", cultivoId: "lechuga", metodoRiego: "goteo", fechaPlantacion: isoD(21) });
 ok(supuesto.Dr < real.Dr,
    `y la suposición de recarga completa da menos déficit (${supuesto.Dr.toFixed(1)}): por eso conviene medir`);
+
+console.log("\n── V1 · las dos preguntas que le faltan al abonado ──");
+// Sin ellas el crédito de residuos del método MAPA es 0 y se abona de más.
+// Van DESPUÉS del primer aviso a propósito: ahí ya ha visto para qué sirve
+// Kylia, así que dos preguntas más se las ha ganado.
+ok(/data-paso="6"/.test(app) && /¿Qué había plantado antes en este campo\?/.test(app),
+   "se pregunta el cultivo anterior");
+ok(/Cuando lo quitaste, ¿los restos se quedaron en la tierra\?/.test(app),
+   "y si los restos se incorporaron, que es lo que condiciona el crédito");
+ok(/id="alta-saltar-abonado"/.test(app) && /No me acuerdo, seguir/.test(app),
+   "con salida: no bloquea el alta");
+ok(/\[0,1,2,3,4,5,6,7\]/.test(alta), "los puntos cuentan ocho pantallas");
+
+console.log("\n── los ocho cultivos coinciden con la tabla del motor ──");
+// Si el alta ofreciera uno que el motor no conoce, el crédito saldría 0 sin
+// que nadie se entere. Se comparan las dos listas de verdad.
+const NUTRI2 = require(join(RAIZ, "api", "_motor-nutricion.js"));
+const ofrecidos = [...app.matchAll(/data-ant="(\w+)"/g)].map(m => m[1]);
+const conocidos = Object.keys(NUTRI2.N_RESIDUOS_KG_HA);
+ok(ofrecidos.length === conocidos.length,
+   `se ofrecen ${ofrecidos.length} cultivos y el motor conoce ${conocidos.length}`);
+ok(ofrecidos.every(c => conocidos.includes(c)),
+   "y todos los ofrecidos están en N_RESIDUOS_KG_HA: ninguno daría crédito 0 por despiste");
+
+console.log("\n── viaja por la ruta que ya existía ──");
+// Descubrimiento al implementarlo: campo.js YA llamaba a creditoResiduosN con
+// esas dos columnas, y /api/log ya las validaba. No faltaba backend — faltaba
+// que alguien las preguntara desde /app.
+const log = leer("api", "log.js");
+ok(/cultivo_anterior:\s+siViene\("cultivo_anterior", CULTIVOS_ANT\.has/.test(log),
+   "/api/log ya valida el cultivo anterior contra su lista");
+ok(/restos_incorporados:\s+siViene\("restos_incorporados"/.test(log),
+   "y ya acepta los restos");
+const campoJs = leer("api", "campo.js");
+ok(/creditoResiduosN\(u\.cultivo_anterior \|\| null, !!u\.restos_incorporados\)/.test(campoJs),
+   "y campo.js ya calcula el crédito con ellas: no ha hecho falta tocarlo");
+ok(/registroUsuario\(\{\n\s+cultivo_anterior:\s+A\.cultivoAnterior/.test(alta),
+   "el alta las manda por registroUsuario, que es lo que escribe las COLUMNAS");
+ok(/restos_incorporados: A\.restos === "1"/.test(alta),
+   "los restos van como booleano, que es lo que espera el motor");
+ok(/if \(!A\.cultivoAnterior \|\| A\.restos == null\) return;/.test(alta),
+   "y si las saltó no se manda nada: mejor sin crédito que con uno inventado");
+
+console.log("\n── el crédito, con el motor real ──");
+const credito = NUTRI2.creditoResiduosN("pimiento", true);
+ok(credito > 0, `un pimiento anterior con restos enterrados da ${credito} kg N/ha de crédito`);
+ok(NUTRI2.creditoResiduosN("pimiento", false) === 0,
+   "y retirados no da ninguno, que es la condición que pone MAPA");
+ok(NUTRI2.creditoResiduosN(null, true) === 0,
+   "sin cultivo anterior tampoco se inventa");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
