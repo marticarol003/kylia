@@ -125,7 +125,7 @@ console.log("\n── un cultivo nuevo se da de alta como en el onboarding ─�
 for (const [id, q] of [["ec-metodo", "cómo riega"], ["ec-cada", "cada cuánto"],
                        ["ec-rato", "cuánto rato"], ["ec-ultimo", "cuándo regó por última vez"]])
   ok(new RegExp(`id="${id}"`).test(app), `pregunta ${q}`);
-ok(/btn\.disabled = !\(ecCabe && ecR\.metodo && ecR\.cada && ecR\.minutos && ecR\.ultimo != null\)/.test(app),
+ok(/ecR\.metodo && ecR\.cada && ecR\.minutos && ecR\.ultimo != null/.test(app),
    "y no se guarda sin ellas: el área sola ya no basta");
 ok(/ecRevelar\("ec-q-cada"\)/.test(app) && /ecRevelar\("ec-q-rato"\)/.test(app),
    "una pregunta cada vez, igual que en el alta");
@@ -192,6 +192,29 @@ ok(/function abrirEditorCultivo\(refForzada = null\)/.test(app),
 
 console.log("\n── detalles de lengua ──");
 ok(/hace \$\{dias\} día\$\{dias === 1 \? "" : "s"\}/.test(app), "no dice 'hace 1 días'");
+
+console.log("\n── primero se pregunta cuánto ocupa, y solo se dibuja quien lo necesita ──");
+// Lo corriente es que un cultivo ocupe la parcela entera. Sacar el polígono de
+// entrada cobraba a todos el precio del caso raro.
+ok(/id="ec-cuanto"/.test(app) && /¿Cuánto de la parcela ocupa\?/.test(app), "se pregunta");
+ok(/data-cuanto="todo"/.test(app) && /data-cuanto="parte"/.test(app), "toda o una parte");
+ok(/function elegirCuanto\(modo\)/.test(app), "y cada opción hace algo distinto");
+const abrir = app.slice(app.indexOf("function abrirEditorCultivo"), app.indexOf("function pintarEditor"));
+ok(!/pintarEditor\(\);/.test(abrir),
+   "al abrir el editor NO se dibuja nada: el cuadrilátero espera a que lo pida");
+ok(/btn\.disabled = !\(ecR\.cuanto && ecCabe/.test(app),
+   "y no se guarda sin contestar cuánto ocupa");
+
+console.log("\n── 'toda la parcela' usa la superficie OFICIAL, no la del polígono ──");
+// El recinto trae huecos (caseta, balsa, arbolado) y su geometría llegó a dar un
+// 8% de más en un caso medido de Palafolls. Ese 8% serían 8% de abono de más.
+ok(/ecAreaFijada = libres;/.test(app), "'toda' fija los metros libres del recinto");
+ok(/const area = ecAreaFijada != null\n\s+\? ecAreaFijada/.test(app),
+   "y al guardar se usa esa cifra, no se recalcula del contorno");
+ok(/no se\n\s+\/\/ recalcula del polígono, que traería los huecos de SIGPAC dentro/.test(app),
+   "con el porqué escrito al lado");
+ok(/ecAreaFijada = null;\n\s+\/\/ Nace ocupando la mitad/.test(app),
+   "'una parte' la suelta: ahí manda lo que dibuje");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

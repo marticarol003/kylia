@@ -2752,7 +2752,15 @@
             <option value="50">Hace más de un mes</option>
           </select>
         </div>
-        <p class="alta-nota" id="ec-nota">Arrastra las cuatro esquinas hasta cuadrar tu bancal.</p>
+        <!-- Lo corriente es que un cultivo ocupe la parcela entera. Sacar el
+             polígono de entrada cobra a todos el precio del caso raro, así que
+             se pregunta primero y solo se dibuja quien lo necesita. -->
+        <p class="alta-preg" style="font-size:.95rem">¿Cuánto de la parcela ocupa?</p>
+        <div class="alta-chips" id="ec-cuanto">
+          <button type="button" class="alta-chip" data-cuanto="todo">Toda la parcela</button>
+          <button type="button" class="alta-chip" data-cuanto="parte">Solo una parte</button>
+        </div>
+        <p class="alta-nota" id="ec-nota"></p>
 
         <!-- Las MISMAS preguntas del alta, y por el mismo motivo: cada cultivo
              tiene su propio balance, y sin su rutina no hay de dónde sacarlo.
@@ -3755,6 +3763,11 @@
     // terreno, y esa cifra acaba en los kg de abono) y areaM2 mide lo dibujado.
     // Aquí solo va la parte de dedo.
     let ecGeom = null, ecTiradores = [], ecCapa = null, ecRecinto = null, ecCabe = false;
+    // Cuando ocupa la parcela entera, la superficie es la OFICIAL de SIGPAC y no
+    // la del polígono: el recinto trae huecos (caseta, balsa, arbolado) y su
+    // geometría llegó a dar un 8% de más en un caso medido. Ese 8% serían 8% de
+    // abono de más.
+    let ecAreaFijada = null;
 
     // La parcela sobre la que se añade un cultivo: la del cultivo que se está
     // mirando. Antes devolvía siempre la PRIMERA, así que con dos parcelas el
@@ -3853,11 +3866,12 @@
       ecR = {}; ecCabe = false;
       for (const g of ["ec-metodo", "ec-cada", "ec-rato", "ec-ultimo"])
         document.getElementById(g)?.querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
-      for (const q of ["ec-q-cada", "ec-q-rato", "ec-q-ultimo"])
-        document.getElementById(q).hidden = true;
+      for (const q of ["ec-q-cada", "ec-q-rato", "ec-q-ultimo", "ec-cuanto"])
+        document.getElementById(q).querySelectorAll?.(".alta-chip").forEach(x => x.classList.remove("sel"));
       document.getElementById("editor-cultivo").hidden = false;
       document.getElementById("btn-anadir-cultivo").hidden = true;
-      pintarEditor();
+      document.getElementById("ec-nota").textContent =
+        `Quedan ${libres.toLocaleString("es-ES")} m² sin repartir en esta parcela.`;
       revisarEditor();
     }
 
@@ -3942,7 +3956,34 @@
       if (!btn) return;
       // El área manda igual que antes; ahora además hace falta la rutina, porque
       // sin ella el cultivo nace sin balance.
-      btn.disabled = !(ecCabe && ecR.metodo && ecR.cada && ecR.minutos && ecR.ultimo != null);
+      btn.disabled = !(ecR.cuanto && ecCabe && ecR.metodo && ecR.cada && ecR.minutos && ecR.ultimo != null);
+    }
+
+    // Toda la parcela, o un trozo que él dibuja. Lo primero es lo corriente y no
+    // cuesta ni un toque de mapa; lo segundo saca el cuadrilátero.
+    function elegirCuanto(modo) {
+      const libres = metrosLibres(ecRecinto);
+      if (modo === "todo") {
+        // El trozo ES el recinto entero, con su superficie oficial: no se
+        // recalcula del polígono, que traería los huecos de SIGPAC dentro.
+        ecGeom = ecRecinto.geometria;
+        ecAreaFijada = libres;
+        ecCabe = true;
+        ecTiradores.forEach(t => mapaCampo?.removeLayer(t));
+        ecTiradores = [];
+        if (ecCapa) { mapaCampo?.removeLayer(ecCapa); ecCapa = null; }
+        document.getElementById("ec-nota").textContent =
+          `${libres.toLocaleString("es-ES")} m², la parcela entera.`;
+        revisarEditor();
+        return;
+      }
+      ecAreaFijada = null;
+      // Nace ocupando la mitad de lo libre: se ve entero y hay poco que
+      // arrastrar. Él lo ajusta desde ahí.
+      ecGeom = window.KyliaGeo?.rectanguloCentrado(ecRecinto.geometria, Math.max(1, libres * 0.5))?.geometria
+               || window.KyliaGeo?.rectanguloCentrado(ecRecinto.geometria, libres)?.geometria;
+      if (!ecGeom) return;
+      pintarEditor();
     }
 
     function cerrarEditorCultivo() {
@@ -3950,13 +3991,15 @@
       document.getElementById("btn-anadir-cultivo").hidden = false;
       if (ecCapa) { mapaCampo?.removeLayer(ecCapa); ecCapa = null; }
       ecTiradores.forEach(t => mapaCampo?.removeLayer(t));
-      ecTiradores = []; ecGeom = null;
+      ecTiradores = []; ecGeom = null; ecAreaFijada = null; ecCabe = false;
       pintarMapaCampo();
     }
 
     function guardarCultivoNuevo() {
       if (!ecGeom || !ecRecinto) return;
-      const area = Math.round(window.KyliaGeo.areaM2(window.KyliaGeo.anilloExterior(ecGeom)));
+      const area = ecAreaFijada != null
+        ? ecAreaFijada
+        : Math.round(window.KyliaGeo.areaM2(window.KyliaGeo.anilloExterior(ecGeom)));
       if (!(area > 0) || area > metrosLibres(ecRecinto)) return;
       const hace = Number(document.getElementById("ec-cuando").value);
       const d = new Date(); d.setDate(d.getDate() - hace);
@@ -8834,6 +8877,7 @@
       document.getElementById("btn-refresh").addEventListener("click", cargarDatos);
 
       // Selector de zona (delegación: las pestañas se repintan al guardar).
+      ecGrupo("ec-cuanto", "cuanto", "cuanto", () => elegirCuanto(ecR.cuanto));
       ecGrupo("ec-metodo", "metodo", "metodo", () => ecRevelar("ec-q-cada"));
       ecGrupo("ec-cada",   "cada",   "cada",   () => ecRevelar("ec-q-rato"));
       ecGrupo("ec-rato",   "min",    "minutos", () => ecRevelar("ec-q-ultimo"));
