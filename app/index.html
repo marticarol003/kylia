@@ -760,6 +760,7 @@
     .accion-razon { font-size: .82rem; color: var(--muted); line-height: 1.45; }
     /* La invitación a medir el caudal: un escalón por debajo de la razón, para
        que no compita con la acción. Es una oferta, no una tarea. */
+    .accion-tranquilos { font-size: .84rem; color: var(--muted); margin: 2px 0 0; line-height: 1.5; }
     .accion-pie {
       display: block; margin-top: 8px; padding-top: 8px; font-size: .8rem;
       color: var(--muted); line-height: 1.45; border-top: 1px dashed var(--border);
@@ -3611,15 +3612,10 @@
     function pintarMapaCampo() {
       const caja = document.getElementById("card-mapa");
       if (!caja) return;
-      const todas = parcelasDisponibles().filter(p => p.geometria);
-      // La "parcela principal" es la finca entera. Si ya hay siembras con su
-      // propio contorno, dibujarla además pinta el recinto encima de sus
-      // propios trozos: un cuarto polígono que se superpone a los otros tres y
-      // que al tocar cualquier sitio selecciona el de arriba. Con siembras
-      // dibujadas, la principal sobra en el mapa (en las pestañas se queda: eso
-      // es otra cosa y no se toca).
-      const conTrozos = todas.some(p => p.id);
-      const lista = conTrozos ? todas.filter(p => p.id) : todas;
+      // Ver parcelasReales: con siembras, la principal es la misma tierra y
+      // pintarla además la superpone a sus propios trozos. (En las PESTAÑAS se
+      // queda: eso es navegación y no se toca.)
+      const lista = parcelasReales().filter(p => p.geometria);
       // Sin ningún contorno guardado no se enseña un mapa vacío.
       if (!lista.length) { caja.hidden = true; return; }
       caja.hidden = false;
@@ -3816,6 +3812,17 @@
       subirConfig();
     }
 
+    // Las parcelas que de verdad hay que tener en cuenta. La "parcela principal"
+    // es la finca entera: en cuanto existen siembras, es la MISMA tierra que
+    // ellas, así que contarla además duplica todo — el mapa pintaba su recinto
+    // encima de sus propios trozos y las acciones sacaban dos veces el mismo
+    // cultivo. Una sola regla para los dos sitios, para que no se separen.
+    function parcelasReales() {
+      const todas = parcelasDisponibles();
+      const conTrozos = todas.some(p => p.id);
+      return conTrozos ? todas.filter(p => p.id) : todas;
+    }
+
     function cambiarZona(id) {
       const nuevo = id || null;
       if (nuevo === zonaActiva) return;
@@ -3897,14 +3904,17 @@
             kcDelDia, zrDelDia } = MOTOR;
 
     // Presenta la lámina bruta (L/m² = mm) en la unidad del sistema del agricultor.
-    function fmtRiego(litrosBrutoMm) {
+    // Con la config de una parcela concreta: los metros y el cultivo cambian
+    // entre ellas, y los minutos que salen dependen de eso.
+    function fmtRiegoCon(litrosBrutoMm, c) {
       return MOTOR.presentarRiego(litrosBrutoMm, {
-        metodoRiego:        cfg.metodoRiego,
-        caudalMmh:          cfg.caudal,
-        areaM2:             cfg.areaParcela,
-        capacidadRegaderaL: cfg.capacidadRegadera,
+        metodoRiego:        c.metodoRiego,
+        caudalMmh:          c.caudal,
+        areaM2:             c.areaParcela,
+        capacidadRegaderaL: c.capacidadRegadera,
       }).texto;
     }
+    function fmtRiego(litrosBrutoMm) { return fmtRiegoCon(litrosBrutoMm, cfg); }
 
     // TAW/RAW del día. El motor pide el suelo por parámetro; aquí sale de `cfg`.
     function aguaSuelo(cultivoId = null, dias = null) {
@@ -3922,10 +3932,21 @@
     // revés: "todo en orden" en pantalla mientras el servidor mandaba regar 42
     // L/m². Mismo motor, distinta entrada — que es como volvió a colarse la
     // divergencia que se cerró el 28-jul. Un solo sitio para no repetirlo.
-    function riegosConLamina() {
-      return riegos.map(r => ({
+    // EL CONTEXTO DE UNA PARCELA. Hasta ahora todo esto salía de variables
+    // globales (`cfg`, `riegos`, `ultimoNDMI`) que apuntan a la parcela que se
+    // está MIRANDO. Con varios cultivos eso obliga a ir cambiando de pestaña
+    // para saber qué toca en cada uno, y quien no entra no se entera.
+    //
+    // Se pasa como argumento con el mismo valor por defecto de siempre, así que
+    // los treinta sitios que ya llamaban a estas funciones siguen exactamente
+    // igual. No hay una segunda versión del cálculo: es el mismo, con la
+    // entrada explícita.
+    function ctxActual() { return { cfg, riegos, ndmi: ultimoNDMI }; }
+
+    function riegosConLamina(ctx = ctxActual()) {
+      return (ctx.riegos || []).map(r => ({
         ...r,
-        litros: MOTOR.laminaRiego(r.litros ?? null, r.duracion ?? null, cfg.caudal),
+        litros: MOTOR.laminaRiego(r.litros ?? null, r.duracion ?? null, ctx.cfg.caudal),
       }));
     }
 
@@ -3936,9 +3957,11 @@
 
     // Balance hídrico FAO-56. Devuelve el agotamiento Dr (mm) y RAW/TAW, más
     // campos de compatibilidad usados por el resto de la UI (balanceTotal ≡ Dr).
-    function calcularBalanceHidrico() {
+    function calcularBalanceHidrico(ctx = ctxActual()) {
       if (!ultimoET0 || !ultimoET0.length) return null;
-      const conLamina = riegosConLamina();
+      const cfg = ctx.cfg;                     // sombra local: el resto del cuerpo no cambia
+      const ultimoNDMI = ctx.ndmi || null;
+      const conLamina = riegosConLamina(ctx);
       const ultRiego  = conLamina[conLamina.length - 1] || null;
 
       const cultivoId = (cfg.cultivos || [])[0] || null;
@@ -4531,18 +4554,52 @@
     // tests/test-sin-recomendar-fitosanitarios.mjs— y sin el reconocimiento del
     // DARP tampoco puede. Lo que sí sale es lo que es cuaderno: un plazo de
     // seguridad corriendo, que es una restricción legal de recolección.
+    // El contexto de una parcela cualquiera, no solo de la que se está mirando.
+    // Los riegos de cada una viven en SU clave de localStorage; el satélite va a
+    // null porque el cacheado es el de la parcela activa y atribuírselo a otra
+    // sería peor que no tenerlo.
+    function ctxDe(parcela) {
+      if (!parcela || parcela.id === null) return ctxActual();
+      let rs = [];
+      try { rs = JSON.parse(localStorage.getItem(`kylia_riegos_${parcela.id}`)) || []; } catch (_) {}
+      return {
+        cfg: { ...cfgFinca, cultivos: parcela.cultivo ? [parcela.cultivo] : [],
+               fechaPlantacion: parcela.fechaPlantacion || null,
+               areaParcela: parcela.area_m2 ?? null, parcela: parcela.geometria || null },
+        riegos: rs,
+        ndmi: null,
+      };
+    }
+
     function accionesDeHoy() {
       const acc = [];
+      const parcelas = parcelasReales().filter(p => p.cultivo);
+      const varias = parcelas.length > 1;
+      // Con una sola parcela, todo esto se comporta exactamente como antes.
+      for (const parcela of (varias ? parcelas : [null])) {
+        acc.push(...accionesDeParcela(parcela, varias));
+      }
+      // Lo urgente primero, y dentro de eso el orden en que están sus parcelas.
+      return acc.sort((a, b) => (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
+    }
+
+    function accionesDeParcela(parcela, varias) {
+      const acc = [];
+      const ctx = ctxDe(parcela);
+      // Con varias, cada acción dice de QUÉ cultivo es. Con una, sobra.
+      const deQuien = varias && parcela?.cultivo ? ` · ${nombreCultivo(parcela.cultivo)}` : "";
 
       // 1 · Regar
-      const alerta = calcularAlertaRiego();
-      const bal    = calcularBalanceHidrico();
+      const alerta = calcularAlertaRiego(ctx);
+      const bal    = calcularBalanceHidrico(ctx);
       const cerca  = !alerta && bal && bal.Dr >= 0.75 * bal.raw;
       if (alerta || cerca) {
         const mm = Math.round(bal && bal.Dr > 0 ? bal.Dr : (alerta ? alerta.et0 : 0));
-        const eq = fmtRiego(mm);
+        const eq = fmtRiegoCon(mm, ctx.cfg);
         acc.push({
-          id: "regar", icono: "💧", verbo: "Regar",
+          id: parcela?.id ? `regar-${parcela.id}` : "regar",
+          parcelaId: parcela?.id || null,
+          icono: "💧", verbo: "Regar" + deQuien,
           urgente: !!alerta,
           detalle: `${mm} L/m²` + (/L\/m²/.test(eq) ? "" : ` · ${eq}`),
           razon: alerta
@@ -4556,9 +4613,20 @@
           // veredicto en 16 de 48 casos probados.
           pie: (Number(cfg.caudal) > 0) ? null
             : "Mientras riegas, pon una botella bajo un gotero diez minutos: con eso los próximos avisos te saldrán en minutos.",
-          onClick: () => abrirModalRiego(),
+          onClick: () => {
+            // Apuntar el riego de OTRA parcela exige mirarla: los riegos son
+            // suyos y se guardan en su propia lista.
+            if (parcela?.id && parcela.id !== zonaActiva) cambiarZona(parcela.id);
+            abrirModalRiego();
+          },
         });
       }
+
+      // 2 y 3 solo de la parcela que se está mirando: el plan de abonado y las
+      // aplicaciones se piden al servidor por parcela, y aquí solo está cargado
+      // el de la activa. Pedir los de todas en cada pintado serían N llamadas
+      // por minuto — queda para cuando el servidor los sirva de golpe.
+      if (parcela && parcela.id !== zonaActiva) return acc;
 
       // 2 · Abonar. El tramo que toca sale del reparto que ya calcula el
       // servidor (MAPA, fondo/cobertera o tercios) cruzado con lo que avanza el
@@ -4625,6 +4693,15 @@
       // Sin nada que hacer, la tarjeta no está. Es la diferencia entre una app
       // que avisa y una que habla todos los días.
       if (!acc.length) { card.hidden = true; el.innerHTML = ""; return; }
+
+      // Con varios cultivos, los que NO piden nada se nombran en una línea. Sin
+      // esto, ver "Regar la lechuga" y nada del tomate se lee como que del
+      // tomate no se sabe — y es al revés: se sabe, y está bien.
+      const conCultivo = parcelasReales().filter(p => p.cultivo);
+      const pedidos = new Set(acc.map(a => a.parcelaId).filter(Boolean));
+      const tranquilos = conCultivo.length > 1
+        ? conCultivo.filter(p => p.id && !pedidos.has(p.id)).map(p => nombreCultivo(p.cultivo))
+        : [];
       card.hidden = false;
       // Sin `urgente` en la TARJETA: el color lo lleva cada acción. Ponerlo aquí
       // reactivaba el degradado verde heredado (misma especificidad, declarado
@@ -4641,6 +4718,12 @@
             ${a.pie ? `<span class="accion-pie">${esc(a.pie)}</span>` : ""}
           </span>
         </${a.onClick ? "button" : "div"}>`).join("")
+        + (tranquilos.length
+            ? `<p class="accion-tranquilos">${esc(
+                 tranquilos.length === 1
+                   ? `${tranquilos[0]} no necesita nada hoy.`
+                   : `${tranquilos.slice(0, -1).join(", ")} y ${tranquilos.at(-1)} no necesitan nada hoy.`
+               )}</p>` : "")
         + `<button class="btn-por-que" id="btn-por-que-hoy">¿Por qué?</button>`;
 
       for (const a of acc) {
@@ -5499,13 +5582,13 @@
     }
 
     // ─── Alerta de riego ──────────────────────────────────────────────────────
-    function calcularAlertaRiego() {
-      const bal = calcularBalanceHidrico();
+    function calcularAlertaRiego(ctx = ctxActual()) {
+      const bal = calcularBalanceHidrico(ctx);
       if (!bal) return null;
       // Urgente cuando el agotamiento alcanza el agua fácilmente disponible (RAW).
       if (bal.Dr >= bal.raw) {
         const dias  = bal.diasDesdeUltimoRiego;
-        const desde = ultimoRiego
+        const desde = (ctx.riegos || []).length
           ? `el último riego registrado${dias != null ? ` (hace ${dias} días)` : ""}`
           : "la última imagen del satélite";
         return { et0: bal.Dr, raw: bal.raw, desde };

@@ -25,7 +25,7 @@ ok(/\.catch\(\(\) => \{ caja\.hidden = true; \}\)/.test(app),
 console.log("── reutiliza lo que ya había ──");
 ok(/cargarLeaflet\(\)\.then/.test(app.slice(app.indexOf("function pintarMapaCampo"))),
    "el cargador de Leaflet con su SRI");
-ok(/parcelasDisponibles\(\)\.filter\(p => p\.geometria\)/.test(app),
+ok(/parcelasReales\(\)\.filter\(p => p\.geometria\)/.test(app),
    "la lista de parcelas que ya calculaba el selector");
 ok(/cambiarZona\(p\.id \|\| null\)/.test(app),
    "y el mismo cambiarZona: el mapa no es un segundo selector, es el mismo");
@@ -33,12 +33,14 @@ ok(/cambiarZona\(p\.id \|\| null\)/.test(app),
 console.log("── la parcela principal no se pinta encima de sus propios trozos ──");
 // Es la finca entera. Con siembras dibujadas, pintarla además mete un polígono
 // que se superpone a los otros y se lleva todos los toques.
+// La regla vive en parcelasReales() y la comparten el mapa y las acciones del
+// día, para que no puedan separarse.
 ok(/const conTrozos = todas\.some\(p => p\.id\);/.test(app),
    "se detecta si hay siembras con contorno propio");
-ok(/const lista = conTrozos \? todas\.filter\(p => p\.id\) : todas;/.test(app),
-   "y entonces la principal se cae del mapa");
-ok(/en las pestañas se queda/.test(app),
-   "pero NO de las pestañas: eso es otra cosa y no se toca");
+ok(/return conTrozos \? todas\.filter\(p => p\.id\) : todas;/.test(app),
+   "y entonces la principal se cae");
+ok(/En las PESTAÑAS se\n\s+\/\/ queda/.test(app),
+   "pero NO de las pestañas: eso es navegación y no se toca");
 
 console.log("── se ve cuál estás mirando sin leer nada ──");
 const fn = app.slice(app.indexOf("function pintarMapaCampo"), app.indexOf("function cambiarZona"));

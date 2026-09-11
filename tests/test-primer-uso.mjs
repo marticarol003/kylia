@@ -79,7 +79,9 @@ console.log("── el primer día ya hay balance, no un falso 'todo en orden' �
 // La app exigía un riego apuntado o una imagen de satélite; el servidor no.
 // Quien se daba de alta veía "✓ Todo en orden · Sin alertas urgentes" el día 1,
 // que no significaba que no tocara regar: significaba que no se calculó nada.
-const balance = app.slice(app.indexOf("function calcularBalanceHidrico()"), app.indexOf("// ─── Storage de riegos"));
+// Desde el 11-sep la función recibe el contexto de la parcela, para poder
+// calcular el riego de todos los cultivos sin duplicar el cálculo.
+const balance = app.slice(app.indexOf("function calcularBalanceHidrico(ctx"), app.indexOf("// ─── Storage de riegos"));
 ok(/const refDate = ultRiego\?\.date \|\| ultimoNDMI\?\.fecha \|\| plant;/.test(balance),
    "la fecha de plantación vale como referencia");
 ok(balance.indexOf("const plant") < balance.indexOf("const refDate"),

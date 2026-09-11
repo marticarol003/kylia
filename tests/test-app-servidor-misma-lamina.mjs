@@ -94,7 +94,9 @@ console.log("── guarda estructural: /app no puede dejar de aplicar la lámin
 const app = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
 ok(/MOTOR\.laminaRiego\(/.test(app),
    "app/index.html llama a MOTOR.laminaRiego");
-ok(/function riegosConLamina\(\)/.test(app),
+// Desde el 11-sep recibe el contexto de la parcela (para poder calcular el
+// riego de todos los cultivos a la vez), con el de siempre por defecto.
+ok(/function riegosConLamina\(ctx = ctxActual\(\)\)/.test(app),
    "app/index.html define riegosConLamina()");
 ok(/balanceHidrico\(serie,\s*conLamina\b/.test(app),
    "el balance de la app recibe los riegos con la lámina recalculada, no el array crudo");

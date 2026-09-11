@@ -29,7 +29,7 @@ ok(/function accionesDeHoy\(\)/.test(app), "hay una función que decide qué toc
 console.log("\n── las acciones son verbos, y solo salen si tocan ──");
 ok(/verbo: "Regar"/.test(app), "Regar");
 ok(/verbo: "Abonar"/.test(app), "Abonar");
-ok(/onClick: \(\) => abrirModalRiego\(\)/.test(app),
+ok(/abrirModalRiego\(\);/.test(app),
    "tocar Regar lleva al registro de un toque, no a otro formulario");
 
 console.log("\n── fitosanitarios: se vigila, NO se receta ──");
@@ -103,6 +103,45 @@ ok(/accion-pie/.test(app) && /border-top: 1px dashed/.test(app),
    "va un escalón por debajo de la razón: es una oferta, no una tarea");
 ok(/cambia el\n *\/\/ veredicto en 16 de 48 casos probados/.test(app),
    "y queda escrito por qué importa, que no es solo hablarle en minutos");
+
+console.log("\n── la mañana cubre TODOS los cultivos, no solo el que miras ──");
+// Antes todo salía de variables globales que apuntan a la parcela ACTIVA, así
+// que con tres cultivos había que ir tocando pestañas cada mañana — y quien no
+// entra, no se entera.
+ok(/function ctxDe\(parcela\)/.test(app), "hay un contexto por parcela");
+ok(/localStorage\.getItem\(`kylia_riegos_\$\{parcela\.id\}`\)/.test(app),
+   "los riegos de cada una salen de SU clave, no de la global");
+ok(/ndmi: null,/.test(app),
+   "el satélite va a null para las demás: el cacheado es el de la activa y atribuírselo a otra sería peor que no tenerlo");
+ok(/for \(const parcela of \(varias \? parcelas : \[null\]\)\)/.test(app),
+   "con una sola parcela se comporta exactamente como antes");
+
+console.log("\n── sin duplicar el cálculo ──");
+// El riesgo aquí era escribir un segundo balance para 'las otras parcelas'. Es
+// el mismo, con la entrada explícita y el mismo valor por defecto de siempre.
+ok(/function calcularBalanceHidrico\(ctx = ctxActual\(\)\)/.test(app),
+   "calcularBalanceHidrico recibe el contexto, con el de siempre por defecto");
+ok(/function calcularAlertaRiego\(ctx = ctxActual\(\)\)/.test(app), "y calcularAlertaRiego igual");
+ok(/function riegosConLamina\(ctx = ctxActual\(\)\)/.test(app), "y riegosConLamina");
+ok((app.match(/MOTOR\.balanceHidrico\(/g) || []).length === 1,
+   "sigue habiendo UNA sola llamada al balance del motor en toda la app");
+
+console.log("\n── la parcela principal no se cuenta dos veces ──");
+ok(/function parcelasReales\(\)/.test(app), "hay una regla única");
+ok(/const parcelas = parcelasReales\(\)/.test(app) && /const lista = parcelasReales\(\)/.test(app),
+   "y la usan tanto las acciones como el mapa, para que no se separen");
+ok(/En las PESTAÑAS se\n\s+\/\/ queda/.test(app),
+   "en las pestañas sí se queda: eso es navegación");
+
+console.log("\n── el silencio se explica ──");
+ok(/no necesita nada hoy/.test(app) && /no necesitan nada hoy/.test(app),
+   "los cultivos que no piden nada se nombran, en singular y en plural");
+ok(/se lee como que del\n\s+\/\/ tomate no se sabe/.test(app),
+   "y queda escrito por qué: sin esa línea, no decir nada se lee como no saber");
+ok(/acc\.sort\(\(a, b\) => \(b\.urgente \? 1 : 0\) - \(a\.urgente \? 1 : 0\)\)/.test(app),
+   "lo urgente sube arriba");
+ok(/if \(parcela\?\.id && parcela\.id !== zonaActiva\) cambiarZona\(parcela\.id\);/.test(app),
+   "tocar 'Regar' de otra parcela cambia a ella: sus riegos van a su propia lista");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
