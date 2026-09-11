@@ -78,8 +78,10 @@ console.log("\n── el primer aviso sigue a los días desde su último riego, 
 // Con lámina plana el residuo quedaba por encima del umbral y el primer aviso
 // salía "RIEGA" en 14 de 16 casos probados, incluso diciendo que regó HOY: el
 // consejo era una constante disfrazada de cálculo.
-ok(/litros: i === fechas\.length - 1 \? null : lamina/.test(alta),
-   "el último riego sembrado entra como recarga completa, que es la premisa que dice el comentario");
+// Sigue siendo el respaldo cuando no hay caudal; con caudal se calcula (ver más
+// abajo, "con caudal no se supone"). Antes era la única vía.
+ok(/i === fechas\.length - 1 \? null : lamina/.test(alta),
+   "sin caudal, el último riego sembrado entra como recarga completa: es la premisa que dice el comentario");
 ok(!/saveConfig\(\{ \.\.\.cfg, caudal \}\)/.test(alta),
    "y NO se escribe un caudal deducido: no es una medida, es la suposición despejada");
 ok(/se mide con un cubo/.test(alta),
@@ -215,6 +217,55 @@ const conArea = NUTRI.necesidadNutrientes("lechuga",
   REND.rendimientoEsperadoT("lechuga", 440, {})?.rendimiento_t, oferta, { area_m2: 440 });
 ok(!conArea.motivo && conArea.nutrientes?.N != null,
    "y con ella sí, sin haber cambiado nada del motor");
+
+console.log("\n── V1 · con caudal no se supone: se calcula ──");
+// "Recarga completa" es razonable en superficie y aspersión, pero en GOTEO es
+// falsa: el goteo repone poco y a menudo, y un riego típico no llena la zona
+// radicular. Suponer que sí infravalora el déficit y retrasa el primer aviso.
+ok(/const mmPorRiego = \(caudal > 0 && Number\(A\.minutos\) > 0\)/.test(alta),
+   "con caudal y rato se calculan los milímetros de cada riego");
+ok(/Math\.round\(caudal \* \(Number\(A\.minutos\) \/ 60\) \* 10\) \/ 10/.test(alta),
+   "caudal × rato, sin más magia");
+ok(/litros: mmPorRiego != null/.test(alta) && /: \(i === fechas\.length - 1 \? null : lamina\)/.test(alta),
+   "y la recarga completa queda como respaldo de cuando NO se sabe el caudal");
+ok(/en goteo es FALSA/.test(alta),
+   "el sesgo de esa suposición queda escrito donde se toma, no en un documento aparte");
+
+console.log("\n── el caudal se ofrece, nunca se exige ──");
+// Condición del usuario: no puede bloquear el alta. Quien lo sepa lo pone,
+// quien no, sigue y lo mide luego.
+ok(/id="alta-q-caudal" hidden/.test(app), "nace oculto");
+ok(/¿Sabes cuánta agua echa tu riego\?/.test(app), "y se pregunta antes de pedir el número");
+ok(/No, ya lo mediré/.test(app), "con salida explícita");
+const rev3 = alta.slice(alta.indexOf("function revisar3()"), alta.indexOf("function revisar3()") + 220);
+ok(!/caudal/i.test(rev3),
+   "revisar3 NO mira el caudal: el botón de seguir se enciende sin él");
+ok(/const pasa = v > 0\.5 && v < 80;/.test(alta),
+   "mismo rango de credibilidad que el cálculo por geometría");
+ok(/Ese número no es creíble para un riego/.test(alta),
+   "un disparate se rechaza y se dice");
+ok(/caudal: A\.caudal \?\? cfg\.caudal \?\? null/.test(alta),
+   "solo se guarda si lo ha declarado él");
+
+console.log("\n── la aritmética del sembrado, con el motor real ──");
+// Réplica: lechuga de 21 días en franco, goteo cada 2 días, 30 min.
+// Con 10,9 mm/h son 5,45 mm por riego contra una ETc que pide más: el balance
+// tiene que ENSEÑAR ese déficit, no taparlo.
+const MOT = require(join(RAIZ, "assets", "js", "motor-riego.js"));
+const hoyD = new Date();
+const isoD = d => new Date(hoyD.getTime() - d * 86400000).toISOString().slice(0, 10);
+const clima = []; for (let d = 21; d >= 0; d--) clima.push({ date: isoD(d), et0: 4.6, lluvia: 0, tmax: 28, tmin: 16 });
+const fechas = []; for (let d = 21; d >= 3; d -= 2) fechas.push(isoD(d));
+const balanceCon = (litros) => MOT.balanceHidrico(clima, fechas.map(f => ({ date: f, litros })),
+  { suelo: "franco", cultivoId: "lechuga", metodoRiego: "goteo", fechaPlantacion: isoD(21) });
+const real = balanceCon(10.9 * 0.5);
+ok(real.Dr > real.raw,
+   `con 5,5 mm por riego el déficit (${real.Dr.toFixed(1)}) supera el umbral (${real.raw.toFixed(1)}): la rutina se queda corta y se ve`);
+const supuesto = MOT.balanceHidrico(clima,
+  fechas.map((f, i) => ({ date: f, litros: i === fechas.length - 1 ? null : 6.8 })),
+  { suelo: "franco", cultivoId: "lechuga", metodoRiego: "goteo", fechaPlantacion: isoD(21) });
+ok(supuesto.Dr < real.Dr,
+   `y la suposición de recarga completa da menos déficit (${supuesto.Dr.toFixed(1)}): por eso conviene medir`);
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

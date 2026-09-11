@@ -2440,6 +2440,24 @@
           </div>
         </div>
 
+        <!-- El caudal, OFRECIDO Y NUNCA EXIGIDO. Con él el primer aviso sale de
+             su agua real en vez de una suposición, pero el alta no puede
+             depender de un número que la mayoría no sabe: nace oculto detrás de
+             "lo sé" y el botón de seguir no lo mira nunca. -->
+        <div id="alta-q-caudal" hidden>
+          <p class="alta-preg">¿Sabes cuánta agua echa tu riego?</p>
+          <div class="alta-chips" id="alta-sabe-caudal">
+            <button type="button" class="alta-chip" data-sabe="1">Sí, lo sé</button>
+            <button type="button" class="alta-chip" data-sabe="0">No, ya lo mediré</button>
+          </div>
+          <div id="alta-caudal-campo" hidden style="margin-top:10px">
+            <label class="alta-preg" for="alta-caudal" style="font-size:.95rem">Litros por metro cuadrado en una hora</label>
+            <input type="number" class="alta-input" id="alta-caudal" min="0.5" max="80" step="0.1"
+                   inputmode="decimal" placeholder="Ej: 10,9">
+            <p class="alta-nota" id="alta-caudal-nota">Si no lo tienes a mano, sáltalo: se mide en diez minutos cuando estés regando.</p>
+          </div>
+        </div>
+
         <p class="alta-nota">No hace falta que sepas litros ni caudales. Con tu rutina nos basta.</p>
         <button type="button" class="alta-btn" id="alta-b3" disabled>Ver mi primer aviso</button>
       </section>
@@ -6604,7 +6622,28 @@
         });
         grupo("alta-cada", "cada", "cada", () => { revelar("alta-q-rato"); revisar3(); });
         grupo("alta-rato", "min", "minutos", () => { revelar("alta-q-ultimo"); revisar3(); });
-        grupo("alta-ultimo", "ult", "ultimo", revisar3);
+        grupo("alta-ultimo", "ult", "ultimo", () => { revelar("alta-q-caudal"); revisar3(); });
+
+        // Ofrecerlo no es exigirlo: `revisar3` NO lo mira, así que el botón de
+        // seguir se enciende con las cuatro preguntas de siempre. A quien no lo
+        // sepa se le manda a medirlo cuando esté de pie al lado del riego, que
+        // es donde se mide bien.
+        grupo("alta-sabe-caudal", "sabe", "sabeCaudal", () => {
+          const lo_sabe = A.sabeCaudal === "1";
+          $("alta-caudal-campo").hidden = !lo_sabe;
+          if (lo_sabe) requestAnimationFrame(() => $("alta-caudal").focus());
+          else A.caudal = null;
+        });
+        $("alta-caudal").addEventListener("input", ev => {
+          // Mismo rango que el cálculo por geometría: los pilotos reales van de
+          // 5,4 a 15 mm/h y por encima de 80 hay un error de lectura seguro.
+          const v = Number(String(ev.target.value).replace(",", "."));
+          const pasa = v > 0.5 && v < 80;
+          A.caudal = pasa ? v : null;
+          $("alta-caudal-nota").textContent = (ev.target.value && !pasa)
+            ? "Ese número no es creíble para un riego. Déjalo vacío y lo medimos luego."
+            : "Si no lo tienes a mano, sáltalo: se mide en diez minutos cuando estés regando.";
+        });
         function revisar3() {
           $("alta-b3").disabled = !(A.metodo && A.cada && A.minutos && A.ultimo != null);
         }
@@ -6621,6 +6660,8 @@
             // eso "he regado" ya no es un toque a ciegas: si además conocemos
             // el caudal, esos minutos son milímetros exactos.
             riegoMinutos: Number(A.minutos) || null,
+            // Solo si lo ha declarado él. Nunca deducido: ver sembrarHistorial.
+            caudal: A.caudal ?? cfg.caudal ?? null,
             lat: A.lat, lon: A.lon,
             ciudad: A.ciudad || cfg.ciudad || null,
             // La geometría del recinto sirve para que el satélite mida DENTRO de
@@ -6686,25 +6727,40 @@
           const efic = MOTOR.EFIC_RIEGO[A.metodo] ?? MOTOR.EFIC_DEFAULT;
           const lamina = Math.max(1, Math.round((Math.max(0, neto) / fechas.length / efic) * 10) / 10);
 
-          // EL ÚLTIMO RIEGO VA COMO RECARGA COMPLETA (litros:null), no como una
-          // lámina estimada. Es la única forma de que la premisa de arriba se
-          // cumpla de verdad: si su rutina cubre la demanda, el día que regó por
-          // última vez el suelo estaba lleno.
+          // ── Cuánta agua lleva cada riego sembrado ───────────────────────
           //
-          // Con lámina plana no se cumplía, y el efecto era grave. Kc sube a lo
-          // largo del ciclo: los riegos del principio sobran (y el sobrante se
-          // tira, porque el déficit se recorta en 0) y los del final se quedan
-          // cortos. El residuo que quedaba era mayor que el umbral, así que el
-          // primer aviso salía "RIEGA" en 14 de 16 casos probados — incluso
-          // diciendo que había regado HOY. O sea: el consejo era una constante
-          // disfrazada de cálculo.
+          // CON CAUDAL CONOCIDO no se supone nada: se calcula. `caudal × rato`
+          // son los milímetros que de verdad echa cada vez, y el balance sale
+          // de su agua, no de una premisa. Si su rutina se queda corta, se ve —
+          // que es justo lo que queremos que se vea.
           //
-          // Así, el déficit de hoy es exactamente la ETc de los días que han
-          // pasado desde su último riego. Nada inventado: su fecha, la ET0 de
-          // sus coordenadas y el Kc del cultivo.
+          // SIN CAUDAL hay que suponer, y entonces el último riego va como
+          // RECARGA COMPLETA (litros:null). El porqué: la premisa es "el cultivo
+          // está vivo ⇒ su rutina cubre la demanda", y si eso es cierto, el día
+          // que regó por última vez el suelo estaba lleno.
+          //
+          //   ⚠️ Y es una suposición con sesgo conocido: en goteo es FALSA. El
+          //   goteo está diseñado para reponer poco y a menudo, así que un riego
+          //   típico no llena la zona radicular entera. Suponer que sí
+          //   infravalora el déficit de partida y retrasa el primer aviso. Es el
+          //   precio de no saber el caudal, y la razón de más peso para medirlo.
+          //
+          // El reparto plano de los riegos anteriores tampoco es inocente: Kc
+          // sube a lo largo del ciclo, los del principio sobran (y el sobrante
+          // se tira, porque el déficit se recorta en 0) y los del final se
+          // quedan cortos. Con lámina plana en TODOS, el residuo superaba el
+          // umbral y el primer aviso salía "RIEGA" en 14 de 16 casos probados,
+          // incluso diciendo que había regado hoy. Por eso el último manda.
+          const caudal = Number(cfg.caudal) || Number(A.caudal) || 0;
+          const mmPorRiego = (caudal > 0 && Number(A.minutos) > 0)
+            ? Math.round(caudal * (Number(A.minutos) / 60) * 10) / 10
+            : null;
+
           riegos = fechas.map((f, i) => ({
             date: f,
-            litros: i === fechas.length - 1 ? null : lamina,
+            litros: mmPorRiego != null
+              ? mmPorRiego                                   // su agua, medida
+              : (i === fechas.length - 1 ? null : lamina),   // supuesta
             duracion: Number(A.minutos),
             estimado: true,
           }));
