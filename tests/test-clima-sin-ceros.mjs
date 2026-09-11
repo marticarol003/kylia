@@ -78,5 +78,16 @@ ok(mal < bien * 0.75,
 ok(bien - mal > 50,
    `y la diferencia (${(bien - mal).toFixed(0)} L/m²) es mayor que cualquier ahorro que se pueda publicar`);
 
+console.log("\n── y el MISMO defecto vivía en una segunda copia ──");
+// diario-b.js tiene su propia climaSerie, y tenía el mismo `?? 0`. Arreglar
+// campo.js no bastaba: el Diario B congela la decisión del piloto con ella, y de
+// ahí sale el reveal por la vía heredada.
+const db = readFileSync(join(RAIZ, "api", "diario-b.js"), "utf8");
+ok(!/et0_fao_evapotranspiration\?\.\[i\] \?\? 0/.test(db),
+   "diario-b tampoco convierte una ET₀ ausente en cero");
+ok(/filter\(x => x\.et0 != null\)/.test(db), "los días sin ET₀ se descartan");
+ok(/archive-api\.open-meteo\.com/.test(db), "y para lo pasado también manda el archivo");
+ok(/UN DATO QUE FALTA NO ES UN CERO/.test(db), "con el porqué escrito también aquí");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

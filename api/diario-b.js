@@ -20,6 +20,7 @@
 
 const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js");
 const { balanceHidrico, decisionRiego, laminaRiego } = require("./_motor-riego.js");
+const { serieTermica } = require("./_clima-termico.js");
 
 const { fetchConTimeout } = require("./_http.js");
 const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
@@ -42,21 +43,48 @@ function sumarDias(diaStr, n) {
 
 // Clima diario para un punto: ET₀ FAO + lluvia, desde `desde` hasta hoy (incluido).
 async function climaSerie(lat, lon, desde) {
+  // ⚠️ EL MISMO DEFECTO QUE COSTÓ DOS INFORMES PUBLICADOS, y aquí seguía vivo en
+  // una segunda copia. El endpoint de PRONÓSTICO solo guarda ~64 días de pasado
+  // real: con past_days mayor devuelve el array entero pero los días viejos
+  // vienen a `null`. Esto hacía `?? 0`, así que entraban al balance como "ese
+  // día no se evaporó nada". UN DATO QUE FALTA NO ES UN CERO.
+  //
+  // Se arregla igual que en campo.js: el ARCHIVO (ERA5) para lo pasado cuando el
+  // ciclo se sale de lo que el pronóstico recuerda, y los días sin ET₀ se
+  // descartan en vez de contarse como cero.
   const dias = desde ? Math.min(92, Math.max(1, diasDesde(desde) + 1)) : 30;
-  const url = `${OPEN_METEO}?latitude=${lat}&longitude=${lon}`
-    + `&daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min`
-    + `&past_days=${dias}&forecast_days=1&timezone=Europe%2FMadrid`;
-  const res = await fetchConTimeout(url);
-  if (!res.ok) throw new Error(`open-meteo ${res.status}`);
-  const d = (await res.json()).daily || {};
-  return (d.time || []).map((date, i) => ({
+  const DIARIO = "daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min";
+  const util = (d) => (d?.time || []).map((date, i) => ({
     date,
-    et0:    d.et0_fao_evapotranspiration?.[i] ?? 0,
+    et0:    d.et0_fao_evapotranspiration?.[i],
     lluvia: d.precipitation_sum?.[i] ?? 0,
-    // Temperatura: el reloj fenológico del motor (FAO_GDD). Misma llamada.
     tmax:   d.temperature_2m_max?.[i] ?? null,
     tmin:   d.temperature_2m_min?.[i] ?? null,
-  }));
+  })).filter(x => x.et0 != null);
+
+  const tareas = [fetchConTimeout(
+    `${OPEN_METEO}?latitude=${lat}&longitude=${lon}&${DIARIO}`
+    + `&past_days=${dias}&forecast_days=1&timezone=Europe%2FMadrid`)];
+  const ini = desde ? String(desde).slice(0, 10) : null;
+  if (ini && dias > 60) {
+    const fin = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+    tareas.push(fetchConTimeout(
+      `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&${DIARIO}`
+      + `&start_date=${ini}&end_date=${fin < ini ? ini : fin}&timezone=Europe%2FMadrid`));
+  }
+
+  const res = await Promise.all(tareas.map(t => t.catch(() => null)));
+  if (!res[0]?.ok && !res[1]?.ok) throw new Error("open-meteo sin respuesta");
+  const partes = [];
+  for (const r of res) {
+    if (!r?.ok) { partes.push([]); continue; }
+    try { partes.push(util((await r.json()).daily || {})); } catch (_) { partes.push([]); }
+  }
+  // El pronóstico manda en el solape: es la lectura más fresca del mismo día.
+  const mapa = new Map();
+  for (const d of partes[1] || []) mapa.set(d.date, d);
+  for (const d of partes[0] || []) mapa.set(d.date, d);
+  return [...mapa.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // Riegos del piloto para el balance. La lámina sale del caudal ACTUAL vía
@@ -230,6 +258,21 @@ module.exports = async (req, res) => {
 
       const serie  = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
       const riegos = await riegosDe(u);
+      // ⚠️ AQUÍ NO SE MIRA EL PRONÓSTICO, Y ES A PROPÓSITO. El Diario B congela
+      // lo que Kylia habría decidido, y el reveal compara contra eso con un
+      // contrafactual (simularKylia) que NO puede ver el futuro: darle el
+      // pronóstico a un lado y no al otro inflaría el ahorro publicado. La
+      // asimetría con /api/campo es deliberada y está fijada en
+      // tests/test-riego-pronostico.mjs. Su climaSerie pide forecast_days=1, que
+      // es "hoy incluido", así que la serie termina hoy y no hay futuro que
+      // recortar.
+      //
+      // Lo que SÍ faltaba: la serie térmica. climaSerie corta a 92 días de
+      // pasado, así que en un ciclo más largo no llega a la plantación,
+      // curvaFenologica devuelve null y el reloj cae a calendario — mientras
+      // /api/campo seguía en térmico porque usa serieTermica(), que baja al
+      // archivo hasta el día de plantar. Mismo motor, distinto reloj.
+      const termica = await serieTermica(u.lat, u.lon, u.fecha_plantacion).catch(() => []);
       // Goteo automático de pauta fija: rellena los riegos que falten (nadie los
       // apunta) y súmalos al balance para que no se quede corto.
       const auto = await materializarGoteoAuto(u, riegos, hoy, dry);
@@ -239,6 +282,8 @@ module.exports = async (req, res) => {
         cultivoId:       (u.cultivos || [])[0] || null,
         metodoRiego:     u.metodo_riego,
         fechaPlantacion: u.fecha_plantacion,
+        serieTermica:    termica,
+        ventana:         { desde: serie[0]?.date, hasta: hoy },
       });
       const dec  = decisionRiego(bal);
       const hoyClima = serie[serie.length - 1] || {};
