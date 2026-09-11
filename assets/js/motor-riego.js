@@ -703,10 +703,18 @@
     };
   }
 
-  // Regla de decisión de la card-hoy (idéntica al frontend / motor-de-decision.md §3.2d).
+  // ÚNICA regla de decisión de riego de Kylia (motor-de-decision.md §3.2d).
   //   Dr ≥ RAW        → regar (alta), cantidad bruta = Dr/eficiencia
   //   0.75·RAW ≤ Dr   → vigilar (media)
   //   Dr < 0.75·RAW   → todo en orden (baja)
+  //
+  // Esta cabecera decía "idéntica al frontend". No lo era: /app llevaba su propia
+  // copia escrita a mano, con la regla del 70% de lluvia que FAO-56 sustituyó en
+  // junio, y daba órdenes CONTRARIAS a esta función (11-sep-2026, ciclo 11 de la
+  // auditoría). Afirmar que dos códigos coinciden no los hace coincidir; lo que
+  // los ata es que solo haya uno. Hoy /app, /api/campo, /api/diario-b y el correo
+  // del piloto entran todos por aquí, y tests/test-app-servidor-misma-lamina.mjs
+  // falla si vuelve a aparecer un umbral suelto en la app.
   function decisionRiego(bal, opts = {}) {
     const { Dr, raw, taw, efic } = bal || {};
     // NO SE DECIDE SOBRE UN BALANCE ROTO. Con Dr = NaN, `NaN >= raw` es false y

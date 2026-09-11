@@ -4415,6 +4415,11 @@
 
       return {
         Dr, taw, raw,
+        // `efic` viaja con el balance porque decisionRiego lo exige: sin él, el
+        // motor responde "desconocido" —y con razón, porque no puede pasar de
+        // déficit (neto) a litros de riego (bruto) sin saber cuánto pierde el
+        // sistema por el camino.
+        efic:                 bal.efic,
         balanceTotal:         Dr,        // compat con el resto del código
         et0DesdeUltimo:       et0Acum,
         etcDesdeUltimo:       etcAcum,
@@ -5019,7 +5024,15 @@
       // 1 · Regar
       const alerta = calcularAlertaRiego(ctx);
       const bal    = calcularBalanceHidrico(ctx);
-      const cerca  = !alerta && bal && bal.Dr >= 0.75 * bal.raw;
+      // "Cerca" también sale del motor: es su nivel "media". Pero ese nivel tiene
+      // DOS significados distintos y solo uno justifica enseñar el botón:
+      //   · el déficit se acerca al umbral            → "está cerca"
+      //   · el déficit YA pasó el umbral y viene lluvia → "espera, no riegues"
+      // Sin separarlos, el panel sacaba el botón "Regar · 22 L/m²" justo el día
+      // en que el motor dice que regar es tirar el agua.
+      const decRiego = bal ? MOTOR.decisionRiego(bal, { lluviaPrevista: ultimoPrevision }) : null;
+      const esperaLluvia = decRiego?.nivel === "media" && decRiego.lluvia_prevista_mm > 0;
+      const cerca  = !alerta && decRiego?.nivel === "media" && !esperaLluvia;
 
       // EL CICLO YA CUMPLIDO. El balance no sabe de cosechas: sigue acumulando
       // déficit sobre tierra que puede estar vacía, y una lechuga a 120 días
@@ -5042,8 +5055,30 @@
         });
         return acc;   // y no se manda regar mientras no se sepa
       }
+      if (esperaLluvia) {
+        acc.push({
+          id: parcela?.id ? `lluvia-${parcela.id}` : "lluvia",
+          parcelaId: parcela?.id || null,
+          icono: "🌧️", verbo: "No riegues hoy" + deQuien,
+          urgente: false,
+          detalle: `${decRiego.lluvia_prevista_mm} mm en 48 h`,
+          razon: "El suelo ya pide agua, pero la lluvia que viene lo cubre. Si riegas ahora, esa lluvia se pierde por debajo de la raíz.",
+          onClick: null,
+        });
+      }
       if (alerta || cerca) {
-        const mm = Math.round(bal && bal.Dr > 0 ? bal.Dr : (alerta ? alerta.et0 : 0));
+        // EL NÚMERO DEL BOTÓN ES BRUTO, NO NETO. Hasta el 11-sep aquí se pintaba
+        // `bal.Dr`, que es el agua que le falta AL SUELO; lo que hay que abrir es
+        // esa agua dividida por la eficiencia del sistema, porque parte se pierde
+        // antes de llegar a la raíz. En goteo son 10 L/m² pintados por 11 reales,
+        // pero en aspersión (el caso de Oriol) 20 se quedan en 20 cuando tocaban
+        // 27: un cuarto de riego de menos, cada vez, en el botón principal.
+        //
+        // Con alerta el número lo da el motor (ya descuenta la lluvia prevista).
+        // Sin ella es una estimación de lo que haría falta, no una orden.
+        const mm = alerta
+          ? Math.round(alerta.litros)
+          : Math.round(Math.max(0, bal?.Dr || 0) / (bal?.efic || MOTOR.EFIC_DEFAULT));
         const eq = fmtRiegoCon(mm, ctx.cfg);
         acc.push({
           id: parcela?.id ? `regar-${parcela.id}` : "regar",
@@ -5404,55 +5439,86 @@
       const mes    = new Date().getMonth() + 1;
       const enTemp = mes >= 3 && mes <= 10;
 
-      // Resumen de lluvia prevista (próximos 3 días)
-      const lluviaPrevista  = ultimoPrevision.reduce((s, d) => s + (d.lluvia ?? 0), 0);
-      const diaLluvia       = ultimoPrevision.find(d => (d.lluvia ?? 0) >= 4); // primer día con lluvia significativa
+      // Lluvia prevista PARA EL ABONADO (lixiviación y disolución de la cobertera).
+      // El riego ya no mira aquí: su ventana es de 48 h y la decide el motor, que
+      // además descarta por día la lluvia que no llega a infiltrar (PE_MIN_MM) y
+      // la que es basura (> 200 mm/día). Sumar los 3 días en crudo, como se hacía,
+      // contaba como riego evitado un chispeo de 1 mm que nunca llegó al suelo.
       const lluviaInminente = ultimoPrevision.slice(0, 2).some(d => (d.lluvia ?? 0) >= 4);
       const lluviaExcesiva  = ultimoPrevision.some(d => (d.lluvia ?? 0) > 15);
 
-      // 1. RIEGO — ajustado a la lluvia prevista. Usa balance hídrico
-      // (agotamiento Dr del balance FAO-56: ETc − lluvia efectiva − riegos).
+      // 1. RIEGO — LA DECIDE EL MOTOR, no esta función.
+      //
+      // ⚠️ Hasta el 11-sep-2026 aquí vivía una SEGUNDA regla de decisión, escrita
+      // a mano, y había derivado de la del motor. No en los matices: en el
+      // sentido de la orden. Medido con los dos códigos sobre los mismos números
+      // (lechuga, franco, RAW 13,5 mm, goteo):
+      //
+      //   Dr 14 mm · 14 mm de lluvia en 48 h → esta pantalla: "Riega hoy 16 L/m²"
+      //                                        el motor:      "Esperar a la lluvia"
+      //   Dr 16 mm · 10 mm de lluvia         → esta pantalla: 18 L/m²
+      //                                        el motor:       7 L/m²   (11 de más)
+      //   Dr 12 mm · sin lluvia              → esta pantalla: "Riega 14 L/m²"
+      //                                        el motor:      "Vigilar" (aún no toca)
+      //
+      // Tres defectos distintos, todos en la dirección de gastar agua de más en
+      // un producto que se vende por ahorrarla:
+      //   · la regla vieja del 70% (`lluvia >= Dr·0.7`), la heurística que FAO-56
+      //     sustituyó el 3-jun-2026 y que aquí seguía viva;
+      //   · el pronóstico se IGNORABA cuando el riego era urgente, que es justo
+      //     cuando más litros se tiran si mañana llueve;
+      //   · `Math.max(5, …)`: un suelo de 5 L/m² inventado aquí, que convertía un
+      //     "vigilar" en una orden de regar por debajo del umbral.
+      //
+      // Es el mismo error del 31-jul (app y servidor con distinto balance), que
+      // se cerró unificando el FICHERO. No bastaba: había que unificar también la
+      // DECISIÓN. A partir de aquí esta pantalla solo PRESENTA lo que decide
+      // MOTOR.decisionRiego, y tests/test-app-servidor-misma-lamina.mjs vigila
+      // que no vuelva a aparecer un umbral suelto en este fichero.
       const balance = calcularBalanceHidrico();
       if (balance) {
-        const Dr   = balance.Dr;
-        const raw  = balance.raw;
-        const efic = EFIC_RIEGO[cfg.metodoRiego] ?? EFIC_DEFAULT;
-        if (Dr >= 0.75 * raw) {
-          const urgente = Dr >= raw;
-          // Riego bruto para reponer el déficit a capacidad de campo.
-          const litros  = Math.max(5, Math.ceil(Dr / efic));
-          const dias    = balance.diasDesdeUltimoRiego;
-          const deficit = `El cultivo ha consumido unos ${balance.etcDesdeUltimo.toFixed(0)} mm${dias !== null ? ` en los últimos ${dias} días` : ""}. Déficit actual: ${Dr.toFixed(0)} mm (umbral de riego: ${raw.toFixed(0)} mm).`;
+        const dec = MOTOR.decisionRiego(balance, { lluviaPrevista: ultimoPrevision });
+        const dias    = balance.diasDesdeUltimoRiego;
+        const deficit = `El cultivo ha consumido unos ${balance.etcDesdeUltimo.toFixed(0)} mm${dias !== null ? ` en los últimos ${dias} días` : ""}. Déficit actual: ${balance.Dr.toFixed(0)} mm (umbral de riego: ${balance.raw.toFixed(0)} mm).`;
 
-            if (!urgente && lluviaPrevista >= Dr * 0.7) {
-              // La lluvia cubre >70% del déficit → no hace falta regar
-              recs.push({
-                id: "riego", categoria: "RIEGO", catClass: "riego",
-                titulo: `No riegues — la lluvia prevista (${lluviaPrevista.toFixed(0)} mm) ya lo cubre`,
-                detalle: `${deficit} Se prevén ${lluviaPrevista.toFixed(0)} mm de lluvia en los próximos días, suficiente para reponer la pérdida. Regar ahora desperdiciaría agua y energía.`,
-                prod: null, prioridad: 3, cantidadLm2: 0,
-              });
-            } else if (!urgente && diaLluvia) {
-              // Algo de lluvia pero no cubre todo → riego reducido
-              const restante = Math.max(5, Math.ceil(Math.max(0, Dr - lluviaPrevista) / efic));
-              recs.push({
-                id: "riego", categoria: "RIEGO", catClass: "riego",
-                titulo: `Riega solo ${fmtRiego(restante)} — el ${diaLluvia.nombreDia} llueve`,
-                detalle: `${deficit} Se prevén ${lluviaPrevista.toFixed(0)} mm de lluvia el ${diaLluvia.nombreDia}. Riega ahora solo ${fmtRiego(restante)} (${restante} L/m²) — la lluvia completará el resto. Así usas el mínimo de agua necesario.`,
-                prod: null, prioridad: 3, cantidadLm2: restante,
-              });
-            } else {
-              // Sin lluvia suficiente o urgente → regar normalmente
-              const horario = (ultimoMeteo?.tempMax > 33)
-                ? "mañana temprano (antes de las 9h)"
-                : "esta tarde-noche (entre las 18h y las 21h)";
-              recs.push({
-                id: "riego", categoria: "RIEGO", catClass: "riego",
-                titulo: urgente ? `Riega hoy: ${fmtRiego(litros)}` : `Riega ${fmtRiego(litros)} ${horario}`,
-                detalle: `${deficit} Aplica ${fmtRiego(litros)} (${litros} L/m²) ${horario}. Regar a esa hora evita que el sol evapore el agua antes de llegar a las raíces — el riego es 2-3 veces más eficiente que al mediodía.`,
-                prod: null, prioridad: urgente ? 1 : 3, cantidadLm2: litros,
-              });
-            }
+        if (dec.nivel === "desconocido") {
+          // El motor dice que no puede calcular. Antes esto caía en "todo en
+          // orden" y la pantalla tranquilizaba con datos rotos.
+          recs.push({
+            id: "riego", categoria: "RIEGO", catClass: "riego",
+            titulo: "No puedo calcular el riego de hoy",
+            detalle: "Faltan datos para cerrar el balance de agua (clima o parcela). No te digo que no riegues: te digo que hoy no lo sé. Revisa los datos de la parcela o vuelve a abrir la app en un rato.",
+            prod: null, prioridad: 1, cantidadLm2: null,
+          });
+        } else if (dec.nivel === "alta") {
+          const litros  = dec.cantidad_l_m2;
+          const horario = (ultimoMeteo?.tempMax > 33)
+            ? "mañana temprano (antes de las 9h)"
+            : "esta tarde-noche (entre las 18h y las 21h)";
+          const conLluvia = dec.lluvia_prevista_mm > 0
+            ? ` Ya se ha descontado la lluvia prevista (${dec.lluvia_prevista_mm} mm en 48 h).` : "";
+          recs.push({
+            id: "riego", categoria: "RIEGO", catClass: "riego",
+            titulo: `Riega hoy: ${fmtRiego(litros)}`,
+            detalle: `${deficit}${conLluvia} Aplica ${fmtRiego(litros)} (${litros} L/m²) ${horario}. Regar a esa hora evita que el sol evapore el agua antes de llegar a las raíces — el riego es 2-3 veces más eficiente que al mediodía.`,
+            prod: null, prioridad: 1, cantidadLm2: litros,
+          });
+        } else if (dec.lluvia_prevista_mm > 0) {
+          // "Esperar a la lluvia": el déficit YA alcanzó el umbral, pero lo que
+          // viene lo cubre. Es la rama que más agua ahorra y la que no existía.
+          recs.push({
+            id: "riego", categoria: "RIEGO", catClass: "riego",
+            titulo: `No riegues — la lluvia prevista (${dec.lluvia_prevista_mm} mm) lo cubre`,
+            detalle: `${deficit} Se prevén ${dec.lluvia_prevista_mm} mm en las próximas 48 h, suficiente para reponer lo que falta. Regar ahora sería tirar esa agua: el suelo no puede guardar las dos cosas.`,
+            prod: null, prioridad: 3, cantidadLm2: 0,
+          });
+        } else if (dec.nivel === "media") {
+          recs.push({
+            id: "riego", categoria: "RIEGO", catClass: "riego",
+            titulo: "Aún no toca regar, pero está cerca",
+            detalle: `${deficit} Todavía por debajo del umbral, así que regar hoy sería adelantarse. Vuelve a mirar mañana.`,
+            prod: null, prioridad: 3, cantidadLm2: 0,
+          });
         }
       }
 
@@ -6031,18 +6097,20 @@
     }
 
     // ─── Alerta de riego ──────────────────────────────────────────────────────
+    // El botón "Regar" del panel. Quien decide es el motor: aquí NO se compara
+    // Dr con RAW. Comparar por nuestra cuenta es lo que hacía que el botón
+    // apareciera en días en que el servidor —y el correo que recibe el padre—
+    // decían "esperar a la lluvia".
     function calcularAlertaRiego(ctx = ctxActual()) {
       const bal = calcularBalanceHidrico(ctx);
       if (!bal) return null;
-      // Urgente cuando el agotamiento alcanza el agua fácilmente disponible (RAW).
-      if (bal.Dr >= bal.raw) {
-        const dias  = bal.diasDesdeUltimoRiego;
-        const desde = (ctx.riegos || []).length
-          ? `el último riego registrado${dias != null ? ` (hace ${dias} día${dias === 1 ? "" : "s"})` : ""}`
-          : "la última imagen del satélite";
-        return { et0: bal.Dr, raw: bal.raw, desde };
-      }
-      return null;
+      const dec = MOTOR.decisionRiego(bal, { lluviaPrevista: ultimoPrevision });
+      if (dec.nivel !== "alta") return null;
+      const dias  = bal.diasDesdeUltimoRiego;
+      const desde = (ctx.riegos || []).length
+        ? `el último riego registrado${dias != null ? ` (hace ${dias} día${dias === 1 ? "" : "s"})` : ""}`
+        : "la última imagen del satélite";
+      return { et0: bal.Dr, raw: bal.raw, desde, litros: dec.cantidad_l_m2, texto: dec.texto };
     }
 
     function renderAlertaRiego() { /* replaced by renderHoy */ }
@@ -8659,9 +8727,17 @@
     // recomendación de riego activa con cantidad concreta, la usamos.
     function litrosSugeridosHoy() {
       const bal = calcularBalanceHidrico();
-      if (!bal || bal.Dr < 5) return null;
-      const efic = EFIC_RIEGO[cfg.metodoRiego] ?? EFIC_DEFAULT;
-      return Math.ceil(bal.Dr / efic);  // bruto para reponer el déficit
+      if (!bal) return null;
+      // Si el motor tiene una orden para hoy, ESA es la cifra que se precarga:
+      // ya viene bruta y ya lleva descontada la lluvia de las próximas 48 h.
+      // Antes se precargaba Dr/eficiencia a secas, así que el día que el motor
+      // decía "riega 7, que van a caer 10 mm" el modal proponía 18.
+      const dec = MOTOR.decisionRiego(bal, { lluviaPrevista: ultimoPrevision });
+      if (dec.nivel === "alta") return Math.ceil(dec.cantidad_l_m2);
+      // Sin orden, se propone lo que repondría el déficit —es él quien decide
+      // regar— salvo que sea una cantidad que no merece abrir el riego.
+      const bruto = bal.Dr / (bal.efic || MOTOR.EFIC_DEFAULT);
+      return bruto >= MOTOR.PE_MIN_MM ? Math.ceil(bruto) : null;
     }
 
     function registrarRiego() {

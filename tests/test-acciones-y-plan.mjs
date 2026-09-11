@@ -32,6 +32,28 @@ ok(/verbo: "Abonar"/.test(app), "Abonar");
 ok(/abrirModalRiego\(\);/.test(app),
    "tocar Regar lleva al registro de un toque, no a otro formulario");
 
+console.log("\n── el día que llueve, el botón de regar NO sale ──");
+// Ciclo 11 (11-sep-2026). El nivel "media" del motor significa dos cosas
+// distintas —"se acerca el umbral" y "ya lo pasó pero viene lluvia"— y el panel
+// las trataba igual: sacaba "Regar · 22 L/m²" el día en que el motor dice que
+// regar es tirar el agua por debajo de la raíz.
+const panel = app.slice(app.indexOf("function accionesDeParcela"),
+                        app.indexOf("function tramoDeAbonadoPendiente"));
+ok(/const esperaLluvia = decRiego\?\.nivel === "media" && decRiego\.lluvia_prevista_mm > 0;/.test(panel),
+   "el panel separa 'esperar a la lluvia' de 'se acerca el umbral'");
+ok(/const cerca\s*=\s*!alerta && decRiego\?\.nivel === "media" && !esperaLluvia;/.test(panel),
+   "y 'cerca' excluye el día de lluvia");
+ok(/verbo: "No riegues hoy"/.test(panel),
+   "ese día sale su propia acción: no riegues, y por qué");
+ok(/if \(esperaLluvia\) \{[\s\S]{0,600}?onClick: null,/.test(panel),
+   "sin botón: no hay nada que registrar, es información");
+// Y que de verdad sea el caso que el motor marca así.
+const dec = MOTOR.decisionRiego({ Dr: 20, raw: 15, taw: 45, efic: 0.9 },
+                                { lluviaPrevista: [{ lluvia: 25 }] });
+ok(dec.nivel === "media" && dec.lluvia_prevista_mm === 25,
+   "con Dr 20 > RAW 15 y 25 mm de lluvia, el motor dice media + lluvia prevista");
+ok(dec.cantidad_l_m2 === null, "y no da cantidad: no hay riego que dar");
+
 console.log("\n── fitosanitarios: se vigila, NO se receta ──");
 // Es la línea del consejo del 24-jul, refijada el 13-ago. Un botón que dijera
 // "toca tratar" es una prescripción, y sin el reconocimiento del DARP (art. 20

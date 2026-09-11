@@ -103,5 +103,54 @@ ok(/balanceHidrico\(serie,\s*conLamina\b/.test(app),
 ok(!/balanceHidrico\(serie,\s*riegos\s*,/.test(app),
    "ningún balance de la app recibe ya el array crudo `riegos`");
 
+console.log("── y tampoco puede volver a DECIDIR por su cuenta ──");
+// Ciclo 11 de la auditoría (11-sep-2026). Unificar el FICHERO del motor no bastó:
+// /app seguía teniendo su propia regla de decisión escrita a mano, en tres
+// sitios, y había derivado de la del motor hasta dar órdenes CONTRARIAS.
+// Medido sobre los mismos números (lechuga, franco, RAW 13,5 mm, goteo):
+//
+//   Dr 14 mm con 14 mm de lluvia en 48 h → app "Riega 16 L/m²" · motor "Espera"
+//   Dr 16 mm con 10 mm de lluvia         → app 18 L/m²         · motor 7 L/m²
+//   Dr 12 mm sin lluvia                  → app "Riega 14 L/m²" · motor "Vigilar"
+//
+// Todas en la dirección de gastar agua de más. Estas guardas fijan que la
+// pantalla PRESENTE lo que el motor decide, y que no quede ningún umbral suelto.
+const riegoApp = app.slice(app.indexOf("function generarRecomendaciones"),
+                           app.indexOf("// 2. TRATAMIENTO"));
+ok(/MOTOR\.decisionRiego\(balance,\s*\{\s*lluviaPrevista: ultimoPrevision\s*\}\)/.test(riegoApp),
+   "la tarjeta de recomendaciones pide la decisión al motor, con el pronóstico");
+ok(!/Dr\s*>=\s*0\.75\s*\*\s*raw/.test(riegoApp), "y no compara Dr con 0,75·RAW por su cuenta");
+ok(!/lluviaPrevista\s*>=\s*Dr\s*\*\s*0\.7/.test(app),
+   "la regla del 70% de lluvia —sustituida por FAO-56 el 3-jun-2026— ya no existe en la app");
+ok(!/Math\.max\(5,\s*Math\.ceil\(/.test(app),
+   "ni el suelo inventado de 5 L/m², que convertía un 'vigilar' en una orden de regar");
+
+// Las otras dos copias: el botón "Regar" del panel y el "está cerca".
+ok(/function calcularAlertaRiego[\s\S]{0,400}?MOTOR\.decisionRiego\(bal,\s*\{\s*lluviaPrevista: ultimoPrevision\s*\}\)/.test(app),
+   "el botón Regar del panel también sale de decisionRiego");
+ok(/const decRiego = bal \? MOTOR\.decisionRiego\(bal, \{ lluviaPrevista: ultimoPrevision \}\) : null;/.test(app)
+   && /const cerca\s*=\s*!alerta && decRiego\?\.nivel === "media"/.test(app),
+   "y el estado 'cerca' es el nivel media del motor, no un 0,75·RAW local");
+ok(!/bal\.Dr\s*>=\s*bal\.raw/.test(app) && !/bal\.Dr\s*>=\s*0\.75\s*\*\s*bal\.raw/.test(app),
+   "no queda ninguna comparación suelta de Dr contra RAW en toda la app");
+
+// El número del botón es BRUTO. Con aspersión (efic 0,75) pintar el neto es un
+// cuarto de riego de menos, cada vez.
+ok(/const mm = alerta\s*\n\s*\? Math\.round\(alerta\.litros\)/.test(app),
+   "el botón pinta los litros que da el motor, no el déficit neto del suelo");
+const balAsp = { Dr: 20, raw: 15, taw: 45, efic: M.EFIC_RIEGO.aspersion };
+ok(Math.round(M.decisionRiego(balAsp, {}).cantidad_l_m2) === 27,
+   "y en aspersión eso son 27 L/m² donde el neto decía 20: 7 de diferencia");
+
+// El balance de /app tiene que VIAJAR con su eficiencia: sin ella decisionRiego
+// responde "desconocido" y la pantalla se queda sin riego.
+ok(/efic:\s*bal\.efic,/.test(app), "el balance de la app devuelve `efic`");
+ok(M.decisionRiego({ Dr: 20, raw: 15, taw: 45 }, {}).nivel === "desconocido",
+   "porque un balance sin eficiencia el motor NO lo decide (y hace bien)");
+
+// Y el modal de registro no puede proponer más de lo que el motor manda.
+ok(/function litrosSugeridosHoy[\s\S]{0,600}?MOTOR\.decisionRiego/.test(app),
+   "los litros que precarga el modal también salen del motor");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ app y servidor anclados a la misma lámina");
