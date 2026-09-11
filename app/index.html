@@ -742,9 +742,36 @@
     .accion-detalle { font-weight: 600; font-size: .95rem; color: var(--text); }
     .card-mapa { padding: 14px; }
     .mapa-cab { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; gap: 10px; }
-    .mapa-titulo { font-weight: 700; font-size: .78rem; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+    .mapa-titulo {
+      font-weight: 700; font-size: .78rem; letter-spacing: .07em; text-transform: uppercase;
+      color: var(--muted); background: none; border: none; padding: 0; font-family: inherit;
+      cursor: pointer; text-align: left;
+    }
+    .mapa-titulo:hover { color: var(--verde, #013A27); }
+    .mapa-nombre {
+      font: inherit; font-size: .9rem; padding: 4px 8px; border-radius: 8px;
+      border: 1.5px solid var(--verde, #013A27); background: var(--card); width: 60%;
+    }
     .mapa-sub { font-size: .8rem; color: var(--muted); text-align: right; }
+    .mapa-lienzo { position: relative; }
     .mapa-campo { height: 220px; border-radius: 12px; overflow: hidden; background: var(--border); }
+    .mapa-pantalla {
+      position: absolute; right: 8px; bottom: 8px; z-index: 500;
+      width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
+      border: 1px solid var(--border); background: rgba(255,255,255,.94);
+      font-size: 1rem; line-height: 1; color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    }
+    /* Pantalla completa: la tarjeta sale del flujo y ocupa todo. El mapa de una
+       parcela en 220 px es para mirarlo; para trabajarlo hace falta sitio. */
+    body.mapa-lleno { overflow: hidden; }
+    .card-mapa.lleno {
+      position: fixed; inset: 0; z-index: 9997; margin: 0; border-radius: 0;
+      display: flex; flex-direction: column; padding: 12px;
+      padding-top: max(12px, env(safe-area-inset-top));
+      background: var(--card);
+    }
+    .card-mapa.lleno .mapa-lienzo { flex: 1; min-height: 0; }
+    .card-mapa.lleno .mapa-campo { height: 100%; border-radius: 12px; }
     .mapa-pie { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
     .mapa-libres { font-size: .78rem; color: var(--muted); }
     .editor-fila { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
@@ -2725,10 +2752,16 @@
          no se enseña un mapa vacío. -->
     <section class="card card-mapa" id="card-mapa" aria-label="Tu campo" hidden>
       <div class="mapa-cab">
-        <span class="mapa-titulo">Tu campo</span>
+        <button type="button" class="mapa-titulo" id="mapa-titulo" title="Tocar para renombrar">Tu campo</button>
+        <input type="text" class="mapa-nombre" id="mapa-nombre" maxlength="40" hidden
+               placeholder="El de la riera" aria-label="Nombre de la parcela">
         <span class="mapa-sub" id="mapa-sub"></span>
       </div>
-      <div id="mapa-campo" class="mapa-campo"></div>
+      <div class="mapa-lienzo">
+        <div id="mapa-campo" class="mapa-campo"></div>
+        <button type="button" class="mapa-pantalla" id="btn-mapa-pantalla"
+                aria-label="Ver el mapa a pantalla completa" title="Pantalla completa">⤢</button>
+      </div>
 
       <!-- Añadir un cultivo: nace un cuadrilátero dentro del recinto y se
            arrastran las cuatro esquinas hasta cuadrarlo con el bancal. No se
@@ -3428,13 +3461,20 @@
         area_m2: cfgFinca.areaParcela, fechaPlantacion: cfgFinca.fechaPlantacion,
         geometria: cfgFinca.parcela,
       }];
-      for (const z of zonasGuardadas()) {
+      const zonas = zonasGuardadas();
+      const variasParcelas = zonas.filter(z => z.geometria).length > 1;
+      for (const z of zonas) {
         const solaEnElRecinto = (z.siembras || []).length === 1;
         for (const s of (z.siembras || [])) {
           if (!s.cultivo || !s.id) continue;
           lista.push({
             id: s.id,
-            etiqueta: `${nombreCultivo(s.cultivo)} · ${(s.area_m2 || 0).toLocaleString("es-ES")} m²`,
+            // Con una sola parcela, el nombre sobra: todos los cultivos están
+            // ahí. Con varias es lo que distingue "tomate" de "tomate".
+            etiqueta: variasParcelas && z.nombre
+              ? `${nombreCultivo(s.cultivo)} · ${z.nombre}`
+              : `${nombreCultivo(s.cultivo)} · ${(s.area_m2 || 0).toLocaleString("es-ES")} m²`,
+            parcelaNombre: z.nombre || null,
             cultivo: s.cultivo, area_m2: s.area_m2, fechaPlantacion: s.fechaPlantacion,
             metodoRiego: s.metodoRiego || null, riegoMinutos: s.riegoMinutos ?? null,
             // El contorno propio si la zona se partió; el del recinto entero si
@@ -3706,15 +3746,32 @@
       if (btnP) btnP.hidden = !zonasGuardadas().some(z => z.referencia);
 
       const activa = lista.find(p => (p.id || null) === zonaActiva) || lista[0];
-      document.getElementById("mapa-sub").textContent = lista.length > 1
+      const sub = document.getElementById("mapa-sub");
+      sub.textContent = lista.length > 1
         ? `${lista.length} cultivos · toca uno para verlo`
         : (activa.area_m2 ? `${activa.area_m2.toLocaleString("es-ES")} m²` : "");
+      // El título dice en qué parcela estás, cuando hay más de una.
+      const tit = document.getElementById("mapa-titulo");
+      const varias = zonasGuardadas().filter(z => z.geometria).length > 1;
+      if (tit) {
+        tit.textContent = varias && activa.parcelaNombre ? activa.parcelaNombre : "Tu campo";
+        // Con una sola parcela no hay nada que renombrar: "Tu campo" ya la nombra.
+        tit.disabled = !varias;
+        tit.style.cursor = varias ? "pointer" : "default";
+        tit.title = varias ? "Tocar para renombrar" : "";
+      }
 
       cargarLeaflet().then(() => {
         if (typeof L === "undefined") { caja.hidden = true; return; }
         if (!mapaCampo) {
-          mapaCampo = L.map("mapa-campo", { zoomControl: false, attributionControl: false,
-                                            dragging: true, scrollWheelZoom: false });
+          mapaCampo = L.map("mapa-campo", {
+            zoomControl: true, attributionControl: false, dragging: true,
+            // La rueda queda apagada EN LA TARJETA: si no, bajar por la pantalla
+            // se queda atrapado dentro del mapa. En pantalla completa sí se
+            // enciende, porque allí el mapa es lo único que hay.
+            scrollWheelZoom: false,
+            touchZoom: true, doubleClickZoom: true,
+          });
           const esri = L.tileLayer(
             "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
             { maxZoom: 19 });
@@ -3821,8 +3878,16 @@
           pie.textContent = "Esa parcela ya la tienes.";
           return;
         }
+        // Un nombre, y SOLO para las parcelas. "08154A00700099" no le dice nada a
+        // nadie; "el de la riera" sí. Los cultivos no lo llevan: ya se llaman
+        // por lo que son.
+        //
+        // Nace con uno por defecto y se cambia tocando el título. Nada de
+        // prompt(): bloquea, en el móvil sale como una alerta del sistema y
+        // llega justo cuando el agricultor está mirando su parcela aparecer.
         zonas.push({
           referencia: d.referencia, superficie_m2: d.superficie_m2, uso: d.uso || null,
+          nombre: `Parcela ${zonas.filter(z => z.geometria).length + 1}`,
           geometria: d.parcela,
           // Nace VACÍA, sin cultivo. Meter uno por defecto sería inventarle un
           // cultivo que no ha dicho, y ese cultivo entra en el balance.
@@ -4119,6 +4184,58 @@
       const todas = parcelasDisponibles();
       const conTrozos = todas.some(p => p.id);
       return conTrozos ? todas.filter(p => p.id) : todas;
+    }
+
+    // Pantalla completa. Leaflet mide el contenedor al crearse, así que al
+    // cambiarlo de tamaño hay que decírselo o se queda con el encuadre viejo y
+    // los tiles a medio pintar.
+    // Renombrar la parcela tocando su título. Solo tiene sentido con más de una:
+    // con una sola, "Tu campo" ya la nombra.
+    function zonaDeLaParcelaActiva() {
+      return zonasGuardadas().find(z => (z.siembras || []).some(s => s.id === zonaActiva)) || null;
+    }
+    function abrirRenombrar() {
+      const z = zonaDeLaParcelaActiva();
+      if (!z) return;
+      const inp = document.getElementById("mapa-nombre");
+      const tit = document.getElementById("mapa-titulo");
+      inp.value = z.nombre || "";
+      inp.hidden = false; tit.hidden = true;
+      inp.focus(); inp.select();
+    }
+    function guardarNombreParcela() {
+      const inp = document.getElementById("mapa-nombre");
+      const z = zonaDeLaParcelaActiva();
+      const nuevo = inp.value.trim().slice(0, 40);
+      if (z && nuevo) {
+        const zonas = zonasGuardadas();
+        const i = zonas.findIndex(x => x.referencia === z.referencia);
+        if (i >= 0) { zonas[i].nombre = nuevo; localStorage.setItem(ZONAS_KEY, JSON.stringify(zonas)); }
+      }
+      inp.hidden = true;
+      document.getElementById("mapa-titulo").hidden = false;
+      renderZonasTabs();
+      subirConfig();
+    }
+
+    let mapaLleno = false;
+    function alternarPantallaMapa() {
+      const caja = document.getElementById("card-mapa");
+      if (!caja) return;
+      mapaLleno = !mapaLleno;
+      caja.classList.toggle("lleno", mapaLleno);
+      document.body.classList.toggle("mapa-lleno", mapaLleno);
+      const btn = document.getElementById("btn-mapa-pantalla");
+      if (btn) {
+        btn.textContent = mapaLleno ? "✕" : "⤢";
+        btn.setAttribute("aria-label", mapaLleno ? "Salir de pantalla completa" : "Ver el mapa a pantalla completa");
+      }
+      if (mapaCampo) {
+        // La rueda solo manda cuando el mapa ES la pantalla.
+        if (mapaLleno) mapaCampo.scrollWheelZoom.enable();
+        else           mapaCampo.scrollWheelZoom.disable();
+        setTimeout(() => mapaCampo.invalidateSize(), 80);
+      }
     }
 
     function cambiarZona(id) {
@@ -8884,6 +9001,13 @@
       ecGrupo("ec-ultimo", "ult",    "ultimo");
       document.getElementById("btn-anadir-cultivo")?.addEventListener("click", () => abrirEditorCultivo());
       document.getElementById("btn-anadir-parcela")?.addEventListener("click", pedirOtraParcela);
+      document.getElementById("btn-mapa-pantalla")?.addEventListener("click", alternarPantallaMapa);
+      document.getElementById("mapa-titulo")?.addEventListener("click", abrirRenombrar);
+      document.getElementById("mapa-nombre")?.addEventListener("blur", guardarNombreParcela);
+      document.getElementById("mapa-nombre")?.addEventListener("keydown", ev => {
+        if (ev.key === "Enter") ev.target.blur();
+        if (ev.key === "Escape") { ev.target.value = ""; ev.target.blur(); }
+      });
       document.getElementById("ec-cancelar")?.addEventListener("click", cerrarEditorCultivo);
       document.getElementById("ec-guardar")?.addEventListener("click", guardarCultivoNuevo);
 
@@ -8936,6 +9060,7 @@
 
       document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape") return;
+        if (mapaLleno) alternarPantallaMapa();
         if (!document.getElementById("modal-riego").hidden)      cerrarModalRiego();
         if (!document.getElementById("modal-aplicacion").hidden) cerrarModalAplicacion();
       });

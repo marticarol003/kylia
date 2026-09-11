@@ -216,5 +216,40 @@ ok(/no se\n\s+\/\/ recalcula del polígono, que traería los huecos de SIGPAC de
 ok(/ecAreaFijada = null;\n\s+\/\/ Nace ocupando la mitad/.test(app),
    "'una parte' la suelta: ahí manda lo que dibuje");
 
+console.log("\n── moverse por el mapa ──");
+ok(/zoomControl: true/.test(app), "hay botones de zoom");
+ok(/touchZoom: true, doubleClickZoom: true/.test(app), "y pellizco y doble toque");
+ok(/scrollWheelZoom: false,/.test(app),
+   "la rueda apagada en la tarjeta: si no, bajar por la pantalla se queda atrapado en el mapa");
+
+console.log("\n── pantalla completa ──");
+ok(/id="btn-mapa-pantalla"/.test(app), "hay botón");
+ok(/function alternarPantallaMapa\(\)/.test(app), "y su función");
+ok(/mapaCampo\.scrollWheelZoom\.enable\(\)/.test(app),
+   "en pantalla completa la rueda SÍ se enciende: allí el mapa es lo único que hay");
+ok(/setTimeout\(\(\) => mapaCampo\.invalidateSize\(\), 80\)/.test(app),
+   "y se le avisa del cambio de tamaño, o se queda con el encuadre viejo");
+ok(/if \(mapaLleno\) alternarPantallaMapa\(\);/.test(app), "Escape lo cierra");
+ok(/body\.mapa-lleno \{ overflow: hidden; \}/.test(app),
+   "y el fondo no se puede desplazar por detrás");
+
+console.log("\n── nombre, y SOLO para las parcelas ──");
+ok(/nombre: `Parcela \$\{zonas\.filter\(z => z\.geometria\)\.length \+ 1\}`/.test(app),
+   "la parcela nueva nace con un nombre por defecto");
+// Solo queda la mención en el comentario que explica por qué no se usa.
+ok(!/=\s*prompt\(|\bprompt\([^)]*\)\s*\|\|/.test(app),
+   "sin prompt(): bloquea y en el móvil sale como una alerta del sistema");
+ok(/function abrirRenombrar\(\)/.test(app) && /id="mapa-titulo"/.test(app),
+   "se renombra tocando el título");
+ok(/tit\.disabled = !varias;/.test(app),
+   "y con una sola parcela no se puede: 'Tu campo' ya la nombra");
+ok(/etiqueta: variasParcelas && z\.nombre/.test(app),
+   "el nombre entra en la pestaña, que es donde distingue 'tomate' de 'tomate'");
+ok(/Los cultivos no lo llevan: ya se llaman\n\s+\/\/ por lo que son/.test(app),
+   "los cultivos NO llevan nombre, y queda dicho por qué");
+ok(/if \(ev\.key === "Enter"\) ev\.target\.blur\(\);/.test(app), "intro confirma");
+ok(/if \(ev\.key === "Escape"\) \{ ev\.target\.value = ""; ev\.target\.blur\(\); \}/.test(app),
+   "y escape cancela sin guardar");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
