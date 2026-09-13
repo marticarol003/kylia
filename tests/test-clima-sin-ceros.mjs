@@ -119,5 +119,26 @@ const revealTxt = readFileSync(join(RAIZ, "api", "_reveal.js"), "utf8");
 ok((revealTxt.match(/riegos_sin_cantidad/g) || []).length >= 2,
    "y el reveal los declara en sus dos ramas");
 
+console.log("\n── las DOS pantallas que publican un % miran el mismo umbral ──");
+// 13-sep. El reveal preguntaba "¿con cuánto clima se ha calculado esto?" antes
+// de publicar. La comparativa del campo del padre —la del 440 m², de donde salió
+// el ahorro publicado— no lo preguntaba: pintaba "siguiendo a Kylia ahorrarías
+// un X%" sobre lo que hubiera salido. Es la misma afirmación y ahora pasa por la
+// misma puerta, con el umbral en un único sitio.
+const RV = require(join(RAIZ, "api", "_reveal.js"));
+ok(typeof RV.motivoClimaNoPublicable === "function" && RV.COBERTURA_MIN === 0.95,
+   "el umbral y la comprobación viven en _reveal.js, exportados");
+ok(RV.motivoClimaNoPublicable({ coberturaClima: 1 }) === null, "con el clima entero, se publica");
+ok(/67%/.test(RV.motivoClimaNoPublicable({ coberturaClima: 0.67, diasSinClima: 29 }) || ""),
+   "con el 67% dice cuánto falta");
+ok(RV.motivoClimaNoPublicable({}) !== null, "y sin cobertura declarada, tampoco se publica");
+ok(/publicable:\s+motivoClimaNoPublicable\(kylia\) === null/.test(campoTxt),
+   "la comparativa usa ese mismo helper, no una copia");
+ok(/ventana: \{ desde: inicio \|\| dias\[0\]\?\.date \|\| null, hasta: corte \}/.test(campoTxt),
+   "y declara la ventana que esperaba cubrir, o los huecos del principio no se ven");
+const campoHtml = readFileSync(join(RAIZ, "campo", "index.html"), "utf8");
+ok(/const climaCorto = t\.publicable !== true;/.test(campoHtml),
+   "y /campo no pinta el ahorro si el servidor no lo declara publicable");
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

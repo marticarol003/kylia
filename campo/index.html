@@ -782,8 +782,18 @@
     // sería un claim inflado → lo explicamos sin porcentaje. Y avisamos si hay pocos días.
     const kyliaCero = t.kylia_l_m2 <= 0;
     const pocosDias = (t.dias != null ? t.dias : (data.serie || []).length) < 10;
+    // Y ANTES QUE NADA: ¿con cuánto clima se ha calculado la línea de Kylia?
+    // Esta pantalla llevaba publicando "ahorrarías un X%" sin hacerse la
+    // pregunta. El reveal del piloto sí se la hacía, y por eso se descubrió —
+    // tarde, con dos informes ya enviados— que una serie con el 39% de los días
+    // a ET₀ cero fabrica un ahorro que no existe. El servidor ya lo declara.
+    const climaCorto = t.publicable !== true;
     let veredicto;
-    if (kyliaCero) {
+    if (climaCorto) {
+      veredicto = `No se puede comparar todavía: ${t.motivo_no_publicable || "falta clima del periodo"}.
+        Con menos clima del que hace falta, la línea de Kylia sale baja sola y el
+        ahorro que saldría sería inventado.`;
+    } else if (kyliaCero) {
       const n = t.riegos_padre || 0;
       veredicto = n > 0
         ? `En estos ${t.dias != null ? t.dias + " días" : "días"} Kylia <b>no habría regado todavía</b>
@@ -824,10 +834,12 @@
         <div class="totales">
           <div class="tot kylia">
             <div class="who"><span class="swatch" style="background:#013A27"></span> Kylia recomienda</div>
-            <div class="num">${t.kylia_l_m2} <span class="uni">L/m²</span></div>
-            <div class="uni">${kyliaCero
-              ? "aún no tocaría regar"
-              : (c.area_m2 ? "≈ " + (t.kylia_litros||0).toLocaleString("es-ES") + " L en " + m2 : "")}</div>
+            <div class="num">${climaCorto ? "—" : t.kylia_l_m2} <span class="uni">L/m²</span></div>
+            <div class="uni">${climaCorto
+              ? "sin clima suficiente"
+              : kyliaCero
+                ? "aún no tocaría regar"
+                : (c.area_m2 ? "≈ " + (t.kylia_litros||0).toLocaleString("es-ES") + " L en " + m2 : "")}</div>
           </div>
           <div class="tot padre">
             <div class="who"><span class="swatch" style="background:#8a5a2b"></span> Tu padre aplicó</div>
@@ -837,7 +849,9 @@
         </div>
         <div class="veredicto">${veredicto}</div>
         ${pocosDias && !kyliaCero ? `<div class="nota-escasa">Datos aún escasos (${t.dias != null ? t.dias : (data.serie||[]).length} días): los números se afinarán según avance la campaña.</div>` : ""}
-        ${hayDatos ? chartSVG(data.serie, banda) : `<div class="msg">Aún no hay riegos suficientes para la gráfica.</div>`}
+        ${climaCorto
+            ? `<div class="msg">La gráfica compara dos líneas y una de ellas no se sostiene: no se pinta.</div>`
+            : hayDatos ? chartSVG(data.serie, banda) : `<div class="msg">Aún no hay riegos suficientes para la gráfica.</div>`}
         <div class="legend">
           <span><span class="ln" style="background:#013A27"></span> Kylia (FAO-56)</span>
           <span><span class="ln" style="background:#8a5a2b"></span> Padre ${banda ? "(banda de caudal)" : "(real)"}</span>

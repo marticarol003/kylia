@@ -14,7 +14,7 @@
 
 const { isConfigured, supabaseSelect, supabaseUpdate, preludio } = require("./_supabase.js");
 const { balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia, faseDelDia, ventanaMadurez, curvaFenologica } = require("./_motor-riego.js");
-const { construirReveal } = require("./_reveal.js");
+const { construirReveal, motivoClimaNoPublicable } = require("./_reveal.js");
 const { necesidadNutrientes, creditoResiduosN } = require("./_motor-nutricion.js");
 const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
 const { ofertaSuelo } = require("./_suelo-oferta.js");
@@ -787,6 +787,10 @@ async function vistaComparativa(req, res, u) {
     suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
     metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
     serieTermica: termica,
+    // La ventana que se esperaba cubrir, igual que en el reveal: sin ella los
+    // huecos del PRINCIPIO son invisibles —la serie empieza más tarde y la
+    // cobertura sale 1— y son justo los que rompieron los dos informes.
+    ventana: { desde: inicio || dias[0]?.date || null, hasta: corte },
   });
   const acumKylia = {};
   kylia.puntos.forEach(p => { acumKylia[p.date] = p.acum_l_m2; });
@@ -864,6 +868,14 @@ async function vistaComparativa(req, res, u) {
     // sin cifra desaparecían del total como si no se hubiera regado.
     riegos_sin_cantidad: sinCantidad || null,
     dias: dias.length,
+    // ESTA PANTALLA TAMBIÉN PUBLICA UN PORCENTAJE, y era la única de las dos que
+    // no miraba con cuánto clima se había calculado. Es la del campo de 440 m²,
+    // de donde salió el "ahorro del 25%". Mismo umbral y mismo helper que el
+    // reveal: si el contrafactual no se sostiene, el ahorro no se pinta.
+    cobertura_clima:  kylia.coberturaClima ?? null,
+    dias_sin_clima:   kylia.diasSinClima ?? null,
+    publicable:       motivoClimaNoPublicable(kylia) === null,
+    motivo_no_publicable: motivoClimaNoPublicable(kylia),
   };
 
   // Fertilizantes/tratamientos: solo cualitativo (producto + nº de veces).

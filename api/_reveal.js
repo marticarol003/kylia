@@ -237,6 +237,26 @@ function dimAgua(riegosReales, riegosKylia, contrafactual) {
   };
 }
 
+// ── ¿Se puede publicar un número calculado sobre esta serie de clima? ────
+//
+// El umbral vive aquí, en un solo sitio, porque lo miran DOS pantallas: el
+// reveal del piloto y la comparativa del campo del padre. La segunda publicaba
+// "siguiendo a Kylia ahorrarías un 25%" sin mirar nada de esto.
+const COBERTURA_MIN = 0.95;
+
+// Devuelve el motivo por el que NO se puede publicar, o null si se puede.
+// `cf` es cualquier salida de simularKylia (o el objeto que la transporta).
+function motivoClimaNoPublicable(cf) {
+  const cobertura = cf && cf.coberturaClima != null ? Number(cf.coberturaClima) : null;
+  // NO SABER LA COBERTURA NO ES TENERLA BUENA.
+  if (cobertura == null) return "el contrafactual no declara con cuánto clima se calculó";
+  if (cobertura < COBERTURA_MIN) {
+    return `el contrafactual se calculó con el ${Math.round(cobertura * 100)}% del clima del periodo`
+           + (cf.diasSinClima ? ` (faltan ${cf.diasSinClima} días)` : "");
+  }
+  return null;
+}
+
 // ── Dimensión 2 (variante) · Agua vs contrafactual FAO-56 independiente ──
 // Misma referencia que la comparativa del campo del padre (simularKylia): la
 // lámina de Kylia se calcula sobre el clima/cultivo/suelo de la parcela, SIN ver
@@ -317,22 +337,15 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
   // El motor ya declara su cobertura desde la auditoría del 11-sep. Aquí se usa,
   // y cuando no llega, EL PORCENTAJE NO SE CALCULA. No se marca como poco
   // fiable y se deja ahí para que alguien lo copie: no está.
-  const COBERTURA_MIN = 0.95;
+  // NO SABER LA COBERTURA NO ES TENERLA BUENA. Esto estuvo abierto: campo.js
+  // armaba el contrafactual con {puntos, total, deficitFinal} y dejaba fuera la
+  // cobertura, así que aquí llegaba `null`, el umbral no se evaluaba y el
+  // informe salía `publicable: true` sin que nadie hubiera mirado el clima — la
+  // misma puerta por la que salieron los dos informes del 10-sep.
   const cobertura = cf.coberturaClima != null ? Number(cf.coberturaClima) : null;
   const razones = [];
-  if (cobertura == null) {
-    // NO SABER LA COBERTURA NO ES TENERLA BUENA. Esto estuvo abierto: campo.js
-    // armaba el contrafactual con {puntos, total, deficitFinal} y dejaba fuera
-    // la cobertura, así que aquí llegaba `null`, el umbral de abajo no se
-    // evaluaba y el informe salía `publicable: true` sin que nadie hubiera
-    // mirado el clima — la misma puerta por la que salieron los dos informes
-    // del 10-sep. Si el contrafactual no declara con cuánto clima se calculó,
-    // no se publica ningún porcentaje.
-    razones.push("el contrafactual no declara con cuánto clima se calculó");
-  } else if (cobertura < COBERTURA_MIN) {
-    razones.push(`el contrafactual se calculó con el ${r0(cobertura * 100)}% del clima del periodo`
-                 + (cf.diasSinClima ? ` (faltan ${cf.diasSinClima} días)` : ""));
-  }
+  const motivoClima = motivoClimaNoPublicable(cf);
+  if (motivoClima) razones.push(motivoClima);
   if (sinCifra.length && sinCifra.length > enPeriodo.length * 0.2) {
     razones.push(`${sinCifra.length} de ${enPeriodo.length} riegos están apuntados sin cantidad`);
   }
@@ -576,6 +589,7 @@ function construirReveal(datos, opts = {}) {
 
 module.exports = {
   construirReveal,
+  motivoClimaNoPublicable, COBERTURA_MIN,
   // exportadas para test unitario
   dimAgua, dimAguaDesdeContrafactual, dimHoras, dimTratamientos, dimCoste, semanaISO, soloDia,
 };
