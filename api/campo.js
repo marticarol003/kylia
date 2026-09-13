@@ -752,6 +752,12 @@ async function vistaComparativa(req, res, u) {
 
   const r1    = x => Math.round(x * 10) / 10;
   const numOr = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
+  // Se va en la respuesta, y llevaba sin existir desde el 1-ago: `264539e` quitó
+  // esta línea al meter ultimoDiaDe() y dejó la referencia en el objeto de
+  // abajo. Seis semanas respondiendo {"ok":false,"error":"hoy is not defined"}:
+  // la pantalla "Kylia vs tu padre" estaba muerta y no se notó porque ningún
+  // test EJECUTA la vista — los que hay leen el fuente.
+  const hoy = hoyISO();
 
   const serie = await climaSerie(u.lat, u.lon, u.fecha_plantacion);
   const [riegos, aplics] = await Promise.all([
