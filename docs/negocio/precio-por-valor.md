@@ -81,25 +81,37 @@ todo en `_motor-nutricion.js`). Los 40 kg N/ha que no se descontaban, a ~1,09
 
 ### Capa B — Valor PROBABLE (medido una vez, en una parcela)
 
+> **Rehecho el 13-sep-2026** desde el servidor, con el clima completo y el motor
+> posterior a la auditoría. Los tres números que había aquí eran de antes y
+> ninguno se sostenía. Detalle en `docs/pilotos/revision-2026-09-13.md`.
+
 | Concepto | Valor | Estado de la evidencia |
 |---|---|---|
-| Ahorro de agua | **20-30%**, ~40 m³ en 440 m² | **Una** cosecha, y la parcela estaba invadida de verdolaga |
-| Ahorro de agua (tomate, Breda) | 23 vs 64 L/m² = ~64% | **Un** contrafactual |
+| Ahorro de agua (lechuga, 440 m²) | **15%** · 62,4 L/m² ≈ 27 m³ | **Una** cosecha, y la parcela estaba invadida de verdolaga. Antes decía 20-30% |
+| Ahorro de agua (cebolla, La Selva) | **15%** · 52,7 L/m² | **Una** campaña |
+| Ahorro de agua (tomate, Breda) | **ninguno: regó un 23% de MENOS** | El "~64%" de aquí era el `area_m2` mal metido (30 m² para 88) sobre el clima roto |
 
-Por hectárea y ciclo de lechuga, con los números medidos en el piloto (el padre
-aplicó 380 L/m² = 3.800 m³/ha; Kylia habría dicho 260,6 = 2.606 m³/ha):
+Por hectárea y ciclo de lechuga, con los números del reveal de hoy (el padre
+aplicó 410 L/m² = 4.100 m³/ha; Kylia habría dicho 347,6 = 3.476 m³/ha):
 
-- Ahorro: **760-1.200 m³/ha y ciclo**.
+- Ahorro: **624 m³/ha y ciclo**, y con la banda de suelo (ver abajo) **525-841**.
 - Si el agua se factura por volumen a tarifas de Levante (**0,355 €/m³** Albatera
-  jun-2025; **0,41-0,434 €/m³** Campo de Cartagena jun-2025): **270-520 €/ha y
+  jun-2025; **0,41-0,434 €/m³** Campo de Cartagena jun-2025): **185-365 €/ha y
   ciclo**.
 - Si es canon fijo por hectárea y solo se ahorra bombeo (0,06 → >0,20 €/m³ según
-  las propias comunidades de regantes): **45-240 €/ha y ciclo**.
+  las propias comunidades de regantes): **30-170 €/ha y ciclo**.
 
-⚠️ **Este es el número grande y es el menos sólido.** La validación honesta de
-2026-08-05 dice: la demanda ETc es exacta (RMSE 0,000 en 60 ventanas) pero la
-concordancia de la *decisión* es **62%, no 95%**. Y el ahorro sale de una parcela
-con mala hierba. Un precio construido sobre esto se cae en la primera objeción.
+⚠️ **Este es el número grande y es el menos sólido**, y en septiembre se ha
+encogido dos veces. La validación honesta de 2026-08-05 dice: la demanda ETc es
+exacta (RMSE 0,000 en 60 ventanas) pero la concordancia de la *decisión* es
+**62%, no 95%**. Encima el ahorro sale de una parcela con mala hierba, y la
+lámina que se le atribuye a Kylia se mueve un **±10% solo con cambiar la clase de
+suelo**, que en ninguna de las tres parcelas está medida: es un prior de
+SoilGrids a 250 m. Un precio construido sobre esto se cae en la primera objeción.
+
+**Lo que sí aguanta como argumento es el REPARTO, no el total:** Ferran hizo 73
+riegos donde hacían falta 13. Eso está medido, no estimado, y no depende del
+suelo supuesto.
 
 ### Capa C — Valor PROMETIDO (no existe todavía)
 

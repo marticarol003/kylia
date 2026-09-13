@@ -1,5 +1,15 @@
 # ⛔ El informe de Oriol NO se puede enviar (11-sep-2026)
 
+> **13-sep-2026 · los números de este documento tampoco son los buenos.**
+> El defecto del clima que describe es real y está arreglado y desplegado. Pero
+> las cifras "rehechas con ERA5" de más abajo salieron de un recálculo a mano
+> hecho antes de los 14 ciclos de auditoría del motor, y no se reproducen: para
+> Ferran daban 461,6 donde el motor de aquel mismo día, sobre la serie real, da
+> ≈533. Los números buenos salen del servidor y están en
+> **`revision-2026-09-13.md`**, con la cobertura de clima declarada (1,0) y la
+> sensibilidad al suelo medida. En corto: Oriol **sí** habría ahorrado (−15%, no
+> "acertó"), y Ferran regó de menos **un 23%**, no un 12%.
+
 Su cifra central —**ahorro del 34%, 46,2 m³ de exceso**— es un artefacto de un
 defecto en la serie de clima, no un resultado.
 
