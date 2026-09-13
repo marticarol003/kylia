@@ -2,11 +2,20 @@
 # no los corría nadie salvo a mano: un push que rompiera el balance FAO-56 o el
 # cuaderno de fertilización llegaba a producción sin fricción ninguna.
 #
-# No instala dependencias A PROPÓSITO: los tests solo tocan los módulos puros de
-# api/ (_motor-riego, _motor-nutricion, _motor-cuaderno-fert, _rendimiento,
-# _suelo-oferta y sentinel), que no importan nada de node_modules. Sin `npm ci`
-# el job baja de minuto y medio a ~15 s. Si algún día un test necesita web-push,
-# añadir: - run: npm ci --omit=dev
+# Durante un tiempo no instaló dependencias a propósito: los tests solo tocaban
+# los módulos puros de api/, que no importan nada de node_modules, y sin `npm ci`
+# el job bajaba de minuto y medio a ~15 s. El comentario de entonces decía "si
+# algún día un test necesita web-push, añadir `npm ci --omit=dev`".
+#
+# Ese día fue el 11-sep: test-aviso-silencio.mjs carga api/aviso-lechugas.js, que
+# hace require("web-push") arriba del todo. Desde ese commit la CI estaba en ROJO
+# —`Cannot find module 'web-push'`— y el aviso solo llegaba por correo, así que
+# se acumularon cuatro pushes en rojo antes de que nadie lo mirara.
+#
+# `--omit=dev` deja fuera puppeteer, que son ~150 MB de Chrome: test-xss.mjs ya
+# lo contempla y omite solo su bloque de navegador cuando no está (el resto de
+# sus comprobaciones sí se ejecutan). Es el trato: la CI corre la lógica, el
+# navegador de verdad se prueba en local.
 
 name: tests
 
@@ -24,5 +33,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Dependencias de producción (web-push)
+        run: npm ci --omit=dev
       - name: Batería completa
         run: npm test
