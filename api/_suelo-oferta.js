@@ -131,9 +131,6 @@ async function ofertaSuelo(lat, lon, areaM2, opts = {}) {
     return { disponible: false, motivo: "Faltan coordenadas de la parcela." };
   }
   const area = Number(areaM2);
-  if (!(area > 0)) {
-    return { disponible: false, motivo: "Falta la superficie de la parcela (m²) para escalar la oferta." };
-  }
 
   let props, fuentePunto;
   try {
@@ -148,14 +145,40 @@ async function ofertaSuelo(lat, lon, areaM2, opts = {}) {
     };
   }
 
+  // LA TEXTURA NO DEPENDE DE LA SUPERFICIE. El área solo sirve para pasar de
+  // kg/ha a kg de la parcela; el suelo que hay bajo el punto es el mismo se
+  // cultiven 5 m² o 5 ha. Esta comprobación estaba ARRIBA, antes de consultar, y
+  // con ella el alta nunca deducía el suelo: `vista=textura` llama a propósito
+  // sin área (durante el alta todavía no se ha preguntado la superficie) y
+  // siempre recibía "Falta la superficie". El alta se quedaba con el defecto
+  // franco sin decirlo, y el suelo mueve el umbral de riego entre uno y tres
+  // días (7,4 mm en arenoso contra 13,8 en franco para una lechuga).
+  //
+  // Sin área se devuelve lo OBSERVADO y `disponible: false`, que es lo que el
+  // motor de nutrición ya sabe leer: para él no cambia nada.
+  const textura     = clasificarTextura(props.clay, props.sand);
+  const moPct       = (props.soc / 10) * C_A_MO;
+  const observado   = {
+    n_total_g_kg: r2(props.nitrogen),
+    carbono_org_g_kg: r2(props.soc),
+    materia_organica_pct: r2(moPct),
+    ph: r2(props.phh2o),
+    arcilla_pct: r2(props.clay),
+    arena_pct: r2(props.sand),
+    textura,
+    densidad_t_m3: r2(props.bdod),
+  };
+  if (!(area > 0)) {
+    return { disponible: false, fuente_punto: fuentePunto, observado,
+             motivo: "Falta la superficie de la parcela (m²) para escalar la oferta." };
+  }
+
   const fraccion = Number(opts.fraccionCiclo) > 0 ? Number(opts.fraccionCiclo) : FRACCION_CICLO;
 
   // Mineralización de N del suelo — Tabla 4.2 de MAPA:
   //   MO% = C_orgánico% × 1,724        (soc viene en g/kg → /10 = %)
   //   N_anual (kg/ha) = FACTOR[textura] × MO%
   //   N_ciclo (kg/ha) = N_anual × fracción de ciclo de verano
-  const moPct       = (props.soc / 10) * C_A_MO;
-  const textura     = clasificarTextura(props.clay, props.sand);
   const nAnualKgHa  = N_MIN_FACTOR[textura] * moPct;
   const nCicloKgHa  = nAnualKgHa * fraccion;
   const nMinParcela = nCicloKgHa * (area / 10000);
@@ -169,16 +192,7 @@ async function ofertaSuelo(lat, lon, areaM2, opts = {}) {
     // Trazabilidad honesta.
     fuente: "SoilGrids v2.0 (ISRIC), 250 m, CC-BY · mineralización: Tabla 4.2 Guía MAPA",
     fuente_punto: fuentePunto, // exacto | vecino_cercano
-    observado: {
-      n_total_g_kg: r2(props.nitrogen),
-      carbono_org_g_kg: r2(props.soc),
-      materia_organica_pct: r2(moPct),
-      ph: r2(props.phh2o),
-      arcilla_pct: r2(props.clay),
-      arena_pct: r2(props.sand),
-      textura,
-      densidad_t_m3: r2(props.bdod),
-    },
+    observado,
     modelo_n: {
       metodo: "MAPA Tabla 4.2 (N_anual = factor[textura] × MO%)",
       factor_textura: N_MIN_FACTOR[textura],

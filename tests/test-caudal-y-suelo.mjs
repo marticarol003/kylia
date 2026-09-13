@@ -6,10 +6,12 @@
 // algo que ya nos ha dado (las coordenadas), o se pregunta algo que se ve
 // estando de pie en el bancal, y la aritmética la hacemos nosotros.
 import { readFileSync } from "fs";
+import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
+const require = createRequire(import.meta.url);
 const leer = (...p) => readFileSync(join(RAIZ, ...p), "utf8");
 const app = leer("app", "index.html");
 const campo = leer("api", "campo.js");
@@ -35,6 +37,34 @@ ok(/if \(sueloPedido === clave\) return;/.test(app),
    "y no la repite si el punto no ha cambiado");
 ok(/suelo: A\.suelo \|\| cfg\.suelo \|\| "franco"/.test(app),
    "'franco' pasa a ser el último recurso, no la única opción");
+
+// Y ahora de verdad, no por el fuente: la vista existía y estaba bien escrita,
+// pero NUNCA devolvía textura. Llama a ofertaSuelo(lat, lon, null) —en el alta
+// todavía no se ha preguntado la superficie— y ofertaSuelo salía por una guardia
+// de área puesta ANTES de consultar SoilGrids. Respuesta real de producción el
+// 13-sep: {"textura":null,"motivo":"Falta la superficie de la parcela (m²)…"}.
+// O sea que "el suelo se deduce" llevaba desde el 10-sep cayendo al franco por
+// defecto, que es justo lo que este bloque decía haber arreglado.
+// El área escala kg/ha → kg de parcela; la textura del punto no la necesita.
+const { ofertaSuelo } = require(join(RAIZ, "api", "_suelo-oferta.js"));
+const CAPAS = { nitrogen: 1.4, soc: 15, phh2o: 68, clay: 380, sand: 250, bdod: 140 };
+const fetchFalso = async () => ({
+  ok: true,
+  json: async () => ({ properties: { layers: Object.entries(CAPAS).map(([name, v]) => ({
+    name, unit_measure: { d_factor: 10 },
+    depths: ["0-5cm", "5-15cm", "15-30cm"].map(label => ({ label, values: { mean: v } })),
+  })) } }),
+});
+const sinArea = await ofertaSuelo(41.749, 2.556, null, { fetch: fetchFalso });
+ok(sinArea.observado?.textura === "arcilloso",
+   `sin superficie SIGUE saliendo la textura del punto (${sinArea.observado?.textura})`);
+ok(sinArea.disponible === false,
+   "y sigue declarándose no disponible: para el motor de nutrición no cambia nada");
+const conArea = await ofertaSuelo(41.749, 2.556, 88, { fetch: fetchFalso });
+ok(conArea.disponible === true && conArea.N > 0,
+   `con superficie sí hay oferta de N (${conArea.N} kg)`);
+ok(conArea.observado?.textura === sinArea.observado?.textura,
+   "y la textura es la misma con área que sin ella: no depende de la superficie");
 
 console.log("\n── el vaso NO vale en goteo, y era lo que se enseñaba ──");
 // Un vaso bajo un gotero recoge TODO lo de ese gotero en sus ~38 cm², cuando el
