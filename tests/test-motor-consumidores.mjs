@@ -60,5 +60,29 @@ ok(/ventana:\s+\{ desde: serie\[0\]\?\.date, hasta: hoy \}/.test(diarioB),
 ok(/ventana: \{ desde: dias\[0\]\.date, hasta: corte \}/.test(campo),
    "y campo.js también, en el contrafactual del reveal");
 
+console.log("\n── y lo declarado LLEGA al que lo tiene que mirar ──");
+// El 13-sep salió que declararla no bastaba: campo.js armaba el objeto
+// contrafactual con {puntos, total, deficitFinal} y la cobertura se quedaba por
+// el camino. En _reveal.js llegaba `cf.coberturaClima === undefined`, el umbral
+// del 95% no se evaluaba y el informe decía `publicable: true` sin que nadie
+// hubiera mirado el clima. En producción, con los dos pilotos ya retirados por
+// exactamente eso. El motor lo declaraba, el reveal lo exigía, y entre los dos
+// se perdía.
+//
+// Este test no mira una clave concreta: compara lo que _reveal.js LEE del
+// contrafactual contra lo que campo.js le PASA, así que la próxima clave que se
+// añada al consumidor y se olvide aquí también salta.
+const reveal = readFileSync(join(RAIZ, "api", "_reveal.js"), "utf8");
+const leidas = new Set([...reveal.matchAll(/\bcf\.([a-zA-Z_$][\w$]*)/g)].map(m => m[1]));
+const literal = campo.match(/contrafactual = \{([\s\S]*?)\};/);
+ok(!!literal, "campo.js arma el objeto contrafactual en un literal localizable");
+const pasadas = new Set([...(literal?.[1] || "").matchAll(/(?:^|[{,\s])([a-zA-Z_$][\w$]*)\s*:/g)].map(m => m[1]));
+const huerfanas = [...leidas].filter(k => !pasadas.has(k));
+ok(leidas.has("coberturaClima"), "_reveal.js lee cf.coberturaClima (la guardia del 95%)");
+ok(huerfanas.length === 0,
+   huerfanas.length
+     ? `campo.js no le pasa al reveal: ${huerfanas.join(", ")}`
+     : `campo.js le pasa las ${leidas.size} claves que _reveal.js lee del contrafactual`);
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

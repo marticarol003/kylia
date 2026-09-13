@@ -658,7 +658,17 @@ async function revealDeUsuario(u) {
           // un porcentaje.
           ventana: { desde: dias[0].date, hasta: corte },
         });
-        contrafactual = { puntos: sim.puntos, total: sim.total, deficitFinal: sim.deficitFinal };
+        // LA COBERTURA VIAJA CON EL NÚMERO. El motor la declara desde la
+        // auditoría del 11-sep y _reveal.js la exige antes de publicar un
+        // porcentaje, pero aquí se quedaba fuera del objeto: llegaba `null`, la
+        // comprobación no llegaba a ejecutarse y el informe volvía a decir
+        // `publicable: true` sin haber mirado el clima. La guardia que se
+        // escribió para que no se repitiera lo de los dos pilotos estaba
+        // inerte en producción. Un número sin su cobertura es un número que
+        // alguien va a publicar.
+        contrafactual = { puntos: sim.puntos, total: sim.total, deficitFinal: sim.deficitFinal,
+                          coberturaClima: sim.coberturaClima, diasSinClima: sim.diasSinClima,
+                          modoFenologia: sim.modoFenologia };
       }
     } catch (_) { /* sin clima → método heredado (recomendaciones_log) */ }
   }

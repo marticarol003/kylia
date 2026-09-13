@@ -101,6 +101,19 @@ const pocos = [{ dia: dia(0), l_m2: 18 }, { dia: dia(3), l_m2: 18 }, { dia: dia(
 ok(RV.dimAguaDesdeContrafactual(pocos, cfBien).publicable === true,
    "pero uno suelto de seis no tumba el informe");
 
+console.log("\n── un contrafactual que no dice con cuánto clima se hizo ──");
+// 13-sep: la guardia del 95% solo se evaluaba `if (cobertura != null)`, así que
+// un contrafactual que NO declaraba cobertura pasaba de largo y salía publicable.
+// Y eso era justo lo que llegaba desde campo.js, que armaba el objeto sin ella.
+// No saber la cobertura no es tenerla buena.
+const cfMudo = { puntos: cfBien.puntos, total: cfBien.total, deficitFinal: cfBien.deficitFinal };
+const dMudo = RV.dimAguaDesdeContrafactual(riegos, cfMudo);
+ok(dMudo.publicable === false, "sin cobertura declarada, no se publica");
+ok(dMudo.ahorro_pct === null && dMudo.recomendada_l_m2 === null,
+   "y las cifras tampoco salen, para que nadie las copie");
+ok(/no declara con cuánto clima/.test(dMudo.motivo_no_publicable || ""),
+   `y el motivo lo dice: "${dMudo.motivo_no_publicable}"`);
+
 console.log("\n── porcentajes que no significan nada ──");
 const cfMini = { puntos: [{ date: dia(0), acum_l_m2: 0 }, { date: dia(30), acum_l_m2: 0.1 }],
                  total: 0.1, deficitFinal: 0, coberturaClima: 1 };

@@ -320,7 +320,16 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
   const COBERTURA_MIN = 0.95;
   const cobertura = cf.coberturaClima != null ? Number(cf.coberturaClima) : null;
   const razones = [];
-  if (cobertura != null && cobertura < COBERTURA_MIN) {
+  if (cobertura == null) {
+    // NO SABER LA COBERTURA NO ES TENERLA BUENA. Esto estuvo abierto: campo.js
+    // armaba el contrafactual con {puntos, total, deficitFinal} y dejaba fuera
+    // la cobertura, así que aquí llegaba `null`, el umbral de abajo no se
+    // evaluaba y el informe salía `publicable: true` sin que nadie hubiera
+    // mirado el clima — la misma puerta por la que salieron los dos informes
+    // del 10-sep. Si el contrafactual no declara con cuánto clima se calculó,
+    // no se publica ningún porcentaje.
+    razones.push("el contrafactual no declara con cuánto clima se calculó");
+  } else if (cobertura < COBERTURA_MIN) {
     razones.push(`el contrafactual se calculó con el ${r0(cobertura * 100)}% del clima del periodo`
                  + (cf.diasSinClima ? ` (faltan ${cf.diasSinClima} días)` : ""));
   }
