@@ -283,17 +283,48 @@ module.exports = async (req, res) => {
         texto:         dec.texto,
         cantidad_l_m2: dec.cantidad_l_m2,
         nivel:         dec.nivel,
+        // CON QUÉ SE DECIDIÓ ESTO, para poder reconstruirlo dentro de un año.
+        // Un piloto ciego solo vale si se puede volver atrás y comprobar qué
+        // sabía Kylia ese día — no qué sabemos hoy. Faltaban seis cosas y las
+        // seis hacían falta: el cultivo y la fase (sin ellos no se sabe de qué
+        // curva salió el Kc), el CAUDAL del día (laminaRiego usa el caudal
+        // ACTUAL del usuario, así que afinar un caudal reescribe la historia de
+        // riego hacia atrás), el reloj que se usó, de dónde salió el clima, y de
+        // qué supuestos se estaba fiando el balance.
         contexto: {
           fuente:       "diario-b",
+          // — clima del día de la decisión —
           et0:          Number((hoyClima.et0 ?? 0).toFixed(2)),
           lluvia:       Number((hoyClima.lluvia ?? 0).toFixed(1)),
+          clima_fecha:  hoyClima.date || null,
+          clima_fuente: hoyClima.fuente || null,          // archivo | pronostico
+          clima_cobertura: bal.coberturaClima ?? null,
+          clima_dias_sin: bal.diasSinClima ?? null,
+          // — cultivo y fase —
+          cultivo:      (u.cultivos || [])[0] || null,
+          fase:         bal.faseActual ?? null,
+          dias_fenologicos: bal.diasFenologicos ?? null,
+          gdd_acum:     bal.gddAcum ?? null,
+          modo_fenologia: bal.modoFenologia || null,      // termico | calendario
           kc:           Number(bal.kcActual.toFixed(2)),
+          // — estado hídrico —
           Dr:           Number(bal.Dr.toFixed(1)),
           RAW:          Number(bal.raw.toFixed(1)),
           TAW:          Number(bal.taw.toFixed(1)),
+          etc_acum:     bal.etcAcum == null ? null : Number(bal.etcAcum.toFixed(1)),
+          lluvia_util_acum: bal.lluviaUtilAcum ?? null,
+          riego_util_acum:  bal.riegoUtilAcum ?? null,
+          riego_neto_acum:  bal.riegoNetoAcum ?? null,
+          // — la parcela, tal como estaba ESE día —
           metodo_riego: u.metodo_riego || null,
           suelo:        u.suelo || null,
+          caudal_mmh:   u.caudal ?? null,
+          area_m2:      u.area_m2 ?? null,
+          // — de qué se fía este balance —
           sin_fenologia: bal.sinFenologia,
+          riegos_sin_cantidad: bal.riegosSinCantidad || 0,
+          ultimo_riego_sin_cantidad: bal.ultimoRiegoSinCantidad || null,
+          motivo:       dec.motivo || dec.nivel,
         },
       };
 

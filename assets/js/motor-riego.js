@@ -761,7 +761,7 @@
     // modo de fallo imaginable, porque TRANQUILIZA con los datos corrompidos.
     // Ahora se dice que no se sabe, que es lo único honesto.
     if (![Dr, raw, taw, efic].every(x => Number.isFinite(Number(x))) || raw <= 0 || efic <= 0) {
-      return { nivel: "desconocido", cantidad_l_m2: null,
+      return { nivel: "desconocido", cantidad_l_m2: null, motivo: "sin_balance",
                texto: "No se puede calcular el riego: faltan datos del balance." };
     }
     const r0 = (x) => Math.round(x);
@@ -799,7 +799,8 @@
 
       if (puedeFiarse && prevista >= Dr) {
         return {
-          nivel: "media", cantidad_l_m2: null, lluvia_prevista_mm: Math.round(prevista * 10) / 10,
+          nivel: "media", cantidad_l_m2: null, motivo: "lluvia_cubre_deficit",
+          lluvia_prevista_mm: Math.round(prevista * 10) / 10,
           texto: `Esperar a la lluvia · se prevén ${r0(prevista)} mm en 48 h y cubren el déficit de ${r0(Dr)} mm`,
         };
       }
@@ -813,7 +814,8 @@
       // llega a infiltrar— no hay riego que dar: es esperar a la lluvia.
       if (neto < PE_MIN_MM) {
         return {
-          nivel: "media", cantidad_l_m2: null, lluvia_prevista_mm: Math.round(prevista * 10) / 10,
+          nivel: "media", cantidad_l_m2: null, motivo: "resto_menor_que_lluvia_util",
+          lluvia_prevista_mm: Math.round(prevista * 10) / 10,
           texto: `Esperar a la lluvia · se prevén ${r0(prevista)} mm en 48 h y el déficit es de ${r0(Dr)} mm`,
         };
       }
@@ -821,6 +823,10 @@
       const bruto = Math.round((neto / efic) * 10) / 10;
       return {
         nivel: "alta",
+        // POR QUÉ, en un código estable que se pueda contar y filtrar dentro de
+        // un año. El `texto` es para el agricultor y cambia de redacción; el
+        // motivo es para reconstruir la decisión.
+        motivo: puedeFiarse ? "deficit_supera_umbral_menos_lluvia" : "deficit_supera_umbral",
         cantidad_l_m2: bruto,
         lluvia_prevista_mm: puedeFiarse ? Math.round(prevista * 10) / 10 : 0,
         texto: puedeFiarse
@@ -829,10 +835,10 @@
       };
     }
     if (Dr >= 0.75 * raw) {
-      return { nivel: "media", cantidad_l_m2: null,
+      return { nivel: "media", cantidad_l_m2: null, motivo: "cerca_del_umbral",
                texto: `Vigilar el riego · déficit ${r0(Dr)} mm, cerca del umbral ${r0(raw)}` };
     }
-    return { nivel: "baja", cantidad_l_m2: null,
+    return { nivel: "baja", cantidad_l_m2: null, motivo: "deficit_bajo_umbral",
              texto: `Todo en orden · déficit ${r0(Dr)} mm < umbral ${r0(raw)}` };
   }
 
