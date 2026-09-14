@@ -612,14 +612,29 @@
     // riego cuantificado borraba sus mm y el día pasaba a recarga completa; delante,
     // se perdía el null). Silencioso y no reproducible; ahora es determinista.
     const riegoNeto = {};
+    // ⚠️ UN RIEGO SIN CANTIDAD SE TRATA COMO RECARGA COMPLETA — el suelo pasa a
+    // capacidad de campo. Es una HIPÓTESIS, no un dato, y es la más optimista de
+    // las posibles: cuanto más seco esté el suelo, más agua regala. Medido sobre
+    // un tomate en franco con ET₀ 5,5: un riego sin cifra el día 5 da por
+    // repuestos 19,8 mm, y el día 30, 67,6. Y falla hacia el lado que no se nota
+    // —el motor cree el suelo lleno y no manda regar—, que es el que cuesta
+    // cosecha, no agua.
+    //
+    // No se cambia la hipótesis (quien riega suele regar a dosis, y suponer lo
+    // contrario haría regar de más a quien ya regó), pero SE DECLARA: el balance
+    // cuenta cuántos riegos entraron así y cuándo fue el último, para que quien
+    // enseñe la recomendación pueda decir de qué se está fiando. Un supuesto que
+    // no viaja con el número es un número que alguien va a publicar.
+    const sinCantidad = new Set();
     sanearRiegos(riegos).forEach(r => {
-      if (r.litros == null)          { riegoNeto[r.date] = null; return; }
+      if (r.litros == null)          { riegoNeto[r.date] = null; sinCantidad.add(r.date); return; }
       if (riegoNeto[r.date] === null) return;                    // ya hay un null ese día
       riegoNeto[r.date] = (riegoNeto[r.date] || 0) + r.litros * efic;
     });
 
     const orden = sanearSerie(serie);
     let Dr = 0, etcAcum = 0, et0Acum = 0, lluviaAcum = 0, lluviaUtilAcum = 0, diasEstres = 0;
+    let riegoNetoAcum = 0, riegoUtilAcum = 0;
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     for (const dia of orden) {
       const dias = diaFen(dia.date, new Date(`${dia.date}T12:00:00`));
@@ -634,6 +649,14 @@
       if (ks < 1) diasEstres++;
       if (dia.date in riegoNeto) {
         const r = riegoNeto[dia.date];
+        // Lo que CABE en el déficit se queda; el resto percola por debajo de la
+        // raíz. Sin esto, 100 mm de golpe sobre un suelo de 51 dejaban el mismo
+        // balance que 20 mm bien dados y la diferencia desaparecía sin rastro.
+        // La lluvia ya lo declaraba (lluviaUtilAcum); el riego no.
+        if (r !== null) {
+          riegoNetoAcum += r;
+          riegoUtilAcum += Math.min(r, Dr);
+        }
         Dr = r === null ? 0 : Math.max(0, Dr - r);
       }
       const pe = dia.lluvia >= PE_MIN_MM ? dia.lluvia : 0;   // lluvia efectiva
@@ -689,6 +712,17 @@
       etcAcum, et0Acum, lluviaAcum,
       // La que de verdad se quedó en la zona radicular; el resto percoló.
       lluviaUtilAcum: Math.round(lluviaUtilAcum * 10) / 10,
+      // Lo mismo para el RIEGO, que no lo tenía: de los mm netos aplicados,
+      // cuántos cupieron en el déficit. `riegoNetoAcum − riegoUtilAcum` es agua
+      // que se fue por debajo de la raíz. No incluye los riegos sin cantidad,
+      // que no se pueden sumar.
+      riegoNetoAcum: Math.round(riegoNetoAcum * 10) / 10,
+      riegoUtilAcum: Math.round(riegoUtilAcum * 10) / 10,
+      // De qué se está fiando este balance. Un riego sin cifra entra como
+      // recarga completa (ver arriba): es la hipótesis más optimista y aquí se
+      // declara en vez de esconderse.
+      riegosSinCantidad: sinCantidad.size,
+      ultimoRiegoSinCantidad: sinCantidad.size ? [...sinCantidad].sort().pop() : null,
       // Días en los que el cultivo transpiró por debajo de su potencial.
       diasEstres,
       sinFenologia: !fechaPlantacion,

@@ -195,6 +195,13 @@ async function vistaHoy(res, u) {
       // archivo, que es la regla. Por debajo, parte del pasado salió del
       // pronóstico porque el archivo no respondió, y eso mete un escalón.
       procedencia_clima: procedencia(serie, hoy),
+      // DE QUÉ SE ESTÁ FIANDO. Un riego apuntado sin cantidad entra al balance
+      // como recarga completa —el suelo a capacidad de campo—, que es la
+      // hipótesis más optimista posible y empuja hacia "no toca regar". Si el
+      // déficit de hoy se apoya en uno de esos, quien lo lea tiene que poder
+      // saberlo.
+      riegos_sin_cantidad: balHoy.riegosSinCantidad || null,
+      ultimo_riego_sin_cantidad: balHoy.ultimoRiegoSinCantidad,
     },
     desglose, proximo, riegos_recientes: recientes,
   });
