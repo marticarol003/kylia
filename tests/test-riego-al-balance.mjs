@@ -41,6 +41,33 @@ ok(bNull.riegosSinCantidad === 1, "el balance cuenta cuántos riegos entraron as
 ok(bNull.ultimoRiegoSinCantidad === dia(10), "y cuándo fue el último");
 ok(bPoco.riegosSinCantidad === 0, "un riego cuantificado no cuenta como supuesto");
 
+console.log("\n── un null NO puede borrar los mm que sí se saben ──");
+// HALLAZGO DE CODEX. Si el mismo día había un riego cuantificado y otro sin
+// cifra, el `null` dominaba: se tiraban los mm medidos y el día pasaba a recarga
+// completa. Se perdía información real para poner una suposición en su sitio.
+const soloDato = M.balanceHidrico(serie, [{ date: dia(10), litros: 20 }], OPT);
+const mixto = M.balanceHidrico(serie, [{ date: dia(10), litros: 20 }, { date: dia(10), litros: null }], OPT);
+ok(mixto.riegoNetoAcum === soloDato.riegoNetoAcum,
+   `los ${mixto.riegoNetoAcum} mm medidos siguen contando aunque ese día haya además un riego sin cifra`);
+ok(mixto.riegosSinCantidad === 1, "y el riego sin cifra se anota aparte, no borra al otro");
+ok(mixto.riegoNetoAcum > 0, "antes este total era 0: el dato real desaparecía");
+
+console.log("\n── tres estados de confianza, no dos ──");
+const mk = (riegos, lluvia) => M.balanceHidrico(
+  serie.map(d => ({ ...d, lluvia })), riegos, OPT);
+ok(mk([{ date: dia(10), litros: 20 }], 0).confianzaBalance === "conocido",
+   "todo cuantificado y con lluvia medida → conocido");
+ok(mk([{ date: dia(10), litros: null }], 0).confianzaBalance === "parcial",
+   "un riego sin cifra de veinte días → parcial");
+ok(mk([], null).confianzaBalance === "incierto",
+   "veinte días sin saber si llovió → incierto");
+// El umbral es "más de una quinta parte de los días". La serie de este test son
+// 30 días, así que 6 caen JUSTO en el 20% y no lo pasan: hace falta el séptimo.
+ok(mk(Array.from({ length: 6 }, (_, i) => ({ date: dia(i * 4), litros: null })), 0).confianzaBalance === "parcial",
+   "seis riegos sin cifra de treinta días (20% exacto) → todavía parcial");
+ok(mk(Array.from({ length: 8 }, (_, i) => ({ date: dia(i * 3), litros: null })), 0).confianzaBalance === "incierto",
+   "ocho de treinta (27%) → incierto");
+
 console.log("\n── el agua de riego que percola deja de ser invisible ──");
 // 100 mm de golpe sobre un suelo que aguanta 51 dejaban el MISMO balance que 20
 // mm bien dados, y los 80 restantes desaparecían sin rastro. La lluvia ya se

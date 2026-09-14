@@ -19,14 +19,14 @@
 // Usa el MISMO motor que la app (api/_motor-riego.js) para que no deriven.
 
 const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js");
-const { balanceHidrico, decisionRiego, laminaRiego } = require("./_motor-riego.js");
+const { balanceHidrico, decisionRiego, laminaDeAccion } = require("./_motor-riego.js");
 const { serieTermica } = require("./_clima-termico.js");
-const { climaSerie } = require("./_clima.js");
+const { climaSerie, hoyISO } = require("./_clima.js");
 
 
-function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+// hoyISO viene de _clima.js: el día CIVIL en Europe/Madrid, no el día UTC.
+// Entre las 00:00 y las 02:00 locales no son el mismo, y de eso dependía qué
+// fuente de clima se usaba para el día anterior. Ver assets/js/clima-reglas.js.
 
 function diasDesde(fechaIso) {
   if (!fechaIso) return null;
@@ -51,19 +51,30 @@ function sumarDias(diaStr, n) {
 // inflaría el ahorro publicado. La asimetría está razonada y fijada en
 // tests/test-riego-pronostico.mjs.
 
-// Riegos del piloto para el balance. La lámina sale del caudal ACTUAL vía
-// laminaRiego (ver el motor): el cantidad_l_m2 guardado se congeló con el caudal
-// del día del riego, y los caudales se afinan (truco del vaso, geometría real de
-// la malla). Sin esto, afinar un caudal no movería las decisiones del Diario B.
+// Riegos del piloto para el balance. Pasa por laminaDeAccion, que es la puerta
+// única de lectura del histórico: si el evento trae su lámina congelada, esa
+// manda; si no —riego anterior a la migración del 14-sep— se recalcula con el
+// caudal actual y se marca como reconstruida.
+//
+// Antes se recalculaba SIEMPRE con el caudal actual. Era deliberado (afinar un
+// caudal tiene que mover las decisiones de hoy) pero reescribía el pasado: el
+// riego de 60 min que valía 15 mm pasaba a 5,4 en cuanto se remedía el caudal, y
+// con él se movían el balance del ciclo y el reveal del piloto. Afinar el caudal
+// sigue moviendo lo que viene; lo que ya se registró, no.
 async function riegosDe(u) {
   const filas = await supabaseSelect(
     "acciones",
-    `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.asc`
+    `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2,duracion_min,lamina_mm,lamina_origen,caudal_mmh&order=fecha_local.asc`
   );
   return (filas || [])
     .filter(f => f.fecha_local)
-    .map(f => ({ date: f.fecha_local,
-                 litros: laminaRiego(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal) }));
+    .map(f => {
+      // LA LÁMINA CONGELADA MANDA. Si el evento la trae, el caudal actual del
+      // usuario no la toca: por ahí se reescribía el pasado entero cada vez que
+      // se afinaba un caudal con el vaso.
+      const L = laminaDeAccion(f, u.caudal);
+      return { date: f.fecha_local, litros: L.mm, origen: L.origen, reconstruida: L.reconstruida };
+    });
 }
 
 // Día de la semana ISO de un 'YYYY-MM-DD': 1 = lunes … 7 = domingo.

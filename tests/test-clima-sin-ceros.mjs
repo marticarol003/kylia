@@ -44,8 +44,11 @@ const conLluvia = campo.diasConDato({
   time: ["2026-06-02"], et0_fao_evapotranspiration: [5.2],
   precipitation_sum: [null], temperature_2m_max: [28], temperature_2m_min: [15],
 });
-ok(conLluvia.length === 1 && conLluvia[0].lluvia === 0,
-   "un día con ET0 pero sin lluvia medida entra con lluvia 0");
+// 14-sep: la lluvia ausente ya NO se convierte en 0. "No llovió" y "no sé si
+// llovió" son estados distintos; el balance supone 0 (lo conservador) pero lo
+// cuenta. Comportamiento en tests/test-lluvia-desconocida.mjs.
+ok(conLluvia.length === 1 && conLluvia[0].lluvia === null,
+   "un día con ET0 pero sin lluvia medida entra con lluvia null, no 0");
 
 console.log("\n── y para lo pasado manda el archivo ──");
 // 14-sep: el clima se unificó en api/_clima.js y la regla se INVIRTIÓ. Antes
@@ -54,11 +57,13 @@ console.log("\n── y para lo pasado manda el archivo ──");
 // queda que no vuelva el `?? 0`.
 const clima = readFileSync(join(RAIZ, "api", "_clima.js"), "utf8");
 ok(/archive-api\.open-meteo\.com/.test(clima), "el módulo de clima conoce el archivo");
-ok(/for \(const d of arch\) if \(d\.date < hoy\) mapa\.set/.test(clima),
+// La fusión se mudó a assets/js/clima-reglas.js, que cargan los dos lados.
+const reglas = readFileSync(join(RAIZ, "assets", "js", "clima-reglas.js"), "utf8");
+ok(/for \(const d of archivo \|\| \[\]\) if \(d\.date < hoy\)/.test(reglas),
    "y el archivo manda en el pasado (el pronóstico solo cubre hoy y lo que viene)");
 ok(!/et0_fao_evapotranspiration\?\.\[i\] \?\? 0/.test(clima),
    "y ya no queda ningún `?? 0` sobre la ET0");
-ok(/UN DATO QUE FALTA NO ES UN CERO/.test(clima),
+ok(/UN DATO QUE FALTA NO ES UN CERO/.test(reglas),
    "con el porqué escrito donde se toca, que esto se vuelve a colar solo");
 
 console.log("\n── el balance nota la diferencia: comprobado con el motor ──");
@@ -91,7 +96,7 @@ ok(!/et0_fao_evapotranspiration\?\.\[i\] \?\? 0/.test(db),
 // servidor pasan por el mismo módulo, así que no pueden volver a derivar.
 ok(!/async function climaSerie/.test(db), "diario-b ya no tiene su propia copia del clima");
 ok(/require\("\.\/_clima\.js"\)/.test(db), "usa el módulo único");
-ok(/filter\(x => x\.et0 != null\)/.test(clima), "los días sin ET₀ se descartan");
+ok(/filter\(x => x\.et0 != null\)/.test(reglas), "los días sin ET₀ se descartan");
 
 console.log("\n── el barrido: CUATRO copias del mismo defecto ──");
 // Ciclo 8. El `?? 0` sobre la ET₀ no estaba en un sitio: estaba en los cuatro
@@ -111,8 +116,10 @@ const appTxt = FUENTES[2][1];
 ok(/\.filter\(x => x\.et0 != null\)/.test(appTxt), "la app descarta los días sin ET₀ del histórico");
 ok(/archive-api\.open-meteo\.com/.test(appTxt),
    "y desde el 14-sep baja al ARCHIVO para el pasado, como el servidor: era la única de las cuatro que no lo hacía");
-ok(/for \(const d of arch\) if \(d\.date < hoyISO\)/.test(appTxt),
-   "con la misma regla: el archivo manda en el pasado, el pronóstico en hoy");
+ok(/KyliaClima\.fusionar\(pron, arch, hoyISO, desdeISO\)/.test(appTxt),
+   "con la MISMA regla y del mismo fichero: ya no es una copia, es una llamada");
+ok(/KyliaClima\.hoyISO\(\)/.test(appTxt),
+   "y su 'hoy' es el día civil en Europe/Madrid, no el día UTC");
 ok(/\.filter\(x => x\.et0 != null\)/.test(appTxt), "y también los del pronóstico del calendario");
 
 console.log("\n── y un riego sin cantidad no son cero litros, en los tres sitios ──");

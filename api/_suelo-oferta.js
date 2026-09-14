@@ -47,33 +47,79 @@ function clasificarTextura(clayPct, sandPct) {
 // no es un adorno: elige el AWC del balance de riego, y el salto no es simétrico.
 //   arenoso 0,08 → franco 0,15   = +88% de capacidad de suelo
 //   franco  0,15 → arcilloso 0,16 = +7%
-// O sea que LA FRONTERA QUE DUELE ES ARENA ≥ 65%, no arcilla ≥ 35%. Medido
-// sobre las series reales de los tres pilotos, pasar de una clase a otra mueve
-// la lámina de Kylia entre un 5,5% y un 12,1%, y el ahorro que se publica hasta
-// 10 puntos (Oriol: 1% con arcilloso, 11% con arenoso).
 //
-// SoilGrids es un prior de zona a 250 m, no una medida de la parcela. En vez de
-// obligar a una analítica —que rompería el alta— se declara cuánto margen hay:
-// con margen de sobra la clase aguanta cualquier error razonable del mapa, y
-// solo cuando está en el filo tiene sentido preguntarle al agricultor, que suele
-// saber si su tierra es fuerte o arenosa.
+// ⚠️ ESTO ESTABA MAL HASTA EL 14-SEP, y lo cazó Codex. Se medía la distancia a
+// DOS umbrales sueltos —|35 − arcilla| y |65 − arena|— como si cada uno fuera
+// una frontera por sí mismo. Pero la clasificación real es:
+//
+//     arcilla ≥ 35                     → arcilloso
+//     arena ≥ 65 Y arcilla < 20        → arenoso
+//     resto                            → franco
+//
+// La regla del arenoso es una CONJUNCIÓN, así que la distancia a "arena = 65" no
+// significa nada por sí sola. Los tres casos que lo demostraban:
+//
+//   clay=30 sand=64 → decía "a 1 punto de arenoso". Falso: con arcilla 30 nunca
+//                     puede ser arenoso, por mucha arena que se le eche.
+//   clay=36 sand=65 → decía margen 0 por la arena. Es arcilloso, y lo seguirá
+//                     siendo; su frontera real es arcilla=35, a 1 punto.
+//   clay=19 sand=70 → decía margen 5 (a la arena). Pero lo que lo saca de
+//                     arenoso es la arcilla subiendo 1 punto, de 19 a 20.
+//
+// Ahora se mide la distancia a la frontera REAL de la región: el cambio mínimo,
+// en cualquier dirección, que haga que clasificarTextura devuelva otra cosa.
 const MARGEN_FRAGIL = 8;   // puntos porcentuales
 
+// Distancia mínima desde (clay, sand) hasta un punto de OTRA clase. Se calcula
+// contra la definición, no contra umbrales sueltos: así no hay que mantener la
+// lista de fronteras sincronizada a mano con clasificarTextura().
 function fragilidadTextura(clayPct, sandPct) {
-  if (!(Number.isFinite(clayPct) && Number.isFinite(sandPct))) return null;
-  const aArcilloso = 35 - clayPct;
-  const aArenoso   = 65 - sandPct;
-  // Solo cuentan las fronteras que se pueden cruzar desde donde está.
-  const margen = Math.min(...[aArcilloso, aArenoso].map(Math.abs));
+  // ⚠️ Number(null) es 0 y Number("") también, así que `Number.isFinite(Number(x))`
+  // deja pasar los dos como si fueran un 0% legítimo de arcilla — y con arcilla 0
+  // y arena 40 esto respondía "franco, margen 25 pp" sobre datos que no existen.
+  // Es el mismo agujero que ya mordió cuatro veces en el motor y que allí se
+  // cerró con el predicado `finito`. Aquí, igual.
+  const finito = x => x != null && x !== "" && typeof x !== "boolean" && Number.isFinite(Number(x));
+  if (!(finito(clayPct) && finito(sandPct))) return null;
+  const clay = Number(clayPct), sand = Number(sandPct);
+  const clase = clasificarTextura(clay, sand);
+
+  // Candidatos: para cada frontera, el punto más cercano que la cruza. EPS es lo
+  // mínimo que hay que pasarse para estar del otro lado.
+  const EPS = 0.01;
+  const cand = [];
+  const probar = (c, s, etiqueta) => {
+    const nueva = clasificarTextura(c, s);
+    if (nueva === clase) return;
+    cand.push({ d: Math.hypot(c - clay, s - sand), clase: nueva, via: etiqueta });
+  };
+
+  // Cruzar el umbral de arcilla, en los dos sentidos.
+  probar(35, sand, "arcilla=35");             // hacia arcilloso
+  probar(35 - EPS, sand, "arcilla<35");       // saliendo de arcilloso
+  probar(20, sand, "arcilla=20");             // saliendo de arenoso por arcilla
+  probar(20 - EPS, sand, "arcilla<20");       // entrando en el rango de arenoso
+  // Cruzar el umbral de arena.
+  probar(clay, 65, "arena=65");
+  probar(clay, 65 - EPS, "arena<65");
+  // Y las ESQUINAS: para ser arenoso hacen falta las dos condiciones a la vez, así
+  // que desde un franco con arcilla alta hay que mover las dos.
+  probar(20 - EPS, 65, "esquina arcilla<20 y arena≥65");
+  probar(35, 65, "esquina arcilla≥35");
+
+  if (!cand.length) return { margen_pp: null, clase, frontera_cercana: null, fragil: false };
+  cand.sort((a, b) => a.d - b.d);
+  const mejor = cand[0];
   return {
-    margen_pp: Math.round(margen * 10) / 10,
-    a_arcilloso_pp: Math.round(aArcilloso * 10) / 10,
-    a_arenoso_pp: Math.round(aArenoso * 10) / 10,
-    // La de arena es la que cambia el AWC casi al doble; la de arcilla casi no.
-    frontera_cercana: margen <= MARGEN_FRAGIL
-      ? (Math.abs(aArenoso) < Math.abs(aArcilloso) ? "arenoso" : "arcilloso")
-      : null,
-    fragil: margen <= MARGEN_FRAGIL,
+    clase,
+    margen_pp: Math.round(mejor.d * 10) / 10,
+    // A qué clase se pasaría con ese cambio mínimo, y por dónde.
+    clase_vecina: mejor.clase,
+    via: mejor.via,
+    fragil: mejor.d <= MARGEN_FRAGIL,
+    // La frontera que de verdad duele es la de arena/arenoso: cambia el AWC casi
+    // al doble. Cruzar a arcilloso solo lo mueve un 7%.
+    salto_awc: mejor.clase === "arenoso" || clase === "arenoso" ? "grande" : "pequeno",
   };
 }
 

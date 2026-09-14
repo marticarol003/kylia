@@ -76,11 +76,13 @@ console.log("\n── y cuándo la textura deducida NO es de fiar ──");
 // declara el margen: con margen de sobra la clase aguanta el error del mapa.
 const { fragilidadTextura, clasificarTextura } = require(join(RAIZ, "api", "_suelo-oferta.js"));
 const breda = fragilidadTextura(22.13, 42.81);      // medido en la parcela de Ferran
-const filo  = fragilidadTextura(19, 63);            // a 2 puntos de ser arenoso
+const filo  = fragilidadTextura(19, 63);            // arcilla 19 y arena 63: a 2 pp de arenoso
 ok(clasificarTextura(22.13, 42.81) === "franco" && breda.fragil === false,
    `la parcela de Ferran es franco con ${breda.margen_pp} pp de margen: la clase aguanta`);
-ok(filo.fragil === true && filo.frontera_cercana === "arenoso",
-   `una parcela a ${filo.margen_pp} pp de la frontera de arena se declara frágil`);
+// La distancia se mide contra la REGIÓN, no contra un umbral suelto: para ser
+// arenoso hacen falta arena ≥65 Y arcilla <20 a la vez. Ver test-textura-fronteras.mjs.
+ok(filo.fragil === true && filo.clase_vecina === "arenoso",
+   `una parcela a ${filo.margen_pp} pp de la región arenosa se declara frágil`);
 ok(fragilidadTextura(null, 40) === null, "sin datos de SoilGrids no se inventa una fragilidad");
 ok(/fragil: o\?\.observado\?\.fragilidad\?\.fragil/.test(campo),
    "y la vista del alta lo devuelve, para poder preguntar solo cuando hace falta");

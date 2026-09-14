@@ -259,13 +259,24 @@ const COBERTURA_MIN = 0.95;
 
 // Devuelve el motivo por el que NO se puede publicar, o null si se puede.
 // `cf` es cualquier salida de simularKylia (o el objeto que la transporta).
-function motivoClimaNoPublicable(cf) {
+// Y por debajo de esto, demasiados días del periodo se calcularon sin saber si
+// llovió. El balance los cuenta como 0 mm —la hipótesis conservadora para el
+// riego— pero un contrafactual construido sobre una quinta parte de días sin
+// lluvia conocida no sostiene un porcentaje.
+const LLUVIA_DESCONOCIDA_MAX = 0.2;
+
+function motivoClimaNoPublicable(cf, diasPeriodo) {
   const cobertura = cf && cf.coberturaClima != null ? Number(cf.coberturaClima) : null;
   // NO SABER LA COBERTURA NO ES TENERLA BUENA.
   if (cobertura == null) return "el contrafactual no declara con cuánto clima se calculó";
   if (cobertura < COBERTURA_MIN) {
     return `el contrafactual se calculó con el ${Math.round(cobertura * 100)}% del clima del periodo`
            + (cf.diasSinClima ? ` (faltan ${cf.diasSinClima} días)` : "");
+  }
+  const sinLluvia = Number(cf.diasSinLluviaConocida) || 0;
+  const n = Number(diasPeriodo) || (Array.isArray(cf.puntos) ? cf.puntos.length : 0);
+  if (n > 0 && sinLluvia / n > LLUVIA_DESCONOCIDA_MAX) {
+    return `en ${sinLluvia} de ${n} días no se sabe si llovió (se han contado como 0 mm)`;
   }
   return null;
 }
@@ -357,7 +368,7 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
   // misma puerta por la que salieron los dos informes del 10-sep.
   const cobertura = cf.coberturaClima != null ? Number(cf.coberturaClima) : null;
   const razones = [];
-  const motivoClima = motivoClimaNoPublicable(cf);
+  const motivoClima = motivoClimaNoPublicable(cf, serie.length);
   if (motivoClima) razones.push(motivoClima);
   if (sinCifra.length && sinCifra.length > enPeriodo.length * 0.2) {
     razones.push(`${sinCifra.length} de ${enPeriodo.length} riegos están apuntados sin cantidad`);
@@ -393,8 +404,9 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
   } else if (!publicable) {
     veredicto = `No se puede comparar tu riego con el de Kylia: ${razones.join("; ")}.`;
   } else if (exceso > 0.5) {
-    veredicto = `Aplicaste ~${r0(exceso)} L/m² más que la lámina FAO-56` +
-                (ahorroPct != null ? ` (ahorrarías ${ahorroPct}%)` : "") + " que Kylia habría aplicado.";
+    // Simulación, no resultado: "ahorrarías" da por hecho lo que no se ha medido.
+    veredicto = `Aplicaste ~${r0(exceso)} L/m² más que la lámina FAO-56 que la simulación de` +
+                ` Kylia habría recomendado` + (ahorroPct != null ? ` (un ${ahorroPct}% menos de agua)` : "") + ".";
   } else if (exceso < -0.5) {
     veredicto = `Aplicaste ~${r0(-exceso)} L/m² menos que la lámina FAO-56: posible déficit hídrico a vigilar.`;
   } else {
@@ -574,19 +586,31 @@ function construirReveal(datos, opts = {}) {
 
   // Avisos: lo que el informe NO puede afirmar todavía (transparencia).
   const avisos = [];
-  // Límite de método que afecta a TODO informe de agua, y que juega a favor: el
-  // contrafactual usa el mismo balance de Kc único que el motor, y ese balance
-  // agota la zona radicular más rápido que el Kc dual del estándar (medido sobre
-  // 60 ventanas: +8,1 mm de sesgo en verano, y en 88% de las discrepancias Kylia
-  // riega ANTES que pyfao56, no después). O sea que la Kylia simulada se atribuye
-  // MÁS riegos de los que un FAO-56 dual dispararía → el ahorro sale por lo bajo.
-  // Ver docs/tecnico/motor-de-decision.md §3.4.
+  // Límite de método que afecta a TODO informe de agua. Ver
+  // docs/tecnico/motor-de-decision.md §3.4 y scripts/compara-kc-dual.mjs.
+  //
+  // ⚠️ ESTE AVISO DECÍA "el ahorro calculado es un mínimo, no un máximo", y era
+  // FALSO en aspersión. Salía de la validación contra pyfao56 con riego fijo, que
+  // mide el sesgo del BALANCE. Al simular el contrafactual completo con Kc dual
+  // sobre las parcelas reales (14-sep, scripts/compara-kc-dual.mjs, validado
+  // contra pyfao56 a −0,7% de ETa) el signo se da la vuelta según el método:
+  //
+  //     tomate  goteo      458,1 → 415,5   −9,3%   (el dual pide MENOS)
+  //     cebolla aspersión  348,2 → 350,7   +0,7%   (el dual pide MÁS)
+  //     lechuga aspersión  362,1 → 383,3   +5,9%   (el dual pide MÁS)
+  //
+  // El motivo es físico: el goteo moja el 35% de la superficie y la aspersión el
+  // 100%, así que la evaporación de suelo que el Kc único promedia se queda corta
+  // en aspersión. En una parcela regada por aspersión, el contrafactual de Kylia
+  // puede estar SOBRESTIMANDO el ahorro, no subestimándolo. Decir lo contrario
+  // era dar una garantía que los datos no sostienen.
   if (agua.disponible) {
     avisos.push(
-      "Método: el contrafactual usa el balance de Kc único de Kylia, que agota el " +
-      "suelo más rápido que el Kc dual de FAO-56 (validado sobre 60 ventanas). " +
-      "La Kylia simulada se atribuye por tanto más riegos de los que el estándar " +
-      "dispararía: el ahorro calculado es un mínimo, no un máximo."
+      "Método: el contrafactual usa el balance de Kc único de Kylia. Frente al Kc " +
+      "dual de FAO-56, la diferencia depende del método de riego: en goteo el dual " +
+      "pediría ~9% menos agua y en aspersión ~1-6% más (medido sobre estas mismas " +
+      "parcelas). La cifra no es ni un techo ni un suelo: es el resultado de este " +
+      "modelo, con esa incertidumbre."
     );
   }
   if (!horas.disponible) avisos.push("Dimensión 'horas en decidir': sin captura de tiempo, solo proxy de fuentes.");
@@ -617,7 +641,7 @@ function construirReveal(datos, opts = {}) {
 
 module.exports = {
   construirReveal,
-  motivoClimaNoPublicable, COBERTURA_MIN,
+  motivoClimaNoPublicable, COBERTURA_MIN, LLUVIA_DESCONOCIDA_MAX,
   // exportadas para test unitario
   dimAgua, dimAguaDesdeContrafactual, dimHoras, dimTratamientos, dimCoste, semanaISO, soloDia,
 };

@@ -127,15 +127,24 @@
     // dashboard del padre; exceso_pct mide otra cosa (cuánto te pasaste sobre Kylia).
     const ahorroPct = agua.aplicada_l_m2 > 0 ? Math.round((ex / agua.aplicada_l_m2) * 100) : null;
     let kind, big, cap;
+    // EL LENGUAJE IMPORTA AQUÍ MÁS QUE EN NINGÚN SITIO. Esto es una SIMULACIÓN
+    // contrafactual: lo que el modelo dice que habría recomendado sobre el clima
+    // y el suelo de esta parcela. No es un ahorro demostrado — para eso haría
+    // falta que alguien SIGUIERA a Kylia y se comparara con un control, y en un
+    // piloto ciego eso no existe (`ahorro_demostrado: false` viene del servidor).
+    // "Habrías ahorrado" convierte una simulación en un resultado agronómico.
     if (ex > 0.5) {
       kind = "ahorro"; big = `${ex} L/m²`;
-      cap = `de agua que habrías <b>ahorrado</b> siguiendo a Kylia${ahorroPct != null ? ` (un ${ahorroPct}% menos)` : ""}.`;
+      cap = `menos de agua${ahorroPct != null ? ` (un ${ahorroPct}%)` : ""} es lo que la simulación
+             de Kylia habría recomendado aplicar en este periodo. Es un cálculo sobre el clima
+             y el suelo de tu parcela, no una medida de lo que habría pasado en el campo.`;
     } else if (ex < -0.5) {
       kind = "exceso"; big = `${Math.abs(ex)} L/m²`;
-      cap = `<b>menos</b> de lo que Kylia habría recomendado — posible déficit hídrico a vigilar.`;
+      cap = `<b>más</b> de lo que aplicaste es lo que la simulación de Kylia habría recomendado
+             — posible déficit hídrico a vigilar.`;
     } else {
       kind = "par"; big = "A la par";
-      cap = `tu riego coincidió de cerca con la lámina FAO-56 de Kylia.`;
+      cap = `tu riego coincidió de cerca con la lámina FAO-56 que la simulación de Kylia habría recomendado.`;
     }
     const eur = (coste && coste.agua_eur != null)
       ? `<div class="eur">≈ <b>${coste.agua_eur.toLocaleString("es-ES")} €</b> de agua en el periodo medido.</div>` : "";
@@ -152,9 +161,17 @@
       <div class="sub">${esc([u.ciudad, u.cultivo, u.metodo_riego].filter(Boolean).join(" · "))}` +
       `${inf.periodo ? ` · ${fmtFecha(inf.periodo.desde)}–${fmtFecha(inf.periodo.hasta)}` : ""}</div>`;
 
-    if (!agua.disponible) {
+    // ⚠️ `disponible` NO basta, y era lo único que se miraba. El servidor
+    // calcula además `publicable`: cuando el contrafactual no se sostiene
+    // —cobertura de clima baja, riegos sin cuantificar, demasiados días sin
+    // saber si llovió— las cifras vienen a null y el porcentaje NO EXISTE. Sin
+    // esta comprobación el informe pintaba "0 L/m²" y "A la par" como si fuera
+    // un resultado. Es la misma puerta por la que salieron los dos informes del
+    // 10-sep, en el último sitio donde quedaba abierta.
+    if (!agua.disponible || agua.publicable === false) {
+      const motivo = agua.publicable === false ? agua.motivo_no_publicable : agua.motivo;
       html += `<div class="card"><div class="label">Agua aplicada vs recomendada</div>
-        <div class="msg">${agua.motivo}</div></div>`;
+        <div class="msg">No se puede comparar tu riego con el de Kylia: ${esc(motivo || "faltan datos del periodo")}.</div></div>`;
     } else {
       html += heroAgua(agua, inf.dimensiones.coste);
       html += `<div class="card">

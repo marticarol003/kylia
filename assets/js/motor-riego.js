@@ -478,8 +478,16 @@
       if (!d || typeof d.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) continue;
       if (!finito(d.et0)) continue;                 // sin ET₀ no hay día que calcular
       const et0 = Math.max(0, Number(d.et0));       // una ET₀ negativa no existe
-      const ll  = finito(d.lluvia) ? Math.max(0, Number(d.lluvia)) : 0;
-      porFecha.set(d.date, { ...d, et0, lluvia: ll });
+      // ⚠️ "NO LLOVIÓ" Y "NO SÉ SI LLOVIÓ" NO SON LO MISMO, y aquí se juntaban.
+      // Una lluvia ausente se convertía en 0 mm sin dejar rastro. Para el
+      // BALANCE el 0 es la hipótesis correcta —si no sabes si llovió, no
+      // descuentes agua que a lo mejor no cayó; descontarla haría regar de menos,
+      // que es el error que cuesta cosecha— pero hay que poder CONTAR sobre
+      // cuántos días se está suponiendo eso. Un balance con 20 días sin saber si
+      // llovió no es un balance del que publicar un ahorro.
+      const conocida = finito(d.lluvia);
+      const ll  = conocida ? Math.max(0, Number(d.lluvia)) : 0;
+      porFecha.set(d.date, { ...d, et0, lluvia: ll, lluviaConocida: conocida });
     }
     return [...porFecha.values()].sort((a, b) => a.date.localeCompare(b.date));
   }
@@ -625,16 +633,26 @@
     // cuenta cuántos riegos entraron así y cuándo fue el último, para que quien
     // enseñe la recomendación pueda decir de qué se está fiando. Un supuesto que
     // no viaja con el número es un número que alguien va a publicar.
+    // Y UN SEGUNDO PROBLEMA, que cazó Codex: el `null` DOMINABA sobre lo
+    // cuantificado del mismo día. Si el agricultor apuntaba un riego de 20 mm y
+    // además otro sin cifra, los 20 mm medidos se tiraban y el día pasaba a
+    // recarga completa. Se perdía información real para poner en su lugar una
+    // suposición — al revés de lo que debería.
+    //
+    // Ahora los mm conocidos del día SE APLICAN, y el riego sin cifra se anota
+    // aparte en vez de borrarlos. Lo que queda por decidir es qué hacer con ese
+    // "además regó, no sabemos cuánto": hoy sigue llevando el suelo a capacidad
+    // de campo, que es la hipótesis más optimista. Está en las decisiones
+    // pendientes, no se cambia sin decidirlo.
     const sinCantidad = new Set();
     sanearRiegos(riegos).forEach(r => {
-      if (r.litros == null)          { riegoNeto[r.date] = null; sinCantidad.add(r.date); return; }
-      if (riegoNeto[r.date] === null) return;                    // ya hay un null ese día
+      if (r.litros == null) { sinCantidad.add(r.date); return; }
       riegoNeto[r.date] = (riegoNeto[r.date] || 0) + r.litros * efic;
     });
 
     const orden = sanearSerie(serie);
     let Dr = 0, etcAcum = 0, et0Acum = 0, lluviaAcum = 0, lluviaUtilAcum = 0, diasEstres = 0;
-    let riegoNetoAcum = 0, riegoUtilAcum = 0;
+    let riegoNetoAcum = 0, riegoUtilAcum = 0, diasSinLluviaConocida = 0;
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     for (const dia of orden) {
       const dias = diaFen(dia.date, new Date(`${dia.date}T12:00:00`));
@@ -647,6 +665,9 @@
       const ks  = ksEstres(Dr, taw, raw);
       const etc = etcPot * ks;
       if (ks < 1) diasEstres++;
+      // El día con riego sin cuantificar: se aplica primero lo que SÍ se sabe y
+      // después la hipótesis de recarga (Dr = 0). Así los mm medidos cuentan en
+      // riegoNetoAcum en vez de desaparecer.
       if (dia.date in riegoNeto) {
         const r = riegoNeto[dia.date];
         // Lo que CABE en el déficit se queda; el resto percola por debajo de la
@@ -657,8 +678,10 @@
           riegoNetoAcum += r;
           riegoUtilAcum += Math.min(r, Dr);
         }
-        Dr = r === null ? 0 : Math.max(0, Dr - r);
+        Dr = Math.max(0, Dr - r);
       }
+      if (sinCantidad.has(dia.date)) Dr = 0;   // hipótesis: recarga completa (ver arriba)
+      if (dia.lluviaConocida === false) diasSinLluviaConocida++;
       const pe = dia.lluvia >= PE_MIN_MM ? dia.lluvia : 0;   // lluvia efectiva
       // De la lluvia que infiltra, solo se QUEDA la que cabe en el déficit: el
       // resto percola por debajo de la raíz. Contar los 180 mm de una tormenta
@@ -723,8 +746,26 @@
       // declara en vez de esconderse.
       riegosSinCantidad: sinCantidad.size,
       ultimoRiegoSinCantidad: sinCantidad.size ? [...sinCantidad].sort().pop() : null,
+      // DE QUÉ CONFIANZA ES ESTE BALANCE. Tres estados, no dos:
+      //   conocido  — todo el agua que entró está cuantificada y el clima completo
+      //   parcial   — hay supuestos declarados (algún riego sin cifra, o días sin
+      //               saber si llovió), pero pocos
+      //   incierto  — los supuestos pesan lo bastante como para no publicar un
+      //               número sobre esto
+      // No cambia ninguna decisión: cambia lo que se puede AFIRMAR con ella.
+      confianzaBalance: (() => {
+        const n = orden.length || 1;
+        const dudosos = sinCantidad.size + diasSinLluviaConocida;
+        if (dudosos === 0 && cob.cobertura >= 0.95) return "conocido";
+        if (dudosos / n > 0.2 || cob.cobertura < 0.95) return "incierto";
+        return "parcial";
+      })(),
       // Días en los que el cultivo transpiró por debajo de su potencial.
       diasEstres,
+      // Días con ET₀ pero SIN saber si llovió. El balance los ha contado como 0
+      // mm de lluvia (la hipótesis conservadora para el riego), pero eso es un
+      // supuesto y va declarado: no es lo mismo que saber que no llovió.
+      diasSinLluviaConocida,
       sinFenologia: !fechaPlantacion,
       // Trazabilidad: en qué reloj se ha calculado todo esto.
       modoFenologia: curva ? "termico" : "calendario",
@@ -953,6 +994,45 @@
     return Number.isFinite(c) ? c : null;
   }
 
+  // ⚠️ EL PASADO NO SE RECALCULA. laminaRiego usa el caudal que se le pase, y los
+  // consumidores le pasaban SIEMPRE el caudal actual de la parcela — así que
+  // remedir un caudal con el vaso reescribía hacia atrás todos los riegos del
+  // ciclo, el balance y el reveal del piloto. Un piloto ciego cuyos números
+  // cambian cada vez que se afina un dato no se puede validar.
+  //
+  // Desde el 14-sep cada riego congela su lámina (db/congelar-lamina-riego-…sql).
+  // Esta función es LA puerta para leer un riego del histórico:
+  //
+  //   1. si el evento trae lámina congelada, esa manda y no se toca nada más;
+  //   2. si no la trae —evento anterior a la migración—, se recalcula con el
+  //      caudal actual, PERO SE DICE: `origen: "recalculada_caudal_actual"`.
+  //
+  // Nunca se inventa el pasado en silencio. Quien publique un número puede
+  // contar cuántos de sus riegos son reconstrucciones y cuántos son dato.
+  function laminaDeAccion(accion, caudalActual) {
+    const a = accion || {};
+    const congelada = a.lamina_mm;
+    if (congelada != null && congelada !== "" && Number.isFinite(Number(congelada))) {
+      return {
+        mm: Number(congelada),
+        origen: a.lamina_origen || "congelada",
+        caudal_mmh: a.caudal_mmh ?? null,
+        // El backfill de la migración se calculó con el caudal de HOY, no con el
+        // de aquel día: está congelado, pero no es un dato de época.
+        reconstruida: a.lamina_origen === "backfill_caudal_actual",
+      };
+    }
+    const mm = laminaRiego(a.cantidad_l_m2 ?? null, a.duracion_min ?? null, caudalActual);
+    return {
+      mm,
+      origen: mm == null ? "desconocida"
+            : (Number(a.duracion_min) > 0 && Number(caudalActual) > 0)
+              ? "recalculada_caudal_actual" : "cantidad_apuntada",
+      caudal_mmh: Number(caudalActual) > 0 ? Number(caudalActual) : null,
+      reconstruida: mm != null && Number(a.duracion_min) > 0 && Number(caudalActual) > 0,
+    };
+  }
+
   // Simula el manejo del riego "según Kylia" sobre una serie climática: cada día,
   // si el déficit acumulado alcanza el umbral RAW, riega la lámina BRUTA que
   // recomienda la regla (Dr/eficiencia) y repone el suelo; si no, no riega. Es la
@@ -975,7 +1055,7 @@
     // antes del estrés, así que aquí Ks ≈ 1 y el cultivo gasta lo que pide.
     // Con ella se puede comprobar la ley que sí se sostiene siempre: el riego
     // neto nunca supera lo que el cultivo ha evaporado.
-    let Dr = 0, acum = 0, etcAcum = 0;
+    let Dr = 0, acum = 0, etcAcum = 0, diasSinLluviaConocida = 0;
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     const puntos = [];
     for (const dia of orden) {
@@ -993,6 +1073,7 @@
       etcAcum += etc;
       // Decisión de la mañana: con el déficit que arrastra de ayer (misma regla que decisionRiego).
       if (Dr >= raw) { acum += Dr / efic; Dr = 0; }   // riego bruto = Dr/efic → repone Dr neto
+      if (dia.lluviaConocida === false) diasSinLluviaConocida++;
       const pe = dia.lluvia >= PE_MIN_MM ? dia.lluvia : 0;   // lluvia efectiva
       Dr = Math.min(taw, Math.max(0, Dr + etc - pe));
       puntos.push({ date: dia.date, acum_l_m2: Math.round(acum * 10) / 10 });
@@ -1007,6 +1088,9 @@
              hastaSerie: orden.length ? orden[orden.length - 1].date : null,
              diasSerie: cobS.dias, diasSinClima: cobS.faltan,
              coberturaClima: Math.round(cobS.cobertura * 1000) / 1000,
+             // Días con ET₀ pero sin saber si llovió: contados como 0 mm, que es
+             // la hipótesis conservadora, pero declarados como supuesto.
+             diasSinLluviaConocida,
              modoFenologia: curva ? "termico" : "calendario",
              deficitFinal: Math.round((Dr / efic) * 10) / 10 };
   }
@@ -1014,7 +1098,7 @@
   return {
     FAO_KC, FAO_GDD, SUELO_AWC, ZR_M, P_AGOTAMIENTO, PE_MIN_MM, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
     VENTANA_PRONOSTICO_DIAS,
-    kcDelDia, faseDelDia, zrDelDia, aguaSuelo, ksEstres, diasEntre, balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia,
+    kcDelDia, faseDelDia, zrDelDia, aguaSuelo, ksEstres, diasEntre, balanceHidrico, decisionRiego, presentarRiego, laminaRiego, laminaDeAccion, simularKylia,
     sanearSerie, sanearRiegos, huecosDeSerie,
     gradosDia, gddDelCiclo, diasFenologicos, curvaFenologica, ventanaMadurez, normalesMensuales,
   };

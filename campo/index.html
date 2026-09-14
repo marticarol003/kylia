@@ -798,23 +798,26 @@
       veredicto = n > 0
         ? `En estos ${t.dias != null ? t.dias + " días" : "días"} Kylia <b>no habría regado todavía</b>
            (el suelo aún tenía agua), y tú regaste <b>${n} ${n === 1 ? "vez" : "veces"}</b>
-           (${rango(t.padre_bajo_l_m2, t.padre_alto_l_m2, "L/m²")}). El % de ahorro tendrá sentido
+           (${rango(t.padre_bajo_l_m2, t.padre_alto_l_m2, "L/m²")}). La comparación tendrá sentido
            cuando arranque la demanda de riego.`
         : `Todavía no hay riegos que comparar — ni tú ni Kylia habríais regado aún en este arranque.`;
     } else if (t.dif_bajo_l_m2 > 0.5) {
       const lA = c.area_m2 ? Math.round(t.dif_bajo_l_m2 * c.area_m2).toLocaleString("es-ES") : null;
       const lB = c.area_m2 ? Math.round(t.dif_alto_l_m2 * c.area_m2).toLocaleString("es-ES") : null;
       const pct = banda ? `${t.ahorro_pct_bajo}–${t.ahorro_pct_alto}%` : `${t.ahorro_pct_alto}%`;
-      veredicto = `Siguiendo a Kylia ahorrarías
+      // Es una SIMULACIÓN contrafactual, no un ahorro demostrado: "ahorrarías"
+      // convierte en resultado agronómico lo que solo es un cálculo sobre el
+      // clima y el suelo de esta parcela. Nadie ha seguido a Kylia aquí.
+      veredicto = `La simulación de Kylia habría recomendado
         <b style="color:var(--verde-900)">${rango(t.dif_bajo_l_m2, t.dif_alto_l_m2, "L/m²")} (${pct})</b>
-        en este campo${lB ? ` · ≈ <b>${banda ? lA + "–" + lB : lB} L menos</b> en ${m2}` : ""}.`;
+        menos de agua en este campo${lB ? ` · ≈ <b>${banda ? lA + "–" + lB : lB} L menos</b> en ${m2}` : ""}.`;
     } else if (t.dif_alto_l_m2 < -0.5) {
-      veredicto = `Incluso en el escenario de más caudal, aquí Kylia habría regado
-        <b>${Math.abs(t.dif_alto_l_m2)} L/m² más</b> — tu padre se está quedando corto
-        (ojo al estrés hídrico). Ahorrar no es regar menos, es regar lo justo.`;
+      veredicto = `Incluso en el escenario de más caudal, la simulación de Kylia habría
+        recomendado <b>${Math.abs(t.dif_alto_l_m2)} L/m² más</b> — tu padre se está quedando
+        corto (ojo al estrés hídrico). Regar bien no es regar menos, es regar lo justo.`;
     } else {
       veredicto = `De momento van <b>a la par</b> (Kylia ${t.kylia_l_m2} vs padre ${rango(t.padre_bajo_l_m2, t.padre_alto_l_m2, "L/m²")}) —
-        el ahorro se verá según avance la campaña.`;
+        la diferencia se verá según avance la campaña.`;
     }
 
     let ferts = "";

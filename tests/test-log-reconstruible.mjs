@@ -78,8 +78,10 @@ console.log("\n── y lo que el agricultor hizo ──");
 // Los riegos reales viven en `acciones` con fecha, duración y cantidad. Lo que
 // NO se guarda ahí es el caudal del momento: por eso va en el log de la decisión.
 ok(/duracion_min/.test(diarioB), "el Diario B lee la duración de los riegos reales");
-ok(/laminaRiego\(f\.cantidad_l_m2, f\.duracion_min/.test(diarioB),
-   "y convierte duración × caudal a mm con la misma regla que el motor");
+ok(/laminaDeAccion\(f, u\.caudal\)/.test(diarioB),
+   "y pasa por laminaDeAccion, que prefiere la lámina CONGELADA del evento");
+ok(/lamina_mm,lamina_origen,caudal_mmh/.test(diarioB),
+   "trayéndose del select las columnas congeladas (ver test-historico-congelado.mjs)");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

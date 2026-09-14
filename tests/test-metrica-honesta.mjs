@@ -40,11 +40,17 @@ ok(b.clase_metrica != null, `y también declara su clase (${b.clase_metrica})`);
 console.log("\n── no se publica un ahorro sin poder demostrarlo ──");
 // El informe del piloto habla SIEMPRE en condicional: "habrías ahorrado", nunca
 // "ahorraste". Es la diferencia entre (3) y (4).
+// 14-sep: "habrías ahorrado" también se fue. Convierte una simulación en un
+// resultado agronómico, y eso es lo que no se puede afirmar. El informe habla
+// ahora de lo que la SIMULACIÓN habría recomendado. Comportamiento comprobado
+// ejecutando el pintado en tests/test-reveal-ui-publicable.mjs.
 const informe = readFileSync(join(RAIZ, "piloto", "informe", "index.html"), "utf8");
-ok(/habrías <b>ahorrado<\/b>|habrías ahorrado/.test(informe),
-   "el informe del piloto habla en condicional");
-ok(!/\bahorraste\b|\bhas ahorrado\b|\bahorró\b/i.test(informe),
-   "y nunca en pasado, que sería afirmar lo que no se ha medido");
+ok(/simulación de Kylia habría recomendado/.test(informe),
+   "el informe habla de lo que la simulación habría recomendado");
+ok(!/habrías <b>ahorrado<\/b>/.test(informe),
+   "y ya no dice 'habrías ahorrado'");
+ok(!/\bahorraste\b|\bhas ahorrado\b|\bte ahorró\b/i.test(informe),
+   "ni nada en pasado, que sería afirmar lo que no se ha medido");
 
 console.log("\n── y el 62% no se vende como accuracy ──");
 const doc = readFileSync(join(RAIZ, "docs", "tecnico", "metricas.md"), "utf8");

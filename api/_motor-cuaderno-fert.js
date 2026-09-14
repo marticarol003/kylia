@@ -166,7 +166,9 @@ function cuadernoFertilizacion(necesidad, opts = {}) {
   return {
     disponible: true,
     cultivo: necesidad.cultivo,
-    fecha: opts.fecha || new Date().toISOString().slice(0, 10),
+    // Día CIVIL en Europe/Madrid: esto va al cuaderno de la PAC y un apunte
+    // hecho a las 00:30 no puede quedar fechado el día anterior.
+    fecha: opts.fecha || require("../assets/js/clima-reglas.js").hoyISO(),
     // Una superficie negativa o absurda se copiaba tal cual al encabezado del
     // cuaderno: "−5 m²" impreso en un documento que es registro legal.
     superficie_m2: (Number.isFinite(Number(opts.superficie_m2)) && Number(opts.superficie_m2) > 0)

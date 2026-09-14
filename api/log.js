@@ -325,6 +325,26 @@ async function handleAcciones(req, res, body) {
     nutrientes:           nutrientesOrNull(body.nutrientes),
   };
 
+  // ── CONGELAR LA LÁMINA, si es un riego ───────────────────────────
+  // El caudal se afina con el tiempo (el vaso, la geometría real de la malla) y
+  // eso tiene que mover las decisiones de MAÑANA, no las de julio. Antes la
+  // lámina se recalculaba siempre con el caudal actual, así que remedir un
+  // caudal reescribía el balance del ciclo entero y el reveal del piloto.
+  // Aquí se calcula UNA vez, con el caudal de este momento, y se guarda con él.
+  if (tipo === "riego") {
+    const u = isConfigured()
+      ? (await supabaseSelect("usuarios", `id=eq.${usuario_id}&select=caudal`).catch(() => null) || [])[0]
+      : null;
+    const caudal = Number(u?.caudal);
+    const { laminaRiego } = require("./_motor-riego.js");
+    const mm = laminaRiego(fila.cantidad_l_m2, fila.duracion_min, caudal);
+    fila.caudal_mmh = Number.isFinite(caudal) && caudal > 0 ? caudal : null;
+    fila.lamina_mm  = mm;
+    // De dónde salió, para que el histórico se pueda auditar sin adivinar.
+    fila.lamina_origen = mm == null ? "desconocida"
+      : (fila.duracion_min > 0 && caudal > 0) ? "duracion_x_caudal" : "cantidad_apuntada";
+  }
+
   console.log("[acciones]", JSON.stringify({ usuario_id, tipo, cantidad: fila.cantidad_l_m2, producto: fila.producto_nombre }));
 
   if (!isConfigured()) {

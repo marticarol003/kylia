@@ -524,13 +524,27 @@ antes**. El caso peligroso —dejar el cultivo con sed cuando el estándar manda
 es el **0,8% de los días**. Para un motor que aconseja a un agricultor, equivocarse
 hacia el lado conservador es la dirección correcta del error.
 
-#### Consecuencia para el reveal (importante, y juega a favor)
+#### Consecuencia para el reveal — CORREGIDO el 14-sep-2026
 
-El contrafactual del informe de piloto (`simularKylia`) usa **este mismo `Dr` inflado**.
-Es decir: en la simulación **Kylia se atribuye a sí misma más riegos de los que un
-FAO-56 dual dispararía**. Por tanto **el ahorro que publica el reveal es un SUELO, no
-un techo**: con el balance dual, el agua que Kylia habría gastado sería igual o menor,
-y el ahorro frente al agricultor, igual o mayor. Esto se puede afirmar en público.
+Hasta el 14-sep aquí se afirmaba que **el ahorro publicado era un suelo, no un techo**,
+razonando que el `Dr` inflado hace que Kylia se atribuya más riegos de los que un dual
+dispararía. **Ese razonamiento era incorrecto, y se publicaba como afirmable en público.**
+
+Lo que se midió con riego fijo es el sesgo del BALANCE. Al simular el contrafactual
+COMPLETO con Kc dual sobre las parcelas reales (`scripts/compara-kc-dual.mjs`, validado
+contra `pyfao56` a −0,7% de ETa acumulada), el signo **depende del método de riego**:
+
+| parcela | Kc único | Kc dual | dif |
+|---|---|---|---|
+| tomate, **goteo** | 458,1 | 415,5 | **−9,3%** |
+| cebolla, aspersión | 348,2 | 350,7 | **+0,7%** |
+| lechuga, aspersión | 362,1 | 383,3 | **+5,9%** |
+
+El motivo es físico: el goteo moja el 35% de la superficie y la aspersión el 100%, así
+que la evaporación de suelo que el Kc único promedia se queda **corta en aspersión**.
+
+**En una parcela de aspersión, el contrafactual puede estar SOBRESTIMANDO el ahorro.**
+No hay garantía de que la cifra sea un mínimo, y no se puede afirmar que lo sea.
 
 #### Veredicto y deuda conocida
 

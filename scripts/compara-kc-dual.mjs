@@ -10,12 +10,19 @@
 // modelo. La pregunta es: ¿cambia las DECISIONES, el agua recomendada y los
 // ahorros lo bastante como para justificar tocar el motor?
 //
-// `--validar` contrasta esta implementación contra pyfao56 antes de creerse nada.
+// `--validar` contrasta esta implementación contra pyfao56 ANTES de creerse
+// nada, con inputs idénticos y riego fijo. Necesita python3 con pyfao56 y pandas
+// instalados; si no están, lo dice y sale sin fingir que ha validado.
 import { createRequire } from "module";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 const require = createRequire(import.meta.url);
-const RAIZ = "/Users/marti/Desktop/kylia-1";
-const M = require(`${RAIZ}/assets/js/motor-riego.js`);
-const { climaSerie } = require(`${RAIZ}/api/_clima.js`);
+// Relativo al propio fichero: una ruta absoluta con el home de quien lo escribió
+// hace que el script solo funcione en un portátil. Lo cazó Codex al intentar
+// reproducir los resultados.
+const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
+const M = require(join(RAIZ, "assets", "js", "motor-riego.js"));
+const { climaSerie } = require(join(RAIZ, "api", "_clima.js"));
 
 // ── Kcb basal, FAO-56 Tabla 17 ──────────────────────────────────
 // El motor lleva Kc ÚNICO (Tabla 12), que incluye la evaporación media del
@@ -135,8 +142,61 @@ function simularDual(serie, opts = {}) {
 
 export { simularDual, KCB, CAPA, FW };
 
+// ── Validación contra pyfao56 ───────────────────────────────────
+// Esto es lo que hace creíble todo lo de abajo. Sin ello, la comparación sería
+// "mi dual contra el motor", y un error mío parecería un hallazgo: en la primera
+// pasada la capa evaporativa arrancaba húmeda y el riego se descontaba dos veces
+// de De, y el dual salía un 57% por encima del único. Los dos errores los cazó
+// esta validación, no la lectura del código.
+async function validar() {
+  const { execFileSync } = await import("child_process");
+  const fs = await import("fs");
+  const os = await import("os");
+  const script = join(RAIZ, "scripts", "valida_kc_dual.py");
+  if (!fs.existsSync(script)) { console.error(`falta ${script}`); process.exit(1); }
+  let crudo;
+  try {
+    crudo = execFileSync("python3", [script], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  } catch (e) {
+    console.error("No se pudo ejecutar la referencia pyfao56.");
+    console.error("Necesita:  pip install pyfao56 pandas");
+    console.error(String(e.stderr || e.message).split("\n").slice(-5).join("\n"));
+    process.exit(1);
+  }
+  const ref = JSON.parse(crudo);
+  const serie = ref.dias.map(d => ({ date: d.date, et0: d.et0, lluvia: d.rain, tmax: 30, tmin: 16 }));
+  const fijos = new Set(serie.filter((_, i) => i % ref.cada === 0 && i > 0).map(d => d.date));
+  const r = simularDual(serie, {
+    suelo: ref.suelo, cultivoId: ref.cultivo, metodoRiego: ref.metodo,
+    fechaPlantacion: serie[0].date, termico: false,
+    riegosFijos: fijos, riegoFijoMm: ref.riego_mm,
+  });
+  const n = Math.min(r.diario.length, ref.dias.length);
+  const mias = r.diario.slice(0, n), suyas = ref.dias.slice(0, n);
+  const rmse = (a, b) => Math.sqrt(a.reduce((s, x, i) => s + (x - b[i]) ** 2, 0) / a.length);
+  const suma = (a) => a.reduce((s, x) => s + x, 0);
+  const rKcb = rmse(mias.map(x => x.kcb), suyas.map(x => x.Kcb));
+  const rKe  = rmse(mias.map(x => x.Ke),  suyas.map(x => x.Ke));
+  const rETa = rmse(mias.map(x => x.etc), suyas.map(x => x.ETa));
+  const rDr  = rmse(mias.map(x => x.Dr),  suyas.map(x => x.Dr));
+  const etaMia = suma(mias.map(x => x.etc)), etaRef = suma(suyas.map(x => x.ETa));
+  console.log(`Validación contra pyfao56 · ${ref.cultivo}, ${ref.suelo}, ${n} días desde ${ref.dias[0].date}`);
+  console.log(`  (${ref.lat}, ${ref.lon}) · riego fijo ${ref.riego_mm} mm cada ${ref.cada} d · clima: ${ref.fuente}`);
+  console.log(`  RMSE Kcb ${rKcb.toFixed(4)}  ·  Ke ${rKe.toFixed(3)}  ·  ETa ${rETa.toFixed(3)} mm/d  ·  Dr ${rDr.toFixed(2)} mm`);
+  console.log(`  ETa acumulada: pyfao56 ${etaRef.toFixed(1)} · esta implementación ${etaMia.toFixed(1)} (${((etaMia / etaRef - 1) * 100).toFixed(1)}%)`);
+  // Umbrales: lo bastante fiel para responder "¿merece la pena el dual?", no
+  // para sustituir a pyfao56.
+  const fallos = [];
+  if (rKcb > 0.001) fallos.push(`Kcb RMSE ${rKcb.toFixed(4)} > 0,001`);
+  if (Math.abs(etaMia / etaRef - 1) > 0.03) fallos.push(`ETa acumulada difiere más del 3%`);
+  if (rDr > 6) fallos.push(`Dr RMSE ${rDr.toFixed(2)} mm > 6`);
+  if (fallos.length) { console.error("\n❌ NO VALIDADA: " + fallos.join(" · ")); process.exit(1); }
+  console.log("\n✅ Referencia validada: los resultados de la comparación son creíbles dentro de esos márgenes.");
+}
+
 // ── Ejecución ───────────────────────────────────────────────────
 if (process.argv[1]?.endsWith("compara-kc-dual.mjs")) {
+  if (process.argv.includes("--validar")) { await validar(); process.exit(0); }
   const PIL = [
     { n: "Ferran · tomate · goteo",      lat: 41.749, lon: 2.556, plant: "2026-05-30", desde: "2026-06-13", hasta: "2026-09-08", cul: "tomate",  met: "goteo",     aplico: 412.3 },
     { n: "Oriol · cebolla · aspersión",  lat: 41.668, lon: 2.750, plant: "2026-06-24", desde: "2026-06-24", hasta: "2026-08-12", cul: "cebolla", met: "aspersion", aplico: 360.0 },

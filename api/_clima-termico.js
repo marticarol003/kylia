@@ -39,9 +39,12 @@ const MAX_PAST_FORECAST = 92;   // tope de la API de pronóstico
 const cache = new Map();
 const TTL = { serie: 6 * 3600e3, normales: 30 * 24 * 3600e3 };
 
-function hoyISO()             { return new Date().toISOString().slice(0, 10); }
-function sumarDias(iso, n)    { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
-function diasEntre(a, b)      { return Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / 86400000); }
+// La regla de clima (día civil en Europe/Madrid, quién manda en cada día) sale
+// del MISMO fichero que usa api/_clima.js y que carga la app. Aquí vivía la
+// tercera copia: su hoyISO iba en UTC, así que en la franja de medianoche el
+// reloj térmico podía coger del pronóstico un día que ya era pasado.
+const R = require("../assets/js/clima-reglas.js");
+const { hoyISO, sumarDias, diasEntre } = R;
 
 function guardado(clave, ttl) {
   const hit = cache.get(clave);
@@ -49,18 +52,19 @@ function guardado(clave, ttl) {
 }
 function guardar(clave, v) { cache.set(clave, { t: Date.now(), v }); return v; }
 
-function aSerie(d) {
+function aSerie(d, fuente) {
   return (d?.time || []).map((date, i) => ({
     date,
     tmax: d.temperature_2m_max?.[i] ?? null,
     tmin: d.temperature_2m_min?.[i] ?? null,
+    fuente: fuente || null,          // para poder declarar de dónde salió el calor
   })).filter(x => x.tmax != null && x.tmin != null);
 }
 
-async function pedir(url) {
+async function pedir(url, fuente) {
   const res = await fetchConTimeout(url);
   if (!res.ok) throw new Error(`open-meteo ${res.status}`);
-  return aSerie((await res.json()).daily);
+  return aSerie((await res.json()).daily, fuente);
 }
 
 // Serie diaria de Tmax/Tmin desde `desde` (la plantación) hasta +16 días.
@@ -82,20 +86,15 @@ async function serieTermica(lat, lon, desde) {
   const partes = await Promise.all([
     pedir(`${FORECAST}?latitude=${lat}&longitude=${lon}`
           + `&daily=temperature_2m_max,temperature_2m_min`
-          + `&past_days=${past}&forecast_days=16&timezone=${TZ}`).catch(() => []),
+          + `&past_days=${past}&forecast_days=16&timezone=${TZ}`, "pronostico").catch(() => []),
     pedir(`${ARCHIVE}?latitude=${lat}&longitude=${lon}`
           + `&start_date=${ini}&end_date=${hoy}`
-          + `&daily=temperature_2m_max,temperature_2m_min&timezone=${TZ}`).catch(() => []),
+          + `&daily=temperature_2m_max,temperature_2m_min&timezone=${TZ}`, "archivo").catch(() => []),
   ]);
 
-  const mapa = new Map();
-  for (const d of partes[0]) mapa.set(d.date, d);                       // pronóstico: hoy y futuro
-  for (const d of partes[1]) if (d.date < hoy) mapa.set(d.date, d);     // archivo: manda en el pasado
-
-  const serie = [...mapa.values()]
-    .filter(d => d.date >= ini)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  return guardar(clave, serie);
+  // MISMA fusión que el clima de riego, del mismo fichero: pasado → archivo,
+  // hoy y futuro → pronóstico, y lo que el archivo no cubra queda marcado.
+  return guardar(clave, R.fusionar(partes[0], partes[1], hoy, ini));
 }
 
 // Medias mensuales de los últimos `anios` años completos, para proyectar más

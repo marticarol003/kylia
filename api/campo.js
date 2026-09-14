@@ -13,7 +13,7 @@
 // aquí solo se leen las filas y se ensambla.
 
 const { isConfigured, supabaseSelect, supabaseUpdate, preludio } = require("./_supabase.js");
-const { balanceHidrico, decisionRiego, presentarRiego, laminaRiego, simularKylia, faseDelDia, ventanaMadurez, curvaFenologica } = require("./_motor-riego.js");
+const { balanceHidrico, decisionRiego, presentarRiego, laminaRiego, laminaDeAccion, simularKylia, faseDelDia, ventanaMadurez, curvaFenologica } = require("./_motor-riego.js");
 const { construirReveal, motivoClimaNoPublicable } = require("./_reveal.js");
 const { necesidadNutrientes, creditoResiduosN } = require("./_motor-nutricion.js");
 const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
@@ -25,7 +25,9 @@ const { serieTermica, normalesMensuales } = require("./_clima-termico.js");
 
 const ES_UUID = /^[0-9a-f-]{36}$/i;
 
-function hoyISO() { return new Date().toISOString().slice(0, 10); }
+// hoyISO viene de _clima.js: el día CIVIL en Europe/Madrid, no el día UTC.
+// Entre las 00:00 y las 02:00 locales no son el mismo, y de eso dependía qué
+// fuente de clima se usaba para el día anterior. Ver assets/js/clima-reglas.js.
 
 // Último día que cuenta para este piloto: el de la cosecha si ya pasó, si no hoy.
 // Todo lo que mira "hasta cuándo" tiene que pasar por aquí — el contrafactual
@@ -48,7 +50,7 @@ function diasDesde(fechaIso) {
 // dejaba mandar al pronóstico en el solape, y sobre el piloto de Ferran eso
 // costaba +17,9% de lámina (463,9 contra 393,6 L/m²) y 17 puntos de ahorro
 // publicado. El porqué entero, con las medidas, está en la cabecera de _clima.js.
-const { climaSerie, procedencia, diasConDato } = require("./_clima.js");
+const { climaSerie, procedencia, diasConDato, hoyISO } = require("./_clima.js");
 
 // ── Vista "hoy": recomendación de riego del día en cubos ─────────
 async function vistaHoy(res, u) {
@@ -80,7 +82,7 @@ async function vistaHoy(res, u) {
     .map(f => ({ id: f.id, date: f.fecha_local, duracion_min: f.duracion_min ?? null,
                  // El cantidad_l_m2 guardado se congeló con el caudal del día del
                  // riego; el balance tiene que ver la lámina del caudal de HOY.
-                 litros: laminaRiego(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal) }));
+                 litros: laminaDeAccion(f, u.caudal).mm }));
 
   // Reloj fenológico: la temperatura de TODO el ciclo, que puede empezar antes
   // de donde llega `serie` (el pronóstico solo da 92 días de pasado y un tomate
@@ -295,7 +297,7 @@ async function vistaPerfil(res, u) {
       `usuario_id=eq.${u.id}&tipo=eq.aplicacion&select=id,fecha_local,producto_nombre,dosis,motivo&order=fecha_local.desc&limit=8`),
   ]);
   const recientes = (accs || []).filter(f => f.fecha_local).map(f => {
-    const l_m2 = laminaRiego(f.cantidad_l_m2, f.duracion_min ?? null, u.caudal);
+    const l_m2 = laminaDeAccion(f, u.caudal).mm;
     return {
       id: f.id, fecha: f.fecha_local, l_m2, duracion_min: f.duracion_min ?? null,
       cubos: (u.capacidad_regadera && u.area_m2 && l_m2 != null)
@@ -405,7 +407,7 @@ async function vistaCuaderno(req, res, u) {
       `&select=id,fecha_local,producto_nombre,dosis,coste_estimado_eur,notas,nutrientes&order=fecha_local.asc`),
     supabaseSelect("acciones",
       `usuario_id=eq.${u.id}&tipo=eq.riego` +
-      `&select=fecha_local,cantidad_l_m2,duracion_min,franja_horaria&order=fecha_local.asc`),
+      `&select=fecha_local,cantidad_l_m2,duracion_min,lamina_mm,lamina_origen,caudal_mmh,franja_horaria&order=fecha_local.asc`),
     supabaseSelect("acciones",
       `usuario_id=eq.${u.id}&tipo=in.(aplicacion,tratamiento)&or=(motivo.neq.abonado,motivo.is.null)` +
       `&select=id,fecha_local,producto_nombre,sustancia_activa,dosis,plazo_seguridad_dias,motivo,notas&order=fecha_local.asc`),
@@ -502,7 +504,7 @@ async function vistaCuaderno(req, res, u) {
     },
     riegos: (riegos || []).filter(r => r.fecha_local).map(r => ({
       fecha: r.fecha_local, duracion_min: r.duracion_min ?? null,
-      l_m2: laminaRiego(r.cantidad_l_m2, r.duracion_min ?? null, u.caudal),
+      l_m2: laminaDeAccion(r, u.caudal).mm,
       franja: r.franja_horaria || null,
     })),
     tratamientos: (trats || []).filter(t => t.fecha_local).map(t => ({
@@ -543,7 +545,7 @@ async function revealDeUsuario(u) {
     supabaseSelect("recomendaciones_log",
       `usuario_id=eq.${u.id}${fRec}&select=fecha,tipo,cantidad_l_m2,nivel&order=fecha.asc`),
     supabaseSelect("acciones",
-      `usuario_id=eq.${u.id}${fAcc}&select=fecha_local,tipo,cantidad_l_m2,duracion_min,producto_nombre,motivo&order=fecha_local.asc`),
+      `usuario_id=eq.${u.id}${fAcc}&select=fecha_local,tipo,cantidad_l_m2,duracion_min,lamina_mm,lamina_origen,caudal_mmh,producto_nombre,motivo&order=fecha_local.asc`),
     supabaseSelect("jornadas", `usuario_id=eq.${u.id}&select=fuente_decision`),
   ]);
 
@@ -552,7 +554,7 @@ async function revealDeUsuario(u) {
   const tratKylia = (recs || []).filter(r => r.tipo === "tratamiento" || r.tipo === "nutricion")
     .map(r => ({ dia: dia(r.fecha) }));
   const riegosReales = (acciones || []).filter(a => a.tipo === "riego")
-    .map(a => ({ dia: dia(a.fecha_local), l_m2: laminaRiego(a.cantidad_l_m2, a.duracion_min ?? null, u.caudal) }));
+    .map(a => ({ dia: dia(a.fecha_local), l_m2: laminaDeAccion(a, u.caudal).mm }));
   // Los abonados (motivo="abonado") NO son tratamientos fitosanitarios: van al
   // cuaderno de fertilización (vista=cuaderno), no a la dimensión de plagas.
   const tratReales = (acciones || [])
@@ -604,6 +606,7 @@ async function revealDeUsuario(u) {
         // alguien va a publicar.
         contrafactual = { puntos: sim.puntos, total: sim.total, deficitFinal: sim.deficitFinal,
                           coberturaClima: sim.coberturaClima, diasSinClima: sim.diasSinClima,
+                          diasSinLluviaConocida: sim.diasSinLluviaConocida,
                           modoFenologia: sim.modoFenologia };
       }
     } catch (_) { /* sin clima → método heredado (recomendaciones_log) */ }
@@ -698,7 +701,7 @@ async function vistaComparativa(req, res, u) {
   const serie = await climaSerie(u.lat, u.lon, u.fecha_plantacion, { futuro: 7 });
   const [riegos, aplics] = await Promise.all([
     supabaseSelect("acciones",
-      `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.asc`),
+      `usuario_id=eq.${u.id}&tipo=eq.riego&select=fecha_local,cantidad_l_m2,duracion_min,lamina_mm,lamina_origen,caudal_mmh&order=fecha_local.asc`),
     supabaseSelect("acciones",
       `usuario_id=eq.${u.id}&tipo=eq.aplicacion&select=fecha_local,producto_nombre&order=fecha_local.asc`),
   ]);
@@ -758,8 +761,13 @@ async function vistaComparativa(req, res, u) {
   // L/m² de un riego bajo un caudal dado (misma regla que el resto: la duración
   // manda). Sin duración (cantidad apuntada a mano) → el valor guardado, que es
   // idéntico en ambos escenarios de la banda.
+  // Aquí el caudal es un ESCENARIO (la banda bajo/alto), así que recalcular es
+  // el propósito. Pero si el riego trae su lámina congelada, esa es el dato y la
+  // banda no se la inventa: se devuelve tal cual en los dos escenarios.
   const lm2DeRiego = (r, caudal) =>
-    laminaRiego(r.cantidad_l_m2, r.duracion_min ?? null, caudal);
+    (r.lamina_mm != null && r.lamina_origen !== "backfill_caudal_actual")
+      ? Number(r.lamina_mm)
+      : laminaRiego(r.cantidad_l_m2, r.duracion_min ?? null, caudal);
 
   const bajoPorDia = {}, altoPorDia = {};
   let nRiegosPadre = 0, sinCantidad = 0;

@@ -156,7 +156,7 @@ async function obtenerToken() {
 // últimos 30 días, se queda con la observación válida más reciente. Devuelve el
 // objeto de medición o null (sin paso limpio). Lanza si la API responde error.
 async function medirParcela(token, lat, lon, geometry) {
-  const hoy    = new Date().toISOString().slice(0, 10);
+  const hoy    = require("../assets/js/clima-reglas.js").hoyISO();   // día civil, no UTC
   const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
   const bounds = buildBounds(geometry, lat, lon);
 

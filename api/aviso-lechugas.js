@@ -64,7 +64,9 @@ function destinatariosEmail(hayWhatsapp) {
   return hayWhatsapp ? [] : [EMAIL_DEFECTO];  // sin ningún canal → email de Martí
 }
 
-function hoyISO() { return new Date().toISOString().slice(0, 10); }
+// Día CIVIL en Europe/Madrid. Con el día UTC, un aviso disparado en la franja
+// de medianoche se fecha el día anterior. Ver assets/js/clima-reglas.js.
+const { hoyISO } = require("./_clima.js");
 const fmtFecha = iso => { const [, m, d] = (iso || "").split("-"); return d ? `${d}/${m}` : "—"; };
 
 // La vista "hoy" del propio /api/campo: misma decisión que ve el padre en pantalla.

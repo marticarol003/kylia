@@ -3363,6 +3363,11 @@
        lo reexporta). Antes estaba duplicado dentro de este HTML y las dos copias
        decidían distinto sobre los mismos datos. -->
   <script src="/assets/js/motor-riego.js"></script>
+  <!-- Reglas de clima: el MISMO fichero que hace require api/_clima.js. Aquí
+       vivía la cuarta copia de "qué día es hoy" y "qué fuente manda", y su
+       hoyISO iba en UTC — entre las 00:00 y las 02:00 locales eso hace que el
+       día de ayer se resuelva con pronóstico en vez de con histórico. -->
+  <script src="/assets/js/clima-reglas.js"></script>
   <!-- Partir un recinto por una recta, para separar cultivos en fincas grandes.
        Núcleo puro compartido con los tests (tests/test-geo-parcela.mjs). -->
   <script src="/assets/js/geo-parcela.js"></script>
@@ -4552,7 +4557,7 @@
 
     // Devuelve aplicaciones con plazo de seguridad aún activo (fecha + plazo > hoy)
     function aplicacionesConPlazoActivo() {
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = KyliaClima.hoyISO();
       return aplicaciones.filter(a => {
         if (!a.plazoSeguridad || a.plazoSeguridad <= 0) return false;
         const limite = new Date(a.date);
@@ -4649,7 +4654,7 @@
     async function cargarNDVI(forzar = false) {
       const btnRefreshParcela = document.getElementById("btn-refresh-parcela");
 
-      const hoy     = new Date().toISOString().slice(0, 10);
+      const hoy     = KyliaClima.hoyISO();
       let   history = loadNdviHistory();
       let   entrada = history.find(h => h.date === hoy);
 
@@ -4805,7 +4810,7 @@
         };
         // Sincronizar humedad de suelo (capas) con Supabase
         try {
-          const hoyIso = new Date().toISOString().slice(0, 10);
+          const hoyIso = KyliaClima.hoyISO();
           window.kyliaSync?.medicion({
             fecha:        hoyIso,
             suelo_0_7:    ultimoSuelo.hoy[0] ?? null,
@@ -4872,7 +4877,7 @@
       // planificar — que es justo lo contrario de para qué sirve.
       let Dr = b.Dr > b.raw ? 0 : b.Dr;
       const dias = [];
-      const hoyStr = new Date().toISOString().slice(0, 10);
+      const hoyStr = KyliaClima.hoyISO();
       for (const d of pronosticoET0) {
         if (d.date <= hoyStr) continue;
         const df = MOTOR.diasEntre(cfg.fechaPlantacion, new Date(`${d.date}T12:00:00`));
@@ -4887,7 +4892,7 @@
     // Puerta SOLO para pruebas en navegador sin red (tests/*.mjs con puppeteer).
     // No la usa nada del producto.
     window.__inyectar = (serie) => {
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = KyliaClima.hoyISO();
       ultimoET0     = serie.filter(d => d.date <= hoy);   // igual que cargarET0
       pronosticoET0 = serie.filter(d => d.date >= hoy);   // igual que cargarPronostico
       renderHoy(); renderCalendario();
@@ -4903,7 +4908,7 @@
           ? Math.floor((Date.now() - new Date(`${cfg.fechaPlantacion}T12:00:00`)) / 86400000) + 1
           : 14;
         const past = Math.min(92, Math.max(14, diasPlant));
-        const hoyISO   = new Date().toISOString().slice(0, 10);
+        const hoyISO   = KyliaClima.hoyISO();   // día CIVIL en Europe/Madrid, no UTC
         const desdeISO = cfg.fechaPlantacion
           ? String(cfg.fechaPlantacion).slice(0, 10)
           : new Date(Date.now() - past * 86400000).toISOString().slice(0, 10);
@@ -4939,14 +4944,7 @@
             // La lluvia sí cae a 0: no llover es un dato, no medir no lo es.
             // Tmax/Tmin van en la misma llamada (el reloj fenológico del motor),
             // así que no cuestan una petición más.
-            return (d.time || []).map((date, i) => ({
-              date,
-              et0:    d.et0_fao_evapotranspiration?.[i],
-              lluvia: d.precipitation_sum?.[i] ?? 0,
-              tmax:   d.temperature_2m_max?.[i] ?? null,
-              tmin:   d.temperature_2m_min?.[i] ?? null,
-              fuente,
-            })).filter(x => x.et0 != null);
+            return KyliaClima.diasConDato(d, fuente);
           } catch (_) { return []; }
         };
         const [pron, arch] = await Promise.all([
@@ -4958,12 +4956,10 @@
              + `&daily=${CAMPOS}&start_date=${desdeISO}&end_date=${hoyISO}&timezone=auto`, "archivo"),
         ]);
         if (!pron.length && !arch.length) return;
-        const mapaClima = new Map();
-        for (const d of pron) mapaClima.set(d.date, d);                      // hoy
-        for (const d of arch) if (d.date < hoyISO) mapaClima.set(d.date, d); // el pasado manda el archivo
-        ultimoET0 = [...mapaClima.values()]
-          .filter(d => d.date >= desdeISO)
-          .sort((a, b) => a.date.localeCompare(b.date));
+        // La fusión la hace el módulo compartido, no una copia local: pasado →
+        // archivo, hoy y futuro → pronóstico, y lo que el archivo no cubra queda
+        // marcado con su fuente.
+        ultimoET0 = KyliaClima.fusionar(pron, arch, hoyISO, desdeISO);
       } catch (_) {
         ultimoET0 = null;
       }
@@ -5377,7 +5373,7 @@
       card.hidden = false;
       const ultimas = aplicaciones.slice(-7).reverse();
       lista.innerHTML = "";
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = KyliaClima.hoyISO();
       ultimas.forEach(a => {
         const plazo = a.plazoSeguridad || 0;
         let badge = "";
@@ -5452,7 +5448,7 @@
       const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
-      const hoy  = new Date().toISOString().slice(0, 10);
+      const hoy  = KyliaClima.hoyISO();
       a.href = url;
       a.download = `kylia-aplicaciones-${hoy}.csv`;
       document.body.appendChild(a);
@@ -5949,7 +5945,7 @@
     function enviarRecomendacionesAlLog(recs) {
       if (!Array.isArray(recs) || !window.kyliaSync) return;
       try {
-        const hoy = new Date().toISOString().slice(0, 10);
+        const hoy = KyliaClima.hoyISO();
         const hashRecs = (recs.map(r => `${r.id}|${r.titulo}|${r.prioridad}`).join("·")) + "@" + hoy;
         if (sessionStorage.getItem("kylia_rec_hash") === hashRecs) return;
         sessionStorage.setItem("kylia_rec_hash", hashRecs);
@@ -7378,7 +7374,7 @@
         let paso = 0;
 
         const $ = id => document.getElementById(id);
-        const hoyISO = () => new Date().toISOString().slice(0, 10);
+        const hoyISO = () => KyliaClima.hoyISO();   // día civil en Europe/Madrid
         const menos = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
 
         window.__A = A;   // sonda para los tests de navegador
@@ -8954,7 +8950,7 @@
       return Math.round(caudal * (min / 60) * 10) / 10;
     }
     function abrirModalRiego(fecha = null) {
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = KyliaClima.hoyISO();
       riegoPendiente = fecha && fecha <= hoy ? fecha : hoy;
       const mm = mmDeSuRiego();
       const cuando = riegoPendiente === hoy ? "hoy" : `el ${formatearFechaCorta(riegoPendiente)}`;
@@ -8982,7 +8978,7 @@
     // tabla comparativa. Si no, modal abierto en blanco para entrada libre.
     function abrirModalAplicacion(prefill = {}) {
       const modal = document.getElementById("modal-aplicacion");
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = KyliaClima.hoyISO();
 
       document.getElementById("modal-apl-fecha").value = hoy;
       document.getElementById("modal-apl-fecha").max = hoy;

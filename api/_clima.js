@@ -23,8 +23,12 @@
 // ET₀ alta de una y sin la lluvia de la otra. Es lo peor de cada casa.
 //
 // ⚠️ POR QUÉ EL ARCHIVO Y NO EL PRONÓSTICO, cuando contra las estaciones de la
-// XEMA ninguna de las dos gana claramente (ET₀: RMSE 0,44-0,88 el archivo,
-// 0,47-0,99 el pronóstico; lluvia: las dos fallan mucho). Por ESTABILIDAD, no
+// XEMA ninguna de las dos gana claramente. Medido con scripts/valida-clima-xema.mjs
+// (evidencia en docs/tecnico/validacion-clima-xema-2026-09-14.json): en ET₀ las
+// dos se mueven en un RMSE diario de 0,46-1,43 mm y se turnan según el punto; en
+// LLUVIA las dos fallan mucho y en direcciones opuestas —el archivo se pasa un
+// +105% en Sant Boi y un +284% en Amposta, el pronóstico se queda corto un −78%
+// en Breda—. No hay una fuente "buena" que elegir. Se elige por ESTABILIDAD, no
 // por puntería: el pronóstico REESCRIBE el pasado —el mismo día de julio vale
 // una cosa hoy y otra dentro de un mes, y a los ~64 días desaparece de su
 // respuesta—, así que un balance calculado con él no se puede reconstruir. El
@@ -37,6 +41,12 @@
 // vieja que regalaba casi una semana de pasado al pronóstico sin motivo.
 
 const { fetchConTimeout } = require("./_http.js");
+// La REGLA (qué día es hoy en Europe/Madrid, qué fuente manda en cada día, qué
+// es un hueco) vive en UN fichero que cargan los dos lados, igual que el motor:
+// el servidor por este require y el navegador por <script src>. Aquí solo queda
+// la red. Que las cuatro copias de la regla coincidan hoy no impide que dentro
+// de tres meses no.
+const R = require("../assets/js/clima-reglas.js");
 
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
 const ARCHIVE  = "https://archive-api.open-meteo.com/v1/archive";
@@ -47,33 +57,7 @@ const MAX_PAST_FORECAST = 92;    // tope duro de la API de pronóstico
 const TTL_MS = 30 * 60 * 1000;
 const cache = new Map();
 
-function hoyISO() { return new Date().toISOString().slice(0, 10); }
-function sumarDias(iso, n) {
-  const d = new Date(`${iso}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-function diasEntre(a, b) {
-  return Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / 86400000);
-}
-
-// Un día solo entra si trae ET₀. UN DATO QUE FALTA NO ES UN CERO: sin ET₀ no hay
-// demanda que calcular, y rellenarla con cero es decir que ese día el cultivo no
-// gastó agua. Es el defecto que costó los dos informes de piloto del 11-sep-2026
-// —39 días del ciclo de Ferran entraron a cero— y vivía en las cuatro copias que
-// cargaban clima. Aquí solo hay una.
-// La lluvia sí cae a 0: no llover es un dato, no medir no lo es, pero llegado
-// aquí el día ya trae ET₀, así que el hueco sería solo de lluvia.
-function diasConDato(d, fuente) {
-  return (d?.time || []).map((date, i) => ({
-    date,
-    et0:    d.et0_fao_evapotranspiration?.[i],
-    lluvia: d.precipitation_sum?.[i] ?? 0,
-    tmax:   d.temperature_2m_max?.[i] ?? null,
-    tmin:   d.temperature_2m_min?.[i] ?? null,
-    fuente,
-  })).filter(x => x.et0 != null);
-}
+const { hoyISO, sumarDias, diasEntre, diasConDato, procedencia } = R;
 
 async function pedir(url, fuente) {
   const r = await fetchConTimeout(url).catch(() => null);
@@ -119,13 +103,7 @@ async function climaSerie(lat, lon, desde, opts = {}) {
   // en el punto donde se decide. Mañana, cuando hoy sea pasado, el archivo lo
   // sustituye solo. Eso es lo que significa "la previsión deja de mandar en
   // cuanto el día termina".
-  const mapa = new Map();
-  for (const d of pron) mapa.set(d.date, d);          // primero el pronóstico…
-  for (const d of arch) if (d.date < hoy) mapa.set(d.date, d);   // …y el archivo MANDA en el pasado
-
-  return guardar(clave, hoy, [...mapa.values()]
-    .filter(d => d.date >= ini)
-    .sort((a, b) => a.date.localeCompare(b.date)));
+  return guardar(clave, hoy, R.fusionar(pron, arch, hoy, ini));
 }
 
 function guardar(clave, hoy, serie) {
@@ -133,24 +111,5 @@ function guardar(clave, hoy, serie) {
   return serie;
 }
 
-/**
- * De dónde salió cada día de una serie. Para que quien publique un número pueda
- * declararlo, igual que ya declara la cobertura de clima.
- */
-function procedencia(serie, hoy = hoyISO()) {
-  const s = Array.isArray(serie) ? serie : [];
-  const pasados = s.filter(d => d.date < hoy);
-  const archivo = pasados.filter(d => d.fuente === "archivo").length;
-  return {
-    dias: s.length,
-    dias_pasados: pasados.length,
-    pasado_archivo: archivo,
-    pasado_pronostico: pasados.length - archivo,
-    // 1 = todo el pasado salió del histórico, que es la regla. Por debajo de 1,
-    // parte del pasado se calculó con pronóstico (el archivo falló) y hay mezcla.
-    coherencia: pasados.length ? Math.round((archivo / pasados.length) * 1000) / 1000 : 1,
-    futuro: s.filter(d => d.date > hoy).length,
-  };
-}
-
-module.exports = { climaSerie, procedencia, diasConDato, hoyISO, sumarDias, diasEntre, MAX_PAST_FORECAST };
+module.exports = { climaSerie, procedencia, diasConDato, hoyISO, sumarDias, diasEntre,
+                   fusionar: R.fusionar, horaLocal: R.horaLocal, MAX_PAST_FORECAST };
