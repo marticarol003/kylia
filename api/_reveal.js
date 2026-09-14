@@ -215,6 +215,19 @@ function dimAgua(riegosReales, riegosKylia, contrafactual) {
     // invitar a que alguien las copie al informe sin leer el motivo.
     publicable,
     motivo_no_publicable: publicable ? null : razones.join("; "),
+    // QUÉ CLASE DE NÚMERO ES ESTE, y no es un detalle de nomenclatura. Se
+    // mezclaban cuatro cosas distintas bajo la palabra "ahorro":
+    //   1. consistencia técnica  — que el motor haga lo que dice (RMSE vs FAO-56)
+    //   2. contrafactual         — lo que Kylia habría aplicado vs lo que aplicó él
+    //   3. ahorro POTENCIAL      — la diferencia del 2, si hubiera seguido a Kylia
+    //   4. ahorro DEMOSTRADO     — el que se mide cuando alguien SIGUE a Kylia
+    //                              en una parcela y se compara con un control
+    // Esto es (2) y (3). NUNCA es (4): en un piloto ciego el agricultor riega a
+    // su manera, así que no hay nada que demostrar — solo que simular. Llamarlo
+    // "ahorro" a secas es lo que llevó a publicar dos informes que no se
+    // sostenían. El detalle está en docs/tecnico/metricas.md.
+    clase_metrica: "log_heredado",
+    ahorro_demostrado: false,
     cobertura_clima: cobertura,
     dias_sin_clima: null,
     riegos_sin_cantidad: sinCifra.length
@@ -398,6 +411,19 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
     // que se cometió el 10-sep con los dos pilotos.
     publicable,
     motivo_no_publicable: publicable ? null : razones.join("; "),
+    // QUÉ CLASE DE NÚMERO ES ESTE, y no es un detalle de nomenclatura. Se
+    // mezclaban cuatro cosas distintas bajo la palabra "ahorro":
+    //   1. consistencia técnica  — que el motor haga lo que dice (RMSE vs FAO-56)
+    //   2. contrafactual         — lo que Kylia habría aplicado vs lo que aplicó él
+    //   3. ahorro POTENCIAL      — la diferencia del 2, si hubiera seguido a Kylia
+    //   4. ahorro DEMOSTRADO     — el que se mide cuando alguien SIGUE a Kylia
+    //                              en una parcela y se compara con un control
+    // Esto es (2) y (3). NUNCA es (4): en un piloto ciego el agricultor riega a
+    // su manera, así que no hay nada que demostrar — solo que simular. Llamarlo
+    // "ahorro" a secas es lo que llevó a publicar dos informes que no se
+    // sostenían. El detalle está en docs/tecnico/metricas.md.
+    clase_metrica: "contrafactual_simulado",
+    ahorro_demostrado: false,
     cobertura_clima: cobertura,
     dias_sin_clima: cf.diasSinClima ?? null,
     riegos_sin_cantidad: sinCifra.length
@@ -409,6 +435,8 @@ function dimAguaDesdeContrafactual(riegosReales, cf) {
     exceso_l_m2:      publicable ? r1(exceso) : null,
     exceso_pct:       excesoPct,
     ahorro_pct:       ahorroPct,
+    // El mismo número con el nombre que dice lo que es.
+    ahorro_potencial_pct: ahorroPct,
     dias_regado_real: new Set(realesEnPeriodo.map(r => r.dia)).size,
     dias_regar_kylia: Object.values(kyliaByDay).filter(v => v > 0).length,
     por_semana: porSemana,
