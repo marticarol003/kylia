@@ -92,12 +92,12 @@ const campo = readFileSync(join(RAIZ, "api", "campo.js"), "utf8");
 ok(/decisionRiego\(balHoy, \{ lluviaPrevista: serie\.slice\(corte \+ 1\) \}\)/.test(campo),
    "campo.js (vista de hoy, y el correo del padre) sí lo pasa");
 const diarioB = readFileSync(join(RAIZ, "api", "diario-b.js"), "utf8");
-ok(/forecast_days=1/.test(diarioB) && !/lluviaPrevista/.test(diarioB),
+ok(/\{ futuro: 1 \}/.test(diarioB) && !/lluviaPrevista/.test(diarioB),
    "diario-b NO: congela la decisión del piloto con la misma regla con la que se publicó el reveal");
 
 console.log("── la app mira la misma ventana que el servidor ──");
 const app = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
-ok(/past_days=\$\{past\}&forecast_days=1/.test(app),
+ok(/forecast_days=1&timezone=auto`, "pronostico"\)/.test(app),
    "app/index.html incluye HOY en el balance (con forecast_days=0 se dejaba ~5 mm)");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }

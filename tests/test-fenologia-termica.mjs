@@ -198,7 +198,11 @@ const leer = f => readFileSync(join(RAIZ, ...f), "utf8");
 const campo   = leer(["api", "campo.js"]);
 const diarioB = leer(["api", "diario-b.js"]);
 const app     = leer(["app", "index.html"]);
-for (const [nombre, src] of [["api/campo.js", campo], ["api/diario-b.js", diarioB], ["app/index.html", app]]) {
+// Desde el 14-sep los dos endpoints del servidor no piden clima: lo hace
+// api/_clima.js por ellos. Quien pide Tmax/Tmin es ese módulo (y la app, que
+// vive en el navegador y no puede compartir el require).
+const clima = leer(["api", "_clima.js"]);
+for (const [nombre, src] of [["api/_clima.js", clima], ["app/index.html", app]]) {
   ok(/temperature_2m_max,temperature_2m_min/.test(src),
      `${nombre} pide Tmax/Tmin a open-meteo (va en la misma llamada, no cuesta una petición más)`);
 }

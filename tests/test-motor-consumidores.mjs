@@ -30,8 +30,10 @@ console.log("── el pronóstico NO se mira en el Diario B, y es deliberado �
 // puede ver el futuro. Dárselo a un lado y no al otro inflaría el ahorro
 // publicado. La asimetría está razonada en tests/test-riego-pronostico.mjs.
 ok(!/lluviaPrevista/.test(diarioB), "diario-b no consulta el pronóstico");
-ok(/forecast_days=1/.test(diarioB),
-   "y su serie pide forecast_days=1, que es 'hoy incluido': no hay futuro que recortar");
+ok(/climaSerie\(u\.lat, u\.lon, u\.fecha_plantacion, \{ futuro: 1 \}\)/.test(diarioB),
+   "y su serie pide `futuro: 1`, que es 'hoy incluido': no hay futuro que recortar");
+ok(/climaSerie\(u\.lat, u\.lon, u\.fecha_plantacion, \{ futuro: 7 \}\)/.test(campo),
+   "mientras campo.js sí pide 7 días: ahí se aconseja hoy, no se congela nada");
 ok(/AQUÍ NO SE MIRA EL PRONÓSTICO, Y ES A PROPÓSITO/.test(diarioB),
    "con el porqué escrito al lado, para que no lo 'arregle' el siguiente");
 ok(/decisionRiego\(balHoy, \{ lluviaPrevista: serie\.slice\(corte \+ 1\) \}\)/.test(campo),

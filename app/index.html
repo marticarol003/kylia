@@ -4903,39 +4903,67 @@
           ? Math.floor((Date.now() - new Date(`${cfg.fechaPlantacion}T12:00:00`)) / 86400000) + 1
           : 14;
         const past = Math.min(92, Math.max(14, diasPlant));
-        const url = `https://api.open-meteo.com/v1/forecast`
-          + `?latitude=${p.lat.toFixed(5)}&longitude=${p.lon.toFixed(5)}`
-        // forecast_days=1 = HOY incluido. Con 0, open-meteo cierra la serie AYER y
-        // el balance se dejaba un día entero de ETc: ~5 mm en agosto sobre un umbral
-        // de 13. La app enseñaba menos déficit que el servidor (que sí lo incluye) y
-        // podía decir "vigilar" donde /campo decía "regar" — el mismo desajuste que
-        // se cazó el 31-jul por otra causa. No se piden más días: nada en la app
-        // consume el pronóstico, y meterlo aquí lo colaría en los acumuladores de
-        // ET₀ "desde el último riego" (que suman todo lo que haya en la serie).
-          + `&daily=et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min&past_days=${past}&forecast_days=1&timezone=auto`;
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) return;
-        const data  = await res.json();
-        const dates = data?.daily?.time || [];
-        const vals  = data?.daily?.et0_fao_evapotranspiration || [];
-        const lluv  = data?.daily?.precipitation_sum || [];
-        // Tmax/Tmin: el reloj fenológico del motor. Van en la MISMA llamada, así
-        // que no cuestan una petición más, y con ellas el Kc deja de ir por días
-        // de calendario (que sobre la cebolleta de Oriol iban una fase por
-        // detrás toda la campaña). Ver FAO_GDD en assets/js/motor-riego.js.
-        const tmx   = data?.daily?.temperature_2m_max || [];
-        const tmn   = data?.daily?.temperature_2m_min || [];
-        // ⚠️ NADA DE `?? 0` SOBRE LA ET₀. Es el defecto que costó dos informes
-        // de piloto publicados con cifras falsas: la API devuelve null en los
-        // días que ya no recuerda, y contarlos como cero es decir que ese día el
-        // cultivo no gastó agua. UN DATO QUE FALTA NO ES UN CERO — el día se
-        // descarta, y el motor ya declara cuánta cobertura de clima tuvo.
-        // La lluvia sí cae a 0: no llover es un dato, no medir no lo es, pero
-        // llegado aquí el día ya trae ET₀, así que el hueco es solo de lluvia.
-        ultimoET0 = dates.map((date, i) => ({
-          date, et0: vals[i], lluvia: lluv[i] ?? 0,
-          tmax: tmx[i] ?? null, tmin: tmn[i] ?? null,
-        })).filter(d => d.et0 != null);
+        const hoyISO   = new Date().toISOString().slice(0, 10);
+        const desdeISO = cfg.fechaPlantacion
+          ? String(cfg.fechaPlantacion).slice(0, 10)
+          : new Date(Date.now() - past * 86400000).toISOString().slice(0, 10);
+        const CAMPOS = "et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min";
+
+        // ⚠️ LAS DOS FUENTES, CADA UNA EN SU SITIO: el ARCHIVO para el pasado y
+        // el PRONÓSTICO para hoy. Es la regla que api/_clima.js aplica en el
+        // servidor desde el 14-sep-2026, y aquí hace falta por lo de siempre: si
+        // la app carga su clima de una fuente y el servidor de otra, los dos
+        // lados vuelven a decidir distinto sobre la misma parcela. Ya pasó el
+        // 31-jul (19% de decisiones opuestas) y volvió a pasar el 11-sep.
+        //
+        // Esta era la ÚNICA de las cuatro copias que no bajaba al archivo nunca.
+        // El pronóstico reescribe el pasado —el mismo día vale una cosa hoy y
+        // otra dentro de un mes, y a los ~64 días desaparece— y en Breda eso son
+        // +8,7% de ET₀ y 28 mm menos de lluvia efectiva.
+        //
+        // forecast_days=1 = HOY incluido. Con 0, open-meteo cierra la serie AYER
+        // y el balance se dejaba un día entero de ETc: ~5 mm en agosto sobre un
+        // umbral de 13. No se piden más: nada en la app consume el pronóstico, y
+        // meterlo aquí lo colaría en los acumuladores de ET₀ "desde el último
+        // riego" (que suman todo lo que haya en la serie).
+        const leer = async (url, fuente) => {
+          try {
+            const r = await fetch(url, { cache: "no-store" });
+            if (!r.ok) return [];
+            const d = (await r.json())?.daily || {};
+            // ⚠️ NADA DE `?? 0` SOBRE LA ET₀. Es el defecto que costó dos
+            // informes de piloto publicados con cifras falsas: la API devuelve
+            // null en los días que ya no recuerda, y contarlos como cero es
+            // decir que ese día el cultivo no gastó agua. UN DATO QUE FALTA NO
+            // ES UN CERO — el día se descarta y el motor declara su cobertura.
+            // La lluvia sí cae a 0: no llover es un dato, no medir no lo es.
+            // Tmax/Tmin van en la misma llamada (el reloj fenológico del motor),
+            // así que no cuestan una petición más.
+            return (d.time || []).map((date, i) => ({
+              date,
+              et0:    d.et0_fao_evapotranspiration?.[i],
+              lluvia: d.precipitation_sum?.[i] ?? 0,
+              tmax:   d.temperature_2m_max?.[i] ?? null,
+              tmin:   d.temperature_2m_min?.[i] ?? null,
+              fuente,
+            })).filter(x => x.et0 != null);
+          } catch (_) { return []; }
+        };
+        const [pron, arch] = await Promise.all([
+          leer(`https://api.open-meteo.com/v1/forecast`
+             + `?latitude=${p.lat.toFixed(5)}&longitude=${p.lon.toFixed(5)}`
+             + `&daily=${CAMPOS}&past_days=${Math.min(10, past)}&forecast_days=1&timezone=auto`, "pronostico"),
+          leer(`https://archive-api.open-meteo.com/v1/archive`
+             + `?latitude=${p.lat.toFixed(5)}&longitude=${p.lon.toFixed(5)}`
+             + `&daily=${CAMPOS}&start_date=${desdeISO}&end_date=${hoyISO}&timezone=auto`, "archivo"),
+        ]);
+        if (!pron.length && !arch.length) return;
+        const mapaClima = new Map();
+        for (const d of pron) mapaClima.set(d.date, d);                      // hoy
+        for (const d of arch) if (d.date < hoyISO) mapaClima.set(d.date, d); // el pasado manda el archivo
+        ultimoET0 = [...mapaClima.values()]
+          .filter(d => d.date >= desdeISO)
+          .sort((a, b) => a.date.localeCompare(b.date));
       } catch (_) {
         ultimoET0 = null;
       }

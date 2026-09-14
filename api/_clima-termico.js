@@ -28,10 +28,13 @@ const FORECAST = "https://api.open-meteo.com/v1/forecast";
 const ARCHIVE  = "https://archive-api.open-meteo.com/v1/archive";
 const TZ       = "Europe%2FMadrid";
 
-// El archivo va con retraso; por debajo de esto no se le pregunta y manda el
-// pronóstico, que sí tiene el pasado reciente.
-const RETRASO_ARCHIVO_DIAS = 10;
-const MAX_PAST_FORECAST    = 92;   // tope de la API de pronóstico
+// MISMA REGLA QUE api/_clima.js: el pasado se mira en el archivo y el futuro en
+// el pronóstico. Aquí había un `RETRASO_ARCHIVO_DIAS = 10` —y campo.js tenía un
+// 6— que daban por hecho que el archivo iba con retraso. No va: comprobado el
+// 14-sep-2026, tiene dato de hoy en las cuatro coordenadas probadas. Ese margen
+// le regalaba al pronóstico diez días de pasado, y con ellos el reloj térmico de
+// un mismo día cambiaba según cuándo se consultara.
+const MAX_PAST_FORECAST = 92;   // tope de la API de pronóstico
 
 const cache = new Map();
 const TTL = { serie: 6 * 3600e3, normales: 30 * 24 * 3600e3 };
@@ -70,30 +73,24 @@ async function serieTermica(lat, lon, desde) {
   const hit   = guardado(clave, TTL.serie);
   if (hit) return hit;
 
-  const hoy      = hoyISO();
-  const atras    = Math.max(1, diasEntre(ini, hoy) + 1);
-  const past     = Math.min(MAX_PAST_FORECAST, atras);
-  const cortePrn = sumarDias(hoy, -past);            // primer día que cubre el pronóstico
+  const hoy   = hoyISO();
+  const atras = Math.max(1, diasEntre(ini, hoy) + 1);
+  const past  = Math.min(MAX_PAST_FORECAST, Math.min(10, atras));
 
-  const tareas = [pedir(
-    `${FORECAST}?latitude=${lat}&longitude=${lon}`
-    + `&daily=temperature_2m_max,temperature_2m_min`
-    + `&past_days=${past}&forecast_days=16&timezone=${TZ}`)];
+  // El pronóstico cubre HOY y los 16 días que vienen (el reloj térmico proyecta
+  // el final del ciclo); el archivo cubre todo el pasado, desde la plantación.
+  const partes = await Promise.all([
+    pedir(`${FORECAST}?latitude=${lat}&longitude=${lon}`
+          + `&daily=temperature_2m_max,temperature_2m_min`
+          + `&past_days=${past}&forecast_days=16&timezone=${TZ}`).catch(() => []),
+    pedir(`${ARCHIVE}?latitude=${lat}&longitude=${lon}`
+          + `&start_date=${ini}&end_date=${hoy}`
+          + `&daily=temperature_2m_max,temperature_2m_min&timezone=${TZ}`).catch(() => []),
+  ]);
 
-  // ¿Se queda ciclo por debajo del pronóstico? Entonces el archivo cubre la cola.
-  if (ini < cortePrn) {
-    const fin = sumarDias(hoy, -RETRASO_ARCHIVO_DIAS);
-    tareas.push(pedir(
-      `${ARCHIVE}?latitude=${lat}&longitude=${lon}`
-      + `&start_date=${ini}&end_date=${fin < ini ? ini : fin}`
-      + `&daily=temperature_2m_max,temperature_2m_min&timezone=${TZ}`));
-  }
-
-  const partes = await Promise.all(tareas.map(t => t.catch(() => [])));
-  // El pronóstico manda en el solape: es la observación más fresca del mismo día.
   const mapa = new Map();
-  for (const p of partes.slice(1)) for (const d of p) mapa.set(d.date, d);
-  for (const d of partes[0])                          mapa.set(d.date, d);
+  for (const d of partes[0]) mapa.set(d.date, d);                       // pronóstico: hoy y futuro
+  for (const d of partes[1]) if (d.date < hoy) mapa.set(d.date, d);     // archivo: manda en el pasado
 
   const serie = [...mapa.values()]
     .filter(d => d.date >= ini)
