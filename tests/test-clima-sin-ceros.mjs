@@ -114,10 +114,13 @@ for (const [nombre, txt] of FUENTES) {
 }
 const appTxt = FUENTES[2][1];
 ok(/\.filter\(x => x\.et0 != null\)/.test(appTxt), "la app descarta los días sin ET₀ del histórico");
-ok(/archive-api\.open-meteo\.com/.test(appTxt),
-   "y desde el 14-sep baja al ARCHIVO para el pasado, como el servidor: era la única de las cuatro que no lo hacía");
-ok(/KyliaClima\.fusionar\(pron, arch, hoyISO, desdeISO\)/.test(appTxt),
-   "con la MISMA regla y del mismo fichero: ya no es una copia, es una llamada");
+ok(/KyliaClima\.cargarSerie\(/.test(appTxt),
+   "y desde el 14-sep la app carga el clima por el módulo compartido: el archivo para el pasado, como el servidor");
+// El histórico ya no lo construye la app: no le queda ninguna URL del archivo.
+// (Sí conserva otras peticiones al pronóstico —humedad de suelo por horas, la
+// previsión de 8 días— que no son la serie del balance.)
+ok(!/archive-api/.test(appTxt),
+   "sin construir ninguna URL del archivo por su cuenta: ya no es una copia, es una llamada");
 ok(/KyliaClima\.hoyISO\(\)/.test(appTxt),
    "y su 'hoy' es el día civil en Europe/Madrid, no el día UTC");
 ok(/\.filter\(x => x\.et0 != null\)/.test(appTxt), "y también los del pronóstico del calendario");
@@ -149,8 +152,8 @@ ok(/67%/.test(RV.motivoClimaNoPublicable({ coberturaClima: 0.67, diasSinClima: 2
 ok(RV.motivoClimaNoPublicable({}) !== null, "y sin cobertura declarada, tampoco se publica");
 ok(/publicable:\s+motivoClimaNoPublicable\(kylia\) === null/.test(campoTxt),
    "la comparativa usa ese mismo helper, no una copia");
-ok(/ventana: \{ desde: inicio \|\| dias\[0\]\?\.date \|\| null, hasta: corte \}/.test(campoTxt),
-   "y declara la ventana que esperaba cubrir, o los huecos del principio no se ven");
+ok(/ventana: \{ desde: inicio \|\| String\(u\.fecha_plantacion/.test(campoTxt),
+   "y declara como ventana el periodo del ciclo, no el de los datos recibidos");
 const campoHtml = readFileSync(join(RAIZ, "campo", "index.html"), "utf8");
 ok(/const climaCorto = t\.publicable !== true;/.test(campoHtml),
    "y /campo no pinta el ahorro si el servidor no lo declara publicable");

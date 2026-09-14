@@ -25,7 +25,7 @@
 // ⚠️ POR QUÉ EL ARCHIVO Y NO EL PRONÓSTICO, cuando contra las estaciones de la
 // XEMA ninguna de las dos gana claramente. Medido con scripts/valida-clima-xema.mjs
 // (evidencia en docs/tecnico/validacion-clima-xema-2026-09-14.json): en ET₀ las
-// dos se mueven en un RMSE diario de 0,46-1,43 mm y se turnan según el punto; en
+// dos se mueven en un RMSE diario de 0,46-0,99 mm y se turnan según el punto; en
 // LLUVIA las dos fallan mucho y en direcciones opuestas —el archivo se pasa un
 // +105% en Sant Boi y un +284% en Amposta, el pronóstico se queda corto un −78%
 // en Breda—. No hay una fuente "buena" que elegir. Se elige por ESTABILIDAD, no
@@ -73,60 +73,21 @@ async function pedir(url, fuente) {
  */
 async function climaSerie(lat, lon, desde, opts = {}) {
   const futuro = Number.isFinite(opts.futuro) ? opts.futuro : 7;
-  const hoy    = hoyISO();
+  // `ahora` inyectable: es lo que permite probar la franja de medianoche sin
+  // esperar a las 00:30. En producción no se pasa nunca.
+  const hoy    = hoyISO(opts.ahora);
   const ini    = desde ? String(desde).slice(0, 10) : sumarDias(hoy, -30);
   const clave  = `${Number(lat).toFixed(3)},${Number(lon).toFixed(3)},${ini},${futuro}`;
 
   const hit = cache.get(clave);
   if (hit && Date.now() - hit.t < TTL_MS && hit.hoy === hoy) return hit.serie;
 
-  // El pronóstico solo tiene que cubrir HOY y lo que viene, así que se le piden
-  // pocos días de pasado: es el archivo quien cubre el histórico.
-  //
-  // PERO SI EL ARCHIVO SE CAE —y se cae: el 14-sep-2026 archive-api estuvo horas
-  // sin responder— con 10 días de margen la serie se quedaba en 13 días para un
-  // ciclo de 72. El balance arrancaría casi vacío, el déficit saldría corto y la
-  // recomendación empujaría a "no regar", que es la dirección que no se nota y
-  // la que cuesta cosecha. Por eso, si el archivo no ha cubierto el pasado, se
-  // vuelve a preguntar al pronóstico por todo lo que recuerde (~64 días reales).
-  // Sigue siendo una degradación, y `procedencia()` la declara igual.
-  const diasCiclo = Math.max(1, diasEntre(ini, hoy));
-  const past = Math.min(MAX_PAST_FORECAST, Math.min(10, diasCiclo));
-  const [arch, pron] = await Promise.all([
-    pedir(`${ARCHIVE}?latitude=${lat}&longitude=${lon}&daily=${CAMPOS}`
-          + `&start_date=${ini}&end_date=${hoy}&timezone=${TZ}`, "archivo"),
-    pedir(`${FORECAST}?latitude=${lat}&longitude=${lon}&daily=${CAMPOS}`
-          + `&past_days=${past}&forecast_days=${Math.max(1, futuro)}&timezone=${TZ}`, "pronostico"),
-  ]);
-
-  if (!arch.length && !pron.length) throw new Error("open-meteo sin respuesta");
-
-  // ¿Ha cubierto el archivo el pasado que hacía falta? Si no, segunda pasada al
-  // pronóstico con toda su memoria. Solo cuando de verdad falta: en el camino
-  // normal no hay petición de más.
-  let pronAmplio = pron;
-  const faltaPasado = diasCiclo > past &&
-    !arch.some(d => d.date <= sumarDias(hoy, -past));
-  if (faltaPasado) {
-    const ampliado = await pedir(
-      `${FORECAST}?latitude=${lat}&longitude=${lon}&daily=${CAMPOS}`
-      + `&past_days=${Math.min(MAX_PAST_FORECAST, diasCiclo)}&forecast_days=${Math.max(1, futuro)}&timezone=${TZ}`,
-      "pronostico");
-    if (ampliado.length > pron.length) pronAmplio = ampliado;
-  }
-
-  // Si el archivo no responde, el pronóstico cubre lo que pueda — pero queda
-  // MARCADO como pronóstico, así que el balance puede decir que ese día no se
-  // calculó con histórico. Degradar en silencio es lo que no se hace aquí.
-  // HOY ES DEL PRONÓSTICO, y el corte es estricto (`< hoy`, no `<=`). El archivo
-  // sí devuelve un valor para el día en curso —comprobado: 4,25 mm en Breda
-  // contra 4,93 del pronóstico, no es un acumulado parcial— pero el día no ha
-  // terminado, y la decisión de riego de hoy se toma junto con los días que
-  // vienen: que hoy y mañana salgan de fuentes distintas mete el escalón justo
-  // en el punto donde se decide. Mañana, cuando hoy sea pasado, el archivo lo
-  // sustituye solo. Eso es lo que significa "la previsión deja de mandar en
-  // cuanto el día termina".
-  return guardar(clave, hoy, R.fusionar(pronAmplio, arch, hoy, ini));
+  // El flujo (qué se pide, en qué orden, y qué hacer si el archivo falla) vive en
+  // clima-reglas.js con la regla, para que el servidor y la app no puedan volver
+  // a divergir. Aquí solo se inyecta CÓMO se pide: con timeout y sin reventar.
+  const serie = await R.cargarSerie({ lat, lon, desde: ini, futuro, ahora: opts.ahora, pedir });
+  if (!serie.length) throw new Error("open-meteo sin respuesta");
+  return guardar(clave, hoy, serie);
 }
 
 function guardar(clave, hoy, serie) {

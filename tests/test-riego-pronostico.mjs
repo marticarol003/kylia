@@ -97,8 +97,8 @@ ok(/\{ futuro: 1 \}/.test(diarioB) && !/lluviaPrevista/.test(diarioB),
 
 console.log("── la app mira la misma ventana que el servidor ──");
 const app = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
-ok(/forecast_days=1&timezone=auto`, "pronostico"\)/.test(app),
-   "app/index.html incluye HOY en el balance (con forecast_days=0 se dejaba ~5 mm)");
+ok(/futuro: 1, pedir/.test(app),
+   "app/index.html incluye HOY en el balance (con futuro 0 se dejaba ~5 mm)");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

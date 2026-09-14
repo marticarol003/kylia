@@ -102,6 +102,12 @@ function fragilidadTextura(clayPct, sandPct) {
   const finito = x => x != null && x !== "" && typeof x !== "boolean" && Number.isFinite(Number(x));
   if (!(finito(clayPct) && finito(sandPct))) return null;
   const clay = Number(clayPct), sand = Number(sandPct);
+  // DOMINIO FÍSICO, comprobado antes de calcular nada. Las fracciones de un
+  // suelo no pueden ser negativas ni sumar más de 100 (el resto es limo). Sin
+  // esto, clay = −5 devolvía tan campante "franco, margen 25,5 pp" sobre un
+  // suelo que no existe. Entrada válida → se calcula; entrada imposible → null,
+  // igual que cuando falta el dato: en los dos casos no hay fragilidad que dar.
+  if (clay < 0 || sand < 0) return null;
   if (clay + sand > SUMA_MAX) return null;       // eso ya no es un suelo, es un dato roto
   const techo = Math.max(100, clay + sand);
   const clase = clasificarTextura(clay, sand);

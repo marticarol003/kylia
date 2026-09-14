@@ -542,20 +542,26 @@
   // Quien llama SÍ sabe qué ventana esperaba cubrir (plantación → corte). Se la
   // pasa, y entonces la cobertura mide lo que tiene que medir.
   function huecosDeSerie(orden, ventana = null) {
+    // ¿Nos han dicho qué periodo había que cubrir, o lo estamos deduciendo de lo
+    // que llegó? Sin ventana declarada, la cobertura se mide contra sí misma y
+    // SIEMPRE da 1: un hueco al principio no encoge la serie, la empieza más
+    // tarde. Se declara para que quien publique un número pueda exigirlo.
+    const declarada = Boolean(ventana?.desde && /^\d{4}-\d{2}-\d{2}$/.test(ventana.desde));
     const d0 = ventana?.desde && /^\d{4}-\d{2}-\d{2}$/.test(ventana.desde)
       ? (orden.length && orden[0].date < ventana.desde ? orden[0].date : ventana.desde)
       : (orden.length ? orden[0].date : null);
     const d1 = ventana?.hasta && /^\d{4}-\d{2}-\d{2}$/.test(ventana.hasta)
       ? (orden.length && orden[orden.length - 1].date > ventana.hasta ? orden[orden.length - 1].date : ventana.hasta)
       : (orden.length ? orden[orden.length - 1].date : null);
-    if (!d0 || !d1) return { dias: orden.length, faltan: 0, cobertura: orden.length ? 1 : 0 };
+    if (!d0 || !d1) return { dias: orden.length, faltan: 0, cobertura: orden.length ? 1 : 0, declarada };
     const esperados = Math.round(
       (new Date(`${d1}T12:00:00Z`) - new Date(`${d0}T12:00:00Z`)) / 86400000) + 1;
     if (!Number.isFinite(esperados) || esperados <= 0) {
-      return { dias: orden.length, faltan: 0, cobertura: orden.length ? 1 : 0 };
+      return { dias: orden.length, faltan: 0, cobertura: orden.length ? 1 : 0, declarada };
     }
     const faltan = Math.max(0, esperados - orden.length);
-    return { dias: orden.length, faltan, cobertura: Math.min(1, orden.length / esperados) };
+    return { dias: orden.length, faltan, cobertura: Math.min(1, orden.length / esperados),
+             declarada, diasEsperados: esperados };
   }
 
   // Riegos: fecha válida y lámina finita y NO negativa. Un `litros` nulo sigue
@@ -750,6 +756,10 @@
       // Sobre cuánto clima REAL se ha calculado esto. Un balance con cobertura
       // 0,61 no es un balance del que se pueda publicar un ahorro.
       diasSerie: cob.dias, diasSinClima: cob.faltan,
+      diasEsperadosClima: cob.diasEsperados ?? null,
+      // false = la cobertura se ha medido contra la propia serie, así que no
+      // significa nada. Quien publique un porcentaje tiene que exigir true.
+      ventanaClimaDeclarada: cob.declarada,
       coberturaClima: Math.round(cob.cobertura * 1000) / 1000,
       // Y los extremos: huecosDeSerie solo ve los agujeros de EN MEDIO — si
       // faltan los últimos días, el tramo simplemente se encoge y no hay nada
@@ -1120,6 +1130,8 @@
              desdeSerie: orden.length ? orden[0].date : null,
              hastaSerie: orden.length ? orden[orden.length - 1].date : null,
              diasSerie: cobS.dias, diasSinClima: cobS.faltan,
+             diasEsperadosClima: cobS.diasEsperados ?? null,
+             ventanaClimaDeclarada: cobS.declarada,
              coberturaClima: Math.round(cobS.cobertura * 1000) / 1000,
              // Días con ET₀ pero sin saber si llovió: contados como 0 mm, que es
              // la hipótesis conservadora, pero declarados como supuesto.

@@ -79,7 +79,7 @@ console.log("\n── la previsión no contamina el déficit de hoy ──");
 ok(/let pronosticoET0 = null;/.test(app), "el pronóstico vive en su propia variable");
 const cargar = app.slice(app.indexOf("async function cargarET0()"), app.indexOf("function calcularAlertaRiego"));
 ok(!/pronosticoET0/.test(cargar), "cargarET0 no lo toca");
-ok(/forecast_days=1/.test(cargar), "y sigue pidiendo solo hoy, como estaba");
+ok(/futuro: 1/.test(cargar), "y sigue pidiendo solo hoy (futuro: 1), como estaba");
 ok(/forecast_days=8/.test(app), "el pronóstico son 8 días: más allá la lluvia no se acierta");
 
 console.log("\n── el plan de riego previsto ──");

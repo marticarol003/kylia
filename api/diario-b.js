@@ -188,6 +188,16 @@ async function materializarGoteoAuto(u, riegosExistentes, hoy, dry) {
       tipo:           "riego",
       cantidad_l_m2:  lamina,
       duracion_min:   min,
+      // ⚠️ ESTE TAMBIÉN CONGELA. Es el segundo —y último— escritor de acciones de
+      // riego, y se escapaba del mecanismo: insertaba cantidad y duración pero no
+      // la lámina, así que estas filas quedaban a merced del caudal actual y
+      // remedirlo las reescribía hacia atrás. Y son las MÁS sensibles: las
+      // sintetiza el cron, nadie las revisa, y en el piloto de Ferran son 73 de
+      // los riegos del ciclo. `lamina` ya está calculada arriba con este mismo
+      // caudal; lo único que faltaba era guardarla.
+      caudal_mmh:     caudal,
+      lamina_mm:      lamina,
+      lamina_origen:  "duracion_x_caudal",
       // El goteo automático arranca de madrugada; en la pauta semanal el riego
       // lo abre una persona y no sabemos cuándo → null antes que inventarlo.
       franja_horaria: semana.length ? null : "manana",
@@ -195,7 +205,9 @@ async function materializarGoteoAuto(u, riegosExistentes, hoy, dry) {
       notas:          `${comoEs} · ${min} min · ${caudal} mm/h (sintetizado por diario-b)`,
     })));
   }
-  return nuevos.map(date => ({ date, litros: lamina }));
+  // Con su procedencia, igual que riegosDe(): quien reciba esto no tiene que
+  // adivinar si la lámina es dato o reconstrucción.
+  return nuevos.map(date => ({ date, litros: lamina, origen: "duracion_x_caudal", reconstruida: false }));
 }
 
 // ¿Ya hay una decisión de riego congelada para este usuario hoy?
@@ -282,7 +294,12 @@ module.exports = async (req, res) => {
         metodoRiego:     u.metodo_riego,
         fechaPlantacion: u.fecha_plantacion,
         serieTermica:    termica,
-        ventana:         { desde: serie[0]?.date, hasta: hoy },
+        // La ventana que el balance NECESITABA (desde que se plantó), no la que
+        // le llegó: con `serie[0].date`, un hueco de 18 días al principio del
+        // ciclo no encoge la serie —la empieza más tarde— y la cobertura salía
+        // 1,000 sobre un balance al que le faltaba un tercio del clima.
+        ventana:         { desde: String(u.fecha_plantacion || "").slice(0, 10) || serie[0]?.date,
+                           hasta: hoy },
       });
       const dec  = decisionRiego(bal);
       const hoyClima = serie[serie.length - 1] || {};

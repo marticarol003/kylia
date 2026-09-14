@@ -269,6 +269,13 @@ function motivoClimaNoPublicable(cf, diasPeriodo) {
   const cobertura = cf && cf.coberturaClima != null ? Number(cf.coberturaClima) : null;
   // NO SABER LA COBERTURA NO ES TENERLA BUENA.
   if (cobertura == null) return "el contrafactual no declara con cuánto clima se calculó";
+  // Y UNA COBERTURA MEDIDA CONTRA SÍ MISMA TAMPOCO ES UNA COBERTURA. Sin ventana
+  // declarada, el motor compara la serie con su propio primer y último día, así
+  // que siempre da 1 — incluso si faltan los 18 primeros días del ciclo, que no
+  // encogen la serie: la empiezan más tarde.
+  if (cf.ventanaClimaDeclarada === false) {
+    return "la cobertura de clima se midió contra la propia serie, no contra el periodo del ciclo";
+  }
   if (cobertura < COBERTURA_MIN) {
     return `el contrafactual se calculó con el ${Math.round(cobertura * 100)}% del clima del periodo`
            + (cf.diasSinClima ? ` (faltan ${cf.diasSinClima} días)` : "");

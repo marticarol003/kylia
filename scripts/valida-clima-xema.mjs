@@ -23,6 +23,14 @@
 //     archivo    https://archive-api.open-meteo.com/v1/archive   (ERA5)
 //     pronóstico https://api.open-meteo.com/v1/forecast?past_days=…
 //
+// ⚠️ UNA CIFRA MÍA, DESCARTADA. El 14-sep reporté un RMSE de ET₀ de 0,46-1,43
+// mm/día. Ese 1,43 salía de este mismo script cuando el selector cogía la
+// estación más cercana SIN mirar la altitud: para Breda elegía Puig Sesolles, una
+// cumbre del Montseny a 1.666 m, contra una parcela de valle a 167. Con el
+// selector corregido —altitud parecida, y que publique la variable— el rango
+// reproducible sobre 2026-06-15 → 2026-09-12 es **0,456-0,992 mm/día**. Esa es
+// la evidencia válida; el 1,43 queda descartado por no ser reproducible.
+//
 // ── Método ───────────────────────────────────────────────────────
 //   · Todo en Europe/Madrid (las tres fuentes se piden en esa zona; el día civil
 //     de la XEMA es el día natural local).
@@ -96,6 +104,7 @@ const DESDE = DESDE_ARG || new Date(Date.now() - DIAS * 86400000).toISOString().
 const HASTA = HASTA_ARG || hoy;
 const VENTANA_FIJA = Boolean(DESDE_ARG);
 const diasEsperados = Math.round((new Date(`${HASTA}T12:00:00Z`) - new Date(`${DESDE}T12:00:00Z`)) / 86400000) + 1;
+const sumarDia = (iso) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
 const km = (a, b, c, d) => { const R = 6371, t = x => x * Math.PI / 180;
   const h = Math.sin(t(c - a) / 2) ** 2 + Math.cos(t(a)) * Math.cos(t(c)) * Math.sin(t(d - b) / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h)); };
@@ -166,20 +175,40 @@ for (const p of PARCELAS) {
     .map(e => ({ ...e, km: km(p.lat, p.lon, +e.latitud, +e.longitud), dAlt: Math.abs(+e.altitud - elev) }))
     .sort((a, b) => a.km - b.km);
   const parecidas = Number.isFinite(elev) ? cercanas.filter(e => e.dAlt <= TOLERANCIA_M) : [];
-  const est = parecidas[0] || cercanas[0];
-  const criterio = parecidas.length
-    ? `más cercana con altitud dentro de ±${TOLERANCIA_M} m del punto (${Math.round(elev)} m)`
-    : `más cercana SIN filtro de altitud (no se pudo aplicar)`;
-  const [oEt0, oLl] = await Promise.all([
-    serieXema(est.codi_estacio, VAR.et0),
-    serieXema(est.codi_estacio, VAR.lluvia),
-  ]);
+  const orden = parecidas.length ? parecidas : cercanas;
+
+  // ⚠️ NO TODAS LAS ESTACIONES PUBLICAN ET₀. Se elegía la más cercana y, si esa
+  // no tenía la variable 1700, la comparación de ET₀ se quedaba vacía y la
+  // parcela desaparecía de la evidencia — sin que nada lo dijera. Ahora se busca
+  // POR VARIABLE la primera que publique datos suficientes, y se declara cuál se
+  // ha usado para cada una: pueden ser distintas, y eso hay que poder verlo.
+  const MIN_DIAS = 20;
+  const elegir = async (variable) => {
+    for (const cand of orden.slice(0, 8)) {
+      const serie = await serieXema(cand.codi_estacio, variable);
+      if (serie.size >= MIN_DIAS) return { est: cand, serie, intentos: orden.indexOf(cand) + 1 };
+    }
+    return { est: orden[0], serie: new Map(), intentos: Math.min(8, orden.length) };
+  };
+  const [selEt0, selLl] = await Promise.all([elegir(VAR.et0), elegir(VAR.lluvia)]);
+  const oEt0 = selEt0.serie, oLl = selLl.serie;
+  const est = selLl.est;          // la de lluvia manda para la cabecera
+  const criterio = (parecidas.length
+    ? `altitud dentro de ±${TOLERANCIA_M} m del punto (${Math.round(elev)} m)`
+    : `SIN filtro de altitud (no se pudo aplicar)`)
+    + `, y la primera que publique ≥${MIN_DIAS} días de cada variable`;
   const fuentes = {
     et0:    { obs: oEt0, arch: aMapa(arch, "et0_fao_evapotranspiration"), pron: aMapa(pron, "et0_fao_evapotranspiration") },
     lluvia: { obs: oLl,  arch: aMapa(arch, "precipitation_sum"),          pron: aMapa(pron, "precipitation_sum") },
   };
   const r = { parcela: p.n, lat: p.lat, lon: p.lon,
               elevacion_punto_m: Number.isFinite(elev) ? Math.round(elev) : null,
+              estacion_por_variable: {
+                et0:    { codi: selEt0.est.codi_estacio, nombre: selEt0.est.nom_estacio,
+                          km: +selEt0.est.km.toFixed(1), dias_publicados: selEt0.serie.size },
+                lluvia: { codi: selLl.est.codi_estacio, nombre: selLl.est.nom_estacio,
+                          km: +selLl.est.km.toFixed(1), dias_publicados: selLl.serie.size },
+              },
               estacion: { codi: est.codi_estacio, nombre: est.nom_estacio, km: +est.km.toFixed(1),
                           lat: +est.latitud, lon: +est.longitud, altitud_m: +est.altitud,
                           desnivel_m: Number.isFinite(elev) ? Math.round(est.dAlt) : null,
@@ -187,10 +216,22 @@ for (const p of PARCELAS) {
               variables: {} };
   console.log(`\n═══ ${p.n} → estación ${est.nom_estacio} (${est.codi_estacio}), ${est.km.toFixed(1)} km, ${est.altitud} m (punto a ${Number.isFinite(elev) ? Math.round(elev) : "?"} m) ═══`);
   console.log(`  selección: ${criterio}`);
+  if (selEt0.est.codi_estacio !== selLl.est.codi_estacio)
+    console.log(`  ET₀ desde ${selEt0.est.nom_estacio} (${selEt0.serie.size} días) · lluvia desde ${selLl.est.nom_estacio} (${selLl.serie.size} días)`);
   for (const [nombre, f] of Object.entries(fuentes)) {
     const dias = [...f.obs.keys()].filter(d => f.arch.has(d) && f.pron.has(d)).sort();
-    const descartados = { sin_observacion: 0, sin_archivo: [...f.obs.keys()].filter(d => !f.arch.has(d)).length,
-                          sin_pronostico: [...f.obs.keys()].filter(d => !f.pron.has(d)).length };
+    // Días del periodo que NO entran en la comparación, por quién falta. El
+    // primero estaba cableado a 0, así que los días que la estación no publicó
+    // —justo el hueco que hay que vigilar en una estación de referencia— se
+    // contaban como cero descartes.
+    const todos = [];
+    for (let d = DESDE; d <= HASTA; d = sumarDia(d)) todos.push(d);
+    const descartados = {
+      sin_observacion: todos.filter(d => !f.obs.has(d)).length,
+      sin_archivo:     todos.filter(d => !f.arch.has(d)).length,
+      sin_pronostico:  todos.filter(d => !f.pron.has(d)).length,
+      dias_periodo:    todos.length,
+    };
     if (dias.length < 20) {
       console.log(`  ${nombre}: la estación no lo publica o hay muy pocos días comunes (${dias.length})`);
       r.variables[nombre] = { dias_comunes: dias.length, descartados, nota: "insuficiente" };

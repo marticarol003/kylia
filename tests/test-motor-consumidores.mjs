@@ -57,10 +57,33 @@ ok(/await serieTermica\(u\.lat, u\.lon, u\.fecha_plantacion\)/.test(diarioB),
    "sacándola del mismo sitio que campo.js");
 
 console.log("\n── y la cobertura de clima se declara en los dos ──");
-ok(/ventana:\s+\{ desde: serie\[0\]\?\.date, hasta: hoy \}/.test(diarioB),
-   "diario-b declara la ventana que esperaba cubrir");
-ok(/ventana: \{ desde: dias\[0\]\.date, hasta: corte \}/.test(campo),
+// 14-sep, segunda vuelta: declarar LA VENTANA no basta si la ventana que se
+// declara es "desde el primer día con dato". Un hueco de 18 días al principio no
+// encoge la serie —la empieza más tarde— así que la cobertura daba 1,000 sobre
+// un balance al que le faltaba un tercio del clima. La ventana tiene que ser la
+// que el balance NECESITABA: desde que se plantó (o desde el inicio del piloto).
+ok(/ventana:\s+\{ desde: String\(u\.fecha_plantacion/.test(diarioB),
+   "diario-b declara como ventana el periodo del ciclo, no el de los datos que le llegaron");
+ok(/ventana: \{ desde: desde \|\| String\(u\.fecha_plantacion/.test(campo),
    "y campo.js también, en el contrafactual del reveal");
+// Comprobado ejecutando: la cobertura tiene que bajar falten días al principio,
+// en medio o al final. Antes solo bajaba en los dos últimos casos.
+const dia30 = (i) => dia("2026-07-01", i);
+const completa30 = Array.from({ length: 30 }, (_, i) => ({ date: dia30(i), et0: 5, lluvia: 0, tmax: 30, tmin: 18 }));
+const VENT = { desde: dia30(0), hasta: dia30(29) };
+const OPT30 = { suelo: "franco", cultivoId: "tomate", metodoRiego: "goteo", fechaPlantacion: dia30(0), ventana: VENT };
+ok(M.balanceHidrico(completa30, [], OPT30).coberturaClima === 1, "serie completa → cobertura 1");
+for (const [n, serie] of [
+  ["al principio", completa30.slice(8)],
+  ["en medio",     completa30.filter((_, i) => i < 11 || i > 18)],
+  ["al final",     completa30.slice(0, 22)],
+]) {
+  const b = M.balanceHidrico(serie, [], OPT30);
+  ok(b.coberturaClima < 0.8 && b.diasSinClima === 8,
+     `faltando 8 días ${n} → cobertura ${b.coberturaClima} y ${b.diasSinClima} días declarados`);
+}
+ok(M.balanceHidrico(completa30.slice(8), [], { ...OPT30, ventana: null }).ventanaClimaDeclarada === false,
+   "y sin ventana, el motor declara que su cobertura no significa nada");
 
 console.log("\n── y lo declarado LLEGA al que lo tiene que mirar ──");
 // El 13-sep salió que declararla no bastaba: campo.js armaba el objeto

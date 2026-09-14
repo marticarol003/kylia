@@ -28,28 +28,49 @@
 -- IDEMPOTENTE: cada UPDATE lleva `lamina_origen is null` en el WHERE, así que
 -- reejecutar no reclasifica ninguna fila ya tratada. Se puede correr dos veces.
 
+-- ⚠️ EL ORDEN IMPORTA, y la primera versión de este fichero lo tenía mal.
+-- Capturaba `id_max` ANTES de desplegar, con el código viejo aún escribiendo: los
+-- riegos que entraran entre la captura y el despliegue quedaban por encima del
+-- tope (fuera del backfill) pero los escribía código que todavía no congelaba, o
+-- sea que se quedaban sin lámina y sin que nadie los volviera a mirar. Lo cazó
+-- Codex. El tope se captura DESPUÉS de desplegar, cuando ya no hay ningún
+-- escritor sin congelar, y con las escrituras pausadas un momento.
+
 -- ═════════════════════════════════════════════════════════════════
--- 1 · PREPARACIÓN (antes de tocar nada)
+-- 1 · PAUSAR ESCRITURAS DE RIEGO  (son segundos, no minutos)
 -- ═════════════════════════════════════════════════════════════════
--- Copia de seguridad de las columnas que se van a derivar. Es la vuelta atrás.
+-- Solo hay DOS escritores de acciones de riego (verificado en
+-- tests/test-escritores-riego.mjs):
+--   · api/log.js            — el riego que apunta el agricultor
+--   · api/diario-b.js       — el goteo automático de pauta fija (cron 06:00 UTC)
+--
+-- Se pausan así, y en este orden:
+--   a) DIARIO_B_LIVE=0 en Vercel  → el cron calcula pero no escribe (dry-run).
+--      Es su modo por defecto, así que es volver a lo seguro.
+--   b) La ventana se elige FUERA de las 06:00 UTC, que es cuando corre el cron.
+--   c) El riego manual no se pausa con una bandera: se hace en una franja de
+--      poco uso (la app registra riegos por la mañana temprano y a mediodía).
+--      Si entrara alguno, el paso 7 lo detecta — no se pierde, se ve.
+--
+-- No se bloquea la tabla: un LOCK dejaría la app dando errores al agricultor, y
+-- el coste de que entre un riego suelto es que salga en la verificación.
+
+-- ═════════════════════════════════════════════════════════════════
+-- 2 · SNAPSHOT / BACKUP
+-- ═════════════════════════════════════════════════════════════════
 create table if not exists acciones_backup_20260914 as
   select id, usuario_id, fecha_local, tipo, cantidad_l_m2, duracion_min
     from acciones where tipo = 'riego';
 
--- Foto del estado previo, para comparar después.
+-- Foto del estado previo, para comparar al final.
 select count(*) as riegos_totales,
-       count(*) filter (where duracion_min > 0)   as con_duracion,
+       count(*) filter (where duracion_min > 0)          as con_duracion,
        count(*) filter (where cantidad_l_m2 is not null) as con_cantidad,
-       max(id) as id_maximo
+       max(id) as id_maximo_previo
   from acciones where tipo = 'riego';
 
--- ⚠️ ANOTA EL `id_maximo` QUE DEVUELVE ESTA CONSULTA. El backfill del paso 4 se
--- cierra sobre él: así los riegos que entren MIENTRAS dura el despliegue (que ya
--- vendrán congelados por el código nuevo) no los toca el backfill. Sin ese tope
--- habría carrera entre el código viejo, el nuevo y este UPDATE.
-
 -- ═════════════════════════════════════════════════════════════════
--- 2 · ESQUEMA (compatible con el código viejo: solo añade)
+-- 3 · ESQUEMA (compatible con el código viejo: solo añade)
 -- ═════════════════════════════════════════════════════════════════
 alter table acciones add column if not exists caudal_mmh    numeric;
 alter table acciones add column if not exists lamina_mm      numeric;
@@ -77,21 +98,28 @@ alter table acciones add  constraint acciones_caudal_mmh_ck
   check (caudal_mmh is null or (caudal_mmh > 0 and caudal_mmh <= 200)) not valid;
 
 -- ═════════════════════════════════════════════════════════════════
--- 3 · DESPLIEGUE DEL CÓDIGO  (fuera de este fichero)
+-- 4 · DESPLEGAR EL CÓDIGO  (fuera de este fichero)
 -- ═════════════════════════════════════════════════════════════════
--- Se despliega ENTRE el paso 2 y el 4, y en ese orden por un motivo:
---   · el código nuevo LEE columnas que ya existen (paso 2) → no falla;
---   · el código nuevo ESCRIBE las columnas en cada riego nuevo;
---   · laminaDeAccion() cae al recálculo cuando lamina_mm viene null, así que
---     durante la ventana el comportamiento es el de antes: no hay momento en el
---     que nada se rompa.
--- El código VIEJO conviviendo con el esquema nuevo tampoco rompe: ignora las
--- columnas que no conoce. Por eso el orden 2 → 3 → 4 no tiene carrera.
+-- Ahora, y no antes: el código nuevo LEE columnas que ya existen (paso 3), así
+-- que no falla; y a partir de aquí los DOS escritores congelan. El código viejo
+-- conviviendo con el esquema nuevo tampoco rompe: ignora las columnas que no
+-- conoce. Y laminaDeAccion() cae al recálculo mientras lamina_mm venga null, así
+-- que en ningún momento hay nada roto.
 
 -- ═════════════════════════════════════════════════════════════════
--- 4 · BACKFILL  (después de desplegar; sustituye :id_max por el del paso 1)
+-- 5 · CAPTURAR EL TOPE, YA CON TODOS LOS ESCRITORES CONGELANDO
 -- ═════════════════════════════════════════════════════════════════
--- Conjunto CERRADO por id: solo lo que existía antes del despliegue.
+select max(id) as id_max from acciones where tipo = 'riego';
+-- ⚠️ ANOTA ESTE `id_max` y úsalo en el paso 6. Cualquier riego que entre a
+-- partir de ahora ya viene congelado por el código nuevo, así que no necesita
+-- backfill: por eso el tope se captura AQUÍ y no al principio.
+
+-- ═════════════════════════════════════════════════════════════════
+-- 6 · BACKFILL, EN UNA TRANSACCIÓN  (sustituye :id_max por el del paso 5)
+-- ═════════════════════════════════════════════════════════════════
+-- Conjunto CERRADO por id. En una transacción: o se clasifican todos los riegos
+-- viejos o ninguno, sin dejar la tabla a medias si algo falla por el camino.
+begin;
 
 -- 4a. Cantidad apuntada a mano: esa ES la lámina y no depende del caudal.
 update acciones
@@ -124,8 +152,10 @@ update acciones
    and id <= :id_max
    and lamina_origen is null;
 
+commit;
+
 -- ═════════════════════════════════════════════════════════════════
--- 5 · VERIFICACIÓN
+-- 7 · VERIFICACIÓN
 -- ═════════════════════════════════════════════════════════════════
 -- 5a. Reparto por procedencia. No debe quedar ningún riego sin clasificar.
 select lamina_origen, count(*), round(avg(lamina_mm)::numeric, 1) as lamina_media,
@@ -142,21 +172,32 @@ select count(*) as descuadres
  where tipo = 'riego' and lamina_origen in ('duracion_x_caudal','backfill_caudal_actual')
    and abs(lamina_mm - (caudal_mmh * duracion_min / 60.0)) > 0.15;   -- debe dar 0
 
--- 5c. Ahora sí, validar las restricciones contra lo que ya hay.
+-- 7c. ¿Ha entrado algún riego manual durante la ventana? No es un error —no se
+--     bloqueó la tabla a propósito— pero tiene que verse, y tiene que venir ya
+--     congelado por el código nuevo. Si alguno sale sin lámina, es que el
+--     despliegue del paso 4 no había llegado todavía: repetir el paso 6 con el
+--     id_max nuevo.
+select id, fecha_local, lamina_origen
+  from acciones
+ where tipo = 'riego' and id > :id_max
+ order by id;
+
+-- ═════════════════════════════════════════════════════════════════
+-- 8 · VALIDAR RESTRICCIONES contra lo que ya hay
+-- ═════════════════════════════════════════════════════════════════
 alter table acciones validate constraint acciones_lamina_origen_ck;
 alter table acciones validate constraint acciones_lamina_mm_ck;
 alter table acciones validate constraint acciones_caudal_mmh_ck;
 
--- 5d. Y comprobar que el reveal de los tres pilotos no se ha movido por esto:
---     comparar con docs/pilotos/reveal-*-2026-09-13.json ANTES de enseñar nada.
+-- Y comprobar que el reveal de los tres pilotos no se ha movido por esto:
+-- comparar con docs/pilotos/reveal-*-2026-09-13.json ANTES de enseñar nada.
 
 -- ═════════════════════════════════════════════════════════════════
--- 6 · REAPERTURA / ROLLBACK
+-- 9 · REANUDAR ESCRITURAS
 -- ═════════════════════════════════════════════════════════════════
--- No hay escrituras que cerrar: los pasos 2 y 4 no bloquean la tabla (los ALTER
--- son ADD COLUMN sin default, instantáneos en Postgres ≥ 11, y las constraints
--- van NOT VALID). El sistema está operativo todo el rato.
+-- DIARIO_B_LIVE=1 en Vercel. El riego manual nunca llegó a bloquearse.
 --
+-- ── ROLLBACK ─────────────────────────────────────────────────────
 -- VUELTA ATRÁS, por orden de gravedad:
 --   a) Backfill mal → se rehace sin tocar el esquema:
 --        update acciones set lamina_mm = null, caudal_mmh = null, lamina_origen = null

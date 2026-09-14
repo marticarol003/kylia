@@ -134,5 +134,62 @@
     };
   }
 
-  return { TZ, hoyISO, horaLocal, sumarDias, diasEntre, diasConDato, fusionar, procedencia };
+  const FORECAST = "https://api.open-meteo.com/v1/forecast";
+  const ARCHIVE   = "https://archive-api.open-meteo.com/v1/archive";
+  const CAMPOS    = "et0_fao_evapotranspiration,precipitation_sum,temperature_2m_max,temperature_2m_min";
+  const MAX_PAST_FORECAST = 92;      // tope duro de la API de pronóstico
+
+  /**
+   * EL FLUJO ENTERO, no solo la regla. Aquí acabó viviendo porque tenerlo en dos
+   * sitios volvía a divergir: el servidor aprendió a ampliar la ventana cuando el
+   * archivo falla y la app se quedó en 10 días, así que un ciclo de 110 días se
+   * truncaba a 10 en el móvil del agricultor y el déficit acumulado salía casi
+   * vacío — empujando a "no regar", que es el error que cuesta cosecha.
+   *
+   * `pedir(url, fuente)` lo inyecta cada lado: el servidor con fetchConTimeout,
+   * la app con el fetch del navegador. Devuelve el array de días ya parseado.
+   */
+  async function cargarSerie(opts) {
+    const { lat, lon, desde, futuro = 7, pedir, ahora } = opts || {};
+    const hoy = hoyISO(ahora);
+    const ini = desde ? String(desde).slice(0, 10) : sumarDias(hoy, -30);
+    const diasCiclo = Math.max(1, diasEntre(ini, hoy));
+    // Al pronóstico se le piden pocos días de pasado: es el archivo quien cubre
+    // el histórico. Si el archivo responde, esto basta y no hay petición de más.
+    const past = Math.min(MAX_PAST_FORECAST, Math.min(10, diasCiclo));
+    const tz = encodeURIComponent(TZ);
+
+    const [pron, arch] = await Promise.all([
+      pedir(`${FORECAST}?latitude=${lat}&longitude=${lon}&daily=${CAMPOS}`
+            + `&past_days=${past}&forecast_days=${Math.max(1, futuro)}&timezone=${tz}`, "pronostico"),
+      pedir(`${ARCHIVE}?latitude=${lat}&longitude=${lon}&daily=${CAMPOS}`
+            + `&start_date=${ini}&end_date=${hoy}&timezone=${tz}`, "archivo"),
+    ]);
+    if (!pron.length && !arch.length) return [];
+
+    // ¿Cubrió el archivo el pasado que hacía falta? Si no —se cae, y se cae de
+    // verdad: archive-api estuvo horas sin responder el 14-sep-2026— se vuelve a
+    // preguntar al pronóstico por toda su memoria (~64 días reales). Sigue siendo
+    // una degradación, y procedencia() la declara igual.
+    // ¿Desde dónde cubre el archivo? Se mira su PRIMER día, no si tiene alguno
+    // más viejo que la ventana del pronóstico: con un archivo PARCIAL —que
+    // responde, pero solo desde hace 40 días de un ciclo de 72— la comprobación
+    // anterior daba por cubierto el pasado y no ampliaba nada, así que se perdían
+    // los 32 primeros días del ciclo en silencio. Lo cazó el test del frontend.
+    let pronAmplio = pron;
+    const primeroArch = arch.length ? arch[0].date : null;
+    const cubreDesde = primeroArch && primeroArch <= sumarDias(ini, 1);
+    const faltaPasado = diasCiclo > past && !cubreDesde;
+    if (faltaPasado) {
+      const ampliado = await pedir(
+        `${FORECAST}?latitude=${lat}&longitude=${lon}&daily=${CAMPOS}`
+        + `&past_days=${Math.min(MAX_PAST_FORECAST, diasCiclo)}&forecast_days=${Math.max(1, futuro)}&timezone=${tz}`,
+        "pronostico");
+      if (ampliado.length > pron.length) pronAmplio = ampliado;
+    }
+    return fusionar(pronAmplio, arch, hoy, ini);
+  }
+
+  return { TZ, FORECAST, ARCHIVE, CAMPOS, MAX_PAST_FORECAST,
+           hoyISO, horaLocal, sumarDias, diasEntre, diasConDato, fusionar, procedencia, cargarSerie };
 });

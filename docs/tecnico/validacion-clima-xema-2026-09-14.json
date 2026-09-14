@@ -1,10 +1,13 @@
 {
-  "generado": "2026-09-14T12:12:07.251Z",
+  "generado": "2026-09-14T17:01:30.740Z",
   "periodo": {
-    "desde": "2026-06-16",
-    "hasta": "2026-09-14",
-    "dias_pedidos": 90
+    "desde": "2026-06-15",
+    "hasta": "2026-09-12",
+    "dias_esperados": 90,
+    "ventana": "fija (--desde/--hasta): reproducible"
   },
+  "reproducir": "node scripts/valida-clima-xema.mjs --desde 2026-06-15 --hasta 2026-09-12",
+  "respuestas_crudas": "no guardadas (usar --crudo <dir> para congelar el dataset)",
   "zona_horaria": "Europe/Madrid",
   "unidades": "mm/día",
   "fuentes": {
@@ -18,68 +21,93 @@
       "parcela": "Ferran · Breda",
       "lat": 41.749,
       "lon": 2.556,
+      "elevacion_punto_m": 167,
+      "estacion_por_variable": {
+        "et0": {
+          "codi": "XS",
+          "nombre": "Santa Coloma de Farners",
+          "km": 15.7,
+          "dias_publicados": 90
+        },
+        "lluvia": {
+          "codi": "KP",
+          "nombre": "Fogars de la Selva",
+          "km": 11.5,
+          "dias_publicados": 90
+        }
+      },
       "estacion": {
-        "codi": "XK",
-        "nombre": "Puig Sesolles (1.666 m)",
-        "km": 10.2,
-        "lat": 41.77362,
-        "lon": 2.43774,
-        "altitud_m": 1666
+        "codi": "KP",
+        "nombre": "Fogars de la Selva",
+        "km": 11.5,
+        "lat": 41.73892,
+        "lon": 2.69438,
+        "altitud_m": 42,
+        "desnivel_m": 125,
+        "criterio_seleccion": "altitud dentro de ±300 m del punto (167 m), y la primera que publique ≥20 días de cada variable"
       },
       "variables": {
         "et0": {
           "dias_comunes": 66,
+          "dias_esperados": 90,
+          "cobertura_pct": 73,
           "desde": "2026-07-09",
           "hasta": "2026-09-12",
+          "observaciones_estacion": 90,
           "descartados": {
             "sin_observacion": 0,
             "sin_archivo": 0,
-            "sin_pronostico": 23
+            "sin_pronostico": 24,
+            "dias_periodo": 90
           },
           "archivo": {
             "n": 66,
-            "sesgo_medio_dia": -0.248,
-            "rmse_dia": 1.426,
+            "sesgo_medio_dia": -0.167,
+            "rmse_dia": 0.486,
             "acum_modelo": 335.4,
-            "acum_observado": 351.8,
-            "acum_dif_pct": -4.7
+            "acum_observado": 346.4,
+            "acum_dif_pct": -3.2
           },
           "pronostico": {
             "n": 66,
-            "sesgo_medio_dia": 0.168,
-            "rmse_dia": 1.388,
+            "sesgo_medio_dia": 0.249,
+            "rmse_dia": 0.617,
             "acum_modelo": 362.9,
-            "acum_observado": 351.8,
-            "acum_dif_pct": 3.2
+            "acum_observado": 346.4,
+            "acum_dif_pct": 4.7
           },
-          "mas_cercano_a_lo_medido": "pronostico"
+          "mas_cercano_a_lo_medido": "archivo"
         },
         "lluvia": {
           "dias_comunes": 66,
+          "dias_esperados": 90,
+          "cobertura_pct": 73,
           "desde": "2026-07-09",
           "hasta": "2026-09-12",
+          "observaciones_estacion": 90,
           "descartados": {
             "sin_observacion": 0,
             "sin_archivo": 0,
-            "sin_pronostico": 23
+            "sin_pronostico": 24,
+            "dias_periodo": 90
           },
           "archivo": {
             "n": 66,
-            "sesgo_medio_dia": -0.689,
-            "rmse_dia": 4.157,
+            "sesgo_medio_dia": 0.223,
+            "rmse_dia": 2.76,
             "acum_modelo": 50.2,
-            "acum_observado": 95.7,
-            "acum_dif_pct": -47.5
+            "acum_observado": 35.5,
+            "acum_dif_pct": 41.4
           },
           "pronostico": {
             "n": 66,
-            "sesgo_medio_dia": -1.127,
-            "rmse_dia": 4.228,
+            "sesgo_medio_dia": -0.215,
+            "rmse_dia": 2.691,
             "acum_modelo": 21.3,
-            "acum_observado": 95.7,
-            "acum_dif_pct": -77.7
+            "acum_observado": 35.5,
+            "acum_dif_pct": -40
           },
-          "mas_cercano_a_lo_medido": "archivo"
+          "mas_cercano_a_lo_medido": "pronostico"
         }
       }
     },
@@ -87,23 +115,44 @@
       "parcela": "Oriol · La Selva",
       "lat": 41.668,
       "lon": 2.75,
+      "elevacion_punto_m": 17,
+      "estacion_por_variable": {
+        "et0": {
+          "codi": "WT",
+          "nombre": "Malgrat de Mar",
+          "km": 2.4,
+          "dias_publicados": 90
+        },
+        "lluvia": {
+          "codi": "WT",
+          "nombre": "Malgrat de Mar",
+          "km": 2.4,
+          "dias_publicados": 90
+        }
+      },
       "estacion": {
         "codi": "WT",
         "nombre": "Malgrat de Mar",
         "km": 2.4,
         "lat": 41.64706,
         "lon": 2.75659,
-        "altitud_m": 3
+        "altitud_m": 3,
+        "desnivel_m": 14,
+        "criterio_seleccion": "altitud dentro de ±300 m del punto (17 m), y la primera que publique ≥20 días de cada variable"
       },
       "variables": {
         "et0": {
           "dias_comunes": 66,
+          "dias_esperados": 90,
+          "cobertura_pct": 73,
           "desde": "2026-07-09",
           "hasta": "2026-09-12",
+          "observaciones_estacion": 90,
           "descartados": {
             "sin_observacion": 0,
             "sin_archivo": 0,
-            "sin_pronostico": 23
+            "sin_pronostico": 24,
+            "dias_periodo": 90
           },
           "archivo": {
             "n": 66,
@@ -125,12 +174,16 @@
         },
         "lluvia": {
           "dias_comunes": 66,
+          "dias_esperados": 90,
+          "cobertura_pct": 73,
           "desde": "2026-07-09",
           "hasta": "2026-09-12",
+          "observaciones_estacion": 90,
           "descartados": {
             "sin_observacion": 0,
             "sin_archivo": 0,
-            "sin_pronostico": 23
+            "sin_pronostico": 24,
+            "dias_periodo": 90
           },
           "archivo": {
             "n": 66,
@@ -156,23 +209,44 @@
       "parcela": "Padre · Sant Boi",
       "lat": 41.343,
       "lon": 2.037,
+      "elevacion_punto_m": 42,
+      "estacion_por_variable": {
+        "et0": {
+          "codi": "XL",
+          "nombre": "el Prat de Llobregat",
+          "km": 3.6,
+          "dias_publicados": 90
+        },
+        "lluvia": {
+          "codi": "XL",
+          "nombre": "el Prat de Llobregat",
+          "km": 3.6,
+          "dias_publicados": 90
+        }
+      },
       "estacion": {
         "codi": "XL",
         "nombre": "el Prat de Llobregat",
         "km": 3.6,
         "lat": 41.34054,
         "lon": 2.08019,
-        "altitud_m": 7
+        "altitud_m": 7,
+        "desnivel_m": 35,
+        "criterio_seleccion": "altitud dentro de ±300 m del punto (42 m), y la primera que publique ≥20 días de cada variable"
       },
       "variables": {
         "et0": {
           "dias_comunes": 66,
+          "dias_esperados": 90,
+          "cobertura_pct": 73,
           "desde": "2026-07-09",
           "hasta": "2026-09-12",
+          "observaciones_estacion": 90,
           "descartados": {
             "sin_observacion": 0,
             "sin_archivo": 0,
-            "sin_pronostico": 23
+            "sin_pronostico": 24,
+            "dias_periodo": 90
           },
           "archivo": {
             "n": 66,
@@ -194,12 +268,16 @@
         },
         "lluvia": {
           "dias_comunes": 66,
+          "dias_esperados": 90,
+          "cobertura_pct": 73,
           "desde": "2026-07-09",
           "hasta": "2026-09-12",
+          "observaciones_estacion": 90,
           "descartados": {
             "sin_observacion": 0,
             "sin_archivo": 0,
-            "sin_pronostico": 23
+            "sin_pronostico": 24,
+            "dias_periodo": 90
           },
           "archivo": {
             "n": 66,
@@ -225,23 +303,44 @@
       "parcela": "Lleida (validación del motor)",
       "lat": 41.62,
       "lon": 0.62,
+      "elevacion_punto_m": 174,
+      "estacion_por_variable": {
+        "et0": {
+          "codi": "YJ",
+          "nombre": "Lleida - la Femosa",
+          "km": 4.4,
+          "dias_publicados": 90
+        },
+        "lluvia": {
+          "codi": "YJ",
+          "nombre": "Lleida - la Femosa",
+          "km": 4.4,
+          "dias_publicados": 90
+        }
+      },
       "estacion": {
         "codi": "YJ",
         "nombre": "Lleida - la Femosa",
         "km": 4.4,
         "lat": 41.58449,
         "lon": 0.64217,
-        "altitud_m": 170
+        "altitud_m": 170,
+        "desnivel_m": 4,
+        "criterio_seleccion": "altitud dentro de ±300 m del punto (174 m), y la primera que publique ≥20 días de cada variable"
       },
       "variables": {
         "et0": {
           "dias_comunes": 66,
+          "dias_esperados": 90,
+          "cobertura_pct": 73,
           "desde": "2026-07-09",
           "hasta": "2026-09-12",
+          "observaciones_estacion": 90,
           "descartados": {
             "sin_observacion": 0,
             "sin_archivo": 0,
-            "sin_pronostico": 23
+            "sin_pronostico": 24,
+            "dias_periodo": 90
           },
           "archivo": {
             "n": 66,
@@ -263,12 +362,16 @@
         },
         "lluvia": {
           "dias_comunes": 66,
+          "dias_esperados": 90,
+          "cobertura_pct": 73,
           "desde": "2026-07-09",
           "hasta": "2026-09-12",
+          "observaciones_estacion": 90,
           "descartados": {
             "sin_observacion": 0,
             "sin_archivo": 0,
-            "sin_pronostico": 23
+            "sin_pronostico": 24,
+            "dias_periodo": 90
           },
           "archivo": {
             "n": 66,
@@ -294,23 +397,44 @@
       "parcela": "Amposta · delta",
       "lat": 40.71,
       "lon": 0.58,
+      "elevacion_punto_m": 12,
+      "estacion_por_variable": {
+        "et0": {
+          "codi": "UU",
+          "nombre": "Amposta",
+          "km": 4.4,
+          "dias_publicados": 90
+        },
+        "lluvia": {
+          "codi": "UU",
+          "nombre": "Amposta",
+          "km": 4.4,
+          "dias_publicados": 90
+        }
+      },
       "estacion": {
         "codi": "UU",
         "nombre": "Amposta",
         "km": 4.4,
         "lat": 40.70776,
         "lon": 0.63211,
-        "altitud_m": 3
+        "altitud_m": 3,
+        "desnivel_m": 9,
+        "criterio_seleccion": "altitud dentro de ±300 m del punto (12 m), y la primera que publique ≥20 días de cada variable"
       },
       "variables": {
         "et0": {
           "dias_comunes": 66,
+          "dias_esperados": 90,
+          "cobertura_pct": 73,
           "desde": "2026-07-09",
           "hasta": "2026-09-12",
+          "observaciones_estacion": 90,
           "descartados": {
             "sin_observacion": 0,
             "sin_archivo": 0,
-            "sin_pronostico": 23
+            "sin_pronostico": 24,
+            "dias_periodo": 90
           },
           "archivo": {
             "n": 66,
@@ -332,12 +456,16 @@
         },
         "lluvia": {
           "dias_comunes": 66,
+          "dias_esperados": 90,
+          "cobertura_pct": 73,
           "desde": "2026-07-09",
           "hasta": "2026-09-12",
+          "observaciones_estacion": 90,
           "descartados": {
             "sin_observacion": 0,
             "sin_archivo": 0,
-            "sin_pronostico": 23
+            "sin_pronostico": 24,
+            "dias_periodo": 90
           },
           "archivo": {
             "n": 66,
@@ -366,7 +494,7 @@
       "b": "Viladecans - les Filipines",
       "km": 6.5,
       "variable": "lluvia",
-      "n": 89,
+      "n": 90,
       "correlacion": 1,
       "acum_a": 26.9,
       "acum_b": 32.2
@@ -376,17 +504,17 @@
       "b": "Viladecans - les Filipines",
       "km": 6.5,
       "variable": "et0",
-      "n": 89,
-      "correlacion": 0.97,
-      "acum_a": 493.9,
-      "acum_b": 467.4
+      "n": 90,
+      "correlacion": 0.96,
+      "acum_a": 499.9,
+      "acum_b": 473.3
     },
     {
       "a": "el Prat de Llobregat",
       "b": "Barcelona - Zona Universitària",
       "km": 4.8,
       "variable": "lluvia",
-      "n": 89,
+      "n": 90,
       "correlacion": 0.99,
       "acum_a": 26.9,
       "acum_b": 21.7
@@ -396,17 +524,17 @@
       "b": "Barcelona - Zona Universitària",
       "km": 4.8,
       "variable": "et0",
-      "n": 89,
+      "n": 90,
       "correlacion": 0.98,
-      "acum_a": 493.9,
-      "acum_b": 476.8
+      "acum_a": 499.9,
+      "acum_b": 482.6
     },
     {
       "a": "Amposta",
       "b": "l'Aldea",
       "km": 7,
       "variable": "lluvia",
-      "n": 89,
+      "n": 90,
       "correlacion": 0.13,
       "acum_a": 6.7,
       "acum_b": 4.5
@@ -416,17 +544,17 @@
       "b": "l'Aldea",
       "km": 7,
       "variable": "et0",
-      "n": 89,
+      "n": 90,
       "correlacion": 0.97,
-      "acum_a": 427.7,
-      "acum_b": 450.2
+      "acum_a": 433,
+      "acum_b": 456.2
     },
     {
       "a": "Amposta",
       "b": "els Alfacs",
       "km": 9.2,
       "variable": "lluvia",
-      "n": 89,
+      "n": 90,
       "correlacion": 0.79,
       "acum_a": 6.7,
       "acum_b": 9.6
@@ -436,17 +564,17 @@
       "b": "els Alfacs",
       "km": 9.2,
       "variable": "et0",
-      "n": 89,
+      "n": 90,
       "correlacion": 0.94,
-      "acum_a": 427.7,
-      "acum_b": 447.3
+      "acum_a": 433,
+      "acum_b": 452.9
     },
     {
       "a": "Fogars de la Selva",
       "b": "Banyoles",
       "km": 42.7,
       "variable": "lluvia",
-      "n": 89,
+      "n": 90,
       "correlacion": 0.72,
       "acum_a": 35.5,
       "acum_b": 70.7

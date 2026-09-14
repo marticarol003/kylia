@@ -609,7 +609,14 @@ async function revealDeUsuario(u) {
           // por delante, la serie empezaba más tarde y la cobertura daba 1,000.
           // Con la ventana declarada, da 0,67 y el informe se niega a publicar
           // un porcentaje.
-          ventana: { desde: dias[0].date, hasta: corte },
+          // ⚠️ LA VENTANA ES LA QUE EL BALANCE NECESITABA, no la que le llegó.
+          // Aquí se pasaba `dias[0].date` —el primer día CON DATO— así que si
+          // faltaban los 18 primeros días del ciclo, la cobertura se medía
+          // contra el día 19 y daba 1,000. La guardia que impide publicar sin
+          // clima quedaba ciega justo en el caso que más la necesita: un hueco
+          // al principio no encoge la serie, la empieza más tarde.
+          ventana: { desde: desde || String(u.fecha_plantacion || "").slice(0, 10) || dias[0].date,
+                     hasta: corte },
         });
         // LA COBERTURA VIAJA CON EL NÚMERO. El motor la declara desde la
         // auditoría del 11-sep y _reveal.js la exige antes de publicar un
@@ -621,6 +628,8 @@ async function revealDeUsuario(u) {
         // alguien va a publicar.
         contrafactual = { puntos: sim.puntos, total: sim.total, deficitFinal: sim.deficitFinal,
                           coberturaClima: sim.coberturaClima, diasSinClima: sim.diasSinClima,
+                          diasEsperadosClima: sim.diasEsperadosClima,
+                          ventanaClimaDeclarada: sim.ventanaClimaDeclarada,
                           diasSinLluviaConocida: sim.diasSinLluviaConocida,
                           modoFenologia: sim.modoFenologia };
       }
@@ -763,7 +772,10 @@ async function vistaComparativa(req, res, u) {
     // La ventana que se esperaba cubrir, igual que en el reveal: sin ella los
     // huecos del PRINCIPIO son invisibles —la serie empieza más tarde y la
     // cobertura sale 1— y son justo los que rompieron los dos informes.
-    ventana: { desde: inicio || dias[0]?.date || null, hasta: corte },
+    // El periodo esperado es desde el arranque de la comparación (el día
+    // siguiente a plantar), no desde el primer día con dato.
+    ventana: { desde: inicio || String(u.fecha_plantacion || "").slice(0, 10) || dias[0]?.date || null,
+               hasta: corte },
   });
   const acumKylia = {};
   kylia.puntos.forEach(p => { acumKylia[p.date] = p.acum_l_m2; });

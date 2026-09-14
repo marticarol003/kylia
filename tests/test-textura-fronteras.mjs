@@ -131,6 +131,32 @@ ok(peor <= 0.4,
    peorCaso ? `el margen declarado nunca supera al real por más de 0,4 pp (peor: clay=${peorCaso.c} sand=${peorCaso.a}, dice ${peorCaso.dicho} y son ${peorCaso.real})`
             : "el margen declarado coincide con el mínimo real en todos los puntos");
 
+console.log("\n── entrada fuera del dominio físico: estado explícito ──");
+// Las fracciones de un suelo no pueden ser negativas ni sumar más de 100. Sin
+// esta comprobación, clay = −5 devolvía "franco, margen 25,5 pp" tan tranquilo.
+for (const [c, a, etiqueta] of [
+  [-5, 40,  "arcilla negativa"],
+  [20, -3,  "arena negativa"],
+  [-1, -1,  "las dos negativas"],
+  [60, 60,  "suma 120"],
+  [80, 40,  "suma 120 por el otro lado"],
+]) ok(fragilidadTextura(c, a) === null, `${etiqueta} (clay=${c}, sand=${a}) → null`);
+// El límite del redondeo: 105 pasa, 106 no. La frontera está donde se decidió,
+// no donde a uno le parezca.
+ok(fragilidadTextura(100, 5) !== null, "suma 105 (el tope del redondeo tolerado) todavía se evalúa");
+ok(fragilidadTextura(100, 6) === null, "y 106 ya no");
+// Y lo que SÍ es válido sigue calculándose, incluido el límite exacto.
+for (const [c, a, etiqueta] of [
+  [50, 50, "suma 100 exacta"],
+  [30, 70, "suma 100, franco"],
+  [0, 100, "suma 100, todo arena"],
+  [0, 0,   "todo limo"],
+  [36, 65, "suma 101: redondeo de SoilGrids, se tolera"],
+]) {
+  const f = fragilidadTextura(c, a);
+  ok(f !== null && f.margen_pp != null, `${etiqueta} (clay=${c}, sand=${a}) → ${f && f.clase} con margen ${f && f.margen_pp}`);
+}
+
 console.log("\n── y sin datos no se inventa nada ──");
 ok(fragilidadTextura(null, 40) === null, "sin arcilla, null");
 ok(fragilidadTextura(20, undefined) === null, "sin arena, null");
