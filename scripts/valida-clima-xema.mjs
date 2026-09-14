@@ -34,7 +34,8 @@
 //     ACUMULADO del periodo en %. El acumulado es lo que entra en el balance.
 //   · La estación NO es la parcela: la comparación mide "modelo vs estación a N
 //     km", no "modelo vs parcela". Por eso se imprime la distancia.
-import { writeFileSync } from "fs";
+import { writeFileSync, mkdirSync } from "fs";
+import { join } from "path";
 
 const XEMA_DATOS = "https://analisi.transparenciacatalunya.cat/resource/7bvh-jvq2.json";
 const XEMA_META  = "https://analisi.transparenciacatalunya.cat/resource/yqwd-vj5e.json";
@@ -44,12 +45,57 @@ const TZ         = "Europe%2FMadrid";
 const VAR = { lluvia: 1300, et0: 1700 };
 
 const arg = (n, def) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : def; };
-const DIAS = Number(arg("--dias", 90));
 const SALIDA = arg("--json", null);
+const CRUDO  = arg("--crudo", null);      // carpeta donde congelar las respuestas
+const DESDE_ARG = arg("--desde", null);   // YYYY-MM-DD
+const HASTA_ARG = arg("--hasta", null);
+const DIAS = Number(arg("--dias", 90));
+if ((DESDE_ARG && !HASTA_ARG) || (!DESDE_ARG && HASTA_ARG)) {
+  console.error("--desde y --hasta van juntos. Sin ellos se usa una ventana relativa a hoy (--dias).");
+  process.exit(2);
+}
 
-const j = async (u) => { const r = await fetch(u); if (!r.ok) throw new Error(`HTTP ${r.status} · ${u.slice(0, 90)}`); return r.json(); };
+let nPeticiones = 0;
+// Reintento con espera creciente: estas APIs son públicas y gratuitas, y se caen.
+// Un script de validación que revienta con un stack trace en el primer timeout no
+// es reproducible por otra persona, que es justo lo que se le pide.
+const dormir = (ms) => new Promise(r => setTimeout(r, ms));
+const j = async (u, intentos = 3) => {
+  let ultimo;
+  let r;
+  for (let i = 0; i < intentos; i++) {
+    try {
+      r = await fetch(u, { signal: AbortSignal.timeout(30000) });
+      if (r.ok) break;
+      ultimo = new Error(`HTTP ${r.status}`);
+    } catch (e) { ultimo = e; }
+    if (i < intentos - 1) await dormir(2000 * (i + 1));
+  }
+  if (!r || !r.ok) {
+    const host = new URL(u).host;
+    throw new Error(`no se pudo leer ${host} tras ${intentos} intentos (${ultimo?.message || "sin detalle"}).\n` +
+                    `  URL: ${u}\n  Si el servicio está caído, reintenta más tarde: el periodo es fijo y el resultado no cambia.`);
+  }
+  const cuerpo = await r.text();
+  if (CRUDO) {                      // congela la respuesta tal como llegó
+    mkdirSync(CRUDO, { recursive: true });
+    const nombre = String(++nPeticiones).padStart(3, "0") + "-" + u.replace(/[^a-z0-9]+/gi, "_").slice(0, 110) + ".json";
+    writeFileSync(join(CRUDO, nombre), JSON.stringify({ url: u, obtenido: new Date().toISOString(), cuerpo: JSON.parse(cuerpo) }, null, 1));
+  }
+  return JSON.parse(cuerpo);
+};
+// ⚠️ UNA VENTANA RELATIVA A "HOY" NO ES REPRODUCIBLE: el mismo comando da otras
+// cifras la semana que viene, y una cifra que decide sobre el motor tiene que
+// poder recalcularse dentro de un año. Con --desde/--hasta el periodo queda
+// fijo; sin ellos se usa la ventana relativa y el JSON deja constancia de cuál
+// fue. Y `--crudo <dir>` guarda las respuestas tal como llegaron, que es la
+// única forma de congelar el dataset: las APIs reescriben su pasado (el propio
+// pronóstico de Open-Meteo olvida más allá de ~64 días).
 const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-const DESDE = new Date(Date.now() - DIAS * 86400000).toISOString().slice(0, 10);
+const DESDE = DESDE_ARG || new Date(Date.now() - DIAS * 86400000).toISOString().slice(0, 10);
+const HASTA = HASTA_ARG || hoy;
+const VENTANA_FIJA = Boolean(DESDE_ARG);
+const diasEsperados = Math.round((new Date(`${HASTA}T12:00:00Z`) - new Date(`${DESDE}T12:00:00Z`)) / 86400000) + 1;
 const km = (a, b, c, d) => { const R = 6371, t = x => x * Math.PI / 180;
   const h = Math.sin(t(c - a) / 2) ** 2 + Math.cos(t(a)) * Math.cos(t(c)) * Math.sin(t(d - b) / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h)); };
@@ -64,7 +110,7 @@ const PARCELAS = [
 ];
 
 async function serieXema(est, variable) {
-  const w = encodeURIComponent(`data_lectura between '${DESDE}T00:00:00' and '${hoy}T23:59:59'`);
+  const w = encodeURIComponent(`data_lectura between '${DESDE}T00:00:00' and '${HASTA}T23:59:59'`);
   const filas = await j(`${XEMA_DATOS}?codi_estacio=${est}&codi_variable=${variable}&$where=${w}&$limit=400`);
   const m = new Map();
   for (const f of filas) {
@@ -91,32 +137,56 @@ function metricas(dias, modelo, obs) {
   };
 }
 
+try {
 const estaciones = await j(`${XEMA_META}?$limit=500&nom_estat_ema=Operativa`);
-const salida = { generado: new Date().toISOString(), periodo: { desde: DESDE, hasta: hoy, dias_pedidos: DIAS },
+const salida = { generado: new Date().toISOString(),
+                 periodo: { desde: DESDE, hasta: HASTA, dias_esperados: diasEsperados,
+                            ventana: VENTANA_FIJA ? "fija (--desde/--hasta): reproducible"
+                                                  : `relativa a hoy (--dias ${DIAS}): NO reproducible más adelante` },
+                 reproducir: `node scripts/valida-clima-xema.mjs --desde ${DESDE} --hasta ${HASTA}`,
+                 respuestas_crudas: CRUDO || "no guardadas (usar --crudo <dir> para congelar el dataset)",
                  zona_horaria: "Europe/Madrid", unidades: "mm/día",
                  fuentes: { estaciones: XEMA_DATOS, archivo: ARCHIVE, pronostico: FORECAST },
                  tratamiento_missing: "un día entra solo si las TRES fuentes lo tienen; los huecos no se rellenan",
                  parcelas: [] };
 
 for (const p of PARCELAS) {
-  const est = estaciones
-    .map(e => ({ ...e, km: km(p.lat, p.lon, +e.latitud, +e.longitud) }))
-    .sort((a, b) => a.km - b.km)[0];
-  const [oEt0, oLl, arch, pron] = await Promise.all([
+  const [arch, pron] = await Promise.all([
+    j(`${ARCHIVE}?latitude=${p.lat}&longitude=${p.lon}&daily=et0_fao_evapotranspiration,precipitation_sum&start_date=${DESDE}&end_date=${HASTA}&timezone=${TZ}`),
+    j(`${FORECAST}?latitude=${p.lat}&longitude=${p.lon}&daily=et0_fao_evapotranspiration,precipitation_sum&past_days=92&forecast_days=1&timezone=${TZ}`),
+  ]);
+  // ⚠️ LA MÁS CERCANA NO ES LA MÁS PARECIDA. Para Breda, la estación a menos km
+  // es Puig Sesolles, en el Montseny a 1.666 m: una cumbre no representa una
+  // parcela de valle ni en ET₀ ni en lluvia. Se exige que la altitud se parezca
+  // a la del punto (la da Open-Meteo) y, si ninguna cumple, se coge la más
+  // cercana y SE DECLARA que el criterio de altitud no se pudo aplicar.
+  const elev = Number(arch.elevation ?? pron.elevation);
+  const TOLERANCIA_M = 300;
+  const cercanas = estaciones
+    .map(e => ({ ...e, km: km(p.lat, p.lon, +e.latitud, +e.longitud), dAlt: Math.abs(+e.altitud - elev) }))
+    .sort((a, b) => a.km - b.km);
+  const parecidas = Number.isFinite(elev) ? cercanas.filter(e => e.dAlt <= TOLERANCIA_M) : [];
+  const est = parecidas[0] || cercanas[0];
+  const criterio = parecidas.length
+    ? `más cercana con altitud dentro de ±${TOLERANCIA_M} m del punto (${Math.round(elev)} m)`
+    : `más cercana SIN filtro de altitud (no se pudo aplicar)`;
+  const [oEt0, oLl] = await Promise.all([
     serieXema(est.codi_estacio, VAR.et0),
     serieXema(est.codi_estacio, VAR.lluvia),
-    j(`${ARCHIVE}?latitude=${p.lat}&longitude=${p.lon}&daily=et0_fao_evapotranspiration,precipitation_sum&start_date=${DESDE}&end_date=${hoy}&timezone=${TZ}`),
-    j(`${FORECAST}?latitude=${p.lat}&longitude=${p.lon}&daily=et0_fao_evapotranspiration,precipitation_sum&past_days=92&forecast_days=1&timezone=${TZ}`),
   ]);
   const fuentes = {
     et0:    { obs: oEt0, arch: aMapa(arch, "et0_fao_evapotranspiration"), pron: aMapa(pron, "et0_fao_evapotranspiration") },
     lluvia: { obs: oLl,  arch: aMapa(arch, "precipitation_sum"),          pron: aMapa(pron, "precipitation_sum") },
   };
   const r = { parcela: p.n, lat: p.lat, lon: p.lon,
+              elevacion_punto_m: Number.isFinite(elev) ? Math.round(elev) : null,
               estacion: { codi: est.codi_estacio, nombre: est.nom_estacio, km: +est.km.toFixed(1),
-                          lat: +est.latitud, lon: +est.longitud, altitud_m: +est.altitud },
+                          lat: +est.latitud, lon: +est.longitud, altitud_m: +est.altitud,
+                          desnivel_m: Number.isFinite(elev) ? Math.round(est.dAlt) : null,
+                          criterio_seleccion: criterio },
               variables: {} };
-  console.log(`\n═══ ${p.n} → estación ${est.nom_estacio} (${est.codi_estacio}), ${est.km.toFixed(1)} km, ${est.altitud} m ═══`);
+  console.log(`\n═══ ${p.n} → estación ${est.nom_estacio} (${est.codi_estacio}), ${est.km.toFixed(1)} km, ${est.altitud} m (punto a ${Number.isFinite(elev) ? Math.round(elev) : "?"} m) ═══`);
+  console.log(`  selección: ${criterio}`);
   for (const [nombre, f] of Object.entries(fuentes)) {
     const dias = [...f.obs.keys()].filter(d => f.arch.has(d) && f.pron.has(d)).sort();
     const descartados = { sin_observacion: 0, sin_archivo: [...f.obs.keys()].filter(d => !f.arch.has(d)).length,
@@ -127,10 +197,13 @@ for (const p of PARCELAS) {
       continue;
     }
     const mA = metricas(dias, f.arch, f.obs), mP = metricas(dias, f.pron, f.obs);
-    r.variables[nombre] = { dias_comunes: dias.length, desde: dias[0], hasta: dias[dias.length - 1],
+    r.variables[nombre] = { dias_comunes: dias.length, dias_esperados: diasEsperados,
+                            cobertura_pct: Math.round((dias.length / diasEsperados) * 100),
+                            desde: dias[0], hasta: dias[dias.length - 1],
+                            observaciones_estacion: f.obs.size,
                             descartados, archivo: mA, pronostico: mP,
                             mas_cercano_a_lo_medido: mA.rmse_dia <= mP.rmse_dia ? "archivo" : "pronostico" };
-    console.log(`  ${nombre} · ${dias.length} días comunes (${dias[0]} → ${dias[dias.length - 1]}) · observado ${mA.acum_observado} mm`);
+    console.log(`  ${nombre} · ${dias.length} de ${diasEsperados} días esperados (${Math.round(dias.length / diasEsperados * 100)}%), ${dias[0]} → ${dias[dias.length - 1]} · la estación publicó ${f.obs.size} · observado ${mA.acum_observado} mm`);
     console.log(`     ARCHIVO    acum ${String(mA.acum_modelo).padStart(6)} mm (${mA.acum_dif_pct >= 0 ? "+" : ""}${mA.acum_dif_pct}%)  sesgo/día ${mA.sesgo_medio_dia}  RMSE ${mA.rmse_dia}`);
     console.log(`     PRONÓSTICO acum ${String(mP.acum_modelo).padStart(6)} mm (${mP.acum_dif_pct >= 0 ? "+" : ""}${mP.acum_dif_pct}%)  sesgo/día ${mP.sesgo_medio_dia}  RMSE ${mP.rmse_dia}`);
     console.log(`     → más cerca de lo medido: ${r.variables[nombre].mas_cercano_a_lo_medido}`);
@@ -165,3 +238,8 @@ for (const [a, b] of [["XL", "YY"], ["XL", "X8"], ["UU", "U9"], ["UU", "UW"], ["
 }
 
 if (SALIDA) { writeFileSync(SALIDA, JSON.stringify(salida, null, 2)); console.log(`\nJSON en ${SALIDA}`); }
+} catch (e) {
+  // Falla claro y accionable, no un volcado de undici.
+  console.error("\n✖ " + e.message);
+  process.exit(1);
+}

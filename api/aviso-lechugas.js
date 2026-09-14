@@ -40,7 +40,7 @@
 // Para test manual: GET /api/aviso-lechugas?fase=manana&dry=1
 
 const { isConfigured, supabaseSelect, supabaseDelete } = require("./_supabase.js");
-const { laminaRiego } = require("./_motor-riego.js");
+const { laminaDeAccion } = require("./_motor-riego.js");
 const webpush = require("web-push");
 
 const { fetchConTimeout } = require("./_http.js");
@@ -85,7 +85,7 @@ async function riegoDeHoy() {
   if (!isConfigured()) return null;
   const filas = await supabaseSelect("acciones",
     `usuario_id=eq.${USUARIO_ID}&tipo=eq.riego&fecha_local=eq.${hoyISO()}` +
-    `&select=cantidad_l_m2,duracion_min&order=id.desc`);
+    `&select=cantidad_l_m2,duracion_min,lamina_mm,lamina_origen,caudal_mmh&order=id.desc`);
   return (filas || [])[0] || null;
 }
 
@@ -153,8 +153,11 @@ function emailMediodia(data, riego) {
   const durTxt = riego?.duracion_min != null
     ? (riego.duracion_min < 60 ? `${riego.duracion_min} min` : `${Math.round(riego.duracion_min / 6) / 10} h`)
     : null;
-  // L/m² del caudal de HOY, no el que se guardó el día del riego (laminaRiego).
-  const lm2 = riego ? laminaRiego(riego.cantidad_l_m2, riego.duracion_min ?? null, data.usuario?.caudal) : null;
+  // Por laminaDeAccion, no por laminaRiego: si el riego trae su lámina congelada
+  // esa manda, y el caudal actual del usuario no puede reescribirla. El aviso
+  // cuenta lo que se regó AYER; con el recálculo, remedir el caudal cambiaba
+  // hacia atrás lo que el correo decía que se había echado.
+  const lm2 = riego ? laminaDeAccion(riego, data.usuario?.caudal).mm : null;
   const detalle = riego ? [durTxt, lm2 != null ? `${lm2} L/m²` : null].filter(Boolean).join(" · ") : null;
 
   if (h.regar && riego) return {

@@ -95,11 +95,20 @@
   }
 
   function claim(a){
+    // ⚠️ PRIMERO: ¿se sostiene esto? El servidor manda `publicable` desde el
+    // 14-sep. Con publicable=false las cifras llegan a null, y el último caso de
+    // abajo —"su riego coincidió"— se pintaba igual: una conclusión sobre datos
+    // que no la sostienen. Sin cifras no hay veredicto que dar.
+    if(a.publicable === false || a.exceso_l_m2 == null)
+      return `<p class="claim">No se puede comparar su riego con el de Kylia${a.motivo_no_publicable?`: ${a.motivo_no_publicable}`:""}.</p>`;
+    // Y el lenguaje: esto es una SIMULACIÓN contrafactual, no un ahorro medido.
+    // "Ahorrarías" convierte en resultado agronómico lo que solo es un cálculo
+    // sobre el clima y el suelo de la parcela (ahorro_demostrado: false).
     if(a.exceso_l_m2 > 0.5)
-      return `<p class="claim ahorro">Siguiendo a Kylia ahorrarías <b>${a.exceso_l_m2} L/m²${a.ahorro_pct!=null?` (${a.ahorro_pct}%)`:""}</b> en este campo.</p>`;
+      return `<p class="claim ahorro">La simulación de Kylia habría recomendado <b>${a.exceso_l_m2} L/m² menos${a.ahorro_potencial_pct!=null?` (${a.ahorro_potencial_pct}%)`:""}</b> en este campo.</p>`;
     if(a.exceso_l_m2 < -0.5)
-      return `<p class="claim deficit">Regó <b>${Math.abs(a.exceso_l_m2)} L/m² menos</b> que la lámina FAO-56 — posible déficit a vigilar.</p>`;
-    return `<p class="claim">Su riego <b>coincidió</b> con la lámina FAO-56.</p>`;
+      return `<p class="claim deficit">Regó <b>${Math.abs(a.exceso_l_m2)} L/m² menos</b> de lo que la simulación habría recomendado — posible déficit a vigilar.</p>`;
+    return `<p class="claim">Su riego <b>coincidió</b> con la lámina FAO-56 simulada.</p>`;
   }
 
   function card(p){

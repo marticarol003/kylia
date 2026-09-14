@@ -70,9 +70,29 @@ function clasificarTextura(clayPct, sandPct) {
 // en cualquier dirección, que haga que clasificarTextura devuelva otra cosa.
 const MARGEN_FRAGIL = 8;   // puntos porcentuales
 
-// Distancia mínima desde (clay, sand) hasta un punto de OTRA clase. Se calcula
-// contra la definición, no contra umbrales sueltos: así no hay que mantener la
-// lista de fronteras sincronizada a mano con clasificarTextura().
+// Distancia mínima desde (clay, sand) hasta un punto de OTRA clase, DENTRO DEL
+// DOMINIO FÍSICO. Las fracciones de un suelo suman 100 con el limo, así que
+// arcilla + arena ≤ 100 y las dos ≥ 0. Fuera de ahí no hay suelos.
+//
+// ⚠️ Segundo hallazgo de Codex sobre esto: la versión anterior proponía
+// candidatos imposibles. Para clay=0 sand=100 decía "a 20 pp de franco" por el
+// punto (20, 100) — que serían 120% de suelo. El punto franco más cercano de
+// verdad es (20, 80), a 28,3 pp: para ganar arcilla hay que perder arena.
+//
+// Se proyecta sobre cada RECTA de decisión recortada a su tramo válido, más las
+// esquinas donde esas rectas se cortan entre sí y con arcilla+arena = 100. En 2D
+// con fronteras rectas, el punto más cercano de una región siempre cae en una
+// arista o en un vértice, así que con eso está cubierto.
+// El límite de suma es 100, pero se tolera el redondeo: SoilGrids da medias
+// ponderadas en profundidad y la suma puede salir en 100,4 o 101 sin que el dato
+// sea malo. Se toma como techo la suma REAL del punto cuando pasa de 100 —así un
+// redondeo no deja la parcela sin evaluar— y se rechaza solo lo que ya no es un
+// suelo. Lo que NO se hace es proponer candidatos por encima de ese techo, que
+// era el defecto: para clay=0 sand=100 se sugería (20, 100), un 120% de suelo.
+const SUMA_MAX = 105;
+const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+const enDominio = (c, a, techo) => c >= 0 && a >= 0 && c + a <= techo + 1e-9;
+
 function fragilidadTextura(clayPct, sandPct) {
   // ⚠️ Number(null) es 0 y Number("") también, así que `Number.isFinite(Number(x))`
   // deja pasar los dos como si fueran un 0% legítimo de arcilla — y con arcilla 0
@@ -82,38 +102,48 @@ function fragilidadTextura(clayPct, sandPct) {
   const finito = x => x != null && x !== "" && typeof x !== "boolean" && Number.isFinite(Number(x));
   if (!(finito(clayPct) && finito(sandPct))) return null;
   const clay = Number(clayPct), sand = Number(sandPct);
+  if (clay + sand > SUMA_MAX) return null;       // eso ya no es un suelo, es un dato roto
+  const techo = Math.max(100, clay + sand);
   const clase = clasificarTextura(clay, sand);
 
-  // Candidatos: para cada frontera, el punto más cercano que la cruza. EPS es lo
-  // mínimo que hay que pasarse para estar del otro lado.
   const EPS = 0.01;
   const cand = [];
-  const probar = (c, s, etiqueta) => {
-    const nueva = clasificarTextura(c, s);
-    if (nueva === clase) return;
-    cand.push({ d: Math.hypot(c - clay, s - sand), clase: nueva, via: etiqueta });
+  const probar = (c, a, via) => {
+    if (!enDominio(c, a, techo)) return;         // nada de puntos imposibles
+    if (clasificarTextura(c, a) === clase) return;
+    cand.push({ d: Math.hypot(c - clay, a - sand), clase: clasificarTextura(c, a), via, c, a });
   };
 
-  // Cruzar el umbral de arcilla, en los dos sentidos.
-  probar(35, sand, "arcilla=35");             // hacia arcilloso
-  probar(35 - EPS, sand, "arcilla<35");       // saliendo de arcilloso
-  probar(20, sand, "arcilla=20");             // saliendo de arenoso por arcilla
-  probar(20 - EPS, sand, "arcilla<20");       // entrando en el rango de arenoso
-  // Cruzar el umbral de arena.
-  probar(clay, 65, "arena=65");
-  probar(clay, 65 - EPS, "arena<65");
-  // Y las ESQUINAS: para ser arenoso hacen falta las dos condiciones a la vez, así
-  // que desde un franco con arcilla alta hay que mover las dos.
-  probar(20 - EPS, 65, "esquina arcilla<20 y arena≥65");
-  probar(35, 65, "esquina arcilla≥35");
+  // Rectas verticales de arcilla (clay = k), recortadas a la arena que cabe.
+  for (const [k, via] of [[35, "arcilla=35"], [35 - EPS, "arcilla<35"],
+                          [20, "arcilla=20"], [20 - EPS, "arcilla<20"]]) {
+    probar(k, clamp(sand, 0, techo - k), via);
+  }
+  // Rectas horizontales de arena (sand = k), recortadas a la arcilla que cabe.
+  for (const [k, via] of [[65, "arena=65"], [65 - EPS, "arena<65"]]) {
+    probar(clamp(clay, 0, techo - k), k, via);
+  }
+  // Vértices: donde las rectas se cortan entre sí y con arcilla+arena = 100.
+  for (const [c, a, via] of [
+    [35, 65, "esquina arcilla=35 · arena=65"],
+    [20, 65, "esquina arcilla=20 · arena=65"],
+    [20 - EPS, 65, "esquina arcilla<20 · arena=65"],
+    [20, techo - 20, "esquina arcilla=20 · borde de la suma"],
+    [35, techo - 35, "esquina arcilla=35 · borde de la suma"],
+    [0, 65, "arena=65 sin arcilla"],
+    [35, 0, "arcilla=35 sin arena"],
+  ]) probar(c, a, via);
+  // Y la proyección sobre el borde arcilla+arena = 100, por si la clase vecina
+  // solo se alcanza pegado a ese límite.
+  const t = (clay - sand + techo) / 2;
+  probar(clamp(t, 0, techo), clamp(techo - t, 0, techo), "borde arcilla+arena=" + Math.round(techo));
 
-  if (!cand.length) return { margen_pp: null, clase, frontera_cercana: null, fragil: false };
-  cand.sort((a, b) => a.d - b.d);
+  if (!cand.length) return { clase, margen_pp: null, clase_vecina: null, via: null, fragil: false, salto_awc: "pequeno" };
+  cand.sort((x, y) => x.d - y.d);
   const mejor = cand[0];
   return {
     clase,
     margen_pp: Math.round(mejor.d * 10) / 10,
-    // A qué clase se pasaría con ese cambio mínimo, y por dónde.
     clase_vecina: mejor.clase,
     via: mejor.via,
     fragil: mejor.d <= MARGEN_FRAGIL,

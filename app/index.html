@@ -4855,7 +4855,10 @@
         pronosticoET0 = t.map((date, i) => ({
           date,
           et0:    d.daily.et0_fao_evapotranspiration?.[i],
-          lluvia: d.daily.precipitation_sum?.[i] ?? 0,
+          // null = sin dato, NO 0 mm. Los consumidores de abajo lo tratan como 0
+          // para decidir —que es lo conservador: una lluvia que no sabemos si
+          // llega no puede cancelar un riego— pero el estado no se pierde aquí.
+          lluvia: d.daily.precipitation_sum?.[i] ?? null,
           tmax:   d.daily.temperature_2m_max?.[i] ?? null,
           tmin:   d.daily.temperature_2m_min?.[i] ?? null,
         })).filter(x => x.et0 != null);
@@ -5959,6 +5962,10 @@
           temp_max:       ultimoMeteo?.tempMax ?? null,
           hum_max:        ultimoMeteo?.humMax ?? null,
           lluvia_3d:      ultimoPrevision?.reduce((s, d) => s + (d.lluvia ?? 0), 0) ?? null,
+          // Cuántos de esos días de previsión venían SIN dato de lluvia: sumarlos
+          // como 0 es conservador para decidir, pero no es lo mismo que saber
+          // que no va a llover, y quien lea esto tiene que poder distinguirlo.
+          lluvia_3d_dias_sin_dato: ultimoPrevision?.filter(d => d.lluvia == null).length ?? null,
           ultimo_riego:   ultimoRiego || null,
           cultivos:       cfg?.cultivos || [],
           modo:           window.kyliaSync.modo,

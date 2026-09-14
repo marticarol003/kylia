@@ -77,7 +77,8 @@ async function vistaHoy(res, u) {
 
   const serie  = await climaSerie(u.lat, u.lon, u.fecha_plantacion, { futuro: 7 });
   const accs   = await supabaseSelect("acciones",
-    `usuario_id=eq.${u.id}&tipo=eq.riego&select=id,fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.asc`);
+    `usuario_id=eq.${u.id}&tipo=eq.riego` +
+    `&select=id,fecha_local,cantidad_l_m2,duracion_min,lamina_mm,lamina_origen,caudal_mmh&order=fecha_local.asc`);
   const riegos = (accs || []).filter(f => f.fecha_local)
     .map(f => ({ id: f.id, date: f.fecha_local, duracion_min: f.duracion_min ?? null,
                  // El cantidad_l_m2 guardado se congeló con el caudal del día del
@@ -150,7 +151,10 @@ async function vistaHoy(res, u) {
     kc:  Number(balHoy.kcActual.toFixed(2)),
     et0: Number(et0Hoy.toFixed(1)),
     etc: Number((balHoy.kcActual * et0Hoy).toFixed(1)),    // gasto de la planta hoy
-    lluvia: Number((climaHoy.lluvia ?? 0).toFixed(1)),
+    // null = no se sabe si llovió. No es 0 mm. El balance lo trata como 0 (la
+    // hipótesis conservadora) pero la API no puede afirmarlo como medida.
+    lluvia: climaHoy.lluvia == null ? null : Number(climaHoy.lluvia.toFixed(1)),
+    lluvia_conocida: climaHoy.lluvia != null,
     dr:  Number(balHoy.Dr.toFixed(1)),                      // déficit acumulado
     taw: Number(balHoy.taw.toFixed(1)),                     // agua que cabe en el suelo
     raw: Number(balHoy.raw.toFixed(1)),                     // umbral para regar (45% de TAW)
@@ -183,7 +187,11 @@ async function vistaHoy(res, u) {
       fecha: hoy, nivel: decHoy.nivel, regar: decHoy.nivel === "alta",
       texto: decHoy.texto, presentacion: presHoy,
       deficit_mm: Number(balHoy.Dr.toFixed(1)), umbral_mm: Number(balHoy.raw.toFixed(1)),
-      et0: Number((climaHoy.et0 ?? 0).toFixed(1)), lluvia: Number((climaHoy.lluvia ?? 0).toFixed(1)),
+      et0: Number((climaHoy.et0 ?? 0).toFixed(1)),
+      // null = no se sabe si llovió, que no es lo mismo que 0 mm medidos.
+      lluvia: climaHoy.lluvia == null ? null : Number(climaHoy.lluvia.toFixed(1)),
+      lluvia_conocida: climaHoy.lluvia != null,
+      dias_sin_lluvia_conocida: balHoy.diasSinLluviaConocida ?? null,
       // DE QUÉ DÍA SON ESOS NÚMEROS. `serie` puede no llegar hasta hoy si las dos
       // fuentes fallan, y entonces el balance se queda donde llegó: el déficit
       // sale corto —le faltan los días sin contar— y eso empuja hacia "no toca
@@ -204,6 +212,12 @@ async function vistaHoy(res, u) {
       // saberlo.
       riegos_sin_cantidad: balHoy.riegosSinCantidad || null,
       ultimo_riego_sin_cantidad: balHoy.ultimoRiegoSinCantidad,
+      // DE QUÉ CONFIANZA ES ESTA RECOMENDACIÓN. Decisión del 14-sep: mientras un
+      // riego sin cantidad siga entrando como recarga completa (hipótesis A), la
+      // decisión que se apoye en uno NO se presenta como de alta confianza. La
+      // estrategia buena —mantener el intervalo de estados posibles— va en rama
+      // aparte para no mezclarla con estas correcciones.
+      confianza: balHoy.confianzaBalance || null,
     },
     desglose, proximo, riegos_recientes: recientes,
   });
@@ -292,7 +306,8 @@ async function vistaConfig(res, u) {
 async function vistaPerfil(res, u) {
   const [accs, aplics] = await Promise.all([
     supabaseSelect("acciones",
-      `usuario_id=eq.${u.id}&tipo=eq.riego&select=id,fecha_local,cantidad_l_m2,duracion_min&order=fecha_local.desc&limit=8`),
+      `usuario_id=eq.${u.id}&tipo=eq.riego` +
+      `&select=id,fecha_local,cantidad_l_m2,duracion_min,lamina_mm,lamina_origen,caudal_mmh&order=fecha_local.desc&limit=8`),
     supabaseSelect("acciones",
       `usuario_id=eq.${u.id}&tipo=eq.aplicacion&select=id,fecha_local,producto_nombre,dosis,motivo&order=fecha_local.desc&limit=8`),
   ]);
@@ -658,12 +673,25 @@ async function vistaPilotos(req, res) {
           ? { min: u.riego_auto_min ?? null, cada_dias: u.riego_auto_cada_dias ?? null,
               dias_semana: u.riego_auto_dias_semana ?? null, desde: u.riego_auto_desde ?? null }
           : null,
+        // ⚠️ `publicable` VIAJA. El panel pintaba su propio veredicto con estas
+        // cifras y no tenía forma de saber que el informe no se sostiene: con
+        // publicable=false las cifras llegan a null, `exceso > 0.5` da falso y
+        // caía al último caso — "su riego coincidió con la lámina FAO-56", que
+        // es una CONCLUSIÓN sobre datos que no la sostienen. Y `clase_metrica` /
+        // `ahorro_demostrado` van con ellas para que nadie que lea esta API
+        // pueda confundir un contrafactual con un ahorro medido.
         agua: a.disponible
-          ? { disponible: true, aplicada_l_m2: a.aplicada_l_m2, recomendada_l_m2: a.recomendada_l_m2,
+          ? { disponible: true, publicable: a.publicable !== false,
+              motivo_no_publicable: a.motivo_no_publicable || null,
+              clase_metrica: a.clase_metrica || null,
+              ahorro_demostrado: a.ahorro_demostrado === true,
+              aplicada_l_m2: a.aplicada_l_m2, recomendada_l_m2: a.recomendada_l_m2,
               exceso_l_m2: a.exceso_l_m2, ahorro_pct: a.ahorro_pct ?? null,
+              ahorro_potencial_pct: a.ahorro_potencial_pct ?? a.ahorro_pct ?? null,
               dias_regado_real: a.dias_regado_real, veredicto: a.veredicto, serie: a.serie || [],
               nota_pendiente: a.nota_pendiente || null }
-          : { disponible: false, motivo: a.motivo || null },
+          : { disponible: false, publicable: false, motivo: a.motivo || null,
+              clase_metrica: a.clase_metrica || null, ahorro_demostrado: false },
         avisos: informe.avisos || [],
       };
     } catch (e) {

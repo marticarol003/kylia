@@ -80,3 +80,40 @@ que tampoco.
 Y lo que sí está medido y no depende de ningún modelo: **el REPARTO**. Ferran
 hizo 73 riegos donde hacían falta 13. Eso es aritmética sobre su propio registro,
 no una simulación, y es el argumento más sólido que tiene Kylia hoy.
+
+---
+
+## Reproducir una decisión dentro de un año
+
+Congelado hoy en cada fila de `recomendaciones_log`: el clima del día (con su
+fuente y si se sabía la lluvia), el cultivo y la fase, el reloj usado, el estado
+hídrico y sus acumulados, la parcela tal como estaba —caudal y superficie
+incluidos—, los supuestos de los que se fía el balance, el motivo en código, y
+**`motor_version` + `motor_reglas`**.
+
+Con eso se puede saber QUÉ decidió y CON QUÉ. Lo que todavía no se puede es
+**recalcularlo bit a bit**, porque falta la serie climática entera: el balance de
+un día depende de los 90 anteriores, y el archivo de Open-Meteo puede reescribir
+su propio pasado (ERA5 se reprocesa).
+
+### Propuesta, sin implementar
+
+No meter la serie en cada fila —serían 90 días × 4 variables por decisión y por
+piloto, a diario—. Tres opciones, de menos a más trabajo:
+
+1. **Huella de la serie.** Un hash de la serie usada (fechas + ET₀ + lluvia +
+   fuente) en cada decisión, y la serie completa guardada UNA vez por parcela y
+   día en una tabla aparte. Si el hash coincide, la reconstrucción es exacta; si
+   no, se sabe que la fuente cambió bajo los pies. Barato y detecta el problema,
+   aunque no lo arregla.
+2. **Instantánea diaria por parcela.** Una fila al día por parcela con la serie
+   completa en JSONB. Para 3 pilotos son ~1.100 filas al año; para 300, 110.000 —
+   sigue siendo poco, pero ya conviene comprimir o quedarse con los últimos N días.
+   Reconstrucción exacta garantizada.
+3. **Congelar el día cerrado.** Cuando un día pasa a ser pasado y el archivo lo
+   cubre, guardar ESE valor como definitivo para esa parcela y no volver a
+   pedirlo. La serie deja de depender de que la API no cambie de opinión, y de
+   paso se ahorran peticiones. Es la más limpia y la que más toca el código.
+
+La (1) es la que daría más por menos: sin ella, hoy no hay forma de detectar que
+una serie ha cambiado bajo una decisión ya publicada.

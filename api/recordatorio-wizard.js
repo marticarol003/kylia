@@ -69,7 +69,10 @@ async function yaRespondioHoy(email) {
     const usuarioId = usuarios[0].id;
 
     // 2) buscar jornada de hoy
-    const hoyIso = new Date().toISOString().slice(0, 10);
+    // Día CIVIL en Europe/Madrid: la jornada la cierra el agricultor en su hora.
+    // Con el día UTC, un recordatorio disparado en la franja de medianoche
+    // buscaría la jornada de ayer y mandaría un aviso ya contestado.
+    const hoyIso = require("../assets/js/clima-reglas.js").hoyISO();
     const jornadas = await supabaseSelect(
       "jornadas",
       `usuario_id=eq.${usuarioId}&fecha=eq.${hoyIso}&select=id`

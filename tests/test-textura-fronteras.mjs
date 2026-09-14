@@ -79,6 +79,58 @@ for (const [n, cl, sa, esperada] of [["Breda (Ferran)", 22.13, 42.81, false], ["
      `${n}: ${f.clase}, margen ${f.margen_pp} pp hacia ${f.clase_vecina} → fragil=${f.fragil}`);
 }
 
+console.log("\n── el dominio físico: arcilla + arena ≤ 100 ──");
+// Segundo hallazgo de Codex sobre esto. La versión anterior proponía candidatos
+// imposibles: para clay=0 sand=100 decía "a 20 pp de franco" por el punto
+// (20, 100), que serían 120% de suelo. Para ganar arcilla hay que perder arena.
+const extremo = fragilidadTextura(0, 100);
+ok(extremo.clase === "arenoso", "clay=0 sand=100 es arenoso");
+ok(Math.abs(extremo.margen_pp - 28.3) < 0.2,
+   `y el franco más cercano está a 28,3 pp —el punto (20, 80)—, no a 20 (${extremo.margen_pp})`);
+ok(fragilidadTextura(60, 60) === null, "un punto que suma 120 no es un suelo: null");
+// SoilGrids da medias ponderadas en profundidad y la suma puede salir en 101 por
+// redondeo. Eso no puede dejar la parcela sin evaluar.
+const redondeo = fragilidadTextura(36, 65);
+ok(redondeo !== null && redondeo.clase === "arcilloso",
+   `una suma de 101 (redondeo) se sigue evaluando: ${redondeo && redondeo.clase}`);
+ok(redondeo && redondeo.margen_pp === 1, "y su frontera real sigue siendo arcilla=35, a 1 pp");
+
+console.log("\n── comprobación por fuerza bruta: 400 puntos al azar ──");
+// La distancia declarada tiene que ser la mínima REAL. Se barre una rejilla fina
+// del dominio buscando el punto de otra clase más cercano; si existe uno más
+// próximo que el que devuelve fragilidadTextura, es que se ha escapado.
+let peor = 0, peorCaso = null, evaluados = 0;
+const rnd = (() => { let x = 42; return () => (x = (x * 1103515245 + 12345) % 2147483648) / 2147483648; })();
+for (let i = 0; i < 400; i++) {
+  // Mitad al azar en todo el dominio, mitad cerca de las fronteras (que es donde duele)
+  let c, a;
+  if (i % 2) { c = rnd() * 60; a = rnd() * (100 - c); }
+  else {
+    const cerca = [[35, 40], [20, 70], [10, 65], [19.9, 65.1], [35.1, 20]][i % 5];
+    c = clamp(cerca[0] + (rnd() - 0.5) * 3, 0, 100);
+    a = clamp(cerca[1] + (rnd() - 0.5) * 3, 0, 100 - c);
+  }
+  const f = fragilidadTextura(c, a);
+  if (!f || f.margen_pp == null) continue;
+  evaluados++;
+  const clase = clasificarTextura(c, a);
+  let mejorReal = Infinity;
+  for (let dc = -40; dc <= 40; dc += 0.25) for (let da = -40; da <= 40; da += 0.25) {
+    const c2 = c + dc, a2 = a + da;
+    if (c2 < 0 || a2 < 0 || c2 + a2 > Math.max(100, c + a) + 1e-9) continue;
+    if (clasificarTextura(c2, a2) === clase) continue;
+    mejorReal = Math.min(mejorReal, Math.hypot(dc, da));
+  }
+  // La rejilla es de 0,25 pp, así que se admite esa holgura.
+  const error = f.margen_pp - mejorReal;
+  if (error > peor) { peor = error; peorCaso = { c: +c.toFixed(2), a: +a.toFixed(2), dicho: f.margen_pp, real: +mejorReal.toFixed(2) }; }
+}
+function clamp(x, lo, hi) { return Math.min(hi, Math.max(lo, x)); }
+ok(evaluados > 300, `${evaluados} puntos evaluados`);
+ok(peor <= 0.4,
+   peorCaso ? `el margen declarado nunca supera al real por más de 0,4 pp (peor: clay=${peorCaso.c} sand=${peorCaso.a}, dice ${peorCaso.dicho} y son ${peorCaso.real})`
+            : "el margen declarado coincide con el mínimo real en todos los puntos");
+
 console.log("\n── y sin datos no se inventa nada ──");
 ok(fragilidadTextura(null, 40) === null, "sin arcilla, null");
 ok(fragilidadTextura(20, undefined) === null, "sin arena, null");

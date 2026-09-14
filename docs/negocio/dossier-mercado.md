@@ -84,7 +84,11 @@ arriba. Las cifras de OTE hortícola y estrato de tamaño son ahora **dato ofici
 
 ### 2.3 De población a ingresos (la aritmética que importa)
 
-Lo defendible no es un TAM grande, sino la **conversión de un ahorro real en pago**:
+Lo defendible no es un TAM grande, sino la **conversión de un ahorro real en pago**
+—real para el agricultor, se entiende: lo que de verdad se ahorre en su campo, no
+el porcentaje que salga de una simulación. A día de hoy Kylia **no tiene ningún
+ahorro demostrado** (ver `docs/tecnico/metricas.md`), así que esta aritmética es
+una proyección, no un resultado—:
 
 ```
 Ingreso ≈ nº_agricultores_segmento × tasa_conversión × precio

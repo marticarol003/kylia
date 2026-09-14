@@ -80,9 +80,18 @@ async function climaSerie(lat, lon, desde, opts = {}) {
   const hit = cache.get(clave);
   if (hit && Date.now() - hit.t < TTL_MS && hit.hoy === hoy) return hit.serie;
 
-  // El pronóstico solo tiene que cubrir HOY y lo que viene. Se le piden unos
-  // pocos días de pasado nada más, como red de seguridad por si el archivo falla.
-  const past = Math.min(MAX_PAST_FORECAST, Math.max(1, Math.min(10, diasEntre(ini, hoy))));
+  // El pronóstico solo tiene que cubrir HOY y lo que viene, así que se le piden
+  // pocos días de pasado: es el archivo quien cubre el histórico.
+  //
+  // PERO SI EL ARCHIVO SE CAE —y se cae: el 14-sep-2026 archive-api estuvo horas
+  // sin responder— con 10 días de margen la serie se quedaba en 13 días para un
+  // ciclo de 72. El balance arrancaría casi vacío, el déficit saldría corto y la
+  // recomendación empujaría a "no regar", que es la dirección que no se nota y
+  // la que cuesta cosecha. Por eso, si el archivo no ha cubierto el pasado, se
+  // vuelve a preguntar al pronóstico por todo lo que recuerde (~64 días reales).
+  // Sigue siendo una degradación, y `procedencia()` la declara igual.
+  const diasCiclo = Math.max(1, diasEntre(ini, hoy));
+  const past = Math.min(MAX_PAST_FORECAST, Math.min(10, diasCiclo));
   const [arch, pron] = await Promise.all([
     pedir(`${ARCHIVE}?latitude=${lat}&longitude=${lon}&daily=${CAMPOS}`
           + `&start_date=${ini}&end_date=${hoy}&timezone=${TZ}`, "archivo"),
@@ -91,6 +100,20 @@ async function climaSerie(lat, lon, desde, opts = {}) {
   ]);
 
   if (!arch.length && !pron.length) throw new Error("open-meteo sin respuesta");
+
+  // ¿Ha cubierto el archivo el pasado que hacía falta? Si no, segunda pasada al
+  // pronóstico con toda su memoria. Solo cuando de verdad falta: en el camino
+  // normal no hay petición de más.
+  let pronAmplio = pron;
+  const faltaPasado = diasCiclo > past &&
+    !arch.some(d => d.date <= sumarDias(hoy, -past));
+  if (faltaPasado) {
+    const ampliado = await pedir(
+      `${FORECAST}?latitude=${lat}&longitude=${lon}&daily=${CAMPOS}`
+      + `&past_days=${Math.min(MAX_PAST_FORECAST, diasCiclo)}&forecast_days=${Math.max(1, futuro)}&timezone=${TZ}`,
+      "pronostico");
+    if (ampliado.length > pron.length) pronAmplio = ampliado;
+  }
 
   // Si el archivo no responde, el pronóstico cubre lo que pueda — pero queda
   // MARCADO como pronóstico, así que el balance puede decir que ese día no se
@@ -103,7 +126,7 @@ async function climaSerie(lat, lon, desde, opts = {}) {
   // en el punto donde se decide. Mañana, cuando hoy sea pasado, el archivo lo
   // sustituye solo. Eso es lo que significa "la previsión deja de mandar en
   // cuanto el día termina".
-  return guardar(clave, hoy, R.fusionar(pron, arch, hoy, ini));
+  return guardar(clave, hoy, R.fusionar(pronAmplio, arch, hoy, ini));
 }
 
 function guardar(clave, hoy, serie) {

@@ -19,6 +19,25 @@
   else root.KyliaMotor = factory();                                             // navegador
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
+  // ── Identificación reproducible del motor ────────────────────────
+  // Para poder reconstruir una decisión dentro de un año hace falta saber CON QUÉ
+  // CÓDIGO se tomó. Las tablas, los umbrales y las reglas cambian —el 8-sep el
+  // reloj pasó de calendario a grados-día, el 11-sep cambió media docena de
+  // cosas— y sin esto, "el balance decía 38 mm" no se puede comprobar.
+  //
+  // Se sube A MANO cuando cambia algo que mueve un número: tabla, umbral, orden
+  // del balance o regla de decisión. Un hash del fichero sería automático pero
+  // cambiaría con cada comentario, y entonces no significaría nada.
+  const MOTOR_VERSION = "2026-09-14";          // fecha del último cambio con efecto
+  const MOTOR_REGLAS = [
+    "fao56-kc-unico",        // no dual (ver scripts/compara-kc-dual.mjs)
+    "fenologia-termica",     // grados-día, con caída a calendario si falta Tmax/Tmin
+    "p-ajustada-por-etc",
+    "raiz-creciente",
+    "lluvia-efectiva-pe2mm",
+    "riego-sin-cantidad-recarga-completa",   // hipótesis A, declarada
+  ].join("+");
+
   const FAO_KC = {
     lechuga:   { ini: 0.70, med: 1.00, fin: 0.95, L: [20, 30, 15, 10], zr: [0.20, 0.30], p: 0.30 },
     espinaca:  { ini: 0.70, med: 1.00, fin: 0.95, L: [20, 20, 15,  5], zr: [0.20, 0.30], p: 0.20 },
@@ -346,8 +365,12 @@
     const g = FAO_GDD[cultivoId];
     if (!g || objetivo == null || gddAcum == null) return null;
 
-    // Ojo: sin desdeISO esto toma el día UTC, que a partir de las 22:00 en España
-    // ya es "mañana". Quien llama debería pasar su día; se deja el aviso aquí.
+    // `desdeISO` lo pasan SIEMPRE los dos llamantes (api/campo.js, las dos
+    // vistas), y desde el 14-sep con el día civil de Europe/Madrid. Este fallback
+    // no se usa en producción y se queda solo por si alguien llama al motor
+    // suelto: el motor es un módulo PURO y no debe decidir en qué zona horaria
+    // vive quien lo usa — esa decisión está en assets/js/clima-reglas.js, que es
+    // de donde sale el `hoy` que llega hasta aquí.
     const hoy = desdeISO || new Date().toISOString().slice(0, 10);
     if (gddAcum >= objetivo) {
       return { estado: "lista", desde: hoy, probable: hoy, hasta: hoy, dias_restantes: 0,
@@ -692,6 +715,9 @@
       etcAcum += etc; et0Acum += dia.et0; lluviaAcum += pe; lluviaUtilAcum += lluviaUtil;
     }
 
+    // Con la serie vacía no hay balance del que fiarse igualmente (cobertura 0),
+    // así que este fallback solo evita un crash; el día UTC da igual aquí. Las
+    // fechas que SÍ importan salen todas de `orden`, que viene con días civiles.
     const ultimaISO = orden.length ? orden[orden.length - 1].date : new Date().toISOString().slice(0, 10);
     const ultima    = new Date(`${ultimaISO}T12:00:00`);
     const diasFin   = diaFen(ultimaISO, ultima);
@@ -828,7 +854,14 @@
     const prevista = (opts.lluviaPrevista || [])
       .slice(0, VENTANA_PRONOSTICO_DIAS)
       .reduce((s, d) => {
-        const v = Number(d && d.lluvia);
+        // Aquí un `null` NO puede colarse como 0: Number(null) es 0 y es finito,
+        // así que un día de previsión sin dato sumaría "0 mm de lluvia prevista".
+        // Da igual para el total (sumar 0 no cambia nada) pero importa para no
+        // contarlo como día con dato. Y tratar la previsión desconocida como 0 es
+        // lo correcto: una lluvia que no sabemos si llega no puede cancelar un
+        // riego — el error de regar de menos cuesta cosecha.
+        if (d == null || d.lluvia == null) return s;
+        const v = Number(d.lluvia);
         if (!Number.isFinite(v) || v < 0 || v > LLUVIA_MAX_DIA_MM) return s;
         return s + (v >= PE_MIN_MM ? v : 0);
       }, 0);
@@ -1096,6 +1129,7 @@
   }
 
   return {
+    MOTOR_VERSION, MOTOR_REGLAS,
     FAO_KC, FAO_GDD, SUELO_AWC, ZR_M, P_AGOTAMIENTO, PE_MIN_MM, EFIC_RIEGO, EFIC_DEFAULT, CAUDAL_DEFAULT_MMH,
     VENTANA_PRONOSTICO_DIAS,
     kcDelDia, faseDelDia, zrDelDia, aguaSuelo, ksEstres, diasEntre, balanceHidrico, decisionRiego, presentarRiego, laminaRiego, laminaDeAccion, simularKylia,

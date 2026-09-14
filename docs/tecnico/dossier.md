@@ -154,7 +154,13 @@ agricultor, se demuestra con su propio campo:
    día y lo **sella en un registro inalterable** (con la fecha de la decisión, sin
    retrovisor).
 3. Al final se cruzan las dos series —lo que Kylia decidió vs. lo que el agricultor
-   hizo— y se enseña el **ahorro real de agua e insumos** sobre el mismo campo.
+   hizo— y se enseña **cuánta agua habría recomendado Kylia** frente a la que él
+   aplicó, sobre el mismo campo.
+
+   ⚠️ Eso es un **contrafactual simulado**, no un ahorro demostrado: el agricultor
+   regó a su manera, así que no hay nada medido que comparar con un control. La
+   diferencia entre las cuatro clases de número está en `docs/tecnico/metricas.md`,
+   y el payload del reveal la declara (`clase_metrica`, `ahorro_demostrado: false`).
 
 Como Kylia **nunca influyó** en el agricultor durante la prueba, la comparación es
 metodológicamente limpia (equivale a un contrafactual). En el piloto de tomate de

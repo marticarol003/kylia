@@ -19,7 +19,7 @@
 // Usa el MISMO motor que la app (api/_motor-riego.js) para que no deriven.
 
 const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js");
-const { balanceHidrico, decisionRiego, laminaDeAccion } = require("./_motor-riego.js");
+const { balanceHidrico, decisionRiego, laminaDeAccion, MOTOR_VERSION, MOTOR_REGLAS } = require("./_motor-riego.js");
 const { serieTermica } = require("./_clima-termico.js");
 const { climaSerie, hoyISO } = require("./_clima.js");
 
@@ -304,9 +304,20 @@ module.exports = async (req, res) => {
         // qué supuestos se estaba fiando el balance.
         contexto: {
           fuente:       "diario-b",
+          // CON QUÉ CÓDIGO se tomó esta decisión. Sin esto, dentro de un año
+          // "el balance decía 38 mm" no se puede comprobar: las tablas y las
+          // reglas cambian. No congela la serie climática entera (sería enorme);
+          // la propuesta para eso está en docs/tecnico/metricas.md.
+          motor_version: MOTOR_VERSION,
+          motor_reglas:  MOTOR_REGLAS,
           // — clima del día de la decisión —
           et0:          Number((hoyClima.et0 ?? 0).toFixed(2)),
-          lluvia:       Number((hoyClima.lluvia ?? 0).toFixed(1)),
+          // null = no se sabe si llovió ese día. El balance lo cuenta como 0 mm
+          // (conservador: no descontar agua que quizá no cayó) pero el LOG tiene
+          // que conservar el estado, o la decisión no se puede reconstruir.
+          lluvia:       hoyClima.lluvia == null ? null : Number(hoyClima.lluvia.toFixed(1)),
+          lluvia_conocida: hoyClima.lluvia != null,
+          dias_sin_lluvia_conocida: bal.diasSinLluviaConocida ?? 0,
           clima_fecha:  hoyClima.date || null,
           clima_fuente: hoyClima.fuente || null,          // archivo | pronostico
           clima_cobertura: bal.coberturaClima ?? null,
@@ -335,6 +346,7 @@ module.exports = async (req, res) => {
           sin_fenologia: bal.sinFenologia,
           riegos_sin_cantidad: bal.riegosSinCantidad || 0,
           ultimo_riego_sin_cantidad: bal.ultimoRiegoSinCantidad || null,
+          confianza: bal.confianzaBalance || null,
           motivo:       dec.motivo || dec.nivel,
         },
       };

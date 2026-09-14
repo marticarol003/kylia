@@ -157,7 +157,10 @@ async function obtenerToken() {
 // objeto de medición o null (sin paso limpio). Lanza si la API responde error.
 async function medirParcela(token, lat, lon, geometry) {
   const hoy    = require("../assets/js/clima-reglas.js").hoyISO();   // día civil, no UTC
-  const hace30 = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+  // Mismo calendario que `hoy` (día civil): es solo el borde de una ventana de
+  // búsqueda de 30 días, pero si los dos extremos salen de relojes distintos, en
+  // la franja de medianoche la ventana pide 31 días. Barato de hacer bien.
+  const hace30 = require("../assets/js/clima-reglas.js").sumarDias(hoy, -30);
   const bounds = buildBounds(geometry, lat, lon);
 
   const statsReq = {

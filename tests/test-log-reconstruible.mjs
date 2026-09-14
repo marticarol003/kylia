@@ -44,6 +44,10 @@ const CAMPOS = {
   "metodo_riego":        "el método de riego",
   "riegos_sin_cantidad": "cuántos riegos entraron sin cifra (el supuesto de recarga completa)",
   "motivo":              "y el motivo de la decisión, en código",
+  "motor_version":       "la versión del motor con la que se decidió",
+  "motor_reglas":        "y qué reglas llevaba activas",
+  "lluvia_conocida":     "si se sabía o no si llovió ese día",
+  "dias_sin_lluvia_conocida": "y sobre cuántos días del balance se supuso que no",
 };
 for (const [campo, desc] of Object.entries(CAMPOS))
   ok(new RegExp(`\\b${campo}:`).test(ctx), `guarda ${desc} (${campo})`);
@@ -82,6 +86,14 @@ ok(/laminaDeAccion\(f, u\.caudal\)/.test(diarioB),
    "y pasa por laminaDeAccion, que prefiere la lámina CONGELADA del evento");
 ok(/lamina_mm,lamina_origen,caudal_mmh/.test(diarioB),
    "trayéndose del select las columnas congeladas (ver test-historico-congelado.mjs)");
+
+console.log("\n── la versión del motor identifica el código, no el fichero ──");
+// Un hash del fichero cambiaría con cada comentario y no significaría nada. Se
+// sube a mano cuando cambia algo que mueve un número.
+ok(/^\d{4}-\d{2}-\d{2}$/.test(M.MOTOR_VERSION), `MOTOR_VERSION es una fecha (${M.MOTOR_VERSION})`);
+ok(/fao56-kc-unico/.test(M.MOTOR_REGLAS), "y MOTOR_REGLAS dice que sigue siendo Kc único");
+ok(/riego-sin-cantidad-recarga-completa/.test(M.MOTOR_REGLAS),
+   "y declara la hipótesis del riego sin cantidad, que es la que está pendiente de decidir");
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");
