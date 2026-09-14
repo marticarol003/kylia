@@ -395,9 +395,12 @@
         <div class="porque">Déficit de agua en el suelo: <b>${h.deficit_mm} mm</b>
           de un umbral de <b>${h.umbral_mm} mm</b> para regar.</div>
         <div class="chips">
-          <span class="chip">💧 Lluvia hoy ${h.lluvia} mm</span>
+          <span class="chip">💧 Lluvia hoy ${h.lluvia == null ? "sin dato" : h.lluvia + " mm"}</span>
           <span class="chip">☀️ Evaporación ${h.et0} mm</span>
         </div>
+        ${h.riegos_sin_cantidad > 0
+          ? `<div class="porque" style="margin-top:10px;color:#8a5a2b">Precisión reducida: falta conocer la cantidad de un riego anterior.</div>`
+          : ""}
       </div>
       <div class="card"><div class="label">Próximo riego previsto</div>`;
     if (data.proximo) {

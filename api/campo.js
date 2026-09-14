@@ -303,11 +303,14 @@ async function vistaConfig(res, u) {
   });
 }
 
-async function vistaPerfil(res, u) {
+async function vistaPerfil(res, u, opts = {}) {
+  // `limite` lo sube la RECONCILIACIÓN de la app: para copiar las láminas
+  // congeladas a su historial local necesita el ciclo entero, no los 8 últimos.
+  const limite = Math.min(400, Math.max(8, Number(opts.limite) || 8));
   const [accs, aplics] = await Promise.all([
     supabaseSelect("acciones",
       `usuario_id=eq.${u.id}&tipo=eq.riego` +
-      `&select=id,fecha_local,cantidad_l_m2,duracion_min,lamina_mm,lamina_origen,caudal_mmh&order=fecha_local.desc&limit=8`),
+      `&select=id,fecha_local,cantidad_l_m2,duracion_min,lamina_mm,lamina_origen,caudal_mmh&order=fecha_local.desc&limit=${limite}`),
     supabaseSelect("acciones",
       `usuario_id=eq.${u.id}&tipo=eq.aplicacion&select=id,fecha_local,producto_nombre,dosis,motivo&order=fecha_local.desc&limit=8`),
   ]);
@@ -315,6 +318,13 @@ async function vistaPerfil(res, u) {
     const l_m2 = laminaDeAccion(f, u.caudal).mm;
     return {
       id: f.id, fecha: f.fecha_local, l_m2, duracion_min: f.duracion_min ?? null,
+      // Los campos CONGELADOS, tal cual: son lo que la app copia a su historial
+      // local para dejar de recalcular con el caudal actual. `cantidad_l_m2` va
+      // también porque forma parte de la clave de correspondencia.
+      cantidad_l_m2: f.cantidad_l_m2 ?? null,
+      lamina_mm:     f.lamina_mm ?? null,
+      lamina_origen: f.lamina_origen ?? null,
+      caudal_mmh:    f.caudal_mmh ?? null,
       cubos: (u.capacidad_regadera && u.area_m2 && l_m2 != null)
         ? Math.round((l_m2 * u.area_m2 / u.capacidad_regadera) * 10) / 10 : null,
     };
@@ -960,7 +970,7 @@ module.exports = async (req, res) => {
     if (vista === "config")      return await vistaConfig(res, u);
     if (vista === "reveal")      return await vistaReveal(req, res, u);
     if (vista === "comparativa") return await vistaComparativa(req, res, u);
-    if (vista === "perfil")      return await vistaPerfil(res, u);
+    if (vista === "perfil")      return await vistaPerfil(res, u, { limite: req.query?.limite });
     if (vista === "cuaderno")    return await vistaCuaderno(req, res, u);
     if (vista === "madurez")     return await vistaMadurez(res, u);
     return await vistaHoy(res, u);

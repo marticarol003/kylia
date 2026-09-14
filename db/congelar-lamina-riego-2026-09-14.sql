@@ -37,30 +37,53 @@
 -- escritor sin congelar, y con las escrituras pausadas un momento.
 
 -- ═════════════════════════════════════════════════════════════════
--- 1 · PAUSAR ESCRITURAS DE RIEGO  (son segundos, no minutos)
+-- 1 · BLOQUEAR DE VERDAD EL REGISTRO MANUAL DE RIEGOS
 -- ═════════════════════════════════════════════════════════════════
--- Solo hay DOS escritores de acciones de riego (verificado en
--- tests/test-escritores-riego.mjs):
---   · api/log.js            — el riego que apunta el agricultor
---   · api/diario-b.js       — el goteo automático de pauta fija (cron 06:00 UTC)
+-- Solo hay DOS escritores de acciones de riego (verificado ejecutándolos en
+-- tests/test-escritores-riego.mjs, que además cuenta que no aparezca un tercero):
+--   · api/log.js       — el riego que apunta el agricultor
+--   · api/diario-b.js  — el goteo automático de pauta fija (cron 06:00 UTC)
 --
--- Se pausan así, y en este orden:
---   a) DIARIO_B_LIVE=0 en Vercel  → el cron calcula pero no escribe (dry-run).
---      Es su modo por defecto, así que es volver a lo seguro.
---   b) La ventana se elige FUERA de las 06:00 UTC, que es cuando corre el cron.
---   c) El riego manual no se pausa con una bandera: se hace en una franja de
---      poco uso (la app registra riegos por la mañana temprano y a mediodía).
---      Si entrara alguno, el paso 7 lo detecta — no se pierde, se ve.
---
--- No se bloquea la tabla: un LOCK dejaría la app dando errores al agricultor, y
--- el coste de que entre un riego suelto es que salga en la verificación.
+-- "Elegir una franja de poco uso" NO es bloquear: si entra un riego, entra. Se
+-- bloquea con un trigger, que es reversible en una línea y no depende de a qué
+-- hora se haga la migración.
+create or replace function kylia_bloqueo_riegos() returns trigger as $$
+begin
+  raise exception 'Registro de riegos pausado por migración (congelar-lamina-riego-2026-09-14). Reintenta en unos minutos.'
+    using errcode = '55006';
+end; $$ language plpgsql;
+
+create trigger trg_bloqueo_riegos_migracion
+  before insert or update on acciones
+  for each row when (new.tipo = 'riego')
+  execute function kylia_bloqueo_riegos();
+
+-- El cliente reintenta y el agricultor ve un error claro, no un riego perdido.
+-- Se levanta en el paso 14.
 
 -- ═════════════════════════════════════════════════════════════════
--- 2 · SNAPSHOT / BACKUP
+-- 2 · DIARIO_B_LIVE = 0
 -- ═════════════════════════════════════════════════════════════════
-create table if not exists acciones_backup_20260914 as
-  select id, usuario_id, fecha_local, tipo, cantidad_l_m2, duracion_min
-    from acciones where tipo = 'riego';
+-- En Vercel. El cron pasa a dry-run: calcula y loguea, no escribe. Es su modo
+-- por defecto, así que es volver a lo seguro. Hacerlo DESPUÉS del trigger para
+-- que no haya ni un instante sin una de las dos protecciones.
+
+-- ═════════════════════════════════════════════════════════════════
+-- 3 · SNAPSHOT NUEVO Y VERIFICABLE
+-- ═════════════════════════════════════════════════════════════════
+-- ⚠️ NADA DE `create table if not exists`: si ya existe una copia de otro
+-- intento, esa línea no falla — no copia nada y te deja creyendo que has hecho
+-- backup cuando lo que tienes es la foto de antes de ayer. Con `create table` a
+-- secas, si el nombre está cogido, PETA. Que pete es lo que se quiere.
+create table acciones_backup_20260914 as
+  select * from acciones where tipo = 'riego';
+
+-- Y se verifica que la copia es de AHORA y está completa:
+select (select count(*) from acciones_backup_20260914) as filas_copiadas,
+       (select count(*) from acciones where tipo = 'riego') as filas_origen,
+       (select count(*) from acciones_backup_20260914)
+         = (select count(*) from acciones where tipo = 'riego') as cuadra;
+-- `cuadra` tiene que ser true. Si no, PARAR.
 
 -- Foto del estado previo, para comparar al final.
 select count(*) as riegos_totales,
@@ -70,7 +93,7 @@ select count(*) as riegos_totales,
   from acciones where tipo = 'riego';
 
 -- ═════════════════════════════════════════════════════════════════
--- 3 · ESQUEMA (compatible con el código viejo: solo añade)
+-- 4 · ESQUEMA (columnas + constraints NOT VALID)
 -- ═════════════════════════════════════════════════════════════════
 alter table acciones add column if not exists caudal_mmh    numeric;
 alter table acciones add column if not exists lamina_mm      numeric;
@@ -98,7 +121,7 @@ alter table acciones add  constraint acciones_caudal_mmh_ck
   check (caudal_mmh is null or (caudal_mmh > 0 and caudal_mmh <= 200)) not valid;
 
 -- ═════════════════════════════════════════════════════════════════
--- 4 · DESPLEGAR EL CÓDIGO  (fuera de este fichero)
+-- 5 · DESPLEGAR EL CÓDIGO CORREGIDO  (fuera de este fichero)
 -- ═════════════════════════════════════════════════════════════════
 -- Ahora, y no antes: el código nuevo LEE columnas que ya existen (paso 3), así
 -- que no falla; y a partir de aquí los DOS escritores congelan. El código viejo
@@ -107,21 +130,44 @@ alter table acciones add  constraint acciones_caudal_mmh_ck
 -- que en ningún momento hay nada roto.
 
 -- ═════════════════════════════════════════════════════════════════
--- 5 · CAPTURAR EL TOPE, YA CON TODOS LOS ESCRITORES CONGELANDO
+-- 6 y 7 · CONFIRMAR LA VERSIÓN DESPLEGADA Y CAPTURAR id_max
 -- ═════════════════════════════════════════════════════════════════
+-- 6 · Antes de capturar nada: confirmar que TODAS las instancias corren ya el
+--     código que congela. En Vercel, que el deployment esté "Ready" y promovido
+--     a producción, y comprobarlo desde fuera:
+--         curl -s https://kylia.app/api/campo?vista=hoy&usuario_id=<piloto> \
+--           | grep -o '"riegos_sin_cantidad"'
+--     (ese campo solo existe en el código nuevo). Si hay varias regiones o un
+--     deployment a medias, esperar: capturar id_max con una instancia vieja viva
+--     es justo la carrera que este orden viene a evitar.
+
+-- 7 · Ahora sí, el tope.
 select max(id) as id_max from acciones where tipo = 'riego';
--- ⚠️ ANOTA ESTE `id_max` y úsalo en el paso 6. Cualquier riego que entre a
--- partir de ahora ya viene congelado por el código nuevo, así que no necesita
--- backfill: por eso el tope se captura AQUÍ y no al principio.
+-- ⚠️ ANOTA ESTE `id_max`. Cualquier riego posterior ya vendrá congelado por el
+-- código nuevo, así que no necesita backfill.
 
 -- ═════════════════════════════════════════════════════════════════
--- 6 · BACKFILL, EN UNA TRANSACCIÓN  (sustituye :id_max por el del paso 5)
+-- 8 y 9 · REVISAR LÁMINAS ABSURDAS Y BACKFILL EN TRANSACCIÓN
 -- ═════════════════════════════════════════════════════════════════
--- Conjunto CERRADO por id. En una transacción: o se clasifican todos los riegos
--- viejos o ninguno, sin dejar la tabla a medias si algo falla por el camino.
+-- 8 · Antes del backfill: ¿hay duraciones que darían láminas absurdas? El tope
+--     de cordura del motor son 150 mm en un día (el suelo que más agua guarda de
+--     toda la tabla son 112). Por encima es un caudal mal metido o unos minutos
+--     de más, y la constraint del paso 4 haría fallar el backfill entero.
+select a.id, a.fecha_local, a.duracion_min, u.caudal,
+       round((u.caudal * a.duracion_min / 60.0)::numeric, 1) as lamina_estimada
+  from acciones a join usuarios u on u.id = a.usuario_id
+ where a.tipo = 'riego' and a.lamina_origen is null
+   and a.duracion_min > 0 and u.caudal > 0
+   and (u.caudal * a.duracion_min / 60.0) > 150
+ order by lamina_estimada desc;
+-- Si sale alguna fila: decidir UNA a una antes de seguir (corregir la duración,
+-- o marcarla 'desconocida' a mano). No se toca la constraint para que pase.
+
+-- 9 · Backfill. Conjunto CERRADO por id, en una transacción: o se clasifican
+--     todos los riegos viejos o ninguno.
 begin;
 
--- 4a. Cantidad apuntada a mano: esa ES la lámina y no depende del caudal.
+-- 9a. Cantidad apuntada a mano: esa ES la lámina y no depende del caudal.
 update acciones
    set lamina_mm     = cantidad_l_m2,
        lamina_origen = 'cantidad_apuntada'
@@ -131,7 +177,7 @@ update acciones
    and cantidad_l_m2 is not null
    and (duracion_min is null or duracion_min <= 0);
 
--- 4b. Con duración: hay que usar el caudal de HOY, que es lo único que hay.
+-- 9b. Con duración: hay que usar el caudal de HOY, que es lo único que hay.
 --     SE MARCA: no es el caudal de aquel día, es una reconstrucción.
 update acciones a
    set caudal_mmh    = u.caudal,
@@ -145,7 +191,7 @@ update acciones a
    and a.duracion_min is not null and a.duracion_min > 0
    and u.caudal is not null and u.caudal > 0;
 
--- 4c. Ni cantidad ni duración utilizable: regó y no sabemos cuánto.
+-- 9c. Ni cantidad ni duración utilizable: regó y no sabemos cuánto.
 update acciones
    set lamina_origen = 'desconocida'
  where tipo = 'riego'
@@ -155,9 +201,9 @@ update acciones
 commit;
 
 -- ═════════════════════════════════════════════════════════════════
--- 7 · VERIFICACIÓN
+-- 10 · VERIFICACIÓN
 -- ═════════════════════════════════════════════════════════════════
--- 5a. Reparto por procedencia. No debe quedar ningún riego sin clasificar.
+-- 10a. Reparto por procedencia. No debe quedar ningún riego sin clasificar.
 select lamina_origen, count(*), round(avg(lamina_mm)::numeric, 1) as lamina_media,
        min(fecha_local) as desde, max(fecha_local) as hasta
   from acciones where tipo = 'riego'
@@ -166,13 +212,13 @@ select lamina_origen, count(*), round(avg(lamina_mm)::numeric, 1) as lamina_medi
 select count(*) as sin_clasificar
   from acciones where tipo = 'riego' and lamina_origen is null;   -- debe dar 0
 
--- 5b. Coherencia: la lámina congelada tiene que cuadrar con duración × caudal.
+-- 10b. Coherencia: la lámina congelada tiene que cuadrar con duración × caudal.
 select count(*) as descuadres
   from acciones
  where tipo = 'riego' and lamina_origen in ('duracion_x_caudal','backfill_caudal_actual')
    and abs(lamina_mm - (caudal_mmh * duracion_min / 60.0)) > 0.15;   -- debe dar 0
 
--- 7c. ¿Ha entrado algún riego manual durante la ventana? No es un error —no se
+-- 10c. ¿Ha entrado algún riego manual durante la ventana? No es un error —no se
 --     bloqueó la tabla a propósito— pero tiene que verse, y tiene que venir ya
 --     congelado por el código nuevo. Si alguno sale sin lámina, es que el
 --     despliegue del paso 4 no había llegado todavía: repetir el paso 6 con el
@@ -183,7 +229,7 @@ select id, fecha_local, lamina_origen
  order by id;
 
 -- ═════════════════════════════════════════════════════════════════
--- 8 · VALIDAR RESTRICCIONES contra lo que ya hay
+-- 11 · VALIDAR RESTRICCIONES contra lo que ya hay
 -- ═════════════════════════════════════════════════════════════════
 alter table acciones validate constraint acciones_lamina_origen_ck;
 alter table acciones validate constraint acciones_lamina_mm_ck;
@@ -193,9 +239,32 @@ alter table acciones validate constraint acciones_caudal_mmh_ck;
 -- comparar con docs/pilotos/reveal-*-2026-09-13.json ANTES de enseñar nada.
 
 -- ═════════════════════════════════════════════════════════════════
--- 9 · REANUDAR ESCRITURAS
+-- 12, 13 y 14 · PROBAR, RECONCILIAR Y REANUDAR
 -- ═════════════════════════════════════════════════════════════════
--- DIARIO_B_LIVE=1 en Vercel. El riego manual nunca llegó a bloquearse.
+-- 12 · Probar con un piloto REAL antes de reabrir, las cuatro superficies:
+--        · /api/campo?vista=hoy      → el déficit no se ha movido
+--        · /api/campo?vista=reveal   → comparar con docs/pilotos/reveal-*-2026-09-13.json
+--        · /api/campo?vista=perfil   → los riegos traen lamina_origen
+--        · /api/diario-b?dry=1       → el goteo automático sigue calculando igual
+--      Si el reveal se mueve, PARAR: el backfill ha cambiado el histórico y hay
+--      que entender por qué antes de que nadie lo vea.
+--
+-- 13 · Reconciliar el histórico LOCAL. La migración congela Supabase, pero los
+--      riegos que viven en el localStorage del móvil no reciben nada y la app
+--      seguiría recalculándolos con el caudal actual. La app lo hace sola al
+--      arrancar (reconciliarRiegos, ver app/index.html), casando por fecha +
+--      duración + cantidad y solo cuando la correspondencia es inequívoca. Basta
+--      con abrir la app en cada dispositivo de piloto y comprobar en la consola:
+--          await window.kyliaReconciliarRiegos()
+--          → { reconciliados: N, sinCasar: 0 }
+--      `sinCasar > 0` no es un fallo: son riegos que no se pueden casar sin
+--      riesgo de copiar la lámina del que no es. Se quedan con su fallback
+--      declarado.
+--
+-- 14 · Reanudar escritores:
+--        drop trigger if exists trg_bloqueo_riegos_migracion on acciones;
+--        drop function if exists kylia_bloqueo_riegos();
+--        DIARIO_B_LIVE=1 en Vercel.
 --
 -- ── ROLLBACK ─────────────────────────────────────────────────────
 -- VUELTA ATRÁS, por orden de gravedad:

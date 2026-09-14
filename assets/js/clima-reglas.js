@@ -171,15 +171,27 @@
     // verdad: archive-api estuvo horas sin responder el 14-sep-2026— se vuelve a
     // preguntar al pronóstico por toda su memoria (~64 días reales). Sigue siendo
     // una degradación, y procedencia() la declara igual.
-    // ¿Desde dónde cubre el archivo? Se mira su PRIMER día, no si tiene alguno
-    // más viejo que la ventana del pronóstico: con un archivo PARCIAL —que
-    // responde, pero solo desde hace 40 días de un ciclo de 72— la comprobación
-    // anterior daba por cubierto el pasado y no ampliaba nada, así que se perdían
-    // los 32 primeros días del ciclo en silencio. Lo cazó el test del frontend.
+    // ⚠️ MIRAR LA PRIMERA FECHA NO BASTA. Un archivo puede empezar donde toca y
+    // tener días ausentes EN MEDIO —un tramo viejo que se perdió— y con esos
+    // huecos el balance se calcula sobre menos clima del que había disponible,
+    // porque el pronóstico ampliado podría haberlos cubierto y nadie se lo pidió.
+    //
+    // Se construye la ventana requerida día a día y se compara contra lo que hay.
+    // Si falta alguno dentro del alcance del pronóstico (~64 días de memoria), se
+    // amplía. La regla de quién manda no cambia: el histórico válido gana al
+    // fallback, siempre — el pronóstico solo rellena los días que el archivo NO
+    // trae, nunca sustituye uno que sí traiga.
     let pronAmplio = pron;
-    const primeroArch = arch.length ? arch[0].date : null;
-    const cubreDesde = primeroArch && primeroArch <= sumarDias(ini, 1);
-    const faltaPasado = diasCiclo > past && !cubreDesde;
+    const tieneArch = new Set(arch.map(d => d.date));
+    const tienePron = new Set(pron.map(d => d.date));
+    const huecos = [];
+    for (let d = ini; d < hoy; d = sumarDias(d, 1)) {
+      if (!tieneArch.has(d) && !tienePron.has(d)) huecos.push(d);
+    }
+    // Solo se amplía si el pronóstico puede llegar hasta ahí: más allá de su
+    // memoria, pedirlo otra vez no trae nada y es una petición de más.
+    const alcance = sumarDias(hoy, -Math.min(MAX_PAST_FORECAST, diasCiclo));
+    const faltaPasado = huecos.some(d => d >= alcance);
     if (faltaPasado) {
       const ampliado = await pedir(
         `${FORECAST}?latitude=${lat}&longitude=${lon}&daily=${CAMPOS}`
@@ -187,6 +199,9 @@
         "pronostico");
       if (ampliado.length > pron.length) pronAmplio = ampliado;
     }
+    // fusionar() ya respeta la jerarquía: el pronóstico entra primero y el
+    // archivo lo pisa en todo el pasado. Así que un día que el archivo SÍ trae
+    // nunca queda sustituido por el fallback, por muchos huecos que se rellenen.
     return fusionar(pronAmplio, arch, hoy, ini);
   }
 

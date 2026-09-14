@@ -22,8 +22,14 @@ console.log("── cuando no hay nada que hacer, no hay tarjeta ──");
 // Solo quedan las dos menciones en comentarios que explican por qué se fue.
 ok(!/hoy-accion">Todo en orden|"Todo en orden"<\/div>|>Todo en orden</.test(app),
    "'Todo en orden' ya no se pinta en ninguna parte");
-ok(/if \(!acc\.length\) \{ card\.hidden = true;/.test(app),
+// 14-sep: la tarjeta sigue ocultándose cuando no hay nada que hacer, con UNA
+// excepción — si el balance se apoya en un riego sin cantidad, "no toca regar"
+// ES la consecuencia de ese supuesto y hay que decirlo. No es relleno simpático:
+// es la única vez que la tarjeta habla sin tener nada que pedir.
+ok(/card\.hidden = true; el\.innerHTML = ""; return;/.test(app),
    "sin acciones la tarjeta se oculta entera, no se rellena con algo simpático");
+ok(/if \(accionesDeHoy\.__confianzaBaja\) \{\s*\n\s*card\.hidden = false;/.test(app),
+   "salvo cuando la recomendación tiene precisión reducida, que entonces se dice");
 ok(/function accionesDeHoy\(\)/.test(app), "hay una función que decide qué toca");
 
 console.log("\n── las acciones son verbos, y solo salen si tocan ──");

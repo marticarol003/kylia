@@ -126,10 +126,46 @@ for (const [etiqueta, ciclo] of [["72 días", 72], ["110 días", 110]]) {
   ok(pr.coherencia > 0 && pr.coherencia < 1, `coherencia ${pr.coherencia}: ni completa ni cero`);
 }
 
+console.log("\n── 5. la app declara la ventana que NECESITA, no la que recibe ──");
+// HALLAZGO DE CODEX: la app llamaba al balance sin `{ desde, hasta }`, así que
+// una serie truncada se comparaba consigo misma y parecía completa. El caso
+// crítico: ciclo de 110 días, clima disponible 93. No puede dar cobertura 1.
+const MOTOR2 = MOTOR;
+const hoyC = KyliaClima.hoyISO();
+const d = n => KyliaClima.sumarDias(hoyC, -n);
+const CICLO_D = 110, DISPONIBLES = 93;
+const serie110 = Array.from({ length: DISPONIBLES }, (_, i) =>
+  ({ date: d(DISPONIBLES - i), et0: 5, lluvia: 0, tmax: 29, tmin: 16 }));
+const OPTS = { suelo: "franco", cultivoId: "tomate", metodoRiego: "goteo", fechaPlantacion: d(CICLO_D) };
+
+const sinVentana = MOTOR2.balanceHidrico(serie110, [], OPTS);
+ok(sinVentana.coberturaClima === 1,
+   "sin ventana el motor da cobertura 1 midiendo la serie contra sí misma: por eso hacía falta");
+ok(sinVentana.ventanaClimaDeclarada === false, "y lo declara: esa cobertura no significa nada");
+
+const conVentana = MOTOR2.balanceHidrico(serie110, [], { ...OPTS, ventana: { desde: d(CICLO_D), hasta: hoyC } });
+ok(conVentana.ventanaClimaDeclarada === true, "con la ventana del ciclo, la cobertura sí se mide");
+ok(conVentana.diasEsperadosClima === CICLO_D + 1,
+   `días esperados = ${conVentana.diasEsperadosClima} (el ciclo entero)`);
+ok(conVentana.coberturaClima < 1,
+   `cobertura ${conVentana.coberturaClima}, NO 1`);
+ok(conVentana.diasSinClima === CICLO_D + 1 - DISPONIBLES,
+   `y declara los ${conVentana.diasSinClima} días ausentes`);
+ok(conVentana.confianzaBalance === "incierto",
+   `y la confianza cae a "${conVentana.confianzaBalance}"`);
+
+// Y que la app lo haga de verdad: construye la ventana desde la plantación.
+ok(/const ventana = plant \? \{ desde: String\(plant\)\.slice\(0, 10\), hasta: hoyCivil \} : null/.test(app),
+   "la app declara { desde: plantación, hasta: hoy civil }");
+ok(/fechaPlantacion: plant,[\s\S]{0,40}ventana,/.test(app), "y se la pasa al motor");
+for (const campo of ["coberturaClima", "diasSinClima", "confianzaBalance", "riegosSinCantidad",
+                     "ventanaClimaDeclarada", "diasSinLluviaConocida", "diasEsperadosClima"])
+  ok(new RegExp(`${campo}:\\s+bal\\.${campo}`).test(app), `y el adaptador propaga ${campo}`);
+
 console.log("\n── 6. la confianza baja llega a la pantalla ──");
 ok(/bal\?\.riegosSinCantidad > 0/.test(app),
    "la tarjeta de riego mira si el balance se apoya en un riego sin cifra");
-ok(/Menos precisión de lo normal: falta saber cuánta agua echaste en un riego anterior/.test(app),
+ok(/Precisión reducida: falta conocer la cantidad de un riego anterior/.test(app),
    "y lo dice en castellano, sin tecnicismos");
 ok(/accionesDeHoy\.__confianzaBaja = /.test(app),
    "y también cuando HOY no hay nada que hacer: 'no toca regar' puede venir de ese supuesto");

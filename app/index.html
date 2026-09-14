@@ -4433,11 +4433,24 @@
         .filter(({ date }) => !plant || date >= plant)
         .sort((a, b) => a.date.localeCompare(b.date));
 
+      // ⚠️ LA VENTANA QUE EL BALANCE NECESITABA, igual que el servidor. Sin
+      // ella, huecosDeSerie mide la serie contra SÍ MISMA —su primer día contra
+      // su último— y siempre da cobertura 1: un ciclo de 110 días del que solo
+      // llegan 93 parecía completo, porque los 17 que faltan al principio no
+      // encogen la serie, la empiezan más tarde. Con la ventana declarada, esos
+      // días se cuentan y la confianza baja.
+      //
+      // Sin fecha de plantación no hay ciclo que declarar: se pasa null a
+      // propósito y el motor marca `ventanaClimaDeclarada: false`, que es la
+      // forma de decir "esta cobertura no significa nada".
+      const hoyCivil = KyliaClima.hoyISO();
+      const ventana = plant ? { desde: String(plant).slice(0, 10), hasta: hoyCivil } : null;
       const bal = MOTOR.balanceHidrico(serie, conLamina, {
         suelo:           cfg.suelo,
         cultivoId,
         metodoRiego:     cfg.metodoRiego,
         fechaPlantacion: plant,
+        ventana,
       });
       const { Dr, taw, raw, etcAcum, et0Acum, lluviaAcum } = bal;
 
@@ -4466,6 +4479,20 @@
         diasFenologicos:      bal.diasFenologicos,
         faseActual:           bal.faseActual,
         sinFenologia:         !plant,
+        // ⚠️ ESTO SE PERDÍA AQUÍ, y por eso el aviso de precisión reducida era
+        // inalcanzable: el motor lo calculaba, la pantalla lo miraba, y el
+        // adaptador de en medio no lo copiaba. Un campo que no se propaga es un
+        // campo que no existe.
+        riegosSinCantidad:      bal.riegosSinCantidad,
+        ultimoRiegoSinCantidad: bal.ultimoRiegoSinCantidad,
+        confianzaBalance:       bal.confianzaBalance,
+        coberturaClima:         bal.coberturaClima,
+        diasSinClima:           bal.diasSinClima,
+        diasEsperadosClima:     bal.diasEsperadosClima,
+        ventanaClimaDeclarada:  bal.ventanaClimaDeclarada,
+        diasSinLluviaConocida:  bal.diasSinLluviaConocida,
+        cicloCompletado:        bal.cicloCompletado,
+        diasTrasCiclo:          bal.diasTrasCiclo,
       };
     }
 
@@ -4537,12 +4564,96 @@
         });
       } catch (_) {}
     }
+    // ── Reconciliar el historial local con el del servidor ──────────────────
+    //
+    // EL PROBLEMA QUE CIERRA. La migración congela las acciones en Supabase
+    // (lamina_mm, lamina_origen, caudal_mmh), pero los riegos que ya estaban en
+    // el localStorage del móvil no reciben nada. Resultado: el servidor usa la
+    // lámina congelada y la app sigue recalculando con el caudal actual, así que
+    // los dos vuelven a decidir distinto sobre la misma parcela.
+    //
+    // LA CLAVE DE CORRESPONDENCIA, y es deliberadamente estricta: dos acciones
+    // son la misma si coinciden en FECHA y en CONTENIDO —misma duración y misma
+    // cantidad apuntada, con null contando como null—. La fecha sola no vale:
+    // en un mismo día puede haber dos riegos distintos, y copiar la lámina del
+    // que no es sería inventarse el histórico.
+    //
+    // Y tiene que ser INEQUÍVOCA: si ese día hay más de una acción local con la
+    // misma firma, o más de una en el servidor, no hay forma de saber cuál es
+    // cuál. Entonces no se toca, se marca `reconciliado: false` y se sigue
+    // recalculando con el fallback declarado. Un dato que no se puede casar se
+    // conserva, no se completa a ojo.
+    //
+    // PRIORIDAD: manda el servidor. Es la copia canónica, la que alimenta el
+    // reveal y la que se ha migrado.
+    function firmaRiego(r) {
+      const dur  = r.duracion_min ?? r.duracion ?? null;
+      const cant = r.cantidad_l_m2 ?? r.litros ?? null;
+      const n = v => (v == null || v === "" ? "∅" : String(Number(v)));
+      return `${n(dur)}|${n(cant)}`;
+    }
+    async function reconciliarRiegos() {
+      const uid = idParcelaActiva();
+      if (!uid) return { reconciliados: 0, sinCasar: 0, motivo: "sin parcela" };
+      let remotos;
+      try {
+        const res = await fetch(`/api/campo?vista=perfil&usuario_id=${encodeURIComponent(uid)}&limite=400`,
+                                { cache: "no-store" });
+        if (!res.ok) return { reconciliados: 0, sinCasar: 0, motivo: `HTTP ${res.status}` };
+        remotos = (await res.json())?.riegos_recientes || [];
+      } catch (_) { return { reconciliados: 0, sinCasar: 0, motivo: "sin red" }; }
+
+      // Índice del servidor por fecha+firma, contando cuántos hay de cada.
+      const porClave = new Map();
+      for (const r of remotos) {
+        const k = `${r.fecha}#${firmaRiego(r)}`;
+        const e = porClave.get(k) || { n: 0, fila: null };
+        e.n++; e.fila = r;
+        porClave.set(k, e);
+      }
+      // Y cuántos locales comparten cada clave: si hay dos, tampoco es inequívoco.
+      const localesPorClave = new Map();
+      for (const r of riegos) {
+        const k = `${r.date}#${firmaRiego(r)}`;
+        localesPorClave.set(k, (localesPorClave.get(k) || 0) + 1);
+      }
+
+      let reconciliados = 0, sinCasar = 0;
+      const out = riegos.map(r => {
+        if (r.lamina_mm != null) return r;             // ya congelado: no se toca
+        const k = `${r.date}#${firmaRiego(r)}`;
+        const e = porClave.get(k);
+        if (!e || e.n !== 1 || localesPorClave.get(k) !== 1 || e.fila.lamina_mm == null) {
+          sinCasar++;
+          return { ...r, reconciliado: false };
+        }
+        reconciliados++;
+        return { ...r,
+                 lamina_mm:     e.fila.lamina_mm,
+                 lamina_origen: e.fila.lamina_origen,
+                 caudal_mmh:    e.fila.caudal_mmh,
+                 reconciliado:  true };
+      });
+      if (reconciliados) { saveRiegos(out); }
+      else { riegos = out; }                            // guarda la marca sin reescribir
+      return { reconciliados, sinCasar, motivo: null };
+    }
+    window.kyliaReconciliarRiegos = reconciliarRiegos;
+
     function removeRiego(date) {
       saveRiegos(riegos.filter(r => r.date !== date));
     }
     // Inicialización: carga el historial y deriva la fecha del último riego
     riegos = loadRiegos();
     ultimoRiego = riegos.length ? riegos[riegos.length - 1].date : null;
+    // Al arrancar, copiar del servidor las láminas congeladas que falten. Va en
+    // segundo plano y sin bloquear: si no hay red, el historial local sigue
+    // valiendo con su fallback declarado.
+    setTimeout(() => {
+      reconciliarRiegos().then(r => {
+        if (r.reconciliados) { renderIndicadores(); renderHoy(); renderRiegoRegistro(); renderCalendario(); }
+      }).catch(() => {});
+    }, 1200);
 
     // ─── Storage de aplicaciones de productos ────────────────────────────────
     // Cuaderno de aplicaciones del agricultor. Entradas:
@@ -5153,7 +5264,7 @@
           // no lo es. Cuando se implemente la estrategia C (intervalo de estados)
           // esto se sustituye por el intervalo.
           pie: (bal?.riegosSinCantidad > 0)
-            ? "Menos precisión de lo normal: falta saber cuánta agua echaste en un riego anterior."
+            ? "Precisión reducida: falta conocer la cantidad de un riego anterior."
             : (Number(cfg.caudal) > 0) ? null
             : "Mientras riegas, pon una botella bajo un gotero diez minutos: con eso los próximos avisos te saldrán en minutos.",
           onClick: () => {
@@ -5235,7 +5346,29 @@
       const acc = accionesDeHoy();
       // Sin nada que hacer, la tarjeta no está. Es la diferencia entre una app
       // que avisa y una que habla todos los días.
-      if (!acc.length) { card.hidden = true; el.innerHTML = ""; return; }
+      // ⚠️ "TODO EN ORDEN" TAMBIÉN PUEDE VENIR DE UN SUPUESTO. Aquí la tarjeta se
+      // ocultaba en cuanto no había nada que hacer, así que el aviso de precisión
+      // reducida solo se veía los días que tocaba regar — justo al revés de lo
+      // que hace falta: si el motor cree el suelo lleno porque supuso que un
+      // riego sin cifra lo llenó, el "no toca regar" ES la consecuencia de ese
+      // supuesto, y es cuando más importa decirlo.
+      const PIE_CONFIANZA = "Precisión reducida: falta conocer la cantidad de un riego anterior.";
+      if (!acc.length) {
+        if (accionesDeHoy.__confianzaBaja) {
+          card.hidden = false;
+          el.innerHTML = `<p class="accion-tranquilos">Hoy no hay nada que hacer.</p>`
+                       + `<p class="accion-tranquilos">${esc(PIE_CONFIANZA)}</p>`
+                       + `<button class="btn-por-que" id="btn-por-que-hoy">¿Por qué?</button>`;
+          document.getElementById("btn-por-que-hoy")?.addEventListener("click", () => {
+            const det = document.getElementById("det-hoy");
+            if (!det) return;
+            det.textContent = generarDetalleHoy();
+            det.hidden = !det.hidden;
+          });
+          return;
+        }
+        card.hidden = true; el.innerHTML = ""; return;
+      }
 
       // Con varios cultivos, los que NO piden nada se nombran en una línea. Sin
       // esto, ver "Regar la lechuga" y nada del tomate se lee como que del
@@ -5261,8 +5394,7 @@
             ${a.pie ? `<span class="accion-pie">${esc(a.pie)}</span>` : ""}
           </span>
         </${a.onClick ? "button" : "div"}>`).join("")
-        + (accionesDeHoy.__confianzaBaja
-            ? `<p class="accion-tranquilos">Menos precisión de lo normal: falta saber cuánta agua echaste en un riego anterior.</p>` : "")
+        + (accionesDeHoy.__confianzaBaja ? `<p class="accion-tranquilos">${esc(PIE_CONFIANZA)}</p>` : "")
         + (tranquilos.length
             ? `<p class="accion-tranquilos">${esc(
                  tranquilos.length === 1

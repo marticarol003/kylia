@@ -123,8 +123,14 @@ async function serieXema(est, variable) {
   const filas = await j(`${XEMA_DATOS}?codi_estacio=${est}&codi_variable=${variable}&$where=${w}&$limit=400`);
   const m = new Map();
   for (const f of filas) {
+    // ⚠️ Number(null) es 0 y Number("") también, así que un valor ausente se
+    // colaba como "ese día midió 0 mm" — en la fuente que hace de VERDAD de
+    // referencia, que es donde más daño hace. Un missing tiene que seguir siendo
+    // un missing: el día no entra y se cuenta en `descartados.sin_observacion`.
+    if (f.valor == null || f.valor === "") continue;
     const v = Number(f.valor);
-    if (Number.isFinite(v)) m.set(f.data_lectura.slice(0, 10), v);   // un valor no numérico es un hueco, no un 0
+    if (!Number.isFinite(v)) continue;
+    m.set(f.data_lectura.slice(0, 10), v);
   }
   return m;
 }
