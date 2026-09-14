@@ -66,6 +66,25 @@ ok(conArea.disponible === true && conArea.N > 0,
 ok(conArea.observado?.textura === sinArea.observado?.textura,
    "y la textura es la misma con área que sin ella: no depende de la superficie");
 
+console.log("\n── y cuándo la textura deducida NO es de fiar ──");
+// 14-sep. La clase de suelo no es un adorno: elige el AWC del balance. Y el
+// salto no es simétrico — arenoso→franco es +88% de capacidad y franco→arcilloso
+// solo +7%, así que la frontera que duele es arena ≥65%, no arcilla ≥35%.
+// Sobre las series reales de los tres pilotos, cambiar de clase mueve la lámina
+// entre 5,5% y 12,1%, y el ahorro publicado hasta 10 puntos.
+// SoilGrids es un prior de zona a 250 m. En vez de obligar a una analítica se
+// declara el margen: con margen de sobra la clase aguanta el error del mapa.
+const { fragilidadTextura, clasificarTextura } = require(join(RAIZ, "api", "_suelo-oferta.js"));
+const breda = fragilidadTextura(22.13, 42.81);      // medido en la parcela de Ferran
+const filo  = fragilidadTextura(19, 63);            // a 2 puntos de ser arenoso
+ok(clasificarTextura(22.13, 42.81) === "franco" && breda.fragil === false,
+   `la parcela de Ferran es franco con ${breda.margen_pp} pp de margen: la clase aguanta`);
+ok(filo.fragil === true && filo.frontera_cercana === "arenoso",
+   `una parcela a ${filo.margen_pp} pp de la frontera de arena se declara frágil`);
+ok(fragilidadTextura(null, 40) === null, "sin datos de SoilGrids no se inventa una fragilidad");
+ok(/fragil: o\?\.observado\?\.fragilidad\?\.fragil/.test(campo),
+   "y la vista del alta lo devuelve, para poder preguntar solo cuando hace falta");
+
 console.log("\n── el vaso NO vale en goteo, y era lo que se enseñaba ──");
 // Un vaso bajo un gotero recoge TODO lo de ese gotero en sus ~38 cm², cuando el
 // gotero moja el marco entero. Con la geometría de Ferran son 10,9 mm/h reales

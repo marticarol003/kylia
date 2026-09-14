@@ -872,6 +872,11 @@ module.exports = async (req, res) => {
         ok: true, textura: t,
         arcilla_pct: o?.observado?.arcilla_pct ?? null,
         arena_pct: o?.observado?.arena_pct ?? null,
+        // Si la parcela está en el filo entre dos clases, la textura deducida no
+        // aguanta el error del mapa (250 m) y conviene confirmarla. Con margen
+        // de sobra no se le pregunta nada a nadie: el alta sigue igual de corta.
+        fragil: o?.observado?.fragilidad?.fragil ?? null,
+        margen_pp: o?.observado?.fragilidad?.margen_pp ?? null,
         fuente: t ? "SoilGrids v2.0 (ISRIC), 250 m" : null,
         motivo: t ? null : (o?.motivo || "sin_dato"),
       });

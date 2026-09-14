@@ -43,6 +43,40 @@ function clasificarTextura(clayPct, sandPct) {
   return "franco";
 }
 
+// ¿Cuánto falta para que esta parcela cambie de clase? Importa porque la clase
+// no es un adorno: elige el AWC del balance de riego, y el salto no es simétrico.
+//   arenoso 0,08 → franco 0,15   = +88% de capacidad de suelo
+//   franco  0,15 → arcilloso 0,16 = +7%
+// O sea que LA FRONTERA QUE DUELE ES ARENA ≥ 65%, no arcilla ≥ 35%. Medido
+// sobre las series reales de los tres pilotos, pasar de una clase a otra mueve
+// la lámina de Kylia entre un 5,5% y un 12,1%, y el ahorro que se publica hasta
+// 10 puntos (Oriol: 1% con arcilloso, 11% con arenoso).
+//
+// SoilGrids es un prior de zona a 250 m, no una medida de la parcela. En vez de
+// obligar a una analítica —que rompería el alta— se declara cuánto margen hay:
+// con margen de sobra la clase aguanta cualquier error razonable del mapa, y
+// solo cuando está en el filo tiene sentido preguntarle al agricultor, que suele
+// saber si su tierra es fuerte o arenosa.
+const MARGEN_FRAGIL = 8;   // puntos porcentuales
+
+function fragilidadTextura(clayPct, sandPct) {
+  if (!(Number.isFinite(clayPct) && Number.isFinite(sandPct))) return null;
+  const aArcilloso = 35 - clayPct;
+  const aArenoso   = 65 - sandPct;
+  // Solo cuentan las fronteras que se pueden cruzar desde donde está.
+  const margen = Math.min(...[aArcilloso, aArenoso].map(Math.abs));
+  return {
+    margen_pp: Math.round(margen * 10) / 10,
+    a_arcilloso_pp: Math.round(aArcilloso * 10) / 10,
+    a_arenoso_pp: Math.round(aArenoso * 10) / 10,
+    // La de arena es la que cambia el AWC casi al doble; la de arcilla casi no.
+    frontera_cercana: margen <= MARGEN_FRAGIL
+      ? (Math.abs(aArenoso) < Math.abs(aArcilloso) ? "arenoso" : "arcilloso")
+      : null,
+    fragil: margen <= MARGEN_FRAGIL,
+  };
+}
+
 // SoilGrids devuelve valores enteros escalados por d_factor. Propiedades y sus
 // unidades objetivo tras dividir por d_factor:
 //   nitrogen → g/kg (N total)   soc → g/kg (C orgánico)   phh2o → pH
@@ -158,6 +192,7 @@ async function ofertaSuelo(lat, lon, areaM2, opts = {}) {
   // motor de nutrición ya sabe leer: para él no cambia nada.
   const textura     = clasificarTextura(props.clay, props.sand);
   const moPct       = (props.soc / 10) * C_A_MO;
+  const fragil      = fragilidadTextura(props.clay, props.sand);
   const observado   = {
     n_total_g_kg: r2(props.nitrogen),
     carbono_org_g_kg: r2(props.soc),
@@ -167,6 +202,9 @@ async function ofertaSuelo(lat, lon, areaM2, opts = {}) {
     arena_pct: r2(props.sand),
     textura,
     densidad_t_m3: r2(props.bdod),
+    // Cuánto margen hay hasta cambiar de clase. `fragil: true` = la textura no
+    // aguanta el error del mapa y conviene confirmarla con el agricultor.
+    fragilidad: fragil,
   };
   if (!(area > 0)) {
     return { disponible: false, fuente_punto: fuentePunto, observado,
@@ -213,6 +251,7 @@ module.exports = {
   ofertaSuelo,
   // exportadas para test
   clasificarTextura,
+  fragilidadTextura,
   consultaPunto,
   consultaConFallback,
 };
