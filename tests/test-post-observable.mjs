@@ -135,6 +135,41 @@ console.log("\n── 2. qué dice cada caso ──");
   ok(r.error === "sin_red" && r.status === 0, "la red caída → sin_red, status 0");
 }
 
+console.log("\n── 2b. JSON VÁLIDO PERO PRIMITIVO: el caso que rompía el contrato ──");
+// `true`, `1` y `"texto"` son JSON válidos. `"persisted" in datos` sobre ellos
+// lanza TypeError, y como post() es async eso rechaza la promesa: con 10 de los
+// 12 call sites sin esperarla, unhandledrejection. `null` cortocircuitaba con
+// `datos &&` y por eso no se veía.
+const PRIMITIVOS = [
+  ["true",    "true"],
+  ["1",       "1"],
+  ['"texto"', '"texto"'],
+  ["null",    "null"],
+  ["[]",      "[]"],
+  ["{}",      "{}"],
+  ["false",   "false"],
+  ["0",       "0"],
+  ['""',      '""'],
+];
+for (const [etiqueta, cuerpo] of PRIMITIVOS) {
+  for (const status of [200, 500]) {
+    const { post } = montar(resp(status, cuerpo));
+    let rechazo = null, r = null;
+    try { r = await post("/api/log", { recurso: "acciones" }); } catch (e) { rechazo = e; }
+    ok(rechazo === null,
+       `body ${etiqueta} con ${status}: no rechaza${rechazo ? " (" + rechazo.constructor.name + ")" : ""}`);
+    ok(r && r.status === status, `  y conserva el status real (${r ? r.status : "—"})`);
+    ok(r && r.error !== "sin_red", "  y no se confunde con sin_red");
+  }
+}
+{
+  // Y que el resultado siga siendo el correcto, no solo que no explote.
+  const r = await montar(resp(200, "true")).post("/x", {});
+  ok(r.ok === true && r.persisted === true, "body `true` con 200 → ok y persisted (no hay campo que diga lo contrario)");
+  const r2 = await montar(resp(500, "1")).post("/x", {});
+  ok(r2.ok === false && r2.persisted === false && r2.error === "HTTP 500", "body `1` con 500 → fallo con su status");
+}
+
 console.log("\n── 3. el registro de fallos ──");
 {
   const m = montar(CASOS[3][1]);
@@ -177,6 +212,11 @@ console.log("\n── 5. guarda de regresión: nadie consume el valor sin proteg
   // Si aparece un tercero, hay que mirarlo a mano: una promesa consumida sin
   // protección es justo lo que este cambio viene a evitar.
   ok(usos.length === 2, `call sites que consumen el valor: ${usos.length} (esperado 2)`);
+  // Y el censo completo, que Codex corrigió: son 12, no 13. La cuenta anterior
+  // se dejaba fuera `guardarConfigServidor?.(`, que lleva llamada opcional.
+  const todos = FUENTE.match(
+    new RegExp("window\\.kyliaSync\\??\\.(" + metodos + ")\\??\\.?\\(", "g")) || [];
+  ok(todos.length === 12, `call sites en total: ${todos.length} (esperado 12)`);
   ok(recorta("function addRiego(").includes(".catch(() => marcarNoSincronizado"),
      "y el de addRiego encadena .catch: no puede quedar colgada");
 }

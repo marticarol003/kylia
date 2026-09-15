@@ -109,8 +109,8 @@
       // viera. Un fallo que no deja rastro no es un fallo silencioso: es un dato
       // perdido con apariencia de éxito.
       //
-      // ⚠️ NUNCA RECHAZA, y es deliberado. De los 13 sitios que escriben por
-      // aquí, 12 no esperan la promesa (auditados uno a uno): hacer throw
+      // ⚠️ NUNCA RECHAZA, y es deliberado. Son 12 los sitios que escriben por
+      // aquí (auditados uno a uno) y 10 no esperan la promesa: hacer throw
       // convertiría un fallo de telemetría en un unhandled rejection, ruido en
       // consola y, según el navegador, un error a la vista del agricultor. La
       // promesa resuelve SIEMPRE a { ok, status, persisted, error, datos }; el
@@ -164,17 +164,39 @@
         // hay que reintentar y esconde lo que sí hay que mirar.
         let datos = null;
         try { datos = JSON.parse(await res.text()); } catch (_) { datos = null; }
-        // `res.ok` solo no basta: /api/log responde 200 con { ok:false } en
-        // varios caminos, y 200 con { persisted:false } cuando no escribió nada.
-        const ok = res.ok && datos?.ok !== false;
-        const persisted = (datos && "persisted" in datos) ? datos.persisted !== false : ok;
-        const r = {
-          ok, status: res.status, persisted,
-          error: ok ? null : (datos?.error || `HTTP ${res.status}`),
-          datos,
-        };
-        if (!ok || persisted === false) anotarFallo(path, data, r);
-        return r;
+        try {
+          // ⚠️ UN JSON VÁLIDO NO ES NECESARIAMENTE UN OBJETO. `true`, `1` y
+          // `"texto"` son JSON perfectamente válidos, y `"persisted" in datos`
+          // sobre cualquiera de ellos lanza TypeError. Como post() es async, ese
+          // throw se convierte en promesa rechazada — y con 10 de los 12 call
+          // sites sin esperar la promesa, en unhandledrejection. O sea que el
+          // guardián del contrato rompía el contrato. Lo cazó Codex.
+          //
+          // `datos && ...` no protege: lo que hay que comprobar no es que sea
+          // truthy, es que sea un objeto. (`null` sí cortocircuita, y por eso
+          // pasaba desapercibido.)
+          const esObjeto = datos !== null && typeof datos === "object";
+          // `res.ok` solo no basta: /api/log responde 200 con { ok:false } en
+          // varios caminos, y 200 con { persisted:false } cuando no escribió nada.
+          const ok = res.ok && (!esObjeto || datos.ok !== false);
+          const persisted = (esObjeto && "persisted" in datos) ? datos.persisted !== false : ok;
+          const r = {
+            ok, status: res.status, persisted,
+            error: ok ? null : ((esObjeto && datos.error) || `HTTP ${res.status}`),
+            datos,
+          };
+          if (!ok || persisted === false) anotarFallo(path, data, r);
+          return r;
+        } catch (_) {
+          // Cinturón, no sustituto del arreglo de arriba. Razonar línea a línea
+          // sobre "esto no puede lanzar" ya falló una vez; el contrato de no
+          // rechazar NUNCA es lo único que no se puede perder. Se conserva el
+          // status real: esto no es sin_red, la petición llegó y contestó.
+          const r = { ok: false, status: res.status, persisted: false,
+                      error: `HTTP ${res.status}`, datos: null };
+          anotarFallo(path, data, r);
+          return r;
+        }
       }
 
       window.kyliaSync = {
@@ -4652,6 +4674,12 @@
     // —fecha, litros, duración y lámina se quedan como están—: solo le quita la
     // apariencia de estar arriba. La reconciliación lo limpia sola en cuanto
     // encuentra su fila en el servidor (ver reconciliarRiegos).
+    // DEUDA CONOCIDA, y se deja a propósito: parte de `riegos`, el array en
+    // memoria del momento en que resuelve la promesa. Si se apuntan dos riegos
+    // muy seguidos y el primero falla después del segundo, el guardado del
+    // segundo puede pisar la marca del primero. Es conservador —se pierde una
+    // MARCA, nunca un riego— y reconciliable: reconciliarRiegos vuelve a mirar
+    // el servidor y decide de nuevo. Se arreglará con el reintento, no aquí.
     function marcarNoSincronizado(date) {
       try {
         saveRiegos(riegos.map(r => r.date === date ? { ...r, sincronizado: false } : r));
