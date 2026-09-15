@@ -101,16 +101,80 @@
       const modo = detectarModo();
       document.documentElement.dataset.modoKylia = modo;
 
-      // ─ POST silencioso con reintento ligero ────────────────────────
-      function post(path, data) {
+      // ─ POST con resultado explícito ────────────────────────────────
+      // Antes era `fetch(...).catch(() => null)`: ni miraba `res.ok` ni
+      // reintentaba ni avisaba. Toda escritura de la app —riegos, altas de
+      // parcela, config— era muda, y por eso la zona `zonas[0]` llevaba desde el
+      // 11-sep existiendo en `config_app` y no en `usuarios` sin que nadie lo
+      // viera. Un fallo que no deja rastro no es un fallo silencioso: es un dato
+      // perdido con apariencia de éxito.
+      //
+      // ⚠️ NUNCA RECHAZA, y es deliberado. De los 13 sitios que escriben por
+      // aquí, 12 no esperan la promesa (auditados uno a uno): hacer throw
+      // convertiría un fallo de telemetría en un unhandled rejection, ruido en
+      // consola y, según el navegador, un error a la vista del agricultor. La
+      // promesa resuelve SIEMPRE a { ok, status, persisted, error, datos }; el
+      // que quiera comprobar comprueba, y el que no, sigue igual que antes.
+      const FALLOS_KEY = "kylia_sync_fallos", FALLOS_MAX = 50;
+
+      // METADATOS MÍNIMOS, nunca el payload entero: esto tiene que bastar para
+      // saber QUÉ no subió, no para reconstruirlo. Y va BLINDADO — localStorage
+      // lanza en navegación privada, con la cuota llena o con el sitio
+      // bloqueado, y el diagnóstico no puede tumbar la escritura que diagnostica.
+      function anotarFallo(path, data, r) {
         try {
-          return fetch(path, {
+          let prev = [];
+          try { prev = JSON.parse(localStorage.getItem(FALLOS_KEY)) || []; } catch (_) { prev = []; }
+          if (!Array.isArray(prev)) prev = [];
+          prev.push({
+            t:        new Date().toISOString(),
+            path,
+            recurso:  data?.recurso ?? null,
+            id:       data?.usuario_id ?? data?.propietario_id ?? data?.id ?? null,
+            ref:      data?.fecha_local ?? data?.tipo ?? null,
+            status:   r.status,
+            persisted: r.persisted,
+            error:    r.error,
+          });
+          localStorage.setItem(FALLOS_KEY, JSON.stringify(prev.slice(-FALLOS_MAX)));
+        } catch (_) { /* si ni esto se puede, queda el console.warn de abajo */ }
+        try {
+          console.warn("[kylia-sync] no subió:", path, r.status,
+                       r.error || `persisted=${r.persisted}`);
+        } catch (_) {}
+      }
+
+      async function post(path, data) {
+        let res;
+        try {
+          res = await fetch(path, {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
             body:    JSON.stringify(data),
             keepalive: true,
-          }).catch(() => null);
-        } catch (_) { return Promise.resolve(null); }
+          });
+        } catch (_) {
+          const r = { ok: false, status: 0, persisted: false, error: "sin_red", datos: null };
+          anotarFallo(path, data, r);
+          return r;
+        }
+        // Cuerpo vacío o que no es JSON: se CONSERVA EL STATUS. Un 500 con una
+        // página de error delante no es "sin red" — la petición llegó y el
+        // servidor contestó que no. Confundirlos manda a reintentar lo que no
+        // hay que reintentar y esconde lo que sí hay que mirar.
+        let datos = null;
+        try { datos = JSON.parse(await res.text()); } catch (_) { datos = null; }
+        // `res.ok` solo no basta: /api/log responde 200 con { ok:false } en
+        // varios caminos, y 200 con { persisted:false } cuando no escribió nada.
+        const ok = res.ok && datos?.ok !== false;
+        const persisted = (datos && "persisted" in datos) ? datos.persisted !== false : ok;
+        const r = {
+          ok, status: res.status, persisted,
+          error: ok ? null : (datos?.error || `HTTP ${res.status}`),
+          datos,
+        };
+        if (!ok || persisted === false) anotarFallo(path, data, r);
+        return r;
       }
 
       window.kyliaSync = {
@@ -143,6 +207,16 @@
         },
         evento(nombre, props) {
           return post("/api/log", { recurso: "eventos", usuario_id: userId, nombre, props: props || {}, url: location.href });
+        },
+        // Lo que NO subió, para poder mirarlo sin adivinar. Se registran tanto
+        // los ok:false como los 200 que no escribieron (persisted:false).
+        //   window.kyliaSync.fallos()      → lista
+        //   window.kyliaSync.fallos(true)  → lista y vacía
+        fallos(vaciar) {
+          let lista = [];
+          try { lista = JSON.parse(localStorage.getItem(FALLOS_KEY)) || []; } catch (_) { lista = []; }
+          if (vaciar) { try { localStorage.removeItem(FALLOS_KEY); } catch (_) {} }
+          return Array.isArray(lista) ? lista : [];
         },
       };
 
@@ -4543,9 +4617,15 @@
       arr.push({ date, litros: litrosN, franja, duracion,
                  lamina_mm: laminaMm, lamina_origen: origen, caudal_mmh: caudalAhora });
       saveRiegos(arr);
-      // Sincronizar en background con Supabase
+      // Sincronizar en background con Supabase.
+      //
+      // ESCRITURA CRÍTICA. El riego ya está guardado arriba, así que no se
+      // pierde pase lo que pase — pero tampoco puede APARENTAR que subió.
+      // Fracaso son las dos cosas: que la petición fallara, y que el servidor
+      // contestara 200 sin escribir nada (persisted:false, p.ej. Supabase sin
+      // configurar). Las dos dejan el riego solo en este móvil.
       try {
-        window.kyliaSync?.accion({
+        const envio = window.kyliaSync?.accion({
           // Cada zona es su propia parcela en el servidor: el riego tiene que
           // ir contra SU id, no contra el del usuario. (kyliaSync.accion pone
           // usuario_id por defecto y el payload lo sobrescribe.)
@@ -4562,6 +4642,19 @@
           lamina_origen:  origen,
           jornada_id:     window._kyliaJornadaActual?.id || null,
         });
+        Promise.resolve(envio)
+          .then(r => { if (!r || !r.ok || r.persisted === false) marcarNoSincronizado(date); })
+          .catch(() => marcarNoSincronizado(date));
+      } catch (_) { marcarNoSincronizado(date); }
+    }
+
+    // Deja constancia de que un riego no llegó al servidor. NO toca sus datos
+    // —fecha, litros, duración y lámina se quedan como están—: solo le quita la
+    // apariencia de estar arriba. La reconciliación lo limpia sola en cuanto
+    // encuentra su fila en el servidor (ver reconciliarRiegos).
+    function marcarNoSincronizado(date) {
+      try {
+        saveRiegos(riegos.map(r => r.date === date ? { ...r, sincronizado: false } : r));
       } catch (_) {}
     }
     // ── Reconciliar el historial local con el del servidor ──────────────────
@@ -4618,12 +4711,23 @@
         localesPorClave.set(k, (localesPorClave.get(k) || 0) + 1);
       }
 
-      let reconciliados = 0, sinCasar = 0;
-      const out = riegos.map(r => {
-        if (r.lamina_mm != null) return r;             // ya congelado: no se toca
-        const k = `${r.date}#${firmaRiego(r)}`;
+      let reconciliados = 0, sinCasar = 0, limpiados = 0;
+      const out = riegos.map(r0 => {
+        const k = `${r0.date}#${firmaRiego(r0)}`;
         const e = porClave.get(k);
-        if (!e || e.n !== 1 || localesPorClave.get(k) !== 1 || e.fila.lamina_mm == null) {
+        const enServidor = !!e && e.n === 1 && localesPorClave.get(k) === 1;
+        // ESTAR ARRIBA y ESTAR CONGELADO ARRIBA son dos cosas distintas, y la
+        // marca de "no subió" depende solo de la primera. Por eso se resuelve
+        // ANTES del early return de la lámina: un riego apuntado hoy ya nace con
+        // lamina_mm (addRiego la congela al escribir), así que si esto fuera
+        // después, su marca no se limpiaría nunca.
+        let r = r0;
+        if (enServidor && r0.sincronizado === false) {
+          const { sincronizado, ...resto } = r0;
+          r = resto; limpiados++;
+        }
+        if (r.lamina_mm != null) return r;             // ya congelado: no se toca
+        if (!enServidor || e.fila.lamina_mm == null) {
           sinCasar++;
           return { ...r, reconciliado: false };
         }
@@ -4634,9 +4738,9 @@
                  caudal_mmh:    e.fila.caudal_mmh,
                  reconciliado:  true };
       });
-      if (reconciliados) { saveRiegos(out); }
+      if (reconciliados || limpiados) { saveRiegos(out); }
       else { riegos = out; }                            // guarda la marca sin reescribir
-      return { reconciliados, sinCasar, motivo: null };
+      return { reconciliados, sinCasar, limpiados, motivo: null };
     }
     window.kyliaReconciliarRiegos = reconciliarRiegos;
 
