@@ -284,9 +284,10 @@ console.log("\n── 5. guarda de regresión: nadie consume el valor sin proteg
   // protección es justo lo que este trabajo viene a evitar. Esta guarda saltó de
   // verdad al añadir sincronizarZonas, que es para lo que está.
   ok(usos.length === 3, `call sites que consumen el valor: ${usos.length} (esperado 3)`);
-  const sincro = recorta("async function sincronizarZonas(");
+  // El tercero vive en rondaSincro, la ronda de sincronización de zonas.
+  const sincro = recorta("async function rondaSincro(");
   ok(sincro.includes("try { r = await window.kyliaSync?.registroUsuario(payload); } catch (_) { r = null; }"),
-     "el de sincronizarZonas va en try/catch con fallback a null");
+     "el de rondaSincro va en try/catch con fallback a null");
   ok(sincro.includes("if (r && r.ok === true && r.persisted === true)"),
      "y comprueba r antes de tocarlo: un null no puede reventar");
   // Y el censo completo, que Codex corrigió: son 12, no 13. La cuenta anterior

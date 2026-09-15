@@ -3635,13 +3635,25 @@
         origen:           localStorage.getItem("kylia_origen"),
       };
     }
-    // Huella del payload NORMALIZADO (claves ordenadas), no de la siembra: lo
-    // que no se manda no puede disparar un reenvío.
+    // Serialización ESTABLE y RECURSIVA. La versión anterior usaba
+    // `JSON.stringify(payload, Object.keys(payload).sort())`, y ese segundo
+    // argumento es un replacer ARRAY: una lista blanca de claves que se aplica a
+    // TODOS los niveles. O sea que borraba `type` y `coordinates` de la
+    // geometría, y dos GeoJSON distintos daban la MISMA huella: mover un
+    // polígono no disparaba sincronización. Lo cazó Codex.
+    function estable(v) {
+      if (v === null) return "null";
+      if (typeof v !== "object") { const t = JSON.stringify(v); return t === undefined ? "null" : t; }
+      if (Array.isArray(v)) return "[" + v.map(estable).join(",") + "]";   // orden conservado
+      return "{" + Object.keys(v).sort()
+        .map(k => JSON.stringify(k) + ":" + estable(v[k])).join(",") + "}";
+    }
+    // Huella del payload EXACTO que se manda, entero y hasta el último nivel.
     function huellaPayload(payload) {
-      const estable = JSON.stringify(payload, Object.keys(payload).sort());
+      const txt = estable(payload);
       let h = 5381;
-      for (let i = 0; i < estable.length; i++) h = ((h * 33) ^ estable.charCodeAt(i)) >>> 0;
-      return `${h.toString(36)}.${estable.length.toString(36)}`;
+      for (let i = 0; i < txt.length; i++) h = ((h * 33) ^ txt.charCodeAt(i)) >>> 0;
+      return `${h.toString(36)}.${txt.length.toString(36)}`;
     }
 
     // BASELINE ANTES DE QUE NADIE PUEDA EDITAR. Si `vista` se pusiera dentro de
@@ -3650,9 +3662,32 @@
     // modificado: perderíamos la referencia anterior y quedaría como histórica
     // intacta para siempre. Por eso se hidrata al cargar. No hace ningún POST y
     // no llama a subirConfig.
+    // Estructura legacy → siembras[]. Tiene que correr ANTES de hidratar: una
+    // zona antigua guarda el cultivo colgando de la zona, sin `siembras`, así que
+    // la hidratación no la veía y la siembra aparecía más tarde SIN baseline. Y
+    // una siembra sin `sync` caía en `vista !== actual` (undefined !== huella) →
+    // ENVIAR: una histórica legacy se habría creado sola. Lo cazó Codex.
+    // Es idempotente y se persiste, para que loadZonas y esto no diverjan.
+    function normalizarZonasLegacy() {
+      const zonas = zonasGuardadas();
+      let n = 0;
+      for (const z of zonas) {
+        if (Array.isArray(z.siembras)) continue;
+        z.siembras = [{
+          id: z.id || uuidZona(), cultivo: z.cultivo || null,
+          area_m2: z.superficie_m2 || null, fechaPlantacion: z.fechaPlantacion || null,
+        }];
+        delete z.cultivo; delete z.fechaPlantacion; delete z.id;
+        n++;
+      }
+      if (n) guardarZonasSinSubir(zonas);
+      return { migradas: n };
+    }
+
     function hidratarSyncZonas() {
       const dueno = window.kyliaSync?.userId;
       if (!dueno) return { hidratadas: 0 };
+      normalizarZonasLegacy();                 // primero la forma, luego la marca
       const zonas = zonasGuardadas();
       let n = 0;
       for (const z of zonas) {
@@ -3772,20 +3807,29 @@
       clearTimeout(subidaPendiente);
       subidaPendiente = setTimeout(() => {
         try {
-          window.kyliaSync?.guardarConfigServidor?.({
-            finca: cfgFinca,
-            zonas: zonasGuardadas(),
-            zonaActiva: zonaActiva || null,
-            modo: window.kyliaSync?.modo || null,
-          });
           // EL INVARIANTE: si el servidor conoce una zona en config_app, su
           // fila-parcela tiene que existir. Va aquí y no en el guardado del
           // panel porque subirConfig es el embudo por el que pasan los CUATRO
           // caminos que suben zonas; colgarlo de uno solo es lo que dejó 4 zonas
           // en config_app sin una sola fila en `usuarios`.
+          //
+          // ⚠️ SINCRONIZAR VA PRIMERO, y el orden importa. Antes se subía la
+          // config y LUEGO se sincronizaba, así que las marcas recién confirmadas
+          // se quedaban en local hasta el siguiente guardado: en un dispositivo
+          // nuevo, `s.sync` llegaba vacío y la siembra parecía histórica. Con la
+          // sincronización delante, las zonas se releen DESPUÉS y el config_app
+          // que sube ya lleva las marcas. Una sola subida, sin recursión.
           Promise.resolve(sincronizarZonas(cfgFinca))
-            .then(r => { ultimaSincroZonas = r; })
-            .catch(() => {});
+            .catch(() => null)
+            .then(r => {
+              ultimaSincroZonas = r;
+              window.kyliaSync?.guardarConfigServidor?.({
+                finca: cfgFinca,
+                zonas: zonasGuardadas(),        // releídas: con las marcas nuevas
+                zonaActiva: zonaActiva || null,
+                modo: window.kyliaSync?.modo || null,
+              });
+            });
         } catch (_) { /* el guardado local ya está hecho; esto es el espejo */ }
       }, 1500);
     }
@@ -4306,20 +4350,15 @@
       z.siembras = z.siembras || [];
       const id = uuidZona();
       const cultivo = document.getElementById("ec-cultivo").value;
-      z.siembras.push({
-        id, cultivo, area_m2: area, fechaPlantacion: plantado, geometria: ecGeom,
+      z.siembras.push(nuevaSiembra(area, {
+        id, cultivo, fechaPlantacion: plantado, geometria: ecGeom,
         // Su propio riego. No se hereda el de la finca: suponer que todos los
         // bancales se riegan igual es falso hasta en fincas pequeñas, y de aquí
         // sale la eficiencia con la que se convierte el agua aplicada en agua
         // que llega a la raíz (de 0,60 a 0,90 según el método).
         metodoRiego: ecR.metodo,
         riegoMinutos: Number(ecR.minutos) || null,
-        // NACE EN EL RÉGIMEN NUEVO. Es la única marca que depende de un camino
-        // concreto, y la que distingue "nueva" de "histórica": sin ella, una
-        // siembra recién creada se hidrataría como preexistente y no se
-        // registraría sola. Se mantiene en true hasta que el servidor confirme.
-        sync: { nueva: true, vista: null, confirmada: null },
-      });
+      }));
       localStorage.setItem(ZONAS_KEY, JSON.stringify(zonas));
 
       // Y su historial, con la MISMA función que usa el alta. Sin esto el
@@ -4905,10 +4944,17 @@
     window.kyliaReconciliarRiegos = reconciliarRiegos;
     // Baseline de las siembras, ANTES de que el usuario pueda editar ninguna.
     try { hidratarSyncZonas(); } catch (_) {}
-    // Qué siembras esperan reparación (punto 2). Solo lectura: no crea nada.
-    window.kyliaZonasPendientes = async () => {
-      const r = await sincronizarZonas(cfgFinca);
-      return r;
+    // DIAGNÓSTICO PURO. Llamaba a sincronizarZonas(), o sea que "mirar" escribía
+    // y podía dar de alta parcelas. Ahora solo clasifica: 0 fetch, 0 POST, 0
+    // escrituras. Lo consumirá el punto 2.
+    window.kyliaZonasPendientes = () => {
+      const c = clasificarSiembras(cfgFinca);
+      return {
+        confirmadas:               c.confirmadas,
+        pendientes_sincronizacion: c.pendientes_sincronizacion.map(x => x.id),
+        pendientes_reparacion:     c.pendientes_reparacion,
+        sin_cultivo:               c.sin_cultivo,
+      };
     };
 
     function removeRiego(date) {
@@ -6989,8 +7035,18 @@
 
     // Cada siembra es un cultivo ocupando un trozo del recinto. Es lo que acaba
     // siendo una parcela en el servidor (una fila de `usuarios`).
-    function nuevaSiembra(areaM2) {
-      return { id: uuidZona(), cultivo: null, area_m2: areaM2 || null, fechaPlantacion: null };
+    // ÚNICO CONSTRUCTOR DE SIEMBRA. Existían dos caminos y solo uno ponía la
+    // marca: nuevaSiembra() no la ponía, así que una siembra creada al elegir
+    // recinto o con "añadir otro cultivo" nacía indistinguible de una histórica
+    // y no se registraba nunca. Lo cazó Codex. Todo lo que cree una siembra pasa
+    // por aquí.
+    function nuevaSiembra(areaM2, extra = {}) {
+      return {
+        id: uuidZona(), cultivo: null, area_m2: areaM2 || null, fechaPlantacion: null,
+        ...extra,
+        // Va al final a propósito: `extra` no puede sobrescribirla por descuido.
+        sync: { nueva: true, vista: null, confirmada: null },
+      };
     }
 
     function loadZonas() {
@@ -7462,7 +7518,11 @@
     // que nadie ha tocado NO se crea por el hecho de volver a guardar config. Se
     // declara y espera al dry-run del punto 2.
     function decidirSiembra(sync, actual) {
-      const y = sync || {};
+      // CINTURÓN: una siembra sin marcas no se envía JAMÁS. Sin esto,
+      // `vista !== actual` es `undefined !== huella` → true → enviar, y una
+      // histórica que se escapara de la hidratación se crearía sola.
+      if (!sync || typeof sync !== "object") return "pendiente_reparacion";
+      const y = sync;
       if (y.confirmada === actual)                      return "nada";
       if (y.nueva === true)                             return "enviar";
       if (y.confirmada != null && y.confirmada !== actual) return "enviar";
@@ -7470,46 +7530,85 @@
       return "pendiente_reparacion";
     }
 
-    // Sube cada siembra como una PARCELA propia (una fila de `usuarios`). Itera
-    // la VERDAD PERSISTIDA —kylia_zonas— y no `zonasSel`, que era el fallo.
-    async function sincronizarZonas(base) {
+    // CLASIFICADOR PURO. Cero fetch, cero POST, cero escrituras. Es la única
+    // fuente de la decisión: lo usa tanto el diagnóstico como la sincronización,
+    // así que no pueden discrepar.
+    function clasificarSiembras(base) {
       const dueno = window.kyliaSync?.userId;
-      const res = { enviadas: 0, confirmadas: 0, fallidas: 0,
+      const res = { confirmadas: [], pendientes_sincronizacion: [],
                     pendientes_reparacion: [], sin_cultivo: [] };
       if (!dueno) return res;
-      const zonas = zonasGuardadas();
-      let cambiado = false;
-
-      for (const z of zonas) {
+      for (const z of zonasGuardadas()) {
         for (const s of (z.siembras || [])) {
           if (!s || !s.id) continue;
           // Sin cultivo no se sube: el motor de nutrición lo exige para el plan
-          // de abonado y el Kc caería a 1 (ETc = ET₀). Antes se descartaba en
-          // silencio; ahora se declara.
+          // de abonado y el Kc caería a 1 (ETc = ET₀).
           if (!s.cultivo) { res.sin_cultivo.push(s.id); continue; }
-
           const payload = payloadSiembra(z, s, base, dueno);
-          const actual  = huellaPayload(payload);
-          const quehacer = decidirSiembra(s.sync, actual);
-          if (quehacer === "nada") continue;
-          if (quehacer === "pendiente_reparacion") { res.pendientes_reparacion.push(s.id); continue; }
-
-          res.enviadas++;
-          let r = null;
-          try { r = await window.kyliaSync?.registroUsuario(payload); } catch (_) { r = null; }
-          // SOLO persisted === true avanza las marcas. Si falla, `vista` se
-          // queda donde estaba y la diferencia contra `actual` se vuelve a
-          // detectar en el siguiente guardado: reintento sin cola ni estado.
-          if (r && r.ok === true && r.persisted === true) {
-            s.sync = { nueva: false, vista: actual, confirmada: actual };
-            cambiado = true;
-            res.confirmadas++;
-          } else {
-            res.fallidas++;          // el porqué ya está en kylia_sync_fallos
-          }
+          const huella  = huellaPayload(payload);
+          const q = decidirSiembra(s.sync, huella);
+          if (q === "nada")                  res.confirmadas.push(s.id);
+          else if (q === "enviar")           res.pendientes_sincronizacion.push({ id: s.id, payload, huella });
+          else                               res.pendientes_reparacion.push(s.id);
         }
       }
-      if (cambiado) guardarZonasSinSubir(zonas);
+      return res;
+    }
+
+    // Escribe SOLO s.sync de UNA siembra, releyendo el estado actual. Nunca
+    // vuelca una snapshot entera: si el usuario editó mientras volaba el POST,
+    // volcarla le borraría la edición.
+    function anotarSync(id, marcas) {
+      const zonas = zonasGuardadas();
+      for (const z of zonas) {
+        for (const s of (z.siembras || [])) {
+          if (s && s.id === id) { s.sync = marcas; return guardarZonasSinSubir(zonas); }
+        }
+      }
+      return false;      // la siembra ya no existe: no se resucita
+    }
+
+    // SINGLE-FLIGHT. Dos guardados seguidos lanzaban dos rondas que podían
+    // pisarse las marcas. Se encadenan: la segunda empieza cuando la primera ha
+    // terminado, y como cada una reclasifica desde cero, la segunda ve lo que
+    // dejó la primera.
+    let cadenaSincro = Promise.resolve();
+    function sincronizarZonas(base) {
+      const siguiente = cadenaSincro.then(() => rondaSincro(base), () => rondaSincro(base));
+      cadenaSincro = siguiente.catch(() => {});
+      return siguiente;
+    }
+
+    // Sube cada siembra como una PARCELA propia (una fila de `usuarios`). Itera
+    // la VERDAD PERSISTIDA —kylia_zonas— y no `zonasSel`, que era el fallo
+    // original: aquel Map lo llena solo el editor de mapa.
+    async function rondaSincro(base) {
+      const plan = clasificarSiembras(base);
+      const res = { enviadas: 0, confirmadas: 0, fallidas: 0, descartadas: 0,
+                    pendientes_reparacion: plan.pendientes_reparacion,
+                    sin_cultivo: plan.sin_cultivo };
+
+      for (const { id, payload, huella } of plan.pendientes_sincronizacion) {
+        res.enviadas++;
+        // La huella que de verdad se envía. Si el usuario edita mientras vuela
+        // la petición, lo confirmado es ESTO, no lo que haya ahora.
+        const huellaEnviada = huella;
+        let r = null;
+        try { r = await window.kyliaSync?.registroUsuario(payload); } catch (_) { r = null; }
+
+        if (r && r.ok === true && r.persisted === true) {
+          // Se marca con la huella ENVIADA. Si mientras tanto pasó de A a B, el
+          // contenido B queda INTACTO y `confirmada: A` hace que el siguiente
+          // ciclo detecte A !== B y mande B. Nunca se marca B como confirmada
+          // por una respuesta que era de A.
+          if (!anotarSync(id, { nueva: false, vista: huellaEnviada, confirmada: huellaEnviada })) res.descartadas++;
+          else res.confirmadas++;
+        } else {
+          // Ni una marca avanza: el siguiente guardado vuelve a detectar la
+          // diferencia y reintenta. El porqué ya está en kylia_sync_fallos.
+          res.fallidas++;
+        }
+      }
       return res;
     }
 
