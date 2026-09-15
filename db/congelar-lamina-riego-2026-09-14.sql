@@ -1,5 +1,11 @@
 -- ─────────────────────────────────────────────────────────────────
--- Congelar la lámina de cada riego (14-sep-2026)  ·  NO EJECUTADA
+-- Congelar la lámina de cada riego (14-sep-2026)
+-- ✅ EJECUTADA EL 15-sep-2026. id_max = 275. Backfill: 218 backfill_caudal_actual
+--    + 19 cantidad_apuntada + 1 desconocida = 238 riegos. 0 sin clasificar, 0
+--    discrepancias contra laminaRiego, 0 filas alteradas o perdidas respecto al
+--    snapshot. Constraints validados. Los tres pilotos publicados NO se movieron:
+--    Ferran 412,3/500,7 · Oriol 360/348,2 · padre 440 m² 410/347,7, idénticos
+--    antes y después. Snapshot en kylia_migracion.acciones_backup_20260915.
 -- ─────────────────────────────────────────────────────────────────
 -- EL PROBLEMA. `laminaRiego` convierte duración × caudal en mm usando el caudal
 -- ACTUAL de la parcela. Eso es deliberado —afinar un caudal tiene que mover las
@@ -47,12 +53,29 @@
 -- "Elegir una franja de poco uso" NO es bloquear: si entra un riego, entra. Se
 -- bloquea con un trigger, que es reversible en una línea y no depende de a qué
 -- hora se haga la migración.
+-- ⚠️ EL TRIGGER BLOQUEARÍA TAMBIÉN EL BACKFILL, y eso no estaba previsto en
+-- ninguna versión anterior de este fichero. En un UPDATE de una fila de riego
+-- `new.tipo` sigue valiendo 'riego', así que la condición del WHEN se cumple y
+-- el paso 8 —que es justo un `update ... where tipo = 'riego'`— habría fallado
+-- entero. Lo cazó Martí leyendo el bloque antes de ejecutarlo.
+--
+-- NO se resuelve desactivando el trigger: eso lo abriría para todos. Se le da
+-- una puerta de SESIÓN. Solo pasa quien se haya marcado con
+--     set local kylia.migracion = '1'
+-- que es lo que hace la transacción del paso 8. `set local` vive dentro de esa
+-- transacción y desaparece al cerrarla, pase lo que pase — así que no hay forma
+-- de dejarlo puesto por olvido, y la app y el cron siguen bloqueados en todo
+-- momento.
 create or replace function kylia_bloqueo_riegos() returns trigger as $$
 begin
+  if coalesce(current_setting('kylia.migracion', true), '') = '1' then
+    return new;
+  end if;
   raise exception 'Registro de riegos pausado por migración (congelar-lamina-riego-2026-09-14). Reintenta en unos minutos.'
     using errcode = '55006';
 end; $$ language plpgsql;
 
+drop trigger if exists trg_bloqueo_riegos_migracion on acciones;
 create trigger trg_bloqueo_riegos_migracion
   before insert or update on acciones
   for each row when (new.tipo = 'riego')
@@ -93,14 +116,30 @@ create trigger trg_bloqueo_riegos_migracion
 -- intento, esa línea no falla — no copia nada y te deja creyendo que has hecho
 -- backup cuando lo que tienes es la foto de antes de ayer. Con `create table` a
 -- secas, si el nombre está cogido, PETA. Que pete es lo que se quiere.
-create table acciones_backup_20260914 as
-  select * from acciones where tipo = 'riego';
+-- Se copia la tabla ENTERA, no solo los riegos. El backfill solo toca
+-- tipo='riego', así que con esos bastaría — pero la copia completa cuesta lo
+-- mismo (la tabla son cientos de filas, no millones) y quita de encima toda una
+-- clase de duda si algo sale raro. El nombre lleva el día en que se toma.
+--
+-- ⚠️ Y NO VA EN `public`. Supabase sirve por la Data API los esquemas que estén
+-- en Settings → API → Exposed schemas, y ahí está `public`. Una copia de
+-- `acciones` en public es una segunda superficie de los mismos datos, con el
+-- agujero de RLS que ya tiene la tabla original — duplicarlo por comodidad de
+-- una migración no tiene defensa. En un esquema no expuesto, PostgREST ni
+-- siquiera enruta. Lo pidió Martí antes de ejecutar el bloque.
+create schema if not exists kylia_migracion;
+revoke all on schema kylia_migracion from public, anon, authenticated;
+
+create table kylia_migracion.acciones_backup_20260915 as select * from acciones;
+
+revoke all on kylia_migracion.acciones_backup_20260915 from public, anon, authenticated;
+alter table kylia_migracion.acciones_backup_20260915 enable row level security;
 
 -- Y se verifica que la copia es de AHORA y está completa:
-select (select count(*) from acciones_backup_20260914) as filas_copiadas,
-       (select count(*) from acciones where tipo = 'riego') as filas_origen,
-       (select count(*) from acciones_backup_20260914)
-         = (select count(*) from acciones where tipo = 'riego') as cuadra;
+select (select count(*) from kylia_migracion.acciones_backup_20260915) as filas_copiadas,
+       (select count(*) from acciones)                 as filas_origen,
+       (select count(*) from kylia_migracion.acciones_backup_20260915)
+         = (select count(*) from acciones)             as cuadra;
 -- `cuadra` tiene que ser true. Si no, PARAR.
 
 -- Foto del estado previo, para comparar al final.
@@ -117,7 +156,11 @@ alter table acciones add column if not exists caudal_mmh    numeric;
 alter table acciones add column if not exists lamina_mm      numeric;
 alter table acciones add column if not exists lamina_origen  text;
 
-comment on column acciones.caudal_mmh    is 'mm/h vigentes el día del riego. Congelado: no se recalcula.';
+-- ⚠️ El comentario NO dice "el caudal de aquel día": para las filas que va a
+-- rellenar el backfill eso es falso — se usa el de HOY porque es lo único que
+-- hay. La columna describe QUÉ caudal se usó; de dónde sale lo dice
+-- lamina_origen, y solo él. Lo pidió Martí antes de ejecutar el bloque.
+comment on column acciones.caudal_mmh    is 'Caudal (mm/h) con el que se calculó la lámina congelada. Su procedencia la declara lamina_origen: dato de época en duracion_x_caudal, caudal actual en backfill_caudal_actual.';
 comment on column acciones.lamina_mm     is 'Lámina definitiva del riego en mm (= L/m²). Congelada.';
 comment on column acciones.lamina_origen is 'duracion_x_caudal | cantidad_apuntada | backfill_caudal_actual | desconocida';
 
@@ -247,18 +290,41 @@ select a.id, a.fecha_local, a.duracion_min, u.caudal,
 --     todos los riegos viejos o ninguno.
 begin;
 
--- 8a. Cantidad apuntada a mano: esa ES la lámina y no depende del caudal.
-update acciones
-   set lamina_mm     = cantidad_l_m2,
-       lamina_origen = 'cantidad_apuntada'
- where tipo = 'riego'
-   and id <= :id_max
-   and lamina_origen is null                       -- ← idempotencia
-   and cantidad_l_m2 is not null
-   and (duracion_min is null or duracion_min <= 0);
+-- La puerta del trigger del paso 1, solo para esta transacción. Sin esto el
+-- backfill falla con 'Registro de riegos pausado por migración'.
+set local kylia.migracion = '1';
 
--- 8b. Con duración: hay que usar el caudal de HOY, que es lo único que hay.
---     SE MARCA: no es el caudal de aquel día, es una reconstrucción.
+-- GUARDA DE ENTRADA. Es el único paso irreversible de la migración, así que no
+-- se apoya en que alguien haya mirado bien el paso 5: si el conjunto no es
+-- EXACTAMENTE el que se midió, la transacción se aborta sola y no escribe nada.
+-- Sustituir los tres números por los del paso 5 (medidos el 15-sep-2026).
+do $$
+declare tope bigint; total int; ya int;
+begin
+  select max(id), count(*), count(*) filter (where lamina_origen is not null)
+    into tope, total, ya
+    from acciones where tipo = 'riego';
+  if tope  <> 275 then raise exception 'El tope se ha movido: max(id)=% (se esperaba 275)', tope;  end if;
+  if total <> 238 then raise exception 'Hay % riegos y se esperaban 238', total;                    end if;
+  if ya    <> 0   then raise exception 'Ya hay % filas congeladas: esto no es una primera pasada', ya; end if;
+end $$;
+
+-- ⚠️ EL ORDEN DE ESTAS TRES ES laminaRiego(), TRANSCRITA. No es una preferencia:
+-- assets/js/motor-riego.js:1029 mira PRIMERO `min > 0 && caudal > 0` y devuelve
+-- duración × caudal sin llegar a leer la cantidad; solo si esa puerta no se abre
+-- cae a `cantidadGuardada`. Congelar en otro orden cambiaría la lámina de todos
+-- los riegos que traen los DOS campos, y eso mueve los pilotos en el instante de
+-- congelar — justo lo que esta migración existe para impedir.
+--
+-- La versión anterior ponía la cantidad primero y mandaba a 'desconocida' las
+-- filas con cantidad + duración + parcela SIN caudal. Mal: ahí laminaRiego sí
+-- devuelve la cantidad. Lo encontró Martí ejecutando la comprobación 2f — una
+-- fila real, id 270, cantidad 5 L/m², duración 30 min, caudal NULL. Con el orden
+-- de abajo cae sola en su sitio y no hace falta ningún caso especial.
+
+-- 8a. Con duración Y caudal: es la primera puerta de laminaRiego. Hay que usar
+--     el caudal de HOY, que es lo único que hay, y SE MARCA: no es el caudal de
+--     aquel día, es una reconstrucción.
 update acciones a
    set caudal_mmh    = u.caudal,
        lamina_mm     = round((u.caudal * a.duracion_min / 60.0)::numeric, 1),
@@ -271,12 +337,41 @@ update acciones a
    and a.duracion_min is not null and a.duracion_min > 0
    and u.caudal is not null and u.caudal > 0;
 
+-- 8b. Lo que quede con cantidad apuntada: esa ES la lámina y no depende del
+--     caudal. Entran aquí tanto los riegos sin duración (el cubo de 20 L) como
+--     los que la traen pero cuya parcela no tiene caudal usable.
+update acciones
+   set lamina_mm     = cantidad_l_m2,
+       lamina_origen = 'cantidad_apuntada'
+ where tipo = 'riego'
+   and id <= :id_max
+   and lamina_origen is null                       -- ← idempotencia
+   and cantidad_l_m2 is not null;
+
 -- 8c. Ni cantidad ni duración utilizable: regó y no sabemos cuánto.
 update acciones
    set lamina_origen = 'desconocida'
  where tipo = 'riego'
    and id <= :id_max
    and lamina_origen is null;
+
+-- GUARDA DE SALIDA. El reparto tiene que ser EXACTAMENTE el que predijo el paso
+-- 5. Si no lo es, se levanta la excepción, la transacción se deshace entera y no
+-- queda nada a medio congelar.
+do $$
+declare a int; b int; c int; sin int;
+begin
+  select count(*) filter (where lamina_origen = 'backfill_caudal_actual'),
+         count(*) filter (where lamina_origen = 'cantidad_apuntada'),
+         count(*) filter (where lamina_origen = 'desconocida'),
+         count(*) filter (where lamina_origen is null)
+    into a, b, c, sin
+    from acciones where tipo = 'riego' and id <= 275;
+  if sin <> 0 then raise exception 'Quedan % filas sin clasificar', sin; end if;
+  if (a, b, c) <> (218, 19, 1) then
+    raise exception 'Reparto inesperado: backfill=% cantidad=% desconocida=% (se esperaba 218/19/1)', a, b, c;
+  end if;
+end $$;
 
 commit;
 
@@ -400,7 +495,7 @@ select count(*) as nuevas_sin_congelar
 --      helper las quita de la consulta y sigue (ver paso 5). Antes del 15-sep
 --      este rollback dejaba la app caída.
 --      Los datos originales (cantidad_l_m2, duracion_min) no se han tocado en
---      ningún momento, y además están en acciones_backup_20260914.
+--      ningún momento, y además están en kylia_migracion.acciones_backup_20260915.
 --
 -- La copia se borra SOLO cuando el reveal de los tres pilotos se haya verificado:
---        drop table acciones_backup_20260914;
+--        drop table kylia_migracion.acciones_backup_20260915;
