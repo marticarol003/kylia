@@ -275,12 +275,20 @@ console.log("\n── 5. guarda de regresión: nadie consume el valor sin proteg
   const metodos = "registroUsuario|accion|observacion|jornada|medicion|recomendacionesLog|evento|guardarConfigServidor";
   const re = new RegExp("(await|\\.then\\s*\\(|=\\s*)\\s*window\\.kyliaSync\\??\\.(" + metodos + ")", "g");
   const usos = FUENTE.match(re) || [];
-  // Son DOS, y las dos están protegidas:
+  // Son TRES, y las tres están protegidas:
   //   · el `await` del envío de correo, dentro de un try/catch que ya avisa;
-  //   · el `const envio =` de addRiego, que encadena .then().catch().
-  // Si aparece un tercero, hay que mirarlo a mano: una promesa consumida sin
-  // protección es justo lo que este cambio viene a evitar.
-  ok(usos.length === 2, `call sites que consumen el valor: ${usos.length} (esperado 2)`);
+  //   · el `const envio =` de addRiego, que encadena .then().catch();
+  //   · el `await registroUsuario` de sincronizarZonas, en try/catch con
+  //     fallback a null y comprobación de r antes de usarlo.
+  // Si aparece un CUARTO, hay que mirarlo a mano: una promesa consumida sin
+  // protección es justo lo que este trabajo viene a evitar. Esta guarda saltó de
+  // verdad al añadir sincronizarZonas, que es para lo que está.
+  ok(usos.length === 3, `call sites que consumen el valor: ${usos.length} (esperado 3)`);
+  const sincro = recorta("async function sincronizarZonas(");
+  ok(sincro.includes("try { r = await window.kyliaSync?.registroUsuario(payload); } catch (_) { r = null; }"),
+     "el de sincronizarZonas va en try/catch con fallback a null");
+  ok(sincro.includes("if (r && r.ok === true && r.persisted === true)"),
+     "y comprueba r antes de tocarlo: un null no puede reventar");
   // Y el censo completo, que Codex corrigió: son 12, no 13. La cuenta anterior
   // se dejaba fuera `guardarConfigServidor?.(`, que lleva llamada opcional.
   const todos = FUENTE.match(

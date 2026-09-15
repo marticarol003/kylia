@@ -3582,6 +3582,93 @@
     function zonasGuardadas() {
       try { return JSON.parse(localStorage.getItem("kylia_zonas")) || []; } catch (_) { return []; }
     }
+    function guardarZonasSinSubir(zonas) {
+      // Escribe kylia_zonas SIN llamar a subirConfig(). Lo usan la hidratación y
+      // el avance de marcas: si llamaran, subirConfig volvería a sincronizar y
+      // sincronizar volvería a escribir marcas — bucle. Las marcas viajan al
+      // servidor con el siguiente guardado de verdad, y llegar tarde no rompe
+      // nada porque el upsert de `registro-usuario` es idempotente.
+      try { localStorage.setItem("kylia_zonas", JSON.stringify(zonas)); return true; }
+      catch (_) { return false; }
+    }
+
+    // ─── Sincronización de siembras con su fila-parcela ──────────────────────
+    //
+    // UNA SIEMBRA ES UNA PARCELA: cada una tiene su fila en `usuarios`, con el
+    // propietario_id del agricultor (ver db/schema.sql y sincronizarZonas). Lo
+    // que fallaba: sincronizarZonas iteraba `zonasSel`, el Map del editor de
+    // mapa, que nace vacío y nunca se hidrata desde kylia_zonas — así que solo
+    // registraba lo que estuviera abierto en el editor en ese momento. Y se
+    // llamaba desde UN sitio, mientras subirConfig() —lo que sube config_app—
+    // se llama desde cuatro. Resultado medido el 15-sep: 4 zonas en config_app
+    // del servidor y CERO filas en `usuarios`.
+    //
+    // PAYLOAD Y HUELLA SALEN DE LA MISMA FUNCIÓN, a propósito. Dos listas
+    // paralelas de campos se separan en cuanto alguien añade uno, y entonces la
+    // huella diría "no ha cambiado nada" sobre un payload distinto. Además el
+    // upsert del servidor escribe la fila ENTERA por UUID y un null explícito
+    // borra, así que la huella tiene que cubrir exactamente lo que se manda.
+    function payloadSiembra(z, s, base, dueno) {
+      // Con un solo cultivo, la parcela ES el recinto y va con su contorno. Con
+      // varios SIN partir, NO se manda geometría: el cron mediría el mismo
+      // polígono para cada cultivo y les daría a todos el mismo NDVI mezclado.
+      // Si el agricultor marcó la separación, cada siembra lleva SU trozo.
+      const geomZona = (z.siembras || []).length === 1 ? z.geometria : null;
+      return {
+        id:               s.id,
+        propietario_id:   dueno,
+        email:            localStorage.getItem("kylia_user_email") || null,
+        nombre:           `${nombreCultivo(s.cultivo)} · ${(s.area_m2 || 0).toLocaleString("es-ES")} m²`,
+        ciudad:           base.ciudad,
+        lat:              base.lat,
+        lon:              base.lon,
+        cultivos:         [s.cultivo],
+        parcela:          s.geometria || geomZona,
+        area_m2:          s.area_m2 ?? null,
+        fecha_plantacion: s.fechaPlantacion || null,
+        // De la finca: dónde está, qué suelo tiene y con qué riega.
+        suelo:            base.suelo || null,
+        // El de la siembra si lo tiene: el servidor calcula su propio balance y
+        // con el método de la finca le daría otra eficiencia.
+        metodo_riego:     s.metodoRiego || base.metodoRiego || null,
+        caudal:           base.caudal ?? null,
+        origen:           localStorage.getItem("kylia_origen"),
+      };
+    }
+    // Huella del payload NORMALIZADO (claves ordenadas), no de la siembra: lo
+    // que no se manda no puede disparar un reenvío.
+    function huellaPayload(payload) {
+      const estable = JSON.stringify(payload, Object.keys(payload).sort());
+      let h = 5381;
+      for (let i = 0; i < estable.length; i++) h = ((h * 33) ^ estable.charCodeAt(i)) >>> 0;
+      return `${h.toString(36)}.${estable.length.toString(36)}`;
+    }
+
+    // BASELINE ANTES DE QUE NADIE PUEDA EDITAR. Si `vista` se pusiera dentro de
+    // sincronizarZonas durante un guardado, una siembra histórica editada en la
+    // primera sesión tras el despliegue estrenaría `vista` con el contenido YA
+    // modificado: perderíamos la referencia anterior y quedaría como histórica
+    // intacta para siempre. Por eso se hidrata al cargar. No hace ningún POST y
+    // no llama a subirConfig.
+    function hidratarSyncZonas() {
+      const dueno = window.kyliaSync?.userId;
+      if (!dueno) return { hidratadas: 0 };
+      const zonas = zonasGuardadas();
+      let n = 0;
+      for (const z of zonas) {
+        for (const s of (z.siembras || [])) {
+          if (!s || !s.id || s.sync) continue;
+          s.sync = {
+            nueva:      false,                                   // preexistente
+            vista:      s.cultivo ? huellaPayload(payloadSiembra(z, s, cfgFinca, dueno)) : null,
+            confirmada: null,
+          };
+          n++;
+        }
+      }
+      if (n) guardarZonasSinSubir(zonas);
+      return { hidratadas: n };
+    }
 
     // Las parcelas entre las que se puede saltar: la principal y cada siembra
     // con cultivo puesto (sin cultivo no hay nada que calcular).
@@ -3679,6 +3766,8 @@
     // serían quince peticiones. Y se sube SIEMPRE la foto completa, no un
     // fragmento — así el servidor nunca queda a medias entre dos estados.
     let subidaPendiente = null;
+    // Última foto de qué se sincronizó y qué quedó pendiente. La lee el punto 2.
+    let ultimaSincroZonas = null;
     function subirConfig() {
       clearTimeout(subidaPendiente);
       subidaPendiente = setTimeout(() => {
@@ -3689,6 +3778,14 @@
             zonaActiva: zonaActiva || null,
             modo: window.kyliaSync?.modo || null,
           });
+          // EL INVARIANTE: si el servidor conoce una zona en config_app, su
+          // fila-parcela tiene que existir. Va aquí y no en el guardado del
+          // panel porque subirConfig es el embudo por el que pasan los CUATRO
+          // caminos que suben zonas; colgarlo de uno solo es lo que dejó 4 zonas
+          // en config_app sin una sola fila en `usuarios`.
+          Promise.resolve(sincronizarZonas(cfgFinca))
+            .then(r => { ultimaSincroZonas = r; })
+            .catch(() => {});
         } catch (_) { /* el guardado local ya está hecho; esto es el espejo */ }
       }, 1500);
     }
@@ -4217,6 +4314,11 @@
         // que llega a la raíz (de 0,60 a 0,90 según el método).
         metodoRiego: ecR.metodo,
         riegoMinutos: Number(ecR.minutos) || null,
+        // NACE EN EL RÉGIMEN NUEVO. Es la única marca que depende de un camino
+        // concreto, y la que distingue "nueva" de "histórica": sin ella, una
+        // siembra recién creada se hidrataría como preexistente y no se
+        // registraría sola. Se mantiene en true hasta que el servidor confirme.
+        sync: { nueva: true, vista: null, confirmada: null },
       });
       localStorage.setItem(ZONAS_KEY, JSON.stringify(zonas));
 
@@ -4801,6 +4903,13 @@
       return { reconciliados, sinCasar, limpiados, motivo: null };
     }
     window.kyliaReconciliarRiegos = reconciliarRiegos;
+    // Baseline de las siembras, ANTES de que el usuario pueda editar ninguna.
+    try { hidratarSyncZonas(); } catch (_) {}
+    // Qué siembras esperan reparación (punto 2). Solo lectura: no crea nada.
+    window.kyliaZonasPendientes = async () => {
+      const r = await sincronizarZonas(cfgFinca);
+      return r;
+    };
 
     function removeRiego(date) {
       saveRiegos(riegos.filter(r => r.date !== date));
@@ -7339,61 +7448,69 @@
     // qué sistema de riego y con qué caudal) y deja por zona lo que de verdad
     // cambia entre cultivos: el cultivo, cuándo se plantó y cuánto mide.
     // Sin cultivo no se sube: el motor de nutrición lo exige y el Kc caería a 1.
-    function sincronizarZonas(base) {
-      const dueno = window.kyliaSync?.userId;
-      if (!dueno) return;
-      for (const z of zonasSel.values()) {
-        // Con un solo cultivo, la parcela ES el recinto y va con su contorno.
-        // Con varios SIN partir, NO se manda geometría: si se mandara, el cron
-        // mediría el mismo polígono para cada cultivo y les atribuiría a todos
-        // el mismo NDVI mezclado. Si el agricultor marcó la separación, cada
-        // siembra lleva SU trozo y el satélite mide cada cultivo aparte — que es
-        // el sentido de haber hecho el corte.
-        const geomZona = z.siembras.length === 1 ? z.geometria : null;
-
-        for (const s of z.siembras) {
-          // Sin cultivo no se sube: el motor de nutrición lo exige para el plan
-          // de abonado y el Kc caería a 1 (ETc = ET₀).
-          if (!s.cultivo || !s.id) continue;
-          window.kyliaSync?.registroUsuario({
-            id:               s.id,
-            propietario_id:   dueno,
-            email:            localStorage.getItem("kylia_user_email") || null,
-            nombre:           `${nombreCultivo(s.cultivo)} · ${(s.area_m2 || 0).toLocaleString("es-ES")} m²`,
-            ciudad:           base.ciudad,
-            lat:              base.lat,
-            lon:              base.lon,
-            cultivos:         [s.cultivo],
-            parcela:          s.geometria || geomZona,
-            area_m2:          s.area_m2 ?? null,
-            fecha_plantacion: s.fechaPlantacion || null,
-            // De la finca: dónde está, qué suelo tiene y con qué riega. Lo que
-            // cambia entre cultivos (cuál, cuándo y cuántos metros) va arriba.
-            suelo:            base.suelo || null,
-            // El de la siembra si lo tiene: el servidor calcula su propio balance
-            // y con el método de la finca le daría otra eficiencia.
-            metodo_riego:     s.metodoRiego || base.metodoRiego || null,
-            caudal:           base.caudal ?? null,
-            origen:           localStorage.getItem("kylia_origen"),
-          });
-        }
-      }
+    // La decisión, tal cual quedó acordada. `actual` es la huella del payload de
+    // ahora; `vista` la de la última vez que se observó sin enviar; `confirmada`
+    // la de la última vez que el servidor dijo persisted:true.
+    //
+    //   confirmada === actual                     → nada
+    //   nueva === true                            → enviar
+    //   confirmada != null && confirmada !== actual → enviar
+    //   confirmada == null && vista !== actual    → enviar
+    //   resto                                     → pendiente_reparacion
+    //
+    // El último renglón es el punto (b) que eligió Martí: una siembra histórica
+    // que nadie ha tocado NO se crea por el hecho de volver a guardar config. Se
+    // declara y espera al dry-run del punto 2.
+    function decidirSiembra(sync, actual) {
+      const y = sync || {};
+      if (y.confirmada === actual)                      return "nada";
+      if (y.nueva === true)                             return "enviar";
+      if (y.confirmada != null && y.confirmada !== actual) return "enviar";
+      if (y.confirmada == null && y.vista !== actual)   return "enviar";
+      return "pendiente_reparacion";
     }
 
-    // Trae los recintos del entorno y los pinta. Falla en silencio: sin ellos la
-    // app sigue funcionando exactamente como antes (una parcela, tocar y confirmar).
-    async function cargarRecintos(lat, lon) {
-      try {
-        const res = await fetch(`/api/sigpac?lat=${lat}&lon=${lon}&vecinos=1`);
-        const d   = await res.json();
-        if (!Array.isArray(d.recintos)) return;
-        if (Number.isFinite(d.umbral_satelite_m2)) umbralSateliteM2 = d.umbral_satelite_m2;
-        recintosMapa = d.recintos;
-        pintarRecintos();
-        renderZonas();
-      } catch (err) {
-        console.warn("[Kylia] no se pudieron cargar los recintos:", err.message);
+    // Sube cada siembra como una PARCELA propia (una fila de `usuarios`). Itera
+    // la VERDAD PERSISTIDA —kylia_zonas— y no `zonasSel`, que era el fallo.
+    async function sincronizarZonas(base) {
+      const dueno = window.kyliaSync?.userId;
+      const res = { enviadas: 0, confirmadas: 0, fallidas: 0,
+                    pendientes_reparacion: [], sin_cultivo: [] };
+      if (!dueno) return res;
+      const zonas = zonasGuardadas();
+      let cambiado = false;
+
+      for (const z of zonas) {
+        for (const s of (z.siembras || [])) {
+          if (!s || !s.id) continue;
+          // Sin cultivo no se sube: el motor de nutrición lo exige para el plan
+          // de abonado y el Kc caería a 1 (ETc = ET₀). Antes se descartaba en
+          // silencio; ahora se declara.
+          if (!s.cultivo) { res.sin_cultivo.push(s.id); continue; }
+
+          const payload = payloadSiembra(z, s, base, dueno);
+          const actual  = huellaPayload(payload);
+          const quehacer = decidirSiembra(s.sync, actual);
+          if (quehacer === "nada") continue;
+          if (quehacer === "pendiente_reparacion") { res.pendientes_reparacion.push(s.id); continue; }
+
+          res.enviadas++;
+          let r = null;
+          try { r = await window.kyliaSync?.registroUsuario(payload); } catch (_) { r = null; }
+          // SOLO persisted === true avanza las marcas. Si falla, `vista` se
+          // queda donde estaba y la diferencia contra `actual` se vuelve a
+          // detectar en el siguiente guardado: reintento sin cola ni estado.
+          if (r && r.ok === true && r.persisted === true) {
+            s.sync = { nueva: false, vista: actual, confirmada: actual };
+            cambiado = true;
+            res.confirmadas++;
+          } else {
+            res.fallidas++;          // el porqué ya está en kylia_sync_fallos
+          }
+        }
       }
+      if (cambiado) guardarZonasSinSubir(zonas);
+      return res;
     }
 
     // Carga Leaflet bajo demanda (solo cuando se abre el panel de configuración).
@@ -8731,7 +8848,9 @@
             capacidad_regadera:   nuevoCfg.capacidadRegadera ?? null,
             origen:               localStorage.getItem("kylia_origen"),
           });
-          sincronizarZonas(nuevoCfg);
+          // sincronizarZonas() ya NO se llama aquí: cuelga de subirConfig(), por
+          // donde pasa este guardado y los otros tres. Llamarla también aquí
+          // duplicaría las peticiones.
         } catch (_) {}
         await cargarDatos();
         cargarNDVI(true);
