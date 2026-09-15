@@ -73,14 +73,16 @@ function monta({ zonas, finca = {}, responde = () => ({ ok: true, persisted: tru
     ${recorta("function huellaPayload(")}
     ${recorta("function normalizarZonasLegacy(")}
     ${recorta("function hidratarSyncZonas(")}
+    ${recorta("function syncValido(")}
     ${recorta("function decidirSiembra(")}
+    ${recorta("function buscarSiembra(")}
     ${recorta("function clasificarSiembras(")}
     ${recorta("function anotarSync(")}
     ${recortaLinea("let cadenaSincro = ")}
     ${recorta("function sincronizarZonas(")}
     ${recorta("async function rondaSincro(")}
     return { hidratarSyncZonas, normalizarZonasLegacy, sincronizarZonas, payloadSiembra,
-             huellaPayload, estable, decidirSiembra, clasificarSiembras, nuevaSiembra,
+             huellaPayload, estable, decidirSiembra, syncValido, clasificarSiembras, nuevaSiembra,
              zonasGuardadas, subidas: () => subidas };
   `;
   const f = new Function("finca", "localStorage", "window", "subidas", cuerpo);
@@ -214,16 +216,16 @@ console.log("\n── 6. solo cambia lo que se envía ──");
 
 console.log("\n── 7. geometría por siembra ──");
 {
-  const una = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true } })]), finca: FINCA });
+  const una = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null } })]), finca: FINCA });
   await una.sincronizarZonas(FINCA);
   ok(JSON.stringify(una.enviados[0].parcela) === JSON.stringify({ g: 1 }), "1 siembra → contorno del recinto");
 
-  const varias = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true } }), siembra("b", { sync: { nueva: true } })]), finca: FINCA });
+  const varias = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null } }), siembra("b", { sync: { nueva: true, vista: null, confirmada: null } })]), finca: FINCA });
   await varias.sincronizarZonas(FINCA);
   ok(varias.enviados.every(p => p.parcela === null), "varias sin partir → parcela null (si no, el cron mezcla el NDVI)");
 
-  const part = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true }, geometria: { g: "a" } }),
-                                       siembra("b", { sync: { nueva: true }, geometria: { g: "b" } })]), finca: FINCA });
+  const part = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null }, geometria: { g: "a" } }),
+                                       siembra("b", { sync: { nueva: true, vista: null, confirmada: null }, geometria: { g: "b" } })]), finca: FINCA });
   await part.sincronizarZonas(FINCA);
   ok(part.enviados.map(p => p.parcela.g).join() === "a,b", "partidas → cada una con SU trozo");
 }
@@ -336,7 +338,7 @@ console.log("\n── 12. BLOQUEANTE 2 · una respuesta tardía no pisa una edic
 {
   // Dos rondas concurrentes: single-flight.
   let n = 0;
-  const app = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true } }), siembra("b", { sync: { nueva: true } })]),
+  const app = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null } }), siembra("b", { sync: { nueva: true, vista: null, confirmada: null } })]),
                       finca: FINCA, responde: async () => { n++; await new Promise(r => setTimeout(r, 1)); return { ok: true, persisted: true }; } });
   const [r1, r2] = await Promise.all([app.sincronizarZonas(FINCA), app.sincronizarZonas(FINCA)]);
   ok(r1.enviadas + r2.enviadas === 2, `entre las dos rondas se envían 2, no 4 (${r1.enviadas}+${r2.enviadas})`);
@@ -347,7 +349,7 @@ console.log("\n── 12. BLOQUEANTE 2 · una respuesta tardía no pisa una edic
 
 console.log("\n── 13. BLOQUEANTE 3 · kyliaZonasPendientes es diagnóstico puro ──");
 {
-  const app = monta({ zonas: zonaCon([siembra("h1"), siembra("n1", { sync: { nueva: true } }),
+  const app = monta({ zonas: zonaCon([siembra("h1"), siembra("n1", { sync: { nueva: true, vista: null, confirmada: null } }),
                                       siembra("s1", { cultivo: null })]), finca: FINCA });
   app.hidratarSyncZonas();
   const antes = JSON.stringify(app.leerZonas());
@@ -403,9 +405,15 @@ console.log("\n── 16. BLOQUEANTE 6 · las marcas viajan a config_app en el f
 {
   const cuerpoSubir = recorta("function subirConfig(");
   const iSincro = cuerpoSubir.indexOf("sincronizarZonas(");
-  const iSubir  = cuerpoSubir.indexOf("guardarConfigServidor");
+  const iSubir  = cuerpoSubir.indexOf("encolarConfig(");
   ok(iSincro > -1 && iSubir > -1 && iSincro < iSubir,
-     "en subirConfig, sincronizar va ANTES de guardarConfigServidor");
+     "en subirConfig, sincronizar va ANTES de encolar el guardado");
+  // Desde el bloqueante 1, subirConfig ya no llama al guardado en directo: pasa
+  // por la cola, que es lo que impide que dos config lleguen desordenadas.
+  ok(!cuerpoSubir.includes("guardarConfigServidor"),
+     "y NO llama a guardarConfigServidor en directo: todo pasa por la cola");
+  ok(recorta("function encolarConfig(").includes("guardarConfigServidor"),
+     "la cola es el único sitio que lo llama");
   ok(/zonas: zonasGuardadas\(\),\s*\/\/ releídas/.test(cuerpoSubir),
      "y las zonas se releen para que el config_app que sube lleve las marcas");
   ok(!recorta("async function rondaSincro(").includes("subirConfig("),
@@ -424,6 +432,165 @@ console.log("\n── 16. BLOQUEANTE 6 · las marcas viajan a config_app en el f
   const r = await otro.sincronizarZonas(FINCA);
   ok(r.enviadas === 0, "el dispositivo nuevo no reenvía: la marca llegó con la config");
   ok(r.pendientes_reparacion.length === 0, "ni la confunde con una histórica");
+}
+
+console.log("\n── 17. BLOQUEANTE 1 · la config no puede llegar desordenada ──");
+// Dos guardarConfigServidor() en vuelo podían terminar al revés y dejar en el
+// servidor una config VIEJA. La cola garantiza que gana el último solicitado.
+function colaDeConfig() {
+  const enServidor = [];
+  const pendientes = [];
+  const kylia = { guardarConfigServidor: (foto) =>
+    new Promise(res => pendientes.push(() => { enServidor.push(foto); res({ ok: true, persisted: true }); })) };
+  const cuerpo = `
+    ${recortaLinea("let colaConfig = ")}
+    ${recortaLinea("let fotoPendiente = ")}
+    ${recortaLinea("let turnoEncolado = ")}
+    ${recorta("function encolarConfig(")}
+    return { encolarConfig };
+  `;
+  const f = new Function("window", cuerpo);
+  return { ...f({ kyliaSync: kylia }), enServidor, pendientes,
+           soltarUno: () => (pendientes.shift() || (() => {}))(),
+           soltarTodo: async () => { while (pendientes.length) { pendientes.shift()(); await new Promise(r => setTimeout(r, 0)); } } };
+}
+{
+  const c = colaDeConfig();
+  c.encolarConfig({ area: 100 });                       // A sale
+  await new Promise(r => setTimeout(r, 0));
+  ok(c.pendientes.length === 1, "A está en vuelo");
+  c.encolarConfig({ area: 200 });                       // B llega mientras A vuela
+  ok(c.pendientes.length === 1, "B NO compite en paralelo: espera turno");
+  await c.soltarTodo();
+  ok(c.enServidor.length === 2, `se escriben las dos, en orden (${c.enServidor.length})`);
+  ok(c.enServidor[0].area === 100 && c.enServidor[1].area === 200, "primero A, después B");
+  ok(c.enServidor[c.enServidor.length - 1].area === 200, "ESTADO FINAL = 200, no 100");
+}
+{
+  const c = colaDeConfig();
+  c.encolarConfig({ v: "A" });
+  await new Promise(r => setTimeout(r, 0));
+  c.encolarConfig({ v: "B" });
+  c.encolarConfig({ v: "C" });                          // coalesce con B
+  await c.soltarTodo();
+  ok(c.enServidor[c.enServidor.length - 1].v === "C", `tres guardados rápidos → estado final C (${c.enServidor.map(x => x.v).join("→")})`);
+  ok(c.enServidor.length <= 2, `los intermedios se coalescen (${c.enServidor.length} POST, no 3)`);
+}
+{
+  // Un fallo de A no puede dejar la cola muerta.
+  const enServidor = [];
+  let primera = true;
+  const kylia = { guardarConfigServidor: async (foto) => {
+    if (primera) { primera = false; return { ok: false, status: 500, persisted: false }; }
+    enServidor.push(foto); return { ok: true, persisted: true };
+  } };
+  const cuerpo = `
+    ${recortaLinea("let colaConfig = ")}
+    ${recortaLinea("let fotoPendiente = ")}
+    ${recortaLinea("let turnoEncolado = ")}
+    ${recorta("function encolarConfig(")}
+    return { encolarConfig };
+  `;
+  const { encolarConfig } = new Function("window", cuerpo)({ kyliaSync: kylia });
+  await encolarConfig({ v: "A" });
+  await encolarConfig({ v: "B" });
+  ok(enServidor.length === 1 && enServidor[0].v === "B", "si A falla, B se intenta igual");
+}
+
+console.log("\n── 18. BLOQUEANTE 2 · revalidar cada siembra justo antes de su POST ──");
+{
+  // Plan [A,B]. Mientras A espera, el usuario BORRA B.
+  let soltarA; const esperaA = new Promise(r => { soltarA = r; });
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
+                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null } })]),
+                      finca: FINCA,
+                      responde: async (p) => { if (p.id === "A") await esperaA; return { ok: true, persisted: true }; } });
+  const ronda = app.sincronizarZonas(FINCA);
+  await new Promise(r => setTimeout(r, 0));
+  const z = app.leerZonas(); z[0].siembras = z[0].siembras.filter(x => x.id !== "A" ? true : true).filter(x => x.id !== "B");
+  app.ls.setItem("kylia_zonas", JSON.stringify(z));
+  soltarA(); const r = await ronda;
+  ok(app.enviados.filter(p => p.id === "B").length === 0, "B recibe 0 POST: se borró mientras A esperaba");
+  ok(app.enviados.filter(p => p.id === "A").length === 1, "A sí se envía, que estaba en vuelo");
+  ok(r.descartadas === 1, `y se contabiliza como descartada (${r.descartadas})`);
+  ok(app.leerZonas()[0].siembras.every(x => x.id !== "B"), "B sigue borrada: la ronda no la resucita");
+}
+{
+  // Plan [A,B]. Mientras A espera, B CAMBIA. No se manda la versión vieja.
+  let soltarA; const esperaA = new Promise(r => { soltarA = r; });
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
+                                      siembra("B", { area_m2: 100, sync: { nueva: true, vista: null, confirmada: null } })]),
+                      finca: FINCA,
+                      responde: async (p) => { if (p.id === "A") await esperaA; return { ok: true, persisted: true }; } });
+  const ronda = app.sincronizarZonas(FINCA);
+  await new Promise(r => setTimeout(r, 0));
+  const z = app.leerZonas(); z[0].siembras.find(x => x.id === "B").area_m2 = 900;
+  app.ls.setItem("kylia_zonas", JSON.stringify(z));
+  soltarA(); await ronda;
+  const deB = app.enviados.filter(p => p.id === "B");
+  ok(deB.length === 0, "la versión vieja de B NO se envía");
+
+  const r2 = await app.sincronizarZonas(FINCA);
+  const deB2 = app.enviados.filter(p => p.id === "B");
+  ok(deB2.length === 1 && deB2[0].area_m2 === 900, "y la ronda siguiente manda la versión ACTUAL (900)");
+  ok(r2.enviadas === 1, "solo esa");
+}
+{
+  // Ninguna fila huérfana: borrar una siembra nunca deja una parcela creada.
+  let soltar; const espera = new Promise(r => { soltar = r; });
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
+                                      siembra("Z", { sync: { nueva: true, vista: null, confirmada: null } })]),
+                      finca: FINCA,
+                      responde: async (p) => { if (p.id === "A") await espera; return { ok: true, persisted: true }; } });
+  const ronda = app.sincronizarZonas(FINCA);
+  await new Promise(r => setTimeout(r, 0));
+  app.ls.setItem("kylia_zonas", JSON.stringify([{ referencia: "R1", geometria: { g: 1 }, siembras: [] }]));
+  soltar(); await ronda;
+  ok(app.enviados.every(p => p.id !== "Z"), "la siembra borrada no crea fila: 0 huérfanas");
+}
+
+console.log("\n── 19. BLOQUEANTE 3 · un sync a medias es conservador ──");
+{
+  const CORRUPTOS = [
+    ["ausente",              undefined],
+    ["null",                 null],
+    ["objeto vacío {}",      {}],
+    ["array []",             []],
+    ["solo nueva:false",     { nueva: false }],
+    ["solo vista:null",      { vista: null }],
+    ["solo confirmada:null", { confirmada: null }],
+    ["nueva como string",    { nueva: "true", vista: "h", confirmada: null }],
+    ["vista numérica",       { nueva: false, vista: 123, confirmada: null }],
+    ["confirmada objeto",    { nueva: false, vista: "h", confirmada: { a: 1 } }],
+    ["vista vacía",          { nueva: false, vista: "", confirmada: null }],
+    ["sin baseline",         { nueva: false, vista: null, confirmada: null }],
+  ];
+  for (const [etiqueta, sync] of CORRUPTOS) {
+    const app = monta({ zonas: zonaCon([siembra("c1", { sync })]), finca: FINCA });
+    const antes = JSON.stringify(app.leerZonas());
+    const r = await app.sincronizarZonas(FINCA);
+    ok(app.enviados.length === 0, `${etiqueta}: 0 POST`);
+    ok(r.pendientes_reparacion.includes("c1"), `${etiqueta}: pendiente_reparacion`);
+    ok(JSON.stringify(app.leerZonas()) === antes, `${etiqueta}: no se toca nada`);
+  }
+}
+{
+  // Y lo válido sigue funcionando: el flujo normal no se ve afectado.
+  const app = monta({ zonas: [], finca: FINCA });
+  ok(app.syncValido({ nueva: true, vista: null, confirmada: null }) === true, "una siembra recién creada es válida");
+  ok(app.syncValido({ nueva: false, vista: "h", confirmada: null }) === true, "una histórica hidratada es válida");
+  ok(app.syncValido({ nueva: false, vista: "h", confirmada: "h" }) === true, "y una confirmada también");
+}
+
+console.log("\n── 20. el payload real es JSON-safe (guarda barata) ──");
+{
+  const app = monta({ zonas: zonaCon([siembra("j", { geometria: { type: "Polygon", coordinates: [[[0, 0], [1, 1], [0, 0]]] } })]), finca: FINCA });
+  const z = app.leerZonas()[0];
+  const p = app.payloadSiembra(z, z.siembras[0], FINCA, "d");
+  ok(JSON.stringify(JSON.parse(JSON.stringify(p))) === JSON.stringify(p),
+     "el payload de payloadSiembra() sobrevive un round-trip por JSON");
+  ok(Object.values(p).every(v => typeof v !== "function" && typeof v !== "bigint"),
+     "y no lleva funciones ni BigInt: estable() no tiene que ser universal");
 }
 
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES\n" : `\n❌ ${fallos} FALLOS\n`);

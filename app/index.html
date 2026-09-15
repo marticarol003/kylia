@@ -3803,6 +3803,37 @@
     let subidaPendiente = null;
     // Última foto de qué se sincronizó y qué quedó pendiente. La lee el punto 2.
     let ultimaSincroZonas = null;
+
+    // ─── Cola de guardados de config_app · EL ÚLTIMO ESTADO GANA ─────────────
+    //
+    // Dos guardarConfigServidor() podían estar en vuelo a la vez y terminar
+    // fuera de orden: la respuesta tardía de una config VIEJA pisaba a la nueva
+    // en el servidor, y el agricultor perdía lo último que había tocado sin que
+    // nada lo indicara. Lo cazó Codex.
+    //
+    // Nunca hay dos POST de config compitiendo: se encadenan. Y si llegan varios
+    // estados mientras uno vuela, los intermedios se COALESCEN —no tiene sentido
+    // escribir tres veces seguidas— pero el ÚLTIMO solicitado es el que queda.
+    // Un fallo no corta la cola: post() no rechaza, y aun así el turno siguiente
+    // se encadena por las dos ramas.
+    let colaConfig = Promise.resolve();
+    let fotoPendiente = null;
+    let turnoEncolado = false;
+    function encolarConfig(foto) {
+      fotoPendiente = foto;                       // el último gana, siempre
+      if (turnoEncolado) return colaConfig;       // ya hay turno esperando: se coalesce
+      turnoEncolado = true;
+      const turno = colaConfig.then(mandar, mandar);
+      colaConfig = turno.catch(() => {});
+      return turno;
+      function mandar() {
+        turnoEncolado = false;
+        const f = fotoPendiente;
+        fotoPendiente = null;
+        if (!f) return null;
+        return window.kyliaSync?.guardarConfigServidor?.(f);
+      }
+    }
     function subirConfig() {
       clearTimeout(subidaPendiente);
       subidaPendiente = setTimeout(() => {
@@ -3823,7 +3854,9 @@
             .catch(() => null)
             .then(r => {
               ultimaSincroZonas = r;
-              window.kyliaSync?.guardarConfigServidor?.({
+              // Por la cola, nunca suelto: dos guardados en paralelo pueden
+              // llegar al servidor en el orden contrario al que se pidieron.
+              encolarConfig({
                 finca: cfgFinca,
                 zonas: zonasGuardadas(),        // releídas: con las marcas nuevas
                 zonaActiva: zonaActiva || null,
@@ -7517,11 +7550,24 @@
     // El último renglón es el punto (b) que eligió Martí: una siembra histórica
     // que nadie ha tocado NO se crea por el hecho de volver a guardar config. Se
     // declara y espera al dry-run del punto 2.
+    // ¿Podemos DEMOSTRAR el estado de esta siembra? Si no, no se toca. Un sync
+    // ausente, a medias o con tipos raros —{}, [], {nueva:false}, {vista:null}—
+    // caía antes en `vista !== actual` (undefined !== huella) → ENVIAR, o sea que
+    // un dato corrupto daba de alta una parcela. Lo cazó Codex.
+    function syncValido(y) {
+      if (!y || typeof y !== "object" || Array.isArray(y)) return false;
+      if (typeof y.nueva !== "boolean") return false;
+      const huellaOnull = v => v === null || (typeof v === "string" && v.length > 0);
+      if (!huellaOnull(y.vista) || !huellaOnull(y.confirmada)) return false;
+      // Una siembra que NO es nueva necesita baseline: sin vista ni confirmada no
+      // hay nada contra lo que comparar, y `vista !== actual` la mandaría.
+      if (y.nueva === false && y.vista === null && y.confirmada === null) return false;
+      return true;
+    }
+
     function decidirSiembra(sync, actual) {
-      // CINTURÓN: una siembra sin marcas no se envía JAMÁS. Sin esto,
-      // `vista !== actual` es `undefined !== huella` → true → enviar, y una
-      // histórica que se escapara de la hidratación se crearía sola.
-      if (!sync || typeof sync !== "object") return "pendiente_reparacion";
+      // CINTURÓN: si no se puede demostrar el estado, no se envía JAMÁS.
+      if (!syncValido(sync)) return "pendiente_reparacion";
       const y = sync;
       if (y.confirmada === actual)                      return "nada";
       if (y.nueva === true)                             return "enviar";
@@ -7553,6 +7599,15 @@
         }
       }
       return res;
+    }
+
+    // Busca una siembra por id en el estado ACTUAL, con su zona. Devuelve null
+    // si ya no existe.
+    function buscarSiembra(id) {
+      for (const z of zonasGuardadas()) {
+        for (const s of (z.siembras || [])) if (s && s.id === id) return { z, s };
+      }
+      return null;
     }
 
     // Escribe SOLO s.sync de UNA siembra, releyendo el estado actual. Nunca
@@ -7588,7 +7643,18 @@
                     pendientes_reparacion: plan.pendientes_reparacion,
                     sin_cultivo: plan.sin_cultivo };
 
+      const dueno = window.kyliaSync?.userId;
       for (const { id, payload, huella } of plan.pendientes_sincronizacion) {
+        // REVALIDAR JUSTO ANTES DEL POST. El plan se congela al empezar la
+        // ronda, así que para cuando le toca el turno a esta siembra el usuario
+        // ha podido borrarla o cambiarla mientras esperaba a la anterior.
+        // Enviarla entonces crearía una parcela huérfana o escribiría una versión
+        // vieja. El plan dice QUÉ revisar; no da permiso para escribir.
+        const vigente = buscarSiembra(id);
+        if (!vigente || !vigente.s.cultivo) { res.descartadas++; continue; }
+        const huellaAhora = huellaPayload(payloadSiembra(vigente.z, vigente.s, base, dueno));
+        if (huellaAhora !== huella) { res.descartadas++; continue; }   // la coge la ronda siguiente
+
         res.enviadas++;
         // La huella que de verdad se envía. Si el usuario edita mientras vuela
         // la petición, lo confirmado es ESTO, no lo que haya ahora.
