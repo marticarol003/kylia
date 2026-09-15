@@ -82,6 +82,19 @@ const resp = (status, texto) => {
   f.llamadas = 0;
   return f;
 };
+// Un fetch que NUNCA resuelve salvo que lo aborten: lo que provoca el timeout.
+const colgado = () => {
+  const f = (url, init) => new Promise((_, rej) => {
+    f.llamadas++;
+    const sig = init && init.signal;
+    if (!sig) return;                       // sin signal se queda colgado de verdad
+    const e = new Error("The operation was aborted."); e.name = "AbortError";
+    if (sig.aborted) return rej(e);
+    sig.addEventListener("abort", () => rej(e));
+  });
+  f.llamadas = 0;
+  return f;
+};
 
 console.log("\n── 1. el contrato: la promesa NUNCA rechaza ──");
 const CASOS = [
@@ -237,6 +250,57 @@ for (const [etiqueta, cuerpo] of SIN_CONFIRMAR) {
   // El invariante que no se puede perder al endurecer esto.
   const r = await montar(resp(200, '{"ok":false,"error":"propietario no encontrado"}')).post("/x", {});
   ok(r.ok === false && r.error === "propietario no encontrado", "{ok:false} con HTTP 200 se sigue detectando");
+}
+
+console.log("\n── 2e. TIMEOUT OPCIONAL: aborta de verdad, y no es sin_red ──");
+{
+  // Sin opts, comportamiento idéntico al de siempre: ningún caller existente cambia.
+  const cuerpo = recorta("async function post(");
+  ok(/async function post\(path, data, opts\)/.test(cuerpo), "post acepta opts, y es opcional");
+  ok(cuerpo.includes("Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 0"),
+     "sin timeoutMs no se arma ningún reloj");
+  ok(cuerpo.includes("AbortController"), "y usa AbortController, no un Promise.race");
+  ok(cuerpo.includes("clearTimeout(reloj)"), "el reloj se limpia siempre");
+}
+{
+  const f = colgado();
+  const { post, leerFallos } = montar(f);
+  let rechazo = null, r = null;
+  const t0 = Date.now();
+  try { r = await post("/api/log", { recurso: "config-app" }, { timeoutMs: 20 }); }
+  catch (e) { rechazo = e; }
+  ok(rechazo === null, "al vencer NO rechaza: devuelve resultado resuelto");
+  ok(r.error === "timeout", `error explícito "timeout" (${r.error})`);
+  ok(r.error !== "sin_red", "y NUNCA sin_red: la red puede estar perfecta");
+  ok(r.ok === false && r.persisted === false, "ok:false y persisted:false");
+  ok(r.status === 0, "status 0: no hubo respuesta");
+  ok(Date.now() - t0 < 500, "y vence pronto, no se queda colgado");
+  ok(leerFallos()[0]?.error === "timeout", "queda registrado como timeout");
+}
+{
+  // Un fallo de red REAL sigue siendo sin_red aunque haya timeout puesto.
+  const { post } = montar(async () => { throw new TypeError("Failed to fetch"); });
+  const r = await post("/x", { recurso: "acciones" }, { timeoutMs: 5000 });
+  ok(r.error === "sin_red", `con timeout puesto, un fallo real de red sigue siendo sin_red (${r.error})`);
+}
+{
+  // Un AbortError que NO viene de nuestro reloj tampoco se llama timeout.
+  const { post } = montar(async () => { const e = new Error("abortada"); e.name = "AbortError"; throw e; });
+  const r = await post("/x", { recurso: "acciones" });
+  ok(r.error === "sin_red", "sin nuestro reloj, un abort ajeno no se etiqueta como timeout");
+}
+{
+  // Sin timeout, una petición normal se comporta igual que antes.
+  const f = resp(200, JSON.stringify({ ok: true, persisted: true }));
+  const { post } = montar(f);
+  const r = await post("/x", { recurso: "acciones" });
+  ok(r.ok === true && r.persisted === true && r.error === null, "sin opts: idéntico a antes");
+  ok(f.llamadas === 1, "y se llama una vez");
+}
+{
+  // guardarConfigServidor acepta opts y se los pasa a post.
+  const g = recorta("window.kyliaSync.guardarConfigServidor = function (config, opts)");
+  ok(g.includes(", opts)"), "guardarConfigServidor pasa opts a post()");
 }
 
 console.log("\n── 3. el registro de fallos ──");

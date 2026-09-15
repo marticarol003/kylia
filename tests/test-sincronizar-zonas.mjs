@@ -61,7 +61,7 @@ function monta({ zonas, finca = {}, responde = () => ({ ok: true, persisted: tru
   };
   let subidas = 0;
   const cuerpo = `
-    const cfgFinca = finca;
+    let cfgFinca = finca;
     const nombreCultivo = (c) => ({ lechuga: "Lechuga", brassica: "Col", calabacin: "Calabacín" }[c] || c);
     const subirConfig = () => { subidas++; };
     ${recorta("function zonasGuardadas(")}
@@ -73,8 +73,10 @@ function monta({ zonas, finca = {}, responde = () => ({ ok: true, persisted: tru
     ${recorta("function huellaPayload(")}
     ${recorta("function normalizarZonasLegacy(")}
     ${recorta("function hidratarSyncZonas(")}
+    ${recortaLinea("const firmaSync = ")}
     ${recorta("function syncValido(")}
     ${recorta("function decidirSiembra(")}
+    ${recorta("function fincaVigente(")}
     ${recorta("function buscarSiembra(")}
     ${recorta("function clasificarSiembras(")}
     ${recorta("function anotarSync(")}
@@ -83,7 +85,8 @@ function monta({ zonas, finca = {}, responde = () => ({ ok: true, persisted: tru
     ${recorta("async function rondaSincro(")}
     return { hidratarSyncZonas, normalizarZonasLegacy, sincronizarZonas, payloadSiembra,
              huellaPayload, estable, decidirSiembra, syncValido, clasificarSiembras, nuevaSiembra,
-             zonasGuardadas, subidas: () => subidas };
+             zonasGuardadas, firmaSync, cambiarFinca: (f) => { cfgFinca = f; },
+             subidas: () => subidas };
   `;
   const f = new Function("finca", "localStorage", "window", "subidas", cuerpo);
   const api = f(finca, ls, win, 0);
@@ -443,6 +446,7 @@ function colaDeConfig() {
   const kylia = { guardarConfigServidor: (foto) =>
     new Promise(res => pendientes.push(() => { enServidor.push(foto); res({ ok: true, persisted: true }); })) };
   const cuerpo = `
+    ${recortaLinea("const TIMEOUT_CONFIG_MS = ")}
     ${recortaLinea("let colaConfig = ")}
     ${recortaLinea("let fotoPendiente = ")}
     ${recortaLinea("let turnoEncolado = ")}
@@ -485,6 +489,7 @@ function colaDeConfig() {
     enServidor.push(foto); return { ok: true, persisted: true };
   } };
   const cuerpo = `
+    ${recortaLinea("const TIMEOUT_CONFIG_MS = ")}
     ${recortaLinea("let colaConfig = ")}
     ${recortaLinea("let fotoPendiente = ")}
     ${recortaLinea("let turnoEncolado = ")}
@@ -591,6 +596,157 @@ console.log("\n── 20. el payload real es JSON-safe (guarda barata) ──");
      "el payload de payloadSiembra() sobrevive un round-trip por JSON");
   ok(Object.values(p).every(v => typeof v !== "function" && typeof v !== "bigint"),
      "y no lleva funciones ni BigInt: estable() no tiene que ser universal");
+}
+
+console.log("\n── 21. BLOQUEANTE 1 · un UUID no es una identidad lógica ──");
+{
+  // B planificada como NUEVA. Mientras espera a A, se borra y reaparece con el
+  // MISMO uuid y el MISMO payload, pero ahora es histórica.
+  let soltarA; const esperaA = new Promise(r => { soltarA = r; });
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
+                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null } })]),
+                      finca: FINCA,
+                      responde: async (p) => { if (p.id === "A") await esperaA; return { ok: true, persisted: true }; } });
+  const ronda = app.sincronizarZonas(FINCA);
+  await new Promise(r => setTimeout(r, 0));
+  // Misma B, mismos datos, pero hidratada como preexistente.
+  const z = app.leerZonas();
+  const b = z[0].siembras.find(x => x.id === "B");
+  const huellaB = app.huellaPayload(app.payloadSiembra(z[0], b, FINCA, "dueno-1"));
+  b.sync = { nueva: false, vista: huellaB, confirmada: null };
+  app.ls.setItem("kylia_zonas", JSON.stringify(z));
+  soltarA(); const r = await ronda;
+  ok(app.enviados.filter(p => p.id === "B").length === 0,
+     "mismo UUID y mismo payload, pero otra máquina de estados → 0 POST");
+  ok(r.descartadas === 1, `se descarta (${r.descartadas})`);
+  ok(app.leerZonas()[0].siembras.find(x => x.id === "B").sync.confirmada === null,
+     "y no hereda ninguna confirmación");
+}
+{
+  // El POST de A ya salió. Antes de la respuesta, A se sustituye por otra A.
+  let soltarA; const esperaA = new Promise(r => { soltarA = r; });
+  const app = monta({ zonas: zonaCon([siembra("A", { area_m2: 100, sync: { nueva: true, vista: null, confirmada: null, token: "t-vieja" } })]),
+                      finca: FINCA, responde: async () => { await esperaA; return { ok: true, persisted: true }; } });
+  const ronda = app.sincronizarZonas(FINCA);
+  await new Promise(r => setTimeout(r, 0));
+  ok(app.enviados.length === 1, "el POST de la A original ya salió");
+  const z = app.leerZonas();
+  z[0].siembras = [siembra("A", { area_m2: 777, sync: { nueva: true, vista: null, confirmada: null, token: "t-nueva" } })];
+  app.ls.setItem("kylia_zonas", JSON.stringify(z));   // otra instancia, mismo id
+  soltarA(); await ronda;
+  const nueva = app.leerZonas()[0].siembras[0];
+  ok(nueva.area_m2 === 777, "la sustituta sigue intacta");
+  ok(nueva.sync.confirmada === null && nueva.sync.nueva === true,
+     "la respuesta vieja NO avanza el sync de la instancia nueva");
+  const r2 = await app.sincronizarZonas(FINCA);
+  ok(r2.enviadas === 1 && app.enviados[1].area_m2 === 777, "y la nueva se sincroniza por su cuenta");
+}
+{
+  // Firma: dos sync distintos dan firmas distintas; el mismo, la misma.
+  const app = monta({ zonas: [], finca: FINCA });
+  const a = { nueva: true, vista: null, confirmada: null };
+  ok(app.firmaSync(a) === app.firmaSync({ confirmada: null, vista: null, nueva: true }),
+     "la firma no depende del orden de las claves");
+  ok(app.firmaSync(a) !== app.firmaSync({ nueva: false, vista: "h", confirmada: null }),
+     "y distingue dos máquinas de estados distintas");
+  ok(app.firmaSync(undefined) === app.firmaSync(null), "ausente y null firman igual: los dos son 'no demostrable'");
+}
+
+console.log("\n── 22. BLOQUEANTE 2 · la finca también se revalida ──");
+{
+  let soltarA; const esperaA = new Promise(r => { soltarA = r; });
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
+                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null } })]),
+                      finca: FINCA,
+                      responde: async (p) => { if (p.id === "A") await esperaA; return { ok: true, persisted: true }; } });
+  const ronda = app.sincronizarZonas(FINCA);
+  await new Promise(r => setTimeout(r, 0));
+  app.cambiarFinca({ ...FINCA, caudal: 20 });          // 11 → 20 mientras A espera
+  soltarA(); const r = await ronda;
+  const deB = app.enviados.filter(p => p.id === "B");
+  ok(deB.length === 0, "B no sale con el caudal viejo (11)");
+  ok(r.descartadas === 1, "se descarta y espera a la ronda siguiente");
+
+  const r2 = await app.sincronizarZonas({ ...FINCA, caudal: 20 });
+  const deB2 = app.enviados.filter(p => p.id === "B");
+  ok(deB2.length === 1 && deB2[0].caudal === 20, `la ronda siguiente manda el caudal nuevo (${deB2[0]?.caudal})`);
+}
+{
+  // Varios cambios de finca seguidos mientras la ronda vuela.
+  let soltarA; const esperaA = new Promise(r => { soltarA = r; });
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
+                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null } })]),
+                      finca: FINCA,
+                      responde: async (p) => { if (p.id === "A") await esperaA; return { ok: true, persisted: true }; } });
+  const ronda = app.sincronizarZonas(FINCA);
+  await new Promise(r => setTimeout(r, 0));
+  app.cambiarFinca({ ...FINCA, caudal: 14 });
+  app.cambiarFinca({ ...FINCA, caudal: 14, suelo: "arcilloso" });
+  app.cambiarFinca({ ...FINCA, caudal: 18, suelo: "arcilloso", metodoRiego: "aspersion" });
+  soltarA(); await ronda;
+  ok(app.enviados.filter(p => p.id === "B").length === 0, "con tres cambios encadenados, B tampoco sale con datos viejos");
+  const fin = { ...FINCA, caudal: 18, suelo: "arcilloso", metodoRiego: "aspersion" };
+  await app.sincronizarZonas(fin);
+  const deB = app.enviados.filter(p => p.id === "B")[0];
+  ok(deB && deB.caudal === 18 && deB.suelo === "arcilloso",
+     `y al final sale con la finca vigente entera (caudal ${deB?.caudal}, suelo ${deB?.suelo})`);
+  // Y el método sigue siendo el de LA SIEMBRA, no el de la finca: cada siembra
+  // tiene su riego y de ahí sale su eficiencia. Revalidar la finca no puede
+  // llevarse eso por delante.
+  ok(deB && deB.metodo_riego === "goteo",
+     "sin pisar el método propio de la siembra con el de la finca");
+}
+
+console.log("\n── 23. BLOQUEANTE 3 · una petición colgada no bloquea la cola ──");
+function colaConTimeout(responder) {
+  const enServidor = [];
+  const kylia = { guardarConfigServidor: (foto, opts) => responder(foto, opts, enServidor) };
+  const cuerpo = `
+    ${recortaLinea("const TIMEOUT_CONFIG_MS = ")}
+    ${recortaLinea("let colaConfig = ")}
+    ${recortaLinea("let fotoPendiente = ")}
+    ${recortaLinea("let turnoEncolado = ")}
+    ${recorta("function encolarConfig(")}
+    return { encolarConfig, TIMEOUT_CONFIG_MS };
+  `;
+  return { ...new Function("window", cuerpo)({ kyliaSync: kylia }), enServidor };
+}
+{
+  // A no resuelve nunca; su post() vence por timeout y devuelve resuelto.
+  let vistas = 0;
+  const c = colaConTimeout(async (foto, opts, enServidor) => {
+    vistas++;
+    if (foto.v === "A") {
+      ok(opts && opts.timeoutMs > 0, `la config se manda con timeout explícito (${opts?.timeoutMs} ms)`);
+      await new Promise(r => setTimeout(r, 5));      // simula el vencimiento
+      return { ok: false, status: 0, persisted: false, error: "timeout", datos: null };
+    }
+    enServidor.push(foto); return { ok: true, persisted: true };
+  });
+  c.encolarConfig({ v: "A" });
+  await new Promise(r => setTimeout(r, 0));
+  c.encolarConfig({ v: "B" });
+  await new Promise(r => setTimeout(r, 30));
+  ok(c.enServidor.some(x => x.v === "B"), "tras vencer A, B SÍ se intenta: no hay starvation");
+}
+{
+  // A colgada, B y C durante la espera → después del timeout se manda la última.
+  const c = colaConTimeout(async (foto, opts, enServidor) => {
+    if (foto.v === "A") { await new Promise(r => setTimeout(r, 5)); return { ok: false, error: "timeout", persisted: false, status: 0 }; }
+    enServidor.push(foto); return { ok: true, persisted: true };
+  });
+  c.encolarConfig({ v: "A" });
+  await new Promise(r => setTimeout(r, 0));
+  c.encolarConfig({ v: "B" });
+  c.encolarConfig({ v: "C" });
+  await new Promise(r => setTimeout(r, 30));
+  ok(c.enServidor.length === 1 && c.enServidor[0].v === "C",
+     `después del timeout se manda la ÚLTIMA (${c.enServidor.map(x => x.v).join(",") || "ninguna"})`);
+}
+{
+  const c = colaConTimeout(async () => ({ ok: true, persisted: true }));
+  ok(c.TIMEOUT_CONFIG_MS > 0 && c.TIMEOUT_CONFIG_MS <= 30000,
+     `el timeout de config es explícito y razonable (${c.TIMEOUT_CONFIG_MS} ms)`);
 }
 
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES\n" : `\n❌ ${fallos} FALLOS\n`);

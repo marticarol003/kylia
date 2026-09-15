@@ -144,7 +144,13 @@
         } catch (_) {}
       }
 
-      async function post(path, data) {
+      // `opts.timeoutMs` es OPCIONAL y retrocompatible: sin él, comportamiento
+      // idéntico al de siempre y ningún caller existente cambia. Con él, la
+      // petición se ABORTA de verdad con AbortController — no un Promise.race,
+      // que dejaría la petición vieja viva y pudiendo llegar más tarde a competir
+      // con una configuración nueva. Lo pidió así Codex, y tiene razón: una
+      // carrera "resuelta" con race es la misma carrera, solo que invisible.
+      async function post(path, data, opts) {
         // SERIALIZAR VA PRIMERO Y APARTE. Estaba dentro del try del fetch, así
         // que un payload con una referencia cíclica o un BigInt —JSON.stringify
         // lanza con los dos— acababa clasificado como "sin_red": un diagnóstico
@@ -160,6 +166,15 @@
           anotarFallo(path, data, r);
           return r;                                  // y fetch NO se ejecuta
         }
+        const ms = opts && Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 0;
+        let ctrl = null, reloj = null, abortadoPorNosotros = false;
+        if (ms && typeof AbortController === "function") {
+          ctrl = new AbortController();
+          reloj = setTimeout(() => {
+            abortadoPorNosotros = true;
+            try { ctrl.abort(); } catch (_) {}
+          }, ms);
+        }
         let res;
         try {
           res = await fetch(path, {
@@ -167,11 +182,19 @@
             headers: { "Content-Type": "application/json" },
             body:    cuerpo,
             keepalive: true,
+            ...(ctrl ? { signal: ctrl.signal } : {}),
           });
         } catch (_) {
-          const r = { ok: false, status: 0, persisted: false, error: "sin_red", datos: null };
+          // Un AbortError provocado por NUESTRO reloj no es un fallo de red: la
+          // red puede estar perfecta y el servidor tardando. Distinguirlos
+          // importa porque mandan a mirar sitios distintos.
+          const r = abortadoPorNosotros
+            ? { ok: false, status: 0, persisted: false, error: "timeout",  datos: null }
+            : { ok: false, status: 0, persisted: false, error: "sin_red", datos: null };
           anotarFallo(path, data, r);
           return r;
+        } finally {
+          if (reloj) clearTimeout(reloj);
         }
         // Cuerpo vacío o que no es JSON: se CONSERVA EL STATUS. Un 500 con una
         // página de error delante no es "sin red" — la petición llegó y el
@@ -348,8 +371,8 @@
         } catch (_) { /* sin cobertura: se sigue con lo local, que es nada */ }
       }
 
-      window.kyliaSync.guardarConfigServidor = function (config) {
-        return post("/api/log", { recurso: "config-app", propietario_id: userId, config });
+      window.kyliaSync.guardarConfigServidor = function (config, opts) {
+        return post("/api/log", { recurso: "config-app", propietario_id: userId, config }, opts);
       };
 
       try {
@@ -3697,6 +3720,7 @@
             nueva:      false,                                   // preexistente
             vista:      s.cultivo ? huellaPayload(payloadSiembra(z, s, cfgFinca, dueno)) : null,
             confirmada: null,
+            token:      uuidZona(),
           };
           n++;
         }
@@ -3816,6 +3840,7 @@
     // escribir tres veces seguidas— pero el ÚLTIMO solicitado es el que queda.
     // Un fallo no corta la cola: post() no rechaza, y aun así el turno siguiente
     // se encadena por las dos ramas.
+    const TIMEOUT_CONFIG_MS = 10000;      // la config es pequeña; 10 s es de sobra
     let colaConfig = Promise.resolve();
     let fotoPendiente = null;
     let turnoEncolado = false;
@@ -3831,7 +3856,9 @@
         const f = fotoPendiente;
         fotoPendiente = null;
         if (!f) return null;
-        return window.kyliaSync?.guardarConfigServidor?.(f);
+        // Con tope: una petición que no vuelve nunca no puede dejar la cola
+        // muerta y a la config siguiente esperando para siempre.
+        return window.kyliaSync?.guardarConfigServidor?.(f, { timeoutMs: TIMEOUT_CONFIG_MS });
       }
     }
     function subirConfig() {
@@ -7078,7 +7105,12 @@
         id: uuidZona(), cultivo: null, area_m2: areaM2 || null, fechaPlantacion: null,
         ...extra,
         // Va al final a propósito: `extra` no puede sobrescribirla por descuido.
-        sync: { nueva: true, vista: null, confirmada: null },
+        // `token` es la IDENTIDAD LÓGICA. Sin él, dos siembras recién creadas
+        // tienen un sync idéntico —{nueva:true, vista:null, confirmada:null}— y
+        // su firma no las distingue: borrar una y crear otra con el mismo UUID
+        // dejaba que la respuesta de la primera confirmara a la segunda. Un hash
+        // del estado no es una identidad.
+        sync: { nueva: true, vista: null, confirmada: null, token: uuidZona() },
       };
     }
 
@@ -7559,11 +7591,20 @@
       if (typeof y.nueva !== "boolean") return false;
       const huellaOnull = v => v === null || (typeof v === "string" && v.length > 0);
       if (!huellaOnull(y.vista) || !huellaOnull(y.confirmada)) return false;
+      // `token` es opcional —las marcas anteriores a este cambio no lo llevan—
+      // pero si está, tiene que ser una cadena.
+      if ("token" in y && !(typeof y.token === "string" && y.token.length > 0)) return false;
       // Una siembra que NO es nueva necesita baseline: sin vista ni confirmada no
       // hay nada contra lo que comparar, y `vista !== actual` la mandaría.
       if (y.nueva === false && y.vista === null && y.confirmada === null) return false;
       return true;
     }
+
+    // Firma de la MÁQUINA DE ESTADOS, no del contenido. Autoriza un envío, y se
+    // vuelve a comprobar antes del POST y antes de aplicar la respuesta: si la
+    // siembra se borró y reapareció con el mismo UUID, su sync es otro y la
+    // autorización vieja deja de valer. Un UUID no es una identidad lógica.
+    const firmaSync = (sync) => estable(sync === undefined ? null : sync);
 
     function decidirSiembra(sync, actual) {
       // CINTURÓN: si no se puede demostrar el estado, no se envía JAMÁS.
@@ -7594,12 +7635,16 @@
           const huella  = huellaPayload(payload);
           const q = decidirSiembra(s.sync, huella);
           if (q === "nada")                  res.confirmadas.push(s.id);
-          else if (q === "enviar")           res.pendientes_sincronizacion.push({ id: s.id, payload, huella });
+          else if (q === "enviar")           res.pendientes_sincronizacion.push(
+            { id: s.id, payload, huella, firma: firmaSync(s.sync) });
           else                               res.pendientes_reparacion.push(s.id);
         }
       }
       return res;
     }
+
+    // La finca de AHORA, no la que se capturó al empezar la ronda.
+    function fincaVigente() { return cfgFinca; }
 
     // Busca una siembra por id en el estado ACTUAL, con su zona. Devuelve null
     // si ya no existe.
@@ -7613,11 +7658,19 @@
     // Escribe SOLO s.sync de UNA siembra, releyendo el estado actual. Nunca
     // vuelca una snapshot entera: si el usuario editó mientras volaba el POST,
     // volcarla le borraría la edición.
-    function anotarSync(id, marcas) {
+    function anotarSync(id, marcas, firmaEsperada) {
       const zonas = zonasGuardadas();
       for (const z of zonas) {
         for (const s of (z.siembras || [])) {
-          if (s && s.id === id) { s.sync = marcas; return guardarZonasSinSubir(zonas); }
+          if (!s || s.id !== id) continue;
+          // NO BASTA CON QUE EL UUID COINCIDA. Si entre el envío y la respuesta
+          // la siembra se borró y se creó otra con el mismo id, avanzar sus
+          // marcas le regalaría a la nueva una confirmación que nunca pidió: se
+          // daría por sincronizada sin estarlo. Una sustitución legítima no
+          // hereda la confirmación de la anterior.
+          if (firmaEsperada !== undefined && firmaSync(s.sync) !== firmaEsperada) return false;
+          s.sync = marcas;
+          return guardarZonasSinSubir(zonas);
         }
       }
       return false;      // la siembra ya no existe: no se resucita
@@ -7644,7 +7697,7 @@
                     sin_cultivo: plan.sin_cultivo };
 
       const dueno = window.kyliaSync?.userId;
-      for (const { id, payload, huella } of plan.pendientes_sincronizacion) {
+      for (const { id, payload, huella, firma } of plan.pendientes_sincronizacion) {
         // REVALIDAR JUSTO ANTES DEL POST. El plan se congela al empezar la
         // ronda, así que para cuando le toca el turno a esta siembra el usuario
         // ha podido borrarla o cambiarla mientras esperaba a la anterior.
@@ -7652,13 +7705,27 @@
         // vieja. El plan dice QUÉ revisar; no da permiso para escribir.
         const vigente = buscarSiembra(id);
         if (!vigente || !vigente.s.cultivo) { res.descartadas++; continue; }
-        const huellaAhora = huellaPayload(payloadSiembra(vigente.z, vigente.s, base, dueno));
+
+        // LA FINCA TAMBIÉN PUEDE HABER CAMBIADO mientras esperábamos a la
+        // anterior. El payload hereda caudal, suelo, método y coordenadas de la
+        // finca, así que con el `base` del principio se mandaría un caudal de
+        // hace un minuto. Se relee la vigente, no la capturada.
+        const baseAhora   = fincaVigente() || base;
+        const huellaAhora = huellaPayload(payloadSiembra(vigente.z, vigente.s, baseAhora, dueno));
         if (huellaAhora !== huella) { res.descartadas++; continue; }   // la coge la ronda siguiente
+
+        // Y LA MÁQUINA DE ESTADOS. El payload puede coincidir y aun así tratarse
+        // de otra siembra: borrada y recreada con el mismo UUID y los mismos
+        // datos, pero ahora histórica. El permiso lo dio un `sync` concreto; si
+        // ese sync ya no está, el permiso caducó.
+        if (firmaSync(vigente.s.sync) !== firma) { res.descartadas++; continue; }
+        if (decidirSiembra(vigente.s.sync, huellaAhora) !== "enviar") { res.descartadas++; continue; }
 
         res.enviadas++;
         // La huella que de verdad se envía. Si el usuario edita mientras vuela
         // la petición, lo confirmado es ESTO, no lo que haya ahora.
         const huellaEnviada = huella;
+        const tokenEnviado = vigente.s.sync && vigente.s.sync.token;
         let r = null;
         try { r = await window.kyliaSync?.registroUsuario(payload); } catch (_) { r = null; }
 
@@ -7667,7 +7734,10 @@
           // contenido B queda INTACTO y `confirmada: A` hace que el siguiente
           // ciclo detecte A !== B y mande B. Nunca se marca B como confirmada
           // por una respuesta que era de A.
-          if (!anotarSync(id, { nueva: false, vista: huellaEnviada, confirmada: huellaEnviada })) res.descartadas++;
+          // El token se ARRASTRA: avanzar marcas no cambia de instancia.
+          const marcas = { nueva: false, vista: huellaEnviada, confirmada: huellaEnviada,
+                           ...(tokenEnviado ? { token: tokenEnviado } : {}) };
+          if (!anotarSync(id, marcas, firma)) res.descartadas++;
           else res.confirmadas++;
         } else {
           // Ni una marca avanza: el siguiente guardado vuelve a detectar la
