@@ -53,6 +53,31 @@ ahorrado"*, nunca *"ahorraste"*.
 
 Un 15% honesto se escribe *"entre un 10 y un 20%"*.
 
+### 3b · Calidad del INPUT climático (medida, 14-sep)
+
+No es una clase aparte: es la incertidumbre de la que cuelgan (2) y (3). El clima
+de Open-Meteo se contrastó contra las estaciones automáticas de la XEMA
+(Meteocat), que son observación real.
+
+**Cifra reproducida, y es la única que se cita:**
+
+| variable | RMSE contra XEMA | periodo |
+|---|---|---|
+| **ET₀** | **0,456-0,992 mm/día** | 2026-06-15 → 2026-09-12 |
+
+El rango son las distintas estaciones/parcelas del barrido, no una banda de
+confianza. Se reproduce con `node scripts/valida-clima-xema.mjs`; la salida
+íntegra está en `validacion-clima-xema-2026-09-14.json`.
+
+⚠️ **La LLUVIA de rejilla es harina de otro costal** y es el input peor conocido
+de todo el motor: **+105% a +284%** frente a estación, y dos estaciones a 7 km
+correlan r = 0,13. Un acumulado de lluvia de rejilla no se publica como dato.
+
+⚠️ Un valor ausente de la XEMA es un valor ausente. `Number(null)` da 0 y eso
+colaba un "ese día midió 0 mm" en la fuente que hace de VERDAD de referencia, que
+es donde más daño hace; hoy el día no entra y se cuenta en
+`descartados.sin_observacion`.
+
 ### 4 · Ahorro DEMOSTRADO
 **Qué sería:** la diferencia medida entre una parcela donde se sigue a Kylia y un
 control comparable, con la cosecha medida en las dos.

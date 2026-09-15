@@ -123,11 +123,37 @@ alter table acciones add  constraint acciones_caudal_mmh_ck
 -- ═════════════════════════════════════════════════════════════════
 -- 5 · DESPLEGAR EL CÓDIGO CORREGIDO  (fuera de este fichero)
 -- ═════════════════════════════════════════════════════════════════
--- Ahora, y no antes: el código nuevo LEE columnas que ya existen (paso 3), así
--- que no falla; y a partir de aquí los DOS escritores congelan. El código viejo
--- conviviendo con el esquema nuevo tampoco rompe: ignora las columnas que no
--- conoce. Y laminaDeAccion() cae al recálculo mientras lamina_mm venga null, así
--- que en ningún momento hay nada roto.
+-- Ahora: a partir de aquí los DOS escritores congelan. El código viejo
+-- conviviendo con el esquema nuevo no rompe (ignora las columnas que no conoce)
+-- y laminaDeAccion() cae al recálculo mientras lamina_mm venga null, así que en
+-- ningún momento hay nada roto.
+--
+-- ⚠️ ESTE PASO YA SE SALTÓ, Y SE NOTÓ. La versión anterior decía "el código
+-- nuevo LEE columnas que ya existen (paso 3), así que no falla". Eso describe el
+-- orden PREVISTO, no el que ocurrió: el código salió a producción el 14-sep al
+-- pushear a main —Vercel despliega solo— con la migración sin ejecutar, y
+-- PostgREST no perdona una columna inexistente: tumba el SELECT entero con
+-- 42703. Medido contra la API real el 15-sep:
+--
+--     GET /api/campo?vista=hoy&usuario_id=9aaa1b25-…  → ok:false
+--     GET /api/campo?vista=perfil&usuario_id=…        → ok:false
+--     GET /api/campo?vista=reveal&usuario_id=…        → ok:false  (los 3 pilotos)
+--
+-- O sea: la pantalla de hoy de la única parcela viva y el reveal de los tres
+-- pilotos, caídos. Y api/log.js insertaba lamina_mm, así que apuntar un riego
+-- tampoco podía funcionar.
+--
+-- Corregido en api/_supabase.js: si falta una de las tres columnas, se quita de
+-- la consulta y se repite UNA vez (y en los INSERT se caen los tres campos, para
+-- que un riego no se pierda). No se inventa nada — sin lámina congelada el motor
+-- recalcula con el caudal actual y lo declara `recalculada_caudal_actual`, que
+-- es lo que hacía antes de la migración. Comprobado ejecutándolo contra un
+-- PostgREST sin esas columnas en tests/test-columnas-congeladas.mjs.
+--
+-- Con eso el orden deja de ser una condición de vida o muerte en los DOS
+-- sentidos: antes de migrar funciona, y el rollback (c) de abajo —que dropea las
+-- columnas— tampoco deja producción caída. El orden de este fichero SIGUE siendo
+-- el correcto; lo que ya no es, es el único que no rompe.
 
 -- ═════════════════════════════════════════════════════════════════
 -- 6 y 7 · CONFIRMAR LA VERSIÓN DESPLEGADA Y CAPTURAR id_max
@@ -283,6 +309,9 @@ alter table acciones validate constraint acciones_caudal_mmh_ck;
 --        alter table acciones drop constraint if exists acciones_caudal_mmh_ck;
 --        alter table acciones drop column if exists lamina_origen, drop column if exists lamina_mm,
 --                                drop column if exists caudal_mmh;
+--      Dropear las columnas con el código nuevo delante NO tumba producción: el
+--      helper las quita de la consulta y sigue (ver paso 5). Antes del 15-sep
+--      este rollback dejaba la app caída.
 --      Los datos originales (cantidad_l_m2, duracion_min) no se han tocado en
 --      ningún momento, y además están en acciones_backup_20260914.
 --
