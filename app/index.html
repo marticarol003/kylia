@@ -145,12 +145,27 @@
       }
 
       async function post(path, data) {
+        // SERIALIZAR VA PRIMERO Y APARTE. Estaba dentro del try del fetch, así
+        // que un payload con una referencia cíclica o un BigInt —JSON.stringify
+        // lanza con los dos— acababa clasificado como "sin_red": un diagnóstico
+        // falso que manda a mirar la conexión cuando el problema está en el dato,
+        // y que además dice que la petición salió cuando no salió. Lo cazó Codex.
+        // `sin_red` queda EXCLUSIVAMENTE para una excepción al ejecutar fetch.
+        let cuerpo;
+        try {
+          cuerpo = JSON.stringify(data);
+        } catch (_) {
+          const r = { ok: false, status: 0, persisted: false,
+                      error: "payload_no_serializable", datos: null };
+          anotarFallo(path, data, r);
+          return r;                                  // y fetch NO se ejecuta
+        }
         let res;
         try {
           res = await fetch(path, {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
-            body:    JSON.stringify(data),
+            body:    cuerpo,
             keepalive: true,
           });
         } catch (_) {
@@ -175,17 +190,31 @@
           // `datos && ...` no protege: lo que hay que comprobar no es que sea
           // truthy, es que sea un objeto. (`null` sí cortocircuita, y por eso
           // pasaba desapercibido.)
-          const esObjeto = datos !== null && typeof datos === "object";
+          const esObjeto = datos !== null && typeof datos === "object" && !Array.isArray(datos);
           // `res.ok` solo no basta: /api/log responde 200 con { ok:false } en
           // varios caminos, y 200 con { persisted:false } cuando no escribió nada.
           const ok = res.ok && (!esObjeto || datos.ok !== false);
-          const persisted = (esObjeto && "persisted" in datos) ? datos.persisted !== false : ok;
-          const r = {
-            ok, status: res.status, persisted,
-            error: ok ? null : ((esObjeto && datos.error) || `HTTP ${res.status}`),
-            datos,
-          };
-          if (!ok || persisted === false) anotarFallo(path, data, r);
+          // UN 200 NO ES UNA CONFIRMACIÓN DE ESCRITURA. Antes, cualquier 2xx sin
+          // campo `persisted` —un primitivo, un array, un cuerpo vacío, un HTML
+          // de un proxy— se daba por escrito. Ahora `persisted` solo es true si
+          // el servidor lo DICE. Auditado: post() solo pega a /api/log, y todos
+          // sus caminos de escritura devuelven `persisted` explícito (true al
+          // escribir, false con `reason` cuando no), así que exigirlo no produce
+          // falsos positivos. La ausencia de confirmación es conservadora: se
+          // trata como no escrito, y addRiego deja el riego marcado.
+          const persisted = esObjeto && datos.persisted === true;
+          let error = null;
+          if (!ok) {
+            error = (esObjeto && datos.error) || `HTTP ${res.status}`;
+          } else if (!persisted) {
+            // Malformada NO es sin_red: la petición llegó y el servidor
+            // contestó. Se conserva el status y se dice qué pasó.
+            error = (esObjeto && "persisted" in datos)
+              ? (datos.reason || "no_persistido")
+              : "respuesta_invalida";
+          }
+          const r = { ok, status: res.status, persisted, error, datos };
+          if (!ok || !persisted) anotarFallo(path, data, r);
           return r;
         } catch (_) {
           // Cinturón, no sustituto del arreglo de arriba. Razonar línea a línea
@@ -4644,8 +4673,9 @@
       // ESCRITURA CRÍTICA. El riego ya está guardado arriba, así que no se
       // pierde pase lo que pase — pero tampoco puede APARENTAR que subió.
       // Fracaso son las dos cosas: que la petición fallara, y que el servidor
-      // contestara 200 sin escribir nada (persisted:false, p.ej. Supabase sin
-      // configurar). Las dos dejan el riego solo en este móvil.
+      // contestara 200 sin CONFIRMAR que escribió. Un 200 no es una confirmación:
+      // solo vale `persisted: true` dicho por el servidor. Las dos dejan el riego
+      // solo en este móvil.
       try {
         const envio = window.kyliaSync?.accion({
           // Cada zona es su propia parcela en el servidor: el riego tiene que
@@ -4665,7 +4695,7 @@
           jornada_id:     window._kyliaJornadaActual?.id || null,
         });
         Promise.resolve(envio)
-          .then(r => { if (!r || !r.ok || r.persisted === false) marcarNoSincronizado(date); })
+          .then(r => { if (!r || !r.ok || r.persisted !== true) marcarNoSincronizado(date); })
           .catch(() => marcarNoSincronizado(date));
       } catch (_) { marcarNoSincronizado(date); }
     }

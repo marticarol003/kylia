@@ -8,7 +8,7 @@
 // SIN sus filas en `usuarios`, y nadie se enteró en cuatro días.
 //
 // Aquí se ejecuta el `post()` real de app/index.html contra un fetch simulado.
-// EL CONTRATO QUE NO SE PUEDE ROMPER: la promesa nunca rechaza. 12 de los 13
+// EL CONTRATO QUE NO SE PUEDE ROMPER: la promesa nunca rechaza. 10 de los 12
 // sitios que escriben no la esperan; un throw sería un unhandled rejection.
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -77,9 +77,11 @@ function montar(respuesta, opts = {}) {
   const f = new Function("localStorage", "console", "fetch", cuerpo);
   return { ...f(ctx.localStorage, ctx.console, ctx.fetch), avisos, ls };
 }
-const resp = (status, texto) => async () => ({
-  ok: status >= 200 && status < 300, status, text: async () => texto,
-});
+const resp = (status, texto) => {
+  const f = async () => { f.llamadas++; return { ok: status >= 200 && status < 300, status, text: async () => texto }; };
+  f.llamadas = 0;
+  return f;
+};
 
 console.log("\n── 1. el contrato: la promesa NUNCA rechaza ──");
 const CASOS = [
@@ -164,10 +166,77 @@ for (const [etiqueta, cuerpo] of PRIMITIVOS) {
 }
 {
   // Y que el resultado siga siendo el correcto, no solo que no explote.
+  // Este assert decía lo contrario en la ronda anterior —daba por escrito un 200
+  // con body `true`— y la regla nueva lo invalida a propósito: un 200 no
+  // confirma nada. La petición fue bien (ok), pero no hay confirmación.
   const r = await montar(resp(200, "true")).post("/x", {});
-  ok(r.ok === true && r.persisted === true, "body `true` con 200 → ok y persisted (no hay campo que diga lo contrario)");
+  ok(r.ok === true, "body `true` con 200 → la petición fue bien");
+  ok(r.persisted === false && r.error === "respuesta_invalida",
+     "  pero NO se da por escrito: persisted:false y respuesta_invalida");
   const r2 = await montar(resp(500, "1")).post("/x", {});
   ok(r2.ok === false && r2.persisted === false && r2.error === "HTTP 500", "body `1` con 500 → fallo con su status");
+}
+
+console.log("\n── 2c. SERIALIZAR NO ES RED: un payload imposible no es sin_red ──");
+// JSON.stringify estaba DENTRO del try del fetch, así que un objeto cíclico o un
+// BigInt salían clasificados como "sin_red": diagnóstico falso, y encima decía
+// que la petición había salido cuando ni se intentó.
+{
+  const ciclico = { recurso: "acciones" }; ciclico.yo = ciclico;
+  const conBigInt = { recurso: "acciones", n: 10n };
+  for (const [etiqueta, payload] of [["objeto cíclico", ciclico], ["BigInt", conBigInt]]) {
+    const f = resp(200, JSON.stringify({ ok: true, persisted: true }));
+    const { post, leerFallos } = montar(f);
+    let rechazo = null, r = null;
+    try { r = await post("/api/log", payload); } catch (e) { rechazo = e; }
+    ok(rechazo === null, `${etiqueta}: no rechaza`);
+    ok(f.llamadas === 0, `${etiqueta}: fetchCalls === 0 — no se intenta enviar lo que no se puede serializar (${f.llamadas})`);
+    ok(r && r.status === 0, `${etiqueta}: status 0`);
+    ok(r && r.persisted === false, `${etiqueta}: persisted false`);
+    ok(r && r.error === "payload_no_serializable", `${etiqueta}: error explícito, no genérico (${r && r.error})`);
+    ok(r && r.error !== "sin_red", `${etiqueta}: y NUNCA sin_red`);
+    ok(leerFallos().length === 1, `${etiqueta}: queda registrado`);
+  }
+}
+{
+  // Y al revés: sin_red se reserva para lo que de verdad es un fallo de fetch.
+  const { post } = montar(async () => { throw new TypeError("Failed to fetch"); });
+  const r = await post("/x", { recurso: "acciones" });
+  ok(r.error === "sin_red", "una excepción REAL de fetch sigue siendo sin_red");
+}
+
+console.log("\n── 2d. UN 200 NO CONFIRMA QUE SE HAYA ESCRITO ──");
+// Para una escritura crítica, persisted:true solo si el servidor lo dice.
+const SIN_CONFIRMAR = [
+  ["primitivo true",        "true"],
+  ["primitivo 1",           "1"],
+  ['primitivo "texto"',     '"texto"'],
+  ["array",                 "[]"],
+  ["array con datos",       '[{"persisted":true}]'],
+  ["cuerpo vacío",          ""],
+  ["no-JSON",               "<html>ok</html>"],
+  ["objeto sin persisted",  '{"ok":true}'],
+  ["objeto persisted:1",    '{"ok":true,"persisted":1}'],
+];
+for (const [etiqueta, cuerpo] of SIN_CONFIRMAR) {
+  const { post } = montar(resp(200, cuerpo));
+  const r = await post("/api/log", { recurso: "acciones" });
+  ok(r.persisted === false, `200 con ${etiqueta} → persisted:false`);
+  ok(r.status === 200, `  conserva el status 200 (${r.status})`);
+  ok(r.error !== "sin_red", "  y no se degrada a sin_red");
+}
+{
+  const r = await montar(resp(200, '{"ok":true}')).post("/x", {});
+  ok(r.error === "respuesta_invalida", `objeto sin persisted → error "${r.error}"`);
+  const r2 = await montar(resp(200, '{"ok":true,"persisted":false,"reason":"supabase_not_configured"}')).post("/x", {});
+  ok(r2.error === "supabase_not_configured", `persisted:false arrastra su reason ("${r2.error}")`);
+  const r3 = await montar(resp(200, '{"ok":true,"persisted":true}')).post("/x", {});
+  ok(r3.persisted === true && r3.error === null, "y la confirmación explícita SÍ cuenta");
+}
+{
+  // El invariante que no se puede perder al endurecer esto.
+  const r = await montar(resp(200, '{"ok":false,"error":"propietario no encontrado"}')).post("/x", {});
+  ok(r.ok === false && r.error === "propietario no encontrado", "{ok:false} con HTTP 200 se sigue detectando");
 }
 
 console.log("\n── 3. el registro de fallos ──");
@@ -267,7 +336,20 @@ console.log("\n── 6. un riego que no sube deja de aparentar que subió ─�
   const app = monta1App({ respuestaAccion: async () => ({ ok: true, status: 200, persisted: false, error: null }) });
   app.addRiego("2026-09-15", null, { duracion: 60 });
   await espera();
-  ok(app.ver()[0].sincronizado === false, "200 con persisted:false TAMBIÉN se marca — el caso que pediste");
+  ok(app.ver()[0].sincronizado === false, "200 con persisted:false TAMBIÉN se marca");
+}
+{
+  // Sin confirmación explícita, conservador: se marca igual.
+  for (const [etiqueta, resultado] of [
+    ["persisted ausente",  { ok: true, status: 200, error: "respuesta_invalida" }],
+    ["persisted undefined",{ ok: true, status: 200, persisted: undefined }],
+    ["persisted truthy 1", { ok: true, status: 200, persisted: 1 }],
+  ]) {
+    const app = monta1App({ respuestaAccion: async () => resultado });
+    app.addRiego("2026-09-15", null, { duracion: 60 });
+    await espera();
+    ok(app.ver()[0].sincronizado === false, `${etiqueta}: se marca — solo vale persisted === true`);
+  }
 }
 {
   const app = monta1App({ respuestaAccion: async () => ({ ok: true, status: 200, persisted: true, error: null }) });
