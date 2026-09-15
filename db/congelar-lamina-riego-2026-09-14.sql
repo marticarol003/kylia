@@ -218,11 +218,15 @@ select count(*) as descuadres
  where tipo = 'riego' and lamina_origen in ('duracion_x_caudal','backfill_caudal_actual')
    and abs(lamina_mm - (caudal_mmh * duracion_min / 60.0)) > 0.15;   -- debe dar 0
 
--- 10c. ¿Ha entrado algún riego manual durante la ventana? No es un error —no se
---     bloqueó la tabla a propósito— pero tiene que verse, y tiene que venir ya
---     congelado por el código nuevo. Si alguno sale sin lámina, es que el
---     despliegue del paso 4 no había llegado todavía: repetir el paso 6 con el
---     id_max nuevo.
+-- 10c. ¿Ha entrado algún riego durante la ventana? Con el trigger del paso 1
+--     puesto, esta consulta tiene que salir VACÍA: nada ha podido escribirse.
+--     Si devuelve filas, el bloqueo no estaba activo cuando debía —lo dropeó
+--     alguien, o el paso 1 no llegó a ejecutarse— y entonces hay que mirarlas
+--     una a una: las que vengan con lamina_origen las congeló el código nuevo y
+--     están bien; las que salgan sin lámina son código viejo escribiendo, o sea
+--     que el paso 6 dio por bueno un despliegue a medias. En ese caso: volver a
+--     poner el trigger, repetir el paso 6 de verdad y rehacer 7-9 con el id_max
+--     nuevo.
 select id, fecha_local, lamina_origen
   from acciones
  where tipo = 'riego' and id > :id_max
