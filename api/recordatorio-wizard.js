@@ -15,6 +15,7 @@
 // (calcula y devuelve qué se enviaría, sin enviar nada).
 
 const { isConfigured, supabaseSelect } = require("./_supabase.js");
+const { propietarioPorEmail } = require("./_propietario.js");
 
 const { fetchConTimeout } = require("./_http.js");
 const APP_URL = "https://kylia.app/app";
@@ -149,3 +150,8 @@ module.exports = async (req, res) => {
   console.log("[recordatorio-wizard]", JSON.stringify({ dry, resultados }));
   return res.status(200).json({ ok: true, dry, total: pilotos.length, resultados });
 };
+
+// Expuesta para tests/test-propietario-por-email.mjs: resolver el propietario a
+// partir del correo es la pieza que hay que poder ejecutar, no leer con regex.
+// Un import que falta no lo caza un test estructural: lo caza ejecutarlo.
+module.exports.yaRespondioHoy = yaRespondioHoy;

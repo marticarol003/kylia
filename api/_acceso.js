@@ -23,6 +23,7 @@
 
 const crypto = require("crypto");
 const { supabaseInsert, supabaseSelect, supabaseUpdate } = require("./_supabase.js");
+const { propietarioPorEmail } = require("./_propietario.js");
 const { configDesdeFila, COLUMNAS_FINCA } = require("./_config-app.js");
 const SESION = require("./_sesion.js");
 
