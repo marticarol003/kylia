@@ -299,7 +299,7 @@ console.log("\n── 2e. TIMEOUT OPCIONAL: aborta de verdad, y no es sin_red �
 }
 {
   // guardarConfigServidor acepta opts y se los pasa a post.
-  const g = recorta("window.kyliaSync.guardarConfigServidor = function (config, opts)");
+  const g = recorta("window.kyliaSync.guardarConfigServidor = async function (config, opts)");
   ok(g.includes(", opts)"), "guardarConfigServidor pasa opts a post()");
 }
 

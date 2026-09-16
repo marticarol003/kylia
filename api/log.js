@@ -277,17 +277,67 @@ async function handleConfigApp(req, res, body) {
     return res.status(200).json({ ok: true, persisted: false, reason: "supabase_not_configured" });
   }
 
+  // COMPARE-AND-SET. `base_version` es OBLIGATORIA: es la versión sobre la que el
+  // cliente dice estar escribiendo. Sin ella NO se cae al UPDATE incondicional de
+  // antes —ese es justo el camino que permite que una petición vieja pise a una
+  // nueva—, se rechaza. Un cliente viejo, con la pestaña abierta desde antes del
+  // despliegue, deja de guardar config hasta que recargue: es molesto y es lo
+  // correcto, porque la alternativa es perderle cambios en silencio.
+  if (!("base_version" in body)) {
+    console.warn("[config-app] sin base_version (cliente viejo):", propietario_id);
+    return res.status(426).json({ ok: false, persisted: false, error: "base_version_requerida",
+                                  reason: "cliente_desactualizado" });
+  }
+  // Por TIPO, no por coerción. `Number(null)` es 0, así que un base_version nulo
+  // pasaba por "versión 0" — y sobre una fila que todavía esté en 0 eso es un
+  // UPDATE incondicional con otro nombre. Lo destapó el test.
+  const base = body.base_version;
+  if (typeof base !== "number" || !Number.isSafeInteger(base) || base < 0) {
+    return res.status(400).json({ ok: false, persisted: false, error: "base_version inválida" });
+  }
+
   const foto = { ...config, guardado: new Date().toISOString() };
+  // Quién escribe. Sirve para que el cliente distinga un conflicto causado por su
+  // propia petición anterior —reintentable— de uno causado por otro dispositivo,
+  // que NO se puede resolver sobrescribiendo.
+  if (typeof body.sesion === "string" && body.sesion.length <= 64) foto.sesion = body.sesion;
+
   try {
-    const filas = await supabaseUpdate("usuarios", `id=eq.${propietario_id}`, { config_app: foto });
-    if (!Array.isArray(filas) || filas.length === 0) {
-      return res.status(404).json({ ok: false, error: "propietario no encontrado" });
+    // UN SOLO STATEMENT. El filtro y la escritura de la versión van juntos, así
+    // que la atomicidad la da Postgres. Nada de SELECT → comprobar → UPDATE.
+    const filas = await supabaseUpdate(
+      "usuarios",
+      `id=eq.${propietario_id}&config_version=eq.${base}`,
+      { config_app: foto, config_version: base + 1 });
+
+    if (Array.isArray(filas) && filas.length === 1) {
+      console.log("[config-app]", JSON.stringify({ propietario_id, zonas: zonas.length, version: base + 1 }));
+      return res.status(200).json({ ok: true, persisted: true,
+                                    guardado: foto.guardado, config_version: base + 1 });
     }
-    console.log("[config-app]", JSON.stringify({ propietario_id, zonas: zonas.length }));
-    return res.status(200).json({ ok: true, persisted: true, guardado: foto.guardado });
+
+    // 0 filas: o la versión se movió, o la fila no existe. Se distinguen con una
+    // lectura APARTE —que no forma parte del CAS, solo del mensaje de error— para
+    // poder decirle al cliente sobre qué versión reintentar.
+    const actual = await supabaseSelect("usuarios",
+      `id=eq.${propietario_id}&select=id,config_version,config_app`);
+    if (!actual || actual.length === 0) {
+      return res.status(404).json({ ok: false, persisted: false, error: "propietario no encontrado" });
+    }
+    const fila = actual[0];
+    console.warn("[config-app] conflicto:", JSON.stringify(
+      { propietario_id, base, actual: fila.config_version }));
+    return res.status(409).json({
+      ok: false, persisted: false, error: "conflicto_version",
+      config_version: fila.config_version,
+      // De quién es la versión que hay ahora: si es de esta misma sesión, el
+      // conflicto lo causó una petición propia anterior.
+      sesion: fila.config_app?.sesion || null,
+      guardado: fila.config_app?.guardado || null,
+    });
   } catch (err) {
     console.error("[config-app] error:", err.message);
-    return res.status(500).json({ ok: false, error: "no se pudo guardar la configuración" });
+    return res.status(500).json({ ok: false, persisted: false, error: "no se pudo guardar la configuración" });
   }
 }
 

@@ -31,8 +31,14 @@ ok(/config_vacia/.test(handler),
    "una config sin finca ni zonas se RECHAZA: un móvil recién estrenado no pisa la buena con su nada");
 ok(/zonas\.length > 0/.test(handler) && /finca\.parcela/.test(handler),
    "el criterio de 'vacía' mira contenido real (zonas, contorno, cultivos, superficie), no si el objeto existe");
-ok(/supabaseUpdate\("usuarios"/.test(handler) && !/supabaseInsert/.test(handler),
-   "escribe UNA columna con UPDATE, nunca upsert de la fila (así se perdió el piloto de Breda)");
+ok(/supabaseUpdate\(\s*\n?\s*"usuarios"/.test(handler) && !/supabaseInsert/.test(handler),
+   "escribe con UPDATE, nunca upsert de la fila (así se perdió el piloto de Breda)");
+// Desde db/config-version-cas-2026-09-16.sql el UPDATE es condicional y toca DOS
+// columnas: la foto y su versión, en el mismo statement. Sigue sin ser un upsert.
+ok(/config_version=eq\.\$\{base\}/.test(handler),
+   "y va condicionado a config_version: el último que LLEGA ya no gana por llegar");
+ok(/\{ config_app: foto, config_version: base \+ 1 \}/.test(handler),
+   "escribiendo foto y versión juntas, nada más");
 ok(/config_app: foto/.test(handler) && (handler.match(/patch|config_app/g) || []).length >= 1,
    "y la columna que toca es config_app y ninguna otra");
 ok(/propietario no encontrado/.test(handler),

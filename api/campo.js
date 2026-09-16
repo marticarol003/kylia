@@ -279,13 +279,21 @@ async function vistaMadurez(res, u) {
 async function vistaConfig(res, u) {
   let config = u.config_app || null;
   let de = u.id;
+  // La versión sobre la que el cliente escribirá después (compare-and-set, ver
+  // db/config-version-cas-2026-09-16.sql). Va SIEMPRE junto a la foto, y de la
+  // MISMA fila de la que sale la foto: una versión de otra fila no serviría de
+  // base para nada.
+  let version = Number.isFinite(Number(u.config_version)) ? Number(u.config_version) : 0;
 
   if (!config && u.propietario_id && u.propietario_id !== u.id) {
     const dueños = await supabaseSelect("usuarios",
-      `id=eq.${u.propietario_id}&select=id,config_app,${COLUMNAS_FINCA}`);
+      `id=eq.${u.propietario_id}&select=*`);
     const dueño = dueños?.[0];
     const suya = dueño && (dueño.config_app || configDesdeFila(dueño));
-    if (suya) { config = suya; de = dueño.id; }
+    if (suya) {
+      config = suya; de = dueño.id;
+      version = Number.isFinite(Number(dueño.config_version)) ? Number(dueño.config_version) : 0;
+    }
   }
 
   // Último recurso: la finca reconstruida desde la propia fila. `config_app`
@@ -299,6 +307,7 @@ async function vistaConfig(res, u) {
     propietario_id: u.propietario_id || u.id,
     config,                                   // null = este propietario nunca guardó
     guardado: config?.guardado || null,
+    config_version: version,                  // base del próximo guardado
     de,                                       // de qué fila salió (la propia o la del propietario)
   });
 }
