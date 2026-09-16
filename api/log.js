@@ -18,6 +18,7 @@ const ACCESO = require("./_acceso.js");
 const { puedeVer } = require("./_sesion.js");
 
 const HANDLERS = {
+  "crear-parcela":      handleCrearParcela,
   "registro-usuario":    handleRegistroUsuario,
   "acceso":              handleAcceso,
   "config-app":          handleConfigApp,
@@ -155,6 +156,83 @@ async function handleRegistroUsuario(req, res, body) {
   } catch (err) {
     console.error("[registro-usuario] error:", err.message);
     return res.status(500).json({ ok: false, error: "no se pudo guardar" });
+  }
+}
+
+// ─── crear-parcela (Punto 2: reparar siembras históricas) ─────────
+// POST /api/log { recurso:"crear-parcela", id, propietario_id, ...campos }
+//
+// CREATE-ONLY, y esa es toda la razón de que exista en vez de reutilizar
+// `registro-usuario`: aquel hace supabaseInsert(..., { upsert: true }), que si el
+// UUID ya existe REESCRIBE la fila entera — y su propio comentario lo llama "el
+// vector destructivo del sistema". Para reparar filas que creemos ausentes, un
+// upsert es justo lo que no se puede usar: si entre el diagnóstico y la escritura
+// alguien creó esa parcela, la pisaríamos con nuestra foto.
+//
+// Aquí el INSERT va sin `upsert`, así que la unicidad la impone la PRIMARY KEY:
+// dos peticiones a la vez terminan en una creación y un 23505, nunca en un
+// overwrite. El duplicado se devuelve como 409 para que el llamante RELEA en vez
+// de reintentar.
+//
+// `email` y `origen` NO se aceptan del cuerpo: se heredan de la fila del
+// propietario. Son datos de dispositivo —en la app salen de localStorage— y
+// dejar que los mande quien repara haría que abrir la reparación desde otro
+// navegador cambiara el contenido de la parcela.
+async function handleCrearParcela(req, res, body) {
+  const id = (body.id || "").toString().trim();
+  const propietario_id = (body.propietario_id || "").toString().trim();
+  if (!ES_UUID.test(id))             return res.status(400).json({ ok: false, error: "id inválido" });
+  if (!ES_UUID.test(propietario_id)) return res.status(400).json({ ok: false, error: "propietario_id inválido" });
+  if (id === propietario_id) {
+    // Una siembra es su propia parcela; nunca se redirige a la fila del dueño.
+    return res.status(400).json({ ok: false, error: "una siembra no puede ser su propio propietario" });
+  }
+  if (!isConfigured()) {
+    return res.status(200).json({ ok: true, persisted: false, reason: "supabase_not_configured" });
+  }
+
+  try {
+    const dueños = await supabaseSelect("usuarios",
+      `id=eq.${propietario_id}&select=id,email,origen,piloto_sombra`);
+    const dueño = dueños?.[0];
+    if (!dueño) return res.status(404).json({ ok: false, persisted: false, error: "propietario no encontrado" });
+
+    const permiso = puedeVer(req, dueño);
+    if (!permiso.permitido) {
+      console.warn("[crear-parcela] sesión ajena:", JSON.stringify({ propietario_id, sesion: permiso.sesion }));
+      return res.status(403).json({ ok: false, persisted: false, error: "ese propietario no es tuyo" });
+    }
+
+    const fila = {
+      id,
+      propietario_id,
+      nombre:           clean(body.nombre, 120)  || null,
+      ciudad:           clean(body.ciudad, 120)  || null,
+      lat:              numOrNull(body.lat),
+      lon:              numOrNull(body.lon),
+      cultivos:         Array.isArray(body.cultivos) ? body.cultivos.slice(0, 8).map(c => clean(c, 40)) : [],
+      parcela:          body.parcela && typeof body.parcela === "object" ? body.parcela : null,
+      area_m2:          numOrNull(body.area_m2),
+      fecha_plantacion: dateOrNull(body.fecha_plantacion),
+      suelo:            SUELOS.has(body.suelo) ? body.suelo : null,
+      metodo_riego:     METODOS_RIEGO.has(body.metodo_riego) ? body.metodo_riego : null,
+      caudal:           numOrNull(body.caudal),
+      // Heredados de la fila del propietario, NO del cuerpo.
+      email:            dueño.email  ?? null,
+      origen:           dueño.origen ?? null,
+    };
+
+    const filas = await supabaseInsert("usuarios", fila);      // ← SIN upsert
+    return res.status(201).json({ ok: true, persisted: true, creada: true, usuario: filas?.[0] || null });
+  } catch (err) {
+    // 23505 = unique_violation. El UUID ya estaba: NO se toca, se avisa.
+    if (/23505|duplicate key/i.test(err.message || "")) {
+      console.warn("[crear-parcela] ya existe, no se toca:", id);
+      return res.status(409).json({ ok: false, persisted: false, error: "ya_existe",
+                                    detalle: "ese UUID ya tiene fila; relee antes de decidir" });
+    }
+    console.error("[crear-parcela] error:", err.message);
+    return res.status(500).json({ ok: false, persisted: false, error: "no se pudo crear la parcela" });
   }
 }
 

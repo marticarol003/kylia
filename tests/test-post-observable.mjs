@@ -386,15 +386,20 @@ console.log("\n── 5. guarda de regresión: nadie consume el valor sin proteg
   const metodos = "registroUsuario|accion|observacion|jornada|medicion|recomendacionesLog|evento|guardarConfigServidor";
   const re = new RegExp("(await|\\.then\\s*\\(|=\\s*)\\s*window\\.kyliaSync\\??\\.(" + metodos + ")", "g");
   const usos = FUENTE.match(re) || [];
-  // Son TRES, y las tres están protegidas:
+  // Son CUATRO, y las cuatro están protegidas:
   //   · el `await` del envío de correo, dentro de un try/catch que ya avisa;
   //   · el `const envio =` de addRiego, que encadena .then().catch();
   //   · el `await registroUsuario` de sincronizarZonas, en try/catch con
-  //     fallback a null y comprobación de r antes de usarlo.
-  // Si aparece un CUARTO, hay que mirarlo a mano: una promesa consumida sin
-  // protección es justo lo que este trabajo viene a evitar. Esta guarda saltó de
-  // verdad al añadir sincronizarZonas, que es para lo que está.
-  ok(usos.length === 3, `call sites que consumen el valor: ${usos.length} (esperado 3)`);
+  //     fallback a null y comprobación de r antes de usarlo;
+  //   · el `await guardarConfigServidor` de kyliaConfirmarHistoricas (Punto 2),
+  //     que comprueba `!r || !r.persisted` antes de usarlo.
+  // Si aparece un QUINTO, hay que mirarlo a mano: una promesa consumida sin
+  // protección es justo lo que este trabajo viene a evitar. Esta guarda ha
+  // saltado ya dos veces al añadir un consumidor, que es para lo que está.
+  ok(usos.length === 4, `call sites que consumen el valor: ${usos.length} (esperado 4)`);
+  const conf = /window\.kyliaConfirmarHistoricas = async function[\s\S]*?\n    \};/.exec(FUENTE)[0];
+  ok(/if \(!r \|\| !r\.persisted\)/.test(conf),
+     "el de kyliaConfirmarHistoricas comprueba r antes de tocarlo");
   // El tercero vive en rondaSincro, la ronda de sincronización de zonas.
   const sincro = recorta("async function rondaSincro(");
   ok(sincro.includes("try { r = await window.kyliaSync?.registroUsuario(payload); } catch (_) { r = null; }"),
@@ -405,7 +410,7 @@ console.log("\n── 5. guarda de regresión: nadie consume el valor sin proteg
   // se dejaba fuera `guardarConfigServidor?.(`, que lleva llamada opcional.
   const todos = FUENTE.match(
     new RegExp("window\\.kyliaSync\\??\\.(" + metodos + ")\\??\\.?\\(", "g")) || [];
-  ok(todos.length === 12, `call sites en total: ${todos.length} (esperado 12)`);
+  ok(todos.length === 13, `call sites en total: ${todos.length} (esperado 13)`);
   ok(recorta("function addRiego(").includes(".catch(() => marcarNoSincronizado"),
      "y el de addRiego encadena .catch: no puede quedar colgada");
 }

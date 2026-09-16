@@ -5239,6 +5239,63 @@
     window.kyliaReconciliarRiegos = reconciliarRiegos;
     // Baseline de las siembras, ANTES de que el usuario pueda editar ninguna.
     try { hidratarSyncZonas(); } catch (_) {}
+    // ─── PUNTO 2 · FASE B.2 · confirmar las históricas ya reparadas ──────────
+    // MANUAL Y EXPLÍCITA: no se llama sola desde ningún sitio. El Punto 1 declara
+    // las históricas y NO las crea; cuando la Fase B.1 ha creado sus filas en
+    // `usuarios`, alguien tiene que decirle a la app que esas siembras ya están
+    // arriba — si no, se quedan en pendientes_reparacion para siempre.
+    //
+    // ⚠️ POR QUÉ ESTO VIVE AQUÍ Y NO EN EL SCRIPT. La huella se calcula sobre el
+    // payload de payloadSiembra(), que incluye `email` y `origen` de localStorage.
+    // Una huella calculada fuera del navegador no coincidiría con la que después
+    // compara la app, y la siembra volvería a parecer modificada. La confirmación
+    // la calcula quien luego la va a comparar.
+    //
+    // Solo confirma lo que puede DEMOSTRAR: por cada candidata comprueba contra el
+    // servidor que su fila existe. Conserva el token —la identidad no cambia— y no
+    // toca ningún otro contenido de la zona ni de la siembra. El guardado va por
+    // el CAS ya desplegado, y un 409 para sin reintentar.
+    window.kyliaConfirmarHistoricas = async function () {
+      const plan = clasificarSiembras(cfgFinca);
+      const informe = { confirmadas: [], sin_fila: [], no_guardado: null };
+      if (!plan.pendientes_reparacion.length) return { ...informe, motivo: "no hay históricas pendientes" };
+
+      const zonas = zonasGuardadas();
+      const dueno = window.kyliaSync?.userId;
+      let tocado = false;
+      for (const id of plan.pendientes_reparacion) {
+        const v = buscarSiembra(id);
+        if (!v || !v.s.cultivo || !syncValido(v.s.sync)) { informe.sin_fila.push(id); continue; }
+        // ¿Existe de verdad su fila? Si no, no se confirma nada.
+        let hay = false;
+        try {
+          const r = await fetch(`/api/campo?vista=hoy&usuario_id=${encodeURIComponent(id)}`, { cache: "no-store" });
+          hay = r.ok;
+        } catch (_) { hay = false; }
+        if (!hay) { informe.sin_fila.push(id); continue; }
+
+        const huella = huellaPayload(payloadSiembra(v.z, v.s, cfgFinca, dueno));
+        // En el array que se va a guardar, no en la copia de buscarSiembra.
+        for (const z of zonas) for (const s of (z.siembras || [])) {
+          if (s && s.id === id) {
+            s.sync = { nueva: false, vista: huella, confirmada: huella, token: v.s.sync.token };
+            tocado = true;
+          }
+        }
+        informe.confirmadas.push(id);
+      }
+      if (!tocado) return { ...informe, motivo: "nada que confirmar" };
+      if (!guardarZonasSinSubir(zonas)) return { ...informe, motivo: "no se pudo escribir kylia_zonas" };
+
+      // Y al servidor por el CAS. Sin retry: un 409 se reporta y se para.
+      const r = await window.kyliaSync.guardarConfigServidor({
+        finca: cfgFinca, zonas: zonasGuardadas(),
+        zonaActiva: zonaActiva || null, modo: window.kyliaSync?.modo || null,
+      });
+      if (!r || !r.persisted) informe.no_guardado = { status: r?.status, error: r?.error };
+      return { ...informe, config_version: leerBase()?.base_version ?? null };
+    };
+
     // DIAGNÓSTICO PURO. Llamaba a sincronizarZonas(), o sea que "mirar" escribía
     // y podía dar de alta parcelas. Ahora solo clasifica: 0 fetch, 0 POST, 0
     // escrituras. Lo consumirá el punto 2.
