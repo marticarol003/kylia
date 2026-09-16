@@ -305,9 +305,13 @@ async function vistaConfig(res, u) {
     const dueños = await supabaseSelect("usuarios", `id=eq.${propietarioId}&select=*`);
     filaDueno = dueños?.[0] || null;
   }
+  // La foto del dueño. Si nunca guardó `config_app`, se reconstruye DESDE SU
+  // PROPIA FILA: sigue siendo la misma fila, así que la tupla no se mezcla. Sin
+  // esto, quien configuró su campo antes de que existiera config_app no tendría
+  // tupla adoptable y abriría la app en blanco teniendo la parcela guardada.
   const propietario = {
     id:             propietarioId,
-    config:         filaDueno?.config_app || null,
+    config:         filaDueno ? (filaDueno.config_app || configDesdeFila(filaDueno) || null) : null,
     config_version: filaDueno ? versionValida(filaDueno.config_version) : null,
   };
 

@@ -86,8 +86,14 @@ ok(/const config = fila\?\.config_app/.test(acceso) && /\bconfig,/.test(acceso),
 ok(/canjearAcceso/.test(app) && /accion: "canjear"/.test(app), "la app canjea el token de ?acceso=");
 ok(/location\.replace\("\/app"\)/.test(iife),
    "y sale de la URL con replace: el token no se queda en la barra ni en el historial");
-ok(/restaurarConfig\(d\.config, d\.propietario_id\)/.test(iife),
-   "al canjear se restaura config Y se adopta el propietario");
+// Desde la centralización de la adopción, el canje IDENTIFICA y la config se
+// adopta por el ÚNICO camino: leer la tupla del propietario y escribir foto y
+// base juntas. Antes el canje escribía foto sin base y el dispositivo quedaba sin
+// poder guardar config.
+ok(/adoptarDelPropietario\(d\.propietario_id\)/.test(iife),
+   "al canjear se adopta la config del propietario por el camino canónico");
+ok(/localStorage\.setItem\("kylia_user_id", d\.propietario_id\)/.test(iife),
+   "y se adopta al propietario");
 
 console.log("── qué se sincroniza ──");
 ok(/finca: cfgFinca/.test(app) && /zonas: zonasGuardadas\(\)/.test(app) && /zonaActiva/.test(app),

@@ -330,7 +330,13 @@
         } catch (_) { return false; }
       }
 
-      function restaurarConfig(config, propietarioId) {
+      // ⚠️ ESCRITOR INTERNO. NO se llama desde ningún sitio salvo desde
+      // adoptarConfigPropietario(). Escribir la foto por un lado y la base por
+      // otro es la clase de bug que hemos estado parcheando call site a call
+      // site: restaurarSiVacio cogía la versión del propietario y la foto de
+      // `d.config`, que podía ser la de una ZONA, y canjearAcceso escribía foto
+      // sin base ninguna. Un solo camino, o vuelve a pasar.
+      function escribirConfigLocal(config, propietarioId) {
         if (!config || typeof config !== "object") return false;
         if (config.finca) localStorage.setItem("kylia_config", JSON.stringify(config.finca));
         if (Array.isArray(config.zonas)) localStorage.setItem("kylia_zonas", JSON.stringify(config.zonas));
@@ -345,6 +351,39 @@
         return true;
       }
 
+      // ─── ÚNICO CAMINO DE ADOPCIÓN ──────────────────────────────────
+      // Una configuración remota solo se adopta como TUPLA INSEPARABLE:
+      //     { owner_id, config, config_version }
+      // y los tres tienen que venir de la MISMA fila propietaria. Nunca la foto
+      // de una zona con la versión del dueño, nunca una versión del servidor
+      // pegada a una foto local cuya procedencia no conocemos.
+      //
+      // Es la única función que toca a la vez la foto y kylia_config_base. Si la
+      // tupla no está completa y no es coherente, no se adopta NADA: ni foto, ni
+      // base. Quedarse sin base significa 0 POST, que es el lado seguro.
+      function adoptarConfigPropietario(tupla) {
+        if (!tupla || typeof tupla !== "object" || Array.isArray(tupla)) return false;
+        const { owner_id, config, config_version } = tupla;
+        if (!esOwner(owner_id))       return false;
+        if (!esVersion(config_version)) return false;
+        if (!config || typeof config !== "object" || Array.isArray(config)) return false;
+        // Primero la foto, después la base. Si la base fallara —localStorage
+        // lleno, navegación privada—, el estado que queda es "foto sin base", que
+        // bloquea las escrituras. Al revés dejaría una base autorizando una foto
+        // que no llegó a escribirse.
+        if (!escribirConfigLocal(config, owner_id)) return false;
+        return guardarBase(owner_id, config_version);
+      }
+      // Extrae la tupla de una respuesta de vista=config. Solo del bloque
+      // `propietario`: el `config` de primer nivel puede venir de otra fila y es
+      // para restaurar la pantalla, no para ligarlo a una base.
+      function tuplaDe(d) {
+        const p = d && d.ok && d.propietario;
+        return p ? { owner_id: p.id, config: p.config, config_version: p.config_version } : null;
+      }
+      window.kyliaSync.adoptarConfigPropietario = adoptarConfigPropietario;
+      window.kyliaSync.tuplaConfigDe = tuplaDe;
+
       // Canjear el enlace del correo: adopta al propietario y trae su campo.
       async function canjearAcceso(token) {
         try {
@@ -358,14 +397,18 @@
             location.replace("/app");   // el token no se queda en la barra ni aunque falle
             return;
           }
-          restaurarConfig(d.config, d.propietario_id);
-          // Aunque no hubiera config guardada, el dispositivo ya es suyo.
+          // El canje IDENTIFICA; no adopta. Antes traía su propia representación
+          // parcial de la config y la escribía sin base ninguna: el dispositivo
+          // quedaba con foto y sin saber sobre qué versión estaba, o sea sin
+          // poder guardar config nunca. Ahora se lee la tupla canónica y se
+          // adopta por el único camino.
           localStorage.setItem("kylia_user_id", d.propietario_id);
           // Abrir el enlace que llegó a SU correo es identificarse, y con más
           // fuerza que escribirlo en un formulario. Sin esto el gate salta justo
           // después de canjear y le pide el email a quien acaba de demostrarlo.
           if (d.email) localStorage.setItem("kylia_user_email", d.email);
           if (d.nombre) localStorage.setItem("kylia_user_nombre", d.nombre);
+          await adoptarDelPropietario(d.propietario_id);
           location.replace("/app");            // sin ?acceso= en la barra ni en el historial
         } catch (_) {
           alert("No se ha podido entrar ahora mismo. Inténtalo en un momento.");
@@ -373,19 +416,28 @@
         }
       }
 
+      // Lee vista=config de un propietario y adopta su tupla. Devuelve true si
+      // adoptó. Lo usan los DOS caminos de adopción, y ninguno más.
+      async function adoptarDelPropietario(propietarioId) {
+        try {
+          const res = await fetch(
+            `/api/campo?vista=config&usuario_id=${encodeURIComponent(propietarioId)}`,
+            { cache: "no-store" });
+          if (!res.ok) return false;
+          return adoptarConfigPropietario(tuplaDe(await res.json()));
+        } catch (_) { return false; }
+      }
+
       // Arranque en un dispositivo sin datos: pregunta si el servidor guarda algo.
       async function restaurarSiVacio() {
+        // ⚠️ SI YA HAY CONFIG LOCAL, NO SE TOCA NADA — y en particular NO se le
+        // pega la versión actual del servidor. Esa foto se construyó vete a saber
+        // sobre qué, y asociarle una base que no le corresponde es exactamente el
+        // bug que perseguimos: foto vieja autorizada a escribir sobre lo nuevo.
+        // Sin base, `guardarConfigServidor` devuelve base_desconocida y no manda
+        // nada. Conservador a propósito.
         if (tieneConfigLocal()) return;
-        try {
-          const res = await fetch(`/api/campo?vista=config&usuario_id=${encodeURIComponent(userId)}`,
-                                  { cache: "no-store" });
-          if (!res.ok) return;
-          const d = await res.json();
-          // Adoptar la foto del servidor es adoptar también SU versión: a partir
-          // de aquí, esta copia local está construida sobre ella.
-          if (d?.ok) window.kyliaSync.adoptarBaseConfig(d);
-          if (d?.ok && d.config && restaurarConfig(d.config, null)) location.reload();
-        } catch (_) { /* sin cobertura: se sigue con lo local, que es nada */ }
+        if (await adoptarDelPropietario(userId)) location.reload();
       }
 
       // ─── Guardado de config con compare-and-set ────────────────────
@@ -426,12 +478,6 @@
           return true;
         } catch (_) { return false; }
       }
-      // Se llama al ADOPTAR configuración del servidor (restaurar, canjear).
-      window.kyliaSync.adoptarBaseConfig = (d) => {
-        const p = d && d.propietario;
-        return p && esOwner(p.id) && esVersion(p.config_version)
-          ? guardarBase(p.id, p.config_version) : false;
-      };
 
       function leerConflicto() {
         try {

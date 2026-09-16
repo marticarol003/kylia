@@ -75,7 +75,9 @@ ok(soloParcela && !("caudal" in soloParcela.finca),
 console.log("── y no se lleva por delante lo que ya hay en el móvil ──");
 ok(!("zonas" in c),
    "la config sintetizada NO trae zonas: la app escribe la lista que le llegue y una vacía las borraría");
-const iife = app.slice(app.indexOf("function restaurarConfig"), app.indexOf("// Canjear el enlace"));
+// El escritor se llama ahora escribirConfigLocal y es INTERNO: solo lo invoca
+// adoptarConfigPropietario, el único camino de adopción. Ver test-config-version-cas.
+const iife = app.slice(app.indexOf("function escribirConfigLocal"), app.indexOf("// Canjear el enlace"));
 ok(/if \(Array\.isArray\(config\.zonas\)\)/.test(iife),
    "y del lado de la app, las zonas solo se tocan si vienen de verdad");
 

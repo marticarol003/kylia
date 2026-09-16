@@ -239,7 +239,8 @@ console.log("\n── 10. vista=config: foto y versión de la MISMA fila propiet
   const CAMPO = readFileSync(join(RAIZ, "api", "campo.js"), "utf8");
   const cuerpo = /async function vistaConfig[\s\S]*?\n}/.exec(CAMPO)[0];
   ok(/const propietario = \{/.test(cuerpo), "hay un bloque `propietario` explícito");
-  ok(/config:\s+filaDueno\?\.config_app \|\| null/.test(cuerpo), "su config sale de la fila del dueño");
+  ok(/config:\s+filaDueno \? \(filaDueno\.config_app \|\| configDesdeFila\(filaDueno\) \|\| null\) : null/.test(cuerpo),
+     "su config sale de la fila del dueño, reconstruida de ESA fila si hiciera falta");
   ok(/config_version: filaDueno \? versionValida\(filaDueno\.config_version\) : null/.test(cuerpo),
      "y su versión, de esa MISMA fila");
   const vv = /function versionValida[\s\S]*?\n}/.exec(CAMPO)[0];
@@ -337,19 +338,29 @@ function cargarApp({ almacen, servidor, responde, uid = "zone-1" }) {
     const kyliaSync = {};
     ${trozo("function leerBase()")}
     ${trozo("function guardarBase(")}
-    ${/window\.kyliaSync\.adoptarBaseConfig = [\s\S]*?\n      \};/.exec(APP)[0].replace("window.kyliaSync.", "kyliaSync.")}
+    ${trozo("function escribirConfigLocal(")}
+    ${trozo("function adoptarConfigPropietario(")}
+    ${trozo("function tuplaDe(")}
+    ${trozo("async function adoptarDelPropietario(")}
+    ${trozo("function tieneConfigLocal(")}
+    ${trozo("async function restaurarSiVacio(")}
     ${trozo("function leerConflicto()")}
     ${trozo("function guardarConflicto(")}
     ${trozo("async function leerConfigServidor(")}
     ${trozo("function anotarConflicto(")}
     ${/window\.kyliaSync\.guardarConfigServidor = async function[\s\S]*?\n      \};/.exec(APP)[0].replace("window.kyliaSync.", "kyliaSync.")}
     return { guardar: kyliaSync.guardarConfigServidor,
-             adoptar: kyliaSync.adoptarBaseConfig,
-             base: leerBase, conflicto: leerConflicto };
+             adoptar: adoptarConfigPropietario, tuplaDe,
+             restaurarSiVacio, adoptarDelPropietario,
+             base: leerBase, conflicto: leerConflicto,
+             configLocal: () => { try { return JSON.parse(localStorage.getItem("kylia_config")); } catch (_) { return null; } },
+             dueno: () => localStorage.getItem("kylia_user_id") };
   `;
-  const f = new Function("uid", "localStorage", "responde", "enviados", "fetch", "console", cuerpo);
-  const fetchFalso = async () => ({ ok: true, json: async () => servidor() });
-  return { ...f(uid, almacen, responde, enviados, fetchFalso, { warn: () => {} }), enviados };
+  const f = new Function("uid", "localStorage", "responde", "enviados", "fetch", "console", "location", cuerpo);
+  const recargas = [];
+  const fetchFalso = async (url) => ({ ok: true, json: async () => servidor(url) });
+  return { ...f(uid, almacen, responde, enviados, fetchFalso, { warn: () => {} },
+                { reload: () => recargas.push(1), replace: () => {} }), enviados, recargas };
 }
 const OK_CAS = (v) => async () => ({ ok: true, persisted: true, status: 200, datos: { ok: true, config_version: v } });
 const vistaOwner = (id, version, config) => () => ({ ok: true, propietario: { id, config_version: version, config } });
@@ -362,7 +373,7 @@ const vistaOwner = (id, version, config) => () => ({ ok: true, propietario: { id
   const srv = () => ({ ok: true, propietario: { id: "owner", config_version: versionServidor, config: { n: "del servidor" } } });
   const a1 = cargarApp({ almacen: ls, servidor: srv,
     responde: async () => ({ ok: false, status: 409, persisted: false, datos: { config_version: 8 } }) });
-  a1.adoptar({ propietario: { id: "owner", config_version: 7, config: {} } });
+  a1.adoptar({ owner_id: "owner", config_version: 7, config: { finca: { n: "owner" } } });
   ok(a1.base().base_version === 7 && a1.base().owner_id === "owner", "el móvil adopta base 7 del owner");
 
   versionServidor = 7;                                  // aún no ha llegado lo de Mac
@@ -386,7 +397,7 @@ const vistaOwner = (id, version, config) => () => ({ ok: true, propietario: { id
   // detecta igual, porque la base lo dice.
   const ls = almacenCompartido();
   const a1 = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 7, {}), responde: OK_CAS(8) });
-  a1.adoptar({ propietario: { id: "owner", config_version: 7, config: {} } });
+  a1.adoptar({ owner_id: "owner", config_version: 7, config: { finca: { n: "owner" } } });
   const a2 = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 8, { n: "de Mac" }), responde: OK_CAS(9) });
   const r = await a2.guardar({ n: "del móvil" });
   ok(r.error === "conflicto_config", "servidor en 8 y base local en 7 → conflicto SIN haber visto un 409");
@@ -412,7 +423,7 @@ const vistaOwner = (id, version, config) => () => ({ ok: true, propietario: { id
   // Éxito 7→8: la base pasa a 8 y sobrevive al reload.
   const ls = almacenCompartido();
   const a1 = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 7, {}), responde: OK_CAS(8) });
-  a1.adoptar({ propietario: { id: "owner", config_version: 7, config: {} } });
+  a1.adoptar({ owner_id: "owner", config_version: 7, config: { finca: { n: "owner" } } });
   const r = await a1.guardar({ n: "mío" });
   ok(r.persisted === true, "el CAS confirma");
   ok(a1.base().base_version === 8, "la base local pasa a 8");
@@ -465,7 +476,7 @@ console.log("\n── 14. la tupla owner+versión+foto es inseparable ──");
   const ls = almacenCompartido();
   const a = cargarApp({ almacen: ls, uid: "zone",
     servidor: vistaOwner("owner", 7, { n: "del dueño" }), responde: OK_CAS(8) });
-  a.adoptar({ propietario: { id: "owner", config_version: 7, config: {} } });
+  a.adoptar({ owner_id: "owner", config_version: 7, config: { finca: { n: "owner" } } });
   const r = await a.guardar({ n: "x" });
   ok(r.persisted === true, "escribe");
   ok(a.enviados[0].propietario_id === "owner", `y va al OWNER (${a.enviados[0].propietario_id}), no a la zona`);
@@ -478,6 +489,137 @@ console.log("\n── 14. la tupla owner+versión+foto es inseparable ──");
   const r = await a.guardar({ n: "x" });
   ok(r.error === "owner_no_coincide" && a.enviados.length === 0,
      "una base obtenida para otro UUID no autoriza a escribir aquí");
+}
+
+console.log("\n── 15. A · restaurarSiVacio() REAL, con owner y zone distintos ──");
+{
+  // El servidor devuelve el bloque propietario del OWNER y un `config` de primer
+  // nivel que es el de la ZONA. Solo puede adoptarse el del propietario.
+  const ls = almacenCompartido();
+  const respuestaServidor = () => ({
+    ok: true, vista: "config",
+    propietario_id: "owner",
+    config: { finca: { n: "ZONE" } },              // ← foto de la zona, NO adoptable
+    de: "zone",
+    propietario: { id: "owner", config_version: 7, config: { finca: { n: "OWNER" } } },
+  });
+  const a = cargarApp({ almacen: ls, uid: "zone", servidor: respuestaServidor, responde: OK_CAS(8) });
+  await a.restaurarSiVacio();                      // ← el camino real, no adoptar() a mano
+  ok(a.configLocal()?.n === "OWNER", `la foto adoptada es la del OWNER (${a.configLocal()?.n})`);
+  ok(a.configLocal()?.n !== "ZONE", "y NO la de la zona");
+  ok(a.base()?.owner_id === "owner", "el owner de la base es el propietario");
+  ok(a.base()?.base_version === 7, `y la base es 7, no la 2 de la zona (${a.base()?.base_version})`);
+  ok(a.dueno() === "owner", "el dispositivo adopta al propietario");
+  ok(a.recargas.length === 1, "y recarga, porque media app ya leyó localStorage");
+
+  // Ahora edita y guarda: el POST tiene que ir al owner con base 7.
+  const r = await a.guardar({ finca: { n: "OWNER editado" } });
+  ok(r.persisted === true, "el guardado sale");
+  ok(a.enviados[0].propietario_id === "owner" && a.enviados[0].base_version === 7,
+     `POST a owner con base 7 (${a.enviados[0].propietario_id}/${a.enviados[0].base_version})`);
+  ok(a.enviados[0].config.finca.n === "OWNER editado", "con la foto del owner editada");
+}
+
+console.log("\n── 16. B · canje REAL: identificar, adoptar, recargar, editar, guardar ──");
+{
+  const ls = almacenCompartido();                  // dispositivo vacío
+  const servidor = () => ({
+    ok: true, propietario_id: "owner", de: "owner",
+    config: { finca: { n: "OWNER" } },
+    propietario: { id: "owner", config_version: 4, config: { finca: { n: "OWNER" } } },
+  });
+  // El canje identifica; la adopción va por el camino canónico.
+  const a1 = cargarApp({ almacen: ls, uid: "vacio", servidor, responde: OK_CAS(5) });
+  ls.setItem("kylia_user_id", "owner");            // lo que hace el canje
+  ok(await a1.adoptarDelPropietario("owner") === true, "el canje adopta la tupla del propietario");
+  ok(a1.base()?.owner_id === "owner" && a1.base()?.base_version === 4,
+     "queda base válida: owner + 4");
+
+  // RELOAD real: instancia nueva sobre el mismo almacén.
+  const a2 = cargarApp({ almacen: ls, uid: "owner", servidor, responde: OK_CAS(5) });
+  ok(a2.base()?.base_version === 4, "la base sobrevive al reload");
+  const r = await a2.guardar({ finca: { n: "editado tras canjear" } });
+  ok(r.persisted === true, "y el guardado funciona");
+  ok(a2.enviados[0].propietario_id === "owner" && a2.enviados[0].base_version === 4,
+     "con el owner correcto y su base");
+  ok(a2.base()?.base_version === 5, "la base avanza a 5");
+}
+
+console.log("\n── 17. C · ya hay datos locales y no hay base ──");
+{
+  // La foto local se construyó vete a saber sobre qué. Pegarle la versión actual
+  // del servidor es justo el bug: foto vieja autorizada a escribir sobre lo nuevo.
+  const ls = almacenCompartido({
+    kylia_config: JSON.stringify({ cultivos: ["lechuga"], areaParcela: 100, parcela: { g: 1 } }),
+  });
+  const servidor = () => ({ ok: true, propietario_id: "owner",
+    config: { finca: { n: "del servidor" } }, de: "owner",
+    propietario: { id: "owner", config_version: 9, config: { finca: { n: "del servidor" } } } });
+  const a = cargarApp({ almacen: ls, uid: "owner", servidor, responde: OK_CAS(10) });
+  await a.restaurarSiVacio();
+  ok(a.base() === null, "NO se asocia la versión 9 del servidor a la foto local");
+  ok(a.configLocal()?.areaParcela === 100, "y la config local no se sobrescribe");
+  ok(a.recargas.length === 0, "ni se recarga");
+  const r = await a.guardar({ finca: { n: "x" } });
+  ok(r.error === "base_desconocida" && a.enviados.length === 0, "0 POST remoto");
+}
+
+console.log("\n── 18. D · tuplas incompletas o mezcladas: 0 adopción ──");
+{
+  const TUPLAS = [
+    ["sin owner",            { config_version: 7, config: { finca: {} } }],
+    ["owner vacío",          { owner_id: "", config_version: 7, config: { finca: {} } }],
+    ["sin versión",          { owner_id: "o", config: { finca: {} } }],
+    ['versión "7"',          { owner_id: "o", config_version: "7", config: { finca: {} } }],
+    ["versión -1",           { owner_id: "o", config_version: -1, config: { finca: {} } }],
+    ["versión null",         { owner_id: "o", config_version: null, config: { finca: {} } }],
+    ["sin config",           { owner_id: "o", config_version: 7 }],
+    ["config null",          { owner_id: "o", config_version: 7, config: null }],
+    ["config array",         { owner_id: "o", config_version: 7, config: [] }],
+    ["tupla null",           null],
+    ["tupla array",          []],
+  ];
+  for (const [etiqueta, t] of TUPLAS) {
+    const ls = almacenCompartido();
+    const a = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 7, {}), responde: OK_CAS(8) });
+    ok(a.adoptar(t) === false, `${etiqueta}: no se adopta`);
+    ok(a.base() === null, `${etiqueta}: sin base`);
+    ok(a.configLocal() === null, `${etiqueta}: sin foto`);
+    const r = await a.guardar({ finca: { n: "x" } });
+    ok(r.error === "base_desconocida" && a.enviados.length === 0, `${etiqueta}: 0 POST`);
+  }
+}
+{
+  // Y la respuesta del servidor sin bloque propietario tampoco adopta nada.
+  const ls = almacenCompartido();
+  const a = cargarApp({ almacen: ls, servidor: () => ({ ok: true, config: { finca: { n: "suelta" } } }),
+                        responde: OK_CAS(8) });
+  ok(a.tuplaDe({ ok: true, config: { finca: {} } }) === null, "sin bloque propietario no hay tupla");
+  await a.restaurarSiVacio();
+  ok(a.base() === null && a.configLocal() === null, "y no se adopta ni foto ni base");
+}
+
+console.log("\n── 19. la adopción está CENTRALIZADA, no repartida ──");
+{
+  const A = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+  // El escritor de la foto solo lo llama la función canónica.
+  const llamadas = (A.match(/escribirConfigLocal\(/g) || []).length;
+  ok(llamadas === 2, `escribirConfigLocal: su definición y UN solo llamante (${llamadas})`);
+  const adop = /function adoptarConfigPropietario\(tupla\)[\s\S]*?\n      \}/.exec(A)[0];
+  ok(/escribirConfigLocal\(config, owner_id\)/.test(adop) && /guardarBase\(owner_id, config_version\)/.test(adop),
+     "y ese llamante es adoptarConfigPropietario, que escribe foto y base JUNTAS");
+  // guardarBase, igual: solo la adopción y el éxito del CAS.
+  const bases = (A.match(/guardarBase\(/g) || []).length;
+  ok(bases === 4,
+     `guardarBase: definición + adopción + arranque en 0 + éxito del CAS (${bases})`);
+  ok(!/adoptarBaseConfig/.test(A), "no queda ningún adoptador de base suelto");
+  ok(!/restaurarConfig\(/.test(A), "ni el antiguo restaurarConfig con dos fuentes");
+  const rsv = /async function restaurarSiVacio\(\)[\s\S]*?\n      \}/.exec(A)[0];
+  ok(!/d\.config/.test(rsv), "restaurarSiVacio ya no toca `d.config`");
+  ok(/adoptarDelPropietario\(userId\)/.test(rsv), "sino que adopta por el camino canónico");
+  const canje = /async function canjearAcceso\(token\)[\s\S]*?\n      \}/.exec(A)[0];
+  ok(!/restaurarConfig|guardarBase/.test(canje), "el canje no escribe config ni base por su cuenta");
+  ok(/adoptarDelPropietario\(d\.propietario_id\)/.test(canje), "usa la misma función");
 }
 
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES\n" : `\n❌ ${fallos} FALLOS\n`);
