@@ -133,7 +133,7 @@ console.log("\n── 2. la baseline se pone al HIDRATAR, no al guardar ──")
 
 console.log("\n── 3. siembra nueva ──");
 {
-  const nueva = siembra("n1", { sync: { nueva: true, vista: null, confirmada: null } });
+  const nueva = siembra("n1", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } });
   const app = monta({ zonas: zonaCon([siembra("h1"), nueva]), finca: FINCA });
   app.hidratarSyncZonas();
   const r = await app.sincronizarZonas(FINCA);
@@ -174,7 +174,7 @@ console.log("\n── 4. REINTENTO: si falla, no avanza ninguna marca ──");
 }
 {
   // persisted:false con HTTP 200 cuenta igual que un 500.
-  const app = monta({ zonas: zonaCon([siembra("n1", { sync: { nueva: true, vista: null, confirmada: null } })]),
+  const app = monta({ zonas: zonaCon([siembra("n1", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]),
                       finca: FINCA, responde: () => ({ ok: true, status: 200, persisted: false }) });
   await app.sincronizarZonas(FINCA);
   const s = app.leerZonas()[0].siembras[0].sync;
@@ -185,7 +185,7 @@ console.log("\n── 4. REINTENTO: si falla, no avanza ninguna marca ──");
 
 console.log("\n── 5. payload y huella son EL MISMO objeto ──");
 {
-  const app = monta({ zonas: zonaCon([siembra("n1", { sync: { nueva: true, vista: null, confirmada: null } })]), finca: FINCA });
+  const app = monta({ zonas: zonaCon([siembra("n1", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]), finca: FINCA });
   await app.sincronizarZonas(FINCA);
   const enviado = app.enviados[0];
   const z = app.leerZonas()[0];
@@ -219,23 +219,23 @@ console.log("\n── 6. solo cambia lo que se envía ──");
 
 console.log("\n── 7. geometría por siembra ──");
 {
-  const una = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null } })]), finca: FINCA });
+  const una = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]), finca: FINCA });
   await una.sincronizarZonas(FINCA);
   ok(JSON.stringify(una.enviados[0].parcela) === JSON.stringify({ g: 1 }), "1 siembra → contorno del recinto");
 
-  const varias = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null } }), siembra("b", { sync: { nueva: true, vista: null, confirmada: null } })]), finca: FINCA });
+  const varias = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } }), siembra("b", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]), finca: FINCA });
   await varias.sincronizarZonas(FINCA);
   ok(varias.enviados.every(p => p.parcela === null), "varias sin partir → parcela null (si no, el cron mezcla el NDVI)");
 
-  const part = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null }, geometria: { g: "a" } }),
-                                       siembra("b", { sync: { nueva: true, vista: null, confirmada: null }, geometria: { g: "b" } })]), finca: FINCA });
+  const part = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) }, geometria: { g: "a" } }),
+                                       siembra("b", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) }, geometria: { g: "b" } })]), finca: FINCA });
   await part.sincronizarZonas(FINCA);
   ok(part.enviados.map(p => p.parcela.g).join() === "a,b", "partidas → cada una con SU trozo");
 }
 
 console.log("\n── 8. round-trip de s.sync por config_app ──");
 {
-  const app = monta({ zonas: zonaCon([siembra("n1", { sync: { nueva: true, vista: null, confirmada: null } })]), finca: FINCA });
+  const app = monta({ zonas: zonaCon([siembra("n1", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]), finca: FINCA });
   await app.sincronizarZonas(FINCA);
   // Lo que subirConfig manda al servidor son las zonas tal cual están.
   const viaje = JSON.parse(JSON.stringify(app.zonasGuardadas()));
@@ -251,7 +251,7 @@ console.log("\n── 8. round-trip de s.sync por config_app ──");
 
 console.log("\n── 9. perder la caché local es conservador, no corrupto ──");
 {
-  const app = monta({ zonas: zonaCon([siembra("x", { sync: { nueva: false, vista: "v", confirmada: "v" } })]), finca: FINCA });
+  const app = monta({ zonas: zonaCon([siembra("x", { sync: { nueva: false, vista: "v", confirmada: "v", token: "t-v" } })]), finca: FINCA });
   const z = app.leerZonas(); delete z[0].siembras[0].sync;        // se pierde todo
   app.ls.setItem("kylia_zonas", JSON.stringify(z));
   app.hidratarSyncZonas();
@@ -320,7 +320,7 @@ console.log("\n── 11. BLOQUEANTE 1 · la huella incluye la geometría ENTERA
 console.log("\n── 12. BLOQUEANTE 2 · una respuesta tardía no pisa una edición ──");
 {
   let soltar; const espera = new Promise(r => { soltar = r; });
-  const app = monta({ zonas: zonaCon([siembra("x", { area_m2: 100, sync: { nueva: true, vista: null, confirmada: null } })]),
+  const app = monta({ zonas: zonaCon([siembra("x", { area_m2: 100, sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]),
                       finca: FINCA, responde: async () => { await espera; return { ok: true, persisted: true }; } });
   const enVuelo = app.sincronizarZonas(FINCA);
   await new Promise(r => setTimeout(r, 0));
@@ -341,7 +341,7 @@ console.log("\n── 12. BLOQUEANTE 2 · una respuesta tardía no pisa una edic
 {
   // Dos rondas concurrentes: single-flight.
   let n = 0;
-  const app = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null } }), siembra("b", { sync: { nueva: true, vista: null, confirmada: null } })]),
+  const app = monta({ zonas: zonaCon([siembra("a", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } }), siembra("b", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]),
                       finca: FINCA, responde: async () => { n++; await new Promise(r => setTimeout(r, 1)); return { ok: true, persisted: true }; } });
   const [r1, r2] = await Promise.all([app.sincronizarZonas(FINCA), app.sincronizarZonas(FINCA)]);
   ok(r1.enviadas + r2.enviadas === 2, `entre las dos rondas se envían 2, no 4 (${r1.enviadas}+${r2.enviadas})`);
@@ -352,7 +352,7 @@ console.log("\n── 12. BLOQUEANTE 2 · una respuesta tardía no pisa una edic
 
 console.log("\n── 13. BLOQUEANTE 3 · kyliaZonasPendientes es diagnóstico puro ──");
 {
-  const app = monta({ zonas: zonaCon([siembra("h1"), siembra("n1", { sync: { nueva: true, vista: null, confirmada: null } }),
+  const app = monta({ zonas: zonaCon([siembra("h1"), siembra("n1", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } }),
                                       siembra("s1", { cultivo: null })]), finca: FINCA });
   app.hidratarSyncZonas();
   const antes = JSON.stringify(app.leerZonas());
@@ -425,7 +425,7 @@ console.log("\n── 16. BLOQUEANTE 6 · las marcas viajan a config_app en el f
 {
   // Round-trip por el flujo real: se captura lo que se manda a config_app.
   let subido = null;
-  const app = monta({ zonas: zonaCon([siembra("n1", { sync: { nueva: true, vista: null, confirmada: null } })]), finca: FINCA });
+  const app = monta({ zonas: zonaCon([siembra("n1", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]), finca: FINCA });
   await app.sincronizarZonas(FINCA);
   subido = { finca: FINCA, zonas: app.zonasGuardadas() };      // lo que subirConfig manda después
   ok(subido.zonas[0].siembras[0].sync.confirmada != null, "el config_app que sube YA lleva la marca confirmada");
@@ -506,8 +506,8 @@ console.log("\n── 18. BLOQUEANTE 2 · revalidar cada siembra justo antes de 
 {
   // Plan [A,B]. Mientras A espera, el usuario BORRA B.
   let soltarA; const esperaA = new Promise(r => { soltarA = r; });
-  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
-                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null } })]),
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } }),
+                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]),
                       finca: FINCA,
                       responde: async (p) => { if (p.id === "A") await esperaA; return { ok: true, persisted: true }; } });
   const ronda = app.sincronizarZonas(FINCA);
@@ -523,8 +523,8 @@ console.log("\n── 18. BLOQUEANTE 2 · revalidar cada siembra justo antes de 
 {
   // Plan [A,B]. Mientras A espera, B CAMBIA. No se manda la versión vieja.
   let soltarA; const esperaA = new Promise(r => { soltarA = r; });
-  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
-                                      siembra("B", { area_m2: 100, sync: { nueva: true, vista: null, confirmada: null } })]),
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } }),
+                                      siembra("B", { area_m2: 100, sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]),
                       finca: FINCA,
                       responde: async (p) => { if (p.id === "A") await esperaA; return { ok: true, persisted: true }; } });
   const ronda = app.sincronizarZonas(FINCA);
@@ -543,8 +543,8 @@ console.log("\n── 18. BLOQUEANTE 2 · revalidar cada siembra justo antes de 
 {
   // Ninguna fila huérfana: borrar una siembra nunca deja una parcela creada.
   let soltar; const espera = new Promise(r => { soltar = r; });
-  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
-                                      siembra("Z", { sync: { nueva: true, vista: null, confirmada: null } })]),
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } }),
+                                      siembra("Z", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]),
                       finca: FINCA,
                       responde: async (p) => { if (p.id === "A") await espera; return { ok: true, persisted: true }; } });
   const ronda = app.sincronizarZonas(FINCA);
@@ -568,7 +568,11 @@ console.log("\n── 19. BLOQUEANTE 3 · un sync a medias es conservador ──
     ["vista numérica",       { nueva: false, vista: 123, confirmada: null }],
     ["confirmada objeto",    { nueva: false, vista: "h", confirmada: { a: 1 } }],
     ["vista vacía",          { nueva: false, vista: "", confirmada: null }],
-    ["sin baseline",         { nueva: false, vista: null, confirmada: null }],
+    ["sin baseline",         { nueva: false, vista: null, confirmada: null, token: "t" }],
+    ["SIN TOKEN (nueva)",    { nueva: true,  vista: null, confirmada: null }],
+    ["SIN TOKEN (histórica)",{ nueva: false, vista: "h",  confirmada: null }],
+    ["token vacío",          { nueva: false, vista: "h",  confirmada: null, token: "" }],
+    ["token numérico",       { nueva: false, vista: "h",  confirmada: null, token: 7 }],
   ];
   for (const [etiqueta, sync] of CORRUPTOS) {
     const app = monta({ zonas: zonaCon([siembra("c1", { sync })]), finca: FINCA });
@@ -582,9 +586,9 @@ console.log("\n── 19. BLOQUEANTE 3 · un sync a medias es conservador ──
 {
   // Y lo válido sigue funcionando: el flujo normal no se ve afectado.
   const app = monta({ zonas: [], finca: FINCA });
-  ok(app.syncValido({ nueva: true, vista: null, confirmada: null }) === true, "una siembra recién creada es válida");
-  ok(app.syncValido({ nueva: false, vista: "h", confirmada: null }) === true, "una histórica hidratada es válida");
-  ok(app.syncValido({ nueva: false, vista: "h", confirmada: "h" }) === true, "y una confirmada también");
+  ok(app.syncValido({ nueva: true, vista: null, confirmada: null, token: "t" }) === true, "una siembra recién creada es válida");
+  ok(app.syncValido({ nueva: false, vista: "h", confirmada: null, token: "t" }) === true, "una histórica hidratada es válida");
+  ok(app.syncValido({ nueva: false, vista: "h", confirmada: "h", token: "t" }) === true, "y una confirmada también");
 }
 
 console.log("\n── 20. el payload real es JSON-safe (guarda barata) ──");
@@ -603,8 +607,8 @@ console.log("\n── 21. BLOQUEANTE 1 · un UUID no es una identidad lógica �
   // B planificada como NUEVA. Mientras espera a A, se borra y reaparece con el
   // MISMO uuid y el MISMO payload, pero ahora es histórica.
   let soltarA; const esperaA = new Promise(r => { soltarA = r; });
-  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
-                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null } })]),
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } }),
+                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]),
                       finca: FINCA,
                       responde: async (p) => { if (p.id === "A") await esperaA; return { ok: true, persisted: true }; } });
   const ronda = app.sincronizarZonas(FINCA);
@@ -613,7 +617,7 @@ console.log("\n── 21. BLOQUEANTE 1 · un UUID no es una identidad lógica �
   const z = app.leerZonas();
   const b = z[0].siembras.find(x => x.id === "B");
   const huellaB = app.huellaPayload(app.payloadSiembra(z[0], b, FINCA, "dueno-1"));
-  b.sync = { nueva: false, vista: huellaB, confirmada: null };
+  b.sync = { nueva: false, vista: huellaB, confirmada: null, token: "t-hist" };
   app.ls.setItem("kylia_zonas", JSON.stringify(z));
   soltarA(); const r = await ronda;
   ok(app.enviados.filter(p => p.id === "B").length === 0,
@@ -644,10 +648,10 @@ console.log("\n── 21. BLOQUEANTE 1 · un UUID no es una identidad lógica �
 {
   // Firma: dos sync distintos dan firmas distintas; el mismo, la misma.
   const app = monta({ zonas: [], finca: FINCA });
-  const a = { nueva: true, vista: null, confirmada: null };
-  ok(app.firmaSync(a) === app.firmaSync({ confirmada: null, vista: null, nueva: true }),
+  const a = { nueva: true, vista: null, confirmada: null, token: "t" };
+  ok(app.firmaSync(a) === app.firmaSync({ confirmada: null, vista: null, nueva: true, token: "t" }),
      "la firma no depende del orden de las claves");
-  ok(app.firmaSync(a) !== app.firmaSync({ nueva: false, vista: "h", confirmada: null }),
+  ok(app.firmaSync(a) !== app.firmaSync({ nueva: false, vista: "h", confirmada: null, token: "t" }),
      "y distingue dos máquinas de estados distintas");
   ok(app.firmaSync(undefined) === app.firmaSync(null), "ausente y null firman igual: los dos son 'no demostrable'");
 }
@@ -655,8 +659,8 @@ console.log("\n── 21. BLOQUEANTE 1 · un UUID no es una identidad lógica �
 console.log("\n── 22. BLOQUEANTE 2 · la finca también se revalida ──");
 {
   let soltarA; const esperaA = new Promise(r => { soltarA = r; });
-  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
-                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null } })]),
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } }),
+                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]),
                       finca: FINCA,
                       responde: async (p) => { if (p.id === "A") await esperaA; return { ok: true, persisted: true }; } });
   const ronda = app.sincronizarZonas(FINCA);
@@ -674,8 +678,8 @@ console.log("\n── 22. BLOQUEANTE 2 · la finca también se revalida ──")
 {
   // Varios cambios de finca seguidos mientras la ronda vuela.
   let soltarA; const esperaA = new Promise(r => { soltarA = r; });
-  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null } }),
-                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null } })]),
+  const app = monta({ zonas: zonaCon([siembra("A", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } }),
+                                      siembra("B", { sync: { nueva: true, vista: null, confirmada: null, token: "t-" + (globalThis.n$$ = (globalThis.n$$||0)+1) } })]),
                       finca: FINCA,
                       responde: async (p) => { if (p.id === "A") await esperaA; return { ok: true, persisted: true }; } });
   const ronda = app.sincronizarZonas(FINCA);
@@ -747,6 +751,95 @@ function colaConTimeout(responder) {
   const c = colaConTimeout(async () => ({ ok: true, persisted: true }));
   ok(c.TIMEOUT_CONFIG_MS > 0 && c.TIMEOUT_CONFIG_MS <= 30000,
      `el timeout de config es explícito y razonable (${c.TIMEOUT_CONFIG_MS} ms)`);
+}
+
+console.log("\n── 24. BLOQUEANTE 1 · el token es OBLIGATORIO ──");
+{
+  const app = monta({ zonas: [], finca: FINCA });
+  ok(app.syncValido({ nueva: true, vista: null, confirmada: null }) === false,
+     "un sync sin token ya NO es válido, aunque lo demás esté bien");
+  ok(app.syncValido({ nueva: false, vista: "h", confirmada: null, token: "" }) === false, "token vacío tampoco");
+  ok(app.syncValido({ nueva: false, vista: "h", confirmada: null, token: 7 }) === false, "ni numérico");
+  ok(app.syncValido({ nueva: true, vista: null, confirmada: null, token: "t" }) === true, "con token sí");
+}
+{
+  // Un sync sin token se NORMALIZA a histórica pendiente, nunca a nueva.
+  const app = monta({ zonas: zonaCon([siembra("x", { sync: { nueva: true, vista: null, confirmada: null } })]),
+                      finca: FINCA });
+  app.hidratarSyncZonas();
+  const sy = app.leerZonas()[0].siembras[0].sync;
+  ok(typeof sy.token === "string" && sy.token.length > 0, "la hidratación le pone token nuevo");
+  ok(sy.nueva === false, "y la deja como HISTÓRICA, no como nueva");
+  ok(sy.confirmada === null && typeof sy.vista === "string", "con vista = huella actual y sin confirmar");
+  const r = await app.sincronizarZonas(FINCA);
+  ok(app.enviados.length === 0, "0 POST automático: un sync sin token no autoriza nada");
+  ok(r.pendientes_reparacion.includes("x"), "queda pendiente de reparación");
+}
+{
+  // Una histórica hidratada recibe token y SIGUE pendiente.
+  const app = monta({ zonas: zonaCon([siembra("h")]), finca: FINCA });
+  app.hidratarSyncZonas();
+  const sy = app.leerZonas()[0].siembras[0].sync;
+  ok(typeof sy.token === "string" && sy.token.length > 0, "la histórica recibe token");
+  const r = await app.sincronizarZonas(FINCA);
+  ok(app.enviados.length === 0 && r.pendientes_reparacion.includes("h"),
+     "y el token NO la convierte en nueva ni en modificada");
+}
+{
+  // Las altas reales nacen con token, y distinto cada una.
+  const app = monta({ zonas: [], finca: FINCA });
+  const a = app.nuevaSiembra(100), b = app.nuevaSiembra(200);
+  ok(typeof a.sync.token === "string" && a.sync.token.length > 0, "toda alta nace con token");
+  ok(a.sync.token !== b.sync.token, "y dos altas tienen tokens distintos");
+}
+{
+  // El token sobrevive el round-trip por config_app.
+  const app = monta({ zonas: zonaCon([siembra("n", { sync: { nueva: true, vista: null, confirmada: null, token: "tok-1" } })]),
+                      finca: FINCA });
+  await app.sincronizarZonas(FINCA);
+  const viaje = JSON.parse(JSON.stringify(app.zonasGuardadas()));
+  ok(viaje[0].siembras[0].sync.token === "tok-1", "el token viaja en config_app y se conserva al confirmar");
+  const otro = monta({ zonas: viaje, finca: FINCA });
+  otro.hidratarSyncZonas();
+  ok(otro.leerZonas()[0].siembras[0].sync.token === "tok-1", "y el dispositivo nuevo no lo regenera");
+  ok((await otro.sincronizarZonas(FINCA)).enviadas === 0, "ni reenvía");
+}
+
+console.log("\n── 25. BLOQUEANTE 2 · el timeout cubre también el cuerpo ──");
+{
+  // fetch() devuelve Response, pero res.text() no resuelve nunca.
+  const enServidor = [];
+  const kylia = { guardarConfigServidor: async (foto, opts) => {
+    if (foto.v === "A") {
+      // Lo que hace post() con un cuerpo colgado: vence y devuelve timeout.
+      await new Promise(r => setTimeout(r, 5));
+      return { ok: false, status: 0, persisted: false, error: "timeout", datos: null };
+    }
+    enServidor.push(foto); return { ok: true, persisted: true };
+  } };
+  const cuerpo = `
+    ${recortaLinea("const TIMEOUT_CONFIG_MS = ")}
+    ${recortaLinea("let colaConfig = ")}
+    ${recortaLinea("let fotoPendiente = ")}
+    ${recortaLinea("let turnoEncolado = ")}
+    ${recorta("function encolarConfig(")}
+    return { encolarConfig };
+  `;
+  const { encolarConfig } = new Function("window", cuerpo)({ kyliaSync: kylia });
+  encolarConfig({ v: "A" });
+  await new Promise(r => setTimeout(r, 0));
+  encolarConfig({ v: "B" });
+  encolarConfig({ v: "C" });
+  await new Promise(r => setTimeout(r, 30));
+  ok(enServidor.length === 1 && enServidor[0].v === "C",
+     `con el cuerpo de A colgado, B/C progresan y queda C (${enServidor.map(x => x.v).join(",") || "nada"})`);
+}
+{
+  const cuerpoPost = recorta("async function post(");
+  ok(cuerpoPost.includes("texto = await res.text();"), "res.text() va DENTRO del try vigilado");
+  const iText = cuerpoPost.indexOf("await res.text()");
+  const iClear = cuerpoPost.indexOf("clearTimeout(reloj)");
+  ok(iText > -1 && iClear > iText, "y el reloj se limpia DESPUÉS de leer el cuerpo, no antes");
 }
 
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES\n" : `\n❌ ${fallos} FALLOS\n`);

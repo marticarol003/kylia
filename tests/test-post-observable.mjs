@@ -303,6 +303,53 @@ console.log("\n── 2e. TIMEOUT OPCIONAL: aborta de verdad, y no es sin_red �
   ok(g.includes(", opts)"), "guardarConfigServidor pasa opts a post()");
 }
 
+console.log("\n── 2f. TIMEOUT INTEGRAL: también si el CUERPO se queda colgado ──");
+// El reloj se paraba al recibir los headers. Un servidor puede devolver la
+// Response y dejar el body sin cerrar para siempre: la petición no terminaba
+// nunca y la cola se quedaba muerta igual que antes.
+{
+  const conCuerpoColgado = (init) => {
+    const sig = init && init.signal;
+    return Promise.resolve({
+      ok: true, status: 200,
+      text: () => new Promise((_, rej) => {
+        if (!sig) return;                       // sin signal, colgado de verdad
+        const e = new Error("The operation was aborted."); e.name = "AbortError";
+        if (sig.aborted) return rej(e);
+        sig.addEventListener("abort", () => rej(e));
+      }),
+    });
+  };
+  const { post, leerFallos } = montar((url, init) => conCuerpoColgado(init));
+  const t0 = Date.now();
+  let rechazo = null, r = null;
+  try { r = await post("/api/log", { recurso: "config-app" }, { timeoutMs: 20 }); }
+  catch (e) { rechazo = e; }
+  ok(rechazo === null, "cuerpo colgado: no rechaza");
+  ok(r.error === "timeout", `error "timeout" (${r.error})`);
+  ok(r.status === 0 && r.persisted === false, "status 0 y persisted:false");
+  ok(Date.now() - t0 < 500, "y vence: no se queda esperando el cuerpo para siempre");
+  ok(leerFallos()[0]?.error === "timeout", "registrado como timeout");
+}
+{
+  // Headers OK y cuerpo que se corta SIN ser nuestro abort: no es sin_red, y el
+  // status real se conserva.
+  const { post } = montar(async () => ({
+    ok: false, status: 503,
+    text: async () => { throw new TypeError("network error while reading body"); },
+  }));
+  const r = await post("/x", { recurso: "acciones" });
+  ok(r.status === 503, `se conserva el status real (${r.status}), no se degrada a 0`);
+  ok(r.error !== "sin_red", "y no se llama sin_red: los headers llegaron");
+  ok(r.error === "respuesta_invalida" && r.persisted === false, `error "${r.error}", persisted:false`);
+}
+{
+  // Lo normal sigue igual: cuerpo que sí se lee.
+  const { post } = montar(resp(200, JSON.stringify({ ok: true, persisted: true })));
+  const r = await post("/x", {}, { timeoutMs: 5000 });
+  ok(r.ok === true && r.persisted === true, "con timeout de sobra, una respuesta normal va bien");
+}
+
 console.log("\n── 3. el registro de fallos ──");
 {
   const m = montar(CASOS[3][1]);
