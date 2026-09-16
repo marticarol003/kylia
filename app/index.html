@@ -8142,6 +8142,34 @@
       return res;
     }
 
+    // ⚠️ RESTAURADA. `93efc3e` (el punto 1, sincronización de siembras) borró
+    // esta función y dejó viva su ÚNICA llamada, en initMapaParcela. Desde
+    // entonces `initMapaParcela` reventaba con "cargarRecintos is not defined"
+    // — y como el alta, el borrado de cuenta y todo lo que hay entre medias
+    // viven DENTRO de esa función, nada de eso llegaba a registrarse:
+    // `window.abrirAlta` no existía y EL ALTA NO SE ABRÍA NUNCA.
+    //
+    // Comprobado en producción el 16-sep con un navegador real sobre
+    // https://kylia.app/app?alta=1 → abrirAlta: undefined, window.__A: false,
+    // alta invisible, y un único error de página: cargarRecintos is not defined.
+    //
+    // Va IDÉNTICA a como estaba en `93efc3e~1`. No es un rediseño: es devolver
+    // lo que se cayó. Su try/catch propio es lo que evita que un SIGPAC caído
+    // vuelva a tumbar el alta entera.
+    async function cargarRecintos(lat, lon) {
+      try {
+        const res = await fetch(`/api/sigpac?lat=${lat}&lon=${lon}&vecinos=1`);
+        const d   = await res.json();
+        if (!Array.isArray(d.recintos)) return;
+        if (Number.isFinite(d.umbral_satelite_m2)) umbralSateliteM2 = d.umbral_satelite_m2;
+        recintosMapa = d.recintos;
+        pintarRecintos();
+        renderZonas();
+      } catch (err) {
+        console.warn("[Kylia] no se pudieron cargar los recintos:", err.message);
+      }
+    }
+
     // Carga Leaflet bajo demanda (solo cuando se abre el panel de configuración).
     // Devuelve una promesa que resuelve cuando window.L ya está disponible.
     let leafletPromise = null;
