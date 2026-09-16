@@ -344,6 +344,11 @@ function cargarApp({ almacen, servidor, responde, uid = "zone-1" }) {
     ${trozo("async function adoptarDelPropietario(")}
     ${trozo("function tieneConfigLocal(")}
     ${trozo("async function restaurarSiVacio(")}
+    ${/const STORAGE_KEY = "[^"]+";/.exec(APP)[0]}
+    let cfgFinca = null, cfg = null;
+    const configEfectiva = () => cfgFinca;
+    const subirConfig = () => {};
+    ${trozo("function saveConfig(")}
     ${trozo("function leerConflicto()")}
     ${trozo("function guardarConflicto(")}
     ${trozo("async function leerConfigServidor(")}
@@ -351,7 +356,7 @@ function cargarApp({ almacen, servidor, responde, uid = "zone-1" }) {
     ${/window\.kyliaSync\.guardarConfigServidor = async function[\s\S]*?\n      \};/.exec(APP)[0].replace("window.kyliaSync.", "kyliaSync.")}
     return { guardar: kyliaSync.guardarConfigServidor,
              adoptar: adoptarConfigPropietario, tuplaDe,
-             restaurarSiVacio, adoptarDelPropietario,
+             restaurarSiVacio, adoptarDelPropietario, saveConfig,
              base: leerBase, conflicto: leerConflicto,
              configLocal: () => { try { return JSON.parse(localStorage.getItem("kylia_config")); } catch (_) { return null; } },
              dueno: () => localStorage.getItem("kylia_user_id") };
@@ -616,10 +621,119 @@ console.log("\n── 19. la adopción está CENTRALIZADA, no repartida ──")
   ok(!/restaurarConfig\(/.test(A), "ni el antiguo restaurarConfig con dos fuentes");
   const rsv = /async function restaurarSiVacio\(\)[\s\S]*?\n      \}/.exec(A)[0];
   ok(!/d\.config/.test(rsv), "restaurarSiVacio ya no toca `d.config`");
-  ok(/adoptarDelPropietario\(userId\)/.test(rsv), "sino que adopta por el camino canónico");
+  ok(/adoptarDelPropietario\(userId, \(\) => !tieneConfigLocal\(\)\)/.test(rsv),
+     "sino que adopta por el camino canónico, y con la comprobación vigente");
   const canje = /async function canjearAcceso\(token\)[\s\S]*?\n      \}/.exec(A)[0];
   ok(!/restaurarConfig|guardarBase/.test(canje), "el canje no escribe config ni base por su cuenta");
   ok(/adoptarDelPropietario\(d\.propietario_id\)/.test(canje), "usa la misma función");
+}
+
+console.log("\n── 20. la restauración no puede pisar lo que se guardó mientras esperaba ──");
+// Arnés con el GET RETENIDO: se arranca restaurarSiVacio(), se deja la petición
+// en vuelo, y mientras tanto se llama al saveConfig() REAL.
+function appConGetRetenido({ almacen, respuestaServidor, uid = "owner" }) {
+  let soltar;
+  const enVuelo = new Promise(res => { soltar = res; });
+  const APP2 = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+  const base = cargarApp({ almacen, uid, servidor: () => respuestaServidor, responde: OK_CAS(9) });
+  // Reconstruir con un fetch que espera a que lo suelten.
+  const enviados = [];
+  const cuerpo = `
+    const userId = uid;
+    const encodeURIComponent = (x) => x;
+    ${/const BASE_KEY\s+= "[^"]+";/.exec(APP2)[0]}
+    ${/const CONFLICTO_KEY\s+= "[^"]+";/.exec(APP2)[0]}
+    ${/const TIMEOUT_VERSION_MS = \d+;/.exec(APP2)[0]}
+    ${/const esVersion = [^\n]+/.exec(APP2)[0]}
+    ${/const esOwner   = [^\n]+/.exec(APP2)[0]}
+    ${/const STORAGE_KEY = "[^"]+";/.exec(APP2)[0]}
+    const post = async (p, d) => { enviados.push(d); return { ok: true, persisted: true, status: 200, datos: { config_version: 9 } }; };
+    let cfgFinca = null, cfg = null;
+    const configEfectiva = () => cfgFinca;
+    const subirConfig = () => {};
+    const kyliaSync = {};
+    ${trozo("function leerBase()")}
+    ${trozo("function guardarBase(")}
+    ${trozo("function escribirConfigLocal(")}
+    ${trozo("function adoptarConfigPropietario(")}
+    ${trozo("function tuplaDe(")}
+    ${trozo("async function adoptarDelPropietario(")}
+    ${trozo("function tieneConfigLocal(")}
+    ${trozo("async function restaurarSiVacio(")}
+    ${trozo("function saveConfig(")}
+    return { restaurarSiVacio, saveConfig, base: leerBase,
+             configLocal: () => { try { return JSON.parse(localStorage.getItem("kylia_config")); } catch (_) { return null; } } };
+  `;
+  const recargas = [];
+  const f = new Function("uid", "localStorage", "enviados", "fetch", "console", "location", cuerpo);
+  const fetchRetenido = async () => { await enVuelo; return { ok: true, json: async () => respuestaServidor }; };
+  return { ...f(uid, almacen, enviados, fetchRetenido, { warn: () => {} },
+                { reload: () => recargas.push(1), replace: () => {} }),
+           soltar, recargas };
+}
+const DEL_SERVIDOR = {
+  ok: true, propietario_id: "owner",
+  propietario: { id: "owner", config_version: 7,
+                 config: { finca: { cultivos: ["lechuga"], areaParcela: 100, parcela: { g: 1 } } } },
+};
+{
+  // EL CASO: local vacío, GET en vuelo, el agricultor guarda tomate/900,
+  // y entonces responde el servidor con lechuga/100.
+  const ls = almacenCompartido();
+  const a = appConGetRetenido({ almacen: ls, respuestaServidor: DEL_SERVIDOR });
+  const restaurando = a.restaurarSiVacio();                  // arranca el GET
+  await new Promise(r => setTimeout(r, 0));
+  a.saveConfig({ cultivos: ["tomate"], areaParcela: 900, parcela: { g: 9 } });   // saveConfig REAL
+  a.soltar();                                                // ahora responde el servidor
+  await restaurando;
+
+  const local = a.configLocal();
+  ok(local?.cultivos?.[0] === "tomate", `el cultivo local sigue siendo tomate (${local?.cultivos?.[0]})`);
+  ok(local?.areaParcela === 900, `y el área sigue en 900 (${local?.areaParcela})`);
+  ok(local?.cultivos?.[0] !== "lechuga", "el servidor NO sustituye lo que acaba de guardar el agricultor");
+  ok(a.base() === null, "no se adopta base para una foto del servidor que no se escribió");
+  ok(a.recargas.length === 0, `y no hay reload provocado por la restauración (${a.recargas.length})`);
+}
+{
+  // CONTROL: si sigue vacío cuando responde, la restauración sí adopta.
+  const ls = almacenCompartido();
+  const a = appConGetRetenido({ almacen: ls, respuestaServidor: DEL_SERVIDOR });
+  const restaurando = a.restaurarSiVacio();
+  await new Promise(r => setTimeout(r, 0));
+  a.soltar();                                                // nadie guarda nada
+  await restaurando;
+  ok(a.configLocal()?.cultivos?.[0] === "lechuga", "con el local vacío sí se adopta la del servidor");
+  ok(a.base()?.base_version === 7 && a.base()?.owner_id === "owner", "y su base: owner + 7");
+  ok(a.recargas.length === 1, "y recarga");
+}
+{
+  // La config local aparece JUSTO antes de adoptar: entre que resuelve el GET y
+  // se escribe. Gana siempre el estado local.
+  const ls = almacenCompartido();
+  const a = cargarApp({ almacen: ls, uid: "owner",
+    servidor: () => {
+      // Se guarda algo local en el mismo instante en que el GET entrega su JSON.
+      ls.setItem("kylia_config", JSON.stringify({ cultivos: ["tomate"], areaParcela: 900, parcela: { g: 9 } }));
+      return DEL_SERVIDOR;
+    },
+    responde: OK_CAS(8) });
+  const adoptado = await a.adoptarDelPropietario("owner", () => {
+    try { const c = JSON.parse(ls.getItem("kylia_config")); return !c; } catch (_) { return true; }
+  });
+  ok(adoptado === false, "no se adopta");
+  ok(a.configLocal()?.cultivos?.[0] === "tomate", "gana el estado local");
+  ok(a.base() === null, "y no se escribe base");
+}
+{
+  // Estructural: la comprobación está pegada a la escritura, sin await en medio.
+  const A = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+  const f = /async function adoptarDelPropietario\([\s\S]*?\n      \}/.exec(A)[0];
+  const iChk = f.indexOf("sigueSiendoSeguro()");
+  const iEsc = f.indexOf("adoptarConfigPropietario(tupla)");
+  ok(iChk > -1 && iEsc > iChk, "se comprueba ANTES de adoptar");
+  ok(!/await/.test(f.slice(iChk, iEsc)), "y entre la comprobación y la escritura no hay ningún await");
+  const rsv = /async function restaurarSiVacio\(\)[\s\S]*?\n      \}/.exec(A)[0];
+  ok(/\(\) => !tieneConfigLocal\(\)/.test(rsv), "restaurarSiVacio pasa la comprobación vigente, no una foto vieja");
 }
 
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES\n" : `\n❌ ${fallos} FALLOS\n`);

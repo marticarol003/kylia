@@ -418,13 +418,23 @@
 
       // Lee vista=config de un propietario y adopta su tupla. Devuelve true si
       // adoptó. Lo usan los DOS caminos de adopción, y ninguno más.
-      async function adoptarDelPropietario(propietarioId) {
+      // `sigueSiendoSeguro` se comprueba JUSTO ANTES de adoptar, no antes del GET.
+      // La diferencia importa: entre que sale la petición y vuelve la respuesta
+      // pasan segundos, y en ese hueco el agricultor puede haber guardado su
+      // configuración. Decidir con la foto de cómo estaba el localStorage hace
+      // dos segundos y escribir con ella le borra lo que acaba de escribir.
+      // Entre la comprobación y la escritura no hay ningún await, así que no
+      // queda hueco donde colarse.
+      async function adoptarDelPropietario(propietarioId, sigueSiendoSeguro) {
         try {
           const res = await fetch(
             `/api/campo?vista=config&usuario_id=${encodeURIComponent(propietarioId)}`,
             { cache: "no-store" });
           if (!res.ok) return false;
-          return adoptarConfigPropietario(tuplaDe(await res.json()));
+          const tupla = tuplaDe(await res.json());
+          if (!tupla) return false;
+          if (typeof sigueSiendoSeguro === "function" && !sigueSiendoSeguro()) return false;
+          return adoptarConfigPropietario(tupla);
         } catch (_) { return false; }
       }
 
@@ -437,7 +447,9 @@
         // Sin base, `guardarConfigServidor` devuelve base_desconocida y no manda
         // nada. Conservador a propósito.
         if (tieneConfigLocal()) return;
-        if (await adoptarDelPropietario(userId)) location.reload();
+        // Y se vuelve a comprobar al escribir: "estaba vacío cuando empecé" no
+        // autoriza a pisar lo que haya cuando termino.
+        if (await adoptarDelPropietario(userId, () => !tieneConfigLocal())) location.reload();
       }
 
       // ─── Guardado de config con compare-and-set ────────────────────
