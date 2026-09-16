@@ -397,9 +397,12 @@ console.log("\n── 5. guarda de regresión: nadie consume el valor sin proteg
   // protección es justo lo que este trabajo viene a evitar. Esta guarda ha
   // saltado ya dos veces al añadir un consumidor, que es para lo que está.
   ok(usos.length === 4, `call sites que consumen el valor: ${usos.length} (esperado 4)`);
-  const conf = /window\.kyliaConfirmarHistoricas = async function[\s\S]*?\n    \};/.exec(FUENTE)[0];
+  // Vive en confirmarHistoricas; el envoltorio público es una línea.
+  const conf = /async function confirmarHistoricas\(ids\)[\s\S]*?\n    \}/.exec(FUENTE)[0];
   ok(/if \(!r \|\| !r\.persisted\)/.test(conf),
-     "el de kyliaConfirmarHistoricas comprueba r antes de tocarlo");
+     "el de confirmarHistoricas comprueba r antes de tocarlo");
+  ok(conf.indexOf("guardarConfigServidor") < conf.indexOf("guardarZonasSinSubir"),
+     "y no escribe en local hasta que el CAS confirma");
   // El tercero vive en rondaSincro, la ronda de sincronización de zonas.
   const sincro = recorta("async function rondaSincro(");
   ok(sincro.includes("try { r = await window.kyliaSync?.registroUsuario(payload); } catch (_) { r = null; }"),

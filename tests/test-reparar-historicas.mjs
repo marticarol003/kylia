@@ -190,21 +190,23 @@ console.log("\n── 6. el script: precondiciones y cero escrituras en dry-run 
 
 console.log("\n── 7. la confirmación de s.sync es manual y acotada ──");
 {
-  const f = /window\.kyliaConfirmarHistoricas = async function[\s\S]*?\n    \};/.exec(APP)[0];
+  const f = /async function confirmarHistoricas\(ids\)[\s\S]*?\n    \}/.exec(APP)[0];
   ok(/vista=verificar&usuario_id=/.test(f), "lee la fila ESTRUCTURAL del servidor, geometría incluida");
-  ok(/mismaParcela\(payload, fila\)/.test(f), "y la compara campo a campo con el payload de ahora");
+  ok(/mismaParcela\(p\.payload, fila\)/.test(f), "y la compara campo a campo con el payload de ahora");
   ok(/informe\.divergentes\.length \|\| informe\.sin_fila\.length/.test(f),
      "si alguna diverge o falta, no confirma NINGUNA");
-  ok(/token: m\.token/.test(f), "conserva el token: la identidad no cambia");
-  ok(/nueva: false, vista: m\.huella, confirmada: m\.huella/.test(f), "y solo toca esas tres marcas");
-  ok(/huellaPayload\(payload\)/.test(f), "con la huella calculada AQUÍ, donde está localStorage");
+  ok(/token: p\.token/.test(f), "conserva el token: la identidad no cambia");
+  ok(/nueva: false, vista: p\.huella, confirmada: p\.huella/.test(f), "y solo toca esas tres marcas");
+  ok(/huellaPayload\(payloadSiembra\(/.test(f), "con la huella calculada AQUÍ, donde está localStorage");
   ok(/guardarConfigServidor/.test(f), "el guardado va por el CAS");
   const codigo = sinComentarios(f);
   ok(!/while\s*\(|for\s*\(;;\)/.test(codigo), "sin bucle de reintento");
   ok((codigo.match(/guardarConfigServidor/g) || []).length === 1, "y un solo guardado: no se reintenta");
-  ok(/if \(!r \|\| !r\.persisted\) informe\.no_guardado/.test(f), "un 409 se reporta");
-  const usos = (APP.match(/kyliaConfirmarHistoricas/g) || []).length;
-  ok(usos === 1, `solo se define, nadie la invoca (${usos} apariciones)`);
+  ok(/if \(!r \|\| !r\.persisted\)/.test(f), "un 409 se reporta y no se toca nada");
+  ok(/window\.kyliaConfirmarHistoricas = \(\) => confirmarHistoricas\(HISTORICAS_B1\)/.test(APP),
+     "el envoltorio público no acepta argumentos: la lista no se puede sustituir");
+  const iCas = f.indexOf("guardarConfigServidor"), iLocal = f.indexOf("guardarZonasSinSubir");
+  ok(iCas > -1 && iLocal > iCas, "el CAS va ANTES de escribir en local");
 }
 {
   // mismaParcela, ejecutada.
@@ -242,7 +244,7 @@ function almacen(inicial = {}) {
            setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) };
 }
 // La app real, con el servidor de `vista=verificar` bajo control.
-function cargarApp({ ls, filas, guardaConfig, uid = "owner" }) {
+function cargarApp({ ls, filas, guardaConfig, uid = "owner", retenVerificar = null }) {
   const peticiones = [];
   const cuerpo = `
     const userId = uid;
@@ -250,7 +252,6 @@ function cargarApp({ ls, filas, guardaConfig, uid = "owner" }) {
     const cfgFinca = FINCA;
     const zonaActiva = null;
     const nombreCultivo = (c) => ({ brassica: "Col / Coliflor", lechuga: "Lechuga", calabacin: "Calabacín" }[c] || c);
-    const leerBase = () => ({ owner_id: "owner", base_version: 3 });
     const kyliaSync = { userId: uid, guardarConfigServidor: async (cfg) => guardaConfig(cfg) };
     const window = { kyliaSync };
     ${/const esVersion = [^\n]+/.exec(APP)[0]}
@@ -266,20 +267,25 @@ function cargarApp({ ls, filas, guardaConfig, uid = "owner" }) {
     ${trozo("function clasificarSiembras(")}
     ${/const HISTORICAS_B1 = \[[\s\S]*?\];/.exec(APP)[0]}
     ${trozo("function mismaParcela(")}
-    ${/window\.kyliaConfirmarHistoricas = async function[\s\S]*?\n    \};/.exec(APP)[0].replace(/window\.kyliaConfirmarHistoricas = async function/, "const confirmar = async function")}
+    ${trozo("function buscarEn(")}
+    const fincaVigente = () => FINCA;
+    ${/async function confirmarHistoricas\(ids\)[\s\S]*?\n    \}/.exec(APP)[0]}
+    const confirmar = (ids) => confirmarHistoricas(ids || HISTORICAS_B1);
     return { confirmar, clasificar: () => clasificarSiembras(FINCA),
              zonas: zonasGuardadas, mismaParcela,
              payload: (z, s) => payloadSiembra(z, s, FINCA, uid),
              huella: (p) => huellaPayload(p) };
   `;
-  const f = new Function("uid", "localStorage", "FINCA", "fetch", "console", "guardaConfig", cuerpo);
+  const f = new Function("uid", "localStorage", "FINCA", "fetch", "console", "guardaConfig", "leerBase", cuerpo);
   const fetchFalso = async (url) => {
     peticiones.push(url);
+    if (retenVerificar) await retenVerificar;
     const id = /usuario_id=([^&]+)/.exec(url)?.[1];
     const fila = filas[id];
     return fila ? { ok: true, json: async () => ({ ok: true, parcela: fila }) } : { ok: false };
   };
-  return { ...f(uid, ls, FINCA_REAL, fetchFalso, { warn: () => {} }, guardaConfig), peticiones };
+  return { ...f(uid, ls, FINCA_REAL, fetchFalso, { warn: () => {} }, guardaConfig,
+                () => ({ owner_id: "owner", base_version: 3 })), peticiones };
 }
 const FINCA_REAL = { ciudad: "Sant Boi de Llobregat", lat: 41.32, lon: 2.06,
                      suelo: "franco", metodoRiego: "goteo", caudal: 1.8 };
@@ -411,10 +417,153 @@ console.log("\n── 10. la lista es explícita: no confirma pendientes ajenos 
   ok(app.clasificar().pendientes_sincronizacion.length === 1, "y queda ella sola pendiente");
 }
 {
-  const fuente = /window\.kyliaConfirmarHistoricas = async function[\s\S]*?\n    \};/.exec(APP)[0];
+  const fuente = /async function confirmarHistoricas\(ids\)[\s\S]*?\n    \}/.exec(APP)[0];
   ok(!/registroUsuario|crear-parcela/.test(fuente), "B.2 no llama a registroUsuario ni a crear-parcela");
   ok(!/pendientes_sincronizacion/.test(fuente), "y no se cuelga de la categoría genérica");
-  ok(/const lista = Array\.isArray\(ids\)/.test(fuente), "opera sobre una lista explícita");
+  ok(/ajenos\.length/.test(fuente), "y rechaza cualquier id fuera de la lista");
+  ok(/HISTORICAS_B1\.includes\(id\)/.test(fuente), "opera sobre la lista cerrada");
+}
+
+console.log("\n── 11. A · CAS 409 · el estado local NO puede mentir ──");
+{
+  const zonasIniciales = JSON.stringify(zonasTrasB1());
+  const ls = almacen({ kylia_zonas: zonasIniciales });
+  let intentos = 0;
+  const app = cargarApp({ ls, filas: filasB1(),
+    guardaConfig: async () => { intentos++; return { ok: false, status: 409, persisted: false, error: "conflicto_version" }; } });
+  const antes = app.clasificar();
+  ok(antes.pendientes_sincronizacion.length === 4, "antes: 4 pendientes de sincronizar");
+
+  const r = await app.confirmar();
+  ok(r.confirmadas.length === 0, `confirmadas: 0 (${r.confirmadas.length})`);
+  ok(r.no_guardado?.status === 409, "el 409 se reporta");
+  ok(intentos === 1, `un solo intento (${intentos})`);
+  const despues = app.clasificar();
+  ok(despues.pendientes_sincronizacion.length === 4, `después SIGUEN 4 pendientes (${despues.pendientes_sincronizacion.length})`);
+  ok(despues.confirmadas.length === 0, "y 0 confirmadas: la pantalla no miente");
+  ok(ls.getItem("kylia_zonas") === zonasIniciales, "la foto local es IDÉNTICA byte a byte");
+}
+
+console.log("\n── 12. B · un id ajeno no se puede colar ──");
+{
+  const ls = almacen({ kylia_zonas: JSON.stringify(zonasTrasB1()) });
+  let llamadas = 0;
+  const app = cargarApp({ ls, filas: filasB1(), guardaConfig: async () => { llamadas++; return { ok: true, persisted: true }; } });
+  const antes = ls.getItem("kylia_zonas");
+  for (const intento of [["quinta"], ["quinta", ...IDS], [IDS[0], "otra-cualquiera"], []]) {
+    const r = await app.confirmar(intento);
+    ok(r.confirmadas.length === 0, `confirmar(${JSON.stringify(intento).slice(0, 30)}) → 0 confirmadas`);
+  }
+  ok(llamadas === 0, "ninguno llega al CAS");
+  ok(ls.getItem("kylia_zonas") === antes, "y el estado local no se toca");
+  ok(/window\.kyliaConfirmarHistoricas = \(\) => confirmarHistoricas\(HISTORICAS_B1\)/.test(APP),
+     "y desde consola no hay forma de pasar ids: el envoltorio no los acepta");
+}
+{
+  // La quinta con cambio local real sigue exactamente igual tras la llamada buena.
+  const zonas = zonasTrasB1();
+  zonas[0].siembras.push({ id: "quinta", cultivo: "lechuga", area_m2: 500,
+    fechaPlantacion: "2026-09-06", geometria: GEOM,
+    sync: { nueva: true, vista: null, confirmada: null, token: "tok-q" } });
+  const ls = almacen({ kylia_zonas: JSON.stringify(zonas) });
+  const app = cargarApp({ ls, filas: filasB1(), guardaConfig: async () => ({ ok: true, persisted: true }) });
+  const antesQ = JSON.stringify(JSON.parse(ls.getItem("kylia_zonas"))[0].siembras.find(x => x.id === "quinta"));
+  const r = await app.confirmar();
+  ok(r.confirmadas.length === 4 && !r.confirmadas.includes("quinta"), "confirma las 4 y no la quinta");
+  const despuesQ = JSON.stringify(JSON.parse(ls.getItem("kylia_zonas"))[0].siembras.find(x => x.id === "quinta"));
+  ok(antesQ === despuesQ, "la quinta queda EXACTAMENTE como estaba");
+}
+
+console.log("\n── 13. C · edición durante la verificación: gana la edición ──");
+{
+  let soltar; const reten = new Promise(r => { soltar = r; });
+  const ls = almacen({ kylia_zonas: JSON.stringify(zonasTrasB1()) });
+  let llamadasCas = 0;
+  const app = cargarApp({ ls, filas: filasB1(), retenVerificar: reten,
+    guardaConfig: async () => { llamadasCas++; return { ok: true, persisted: true }; } });
+  const enCurso = app.confirmar();
+  await new Promise(r => setTimeout(r, 0));
+  // El agricultor cambia el área de la primera mientras se verifica.
+  const z = JSON.parse(ls.getItem("kylia_zonas"));
+  z[0].siembras[0].area_m2 = 900;
+  ls.setItem("kylia_zonas", JSON.stringify(z));
+  soltar();
+  const r = await enCurso;
+
+  ok(r.confirmadas.length === 0, "B.2 aborta: 0 confirmadas");
+  ok(/gana la edición local/.test(r.motivo || ""), `y lo dice (${(r.motivo || "").slice(0, 60)})`);
+  ok(llamadasCas === 0, `0 CAS (${llamadasCas})`);
+  const fin = JSON.parse(ls.getItem("kylia_zonas"))[0].siembras[0];
+  ok(fin.area_m2 === 900, `el área final es 900 (${fin.area_m2})`);
+  ok(fin.sync.confirmada === null, "y sigue pendiente, sin marca");
+  ok(app.clasificar().pendientes_sincronizacion.length === 4, "las 4 siguen pendientes");
+}
+
+console.log("\n── 14. D · edición DURANTE el CAS ──");
+{
+  let soltarCas; const retenCas = new Promise(r => { soltarCas = r; });
+  const ls = almacen({ kylia_zonas: JSON.stringify(zonasTrasB1()) });
+  let enviado = null;
+  const app = cargarApp({ ls, filas: filasB1(),
+    guardaConfig: async (cfg) => { enviado = cfg; await retenCas; return { ok: true, persisted: true, status: 200 }; } });
+  const enCurso = app.confirmar();
+  await new Promise(r => setTimeout(r, 0));
+  // El CAS está en vuelo con H1. El agricultor cambia el área a 900.
+  const z = JSON.parse(ls.getItem("kylia_zonas"));
+  z[0].siembras[0].area_m2 = 900;
+  ls.setItem("kylia_zonas", JSON.stringify(z));
+  soltarCas();
+  const r = await enCurso;
+
+  const fin = JSON.parse(ls.getItem("kylia_zonas"))[0];
+  const editada = fin.siembras[0];
+  ok(editada.area_m2 === 900, `el área nueva PERMANECE (${editada.area_m2})`);
+  ok(r.confirmadas.length === 4, "las 4 se marcan con lo que confirmó el servidor");
+  const H1 = app.huella(app.payload({ ...fin, siembras: [] }, { id: IDS[0], cultivo: CULTIVOS[0], area_m2: 1880, fechaPlantacion: "2026-09-06", geometria: GEOM }));
+  ok(editada.sync.confirmada === H1, "confirmada = H1, la huella que viajó al CAS");
+  const H2 = app.huella(app.payload(fin, editada));
+  ok(H2 !== H1, "y la huella actual es otra: H2");
+  const clas = app.clasificar();
+  ok(clas.pendientes_sincronizacion.some(x => x.id === IDS[0]),
+     "así que esa siembra queda PENDIENTE, no falsamente confirmada");
+  ok(clas.confirmadas.length === 3, `y las otras tres sí confirmadas (${clas.confirmadas.length})`);
+  ok(JSON.stringify(enviado.zonas[0].siembras[0].area_m2) === "1880",
+     "el CAS recibió la foto de antes de la edición, que es lo coherente con H1");
+}
+{
+  // Y si la instancia se sustituye durante el CAS, no se le pone marca.
+  let soltarCas; const retenCas = new Promise(r => { soltarCas = r; });
+  const ls = almacen({ kylia_zonas: JSON.stringify(zonasTrasB1()) });
+  const app = cargarApp({ ls, filas: filasB1(),
+    guardaConfig: async () => { await retenCas; return { ok: true, persisted: true }; } });
+  const enCurso = app.confirmar();
+  await new Promise(r => setTimeout(r, 0));
+  const z = JSON.parse(ls.getItem("kylia_zonas"));
+  z[0].siembras[0].sync = { nueva: true, vista: null, confirmada: null, token: "tok-OTRO" };
+  ls.setItem("kylia_zonas", JSON.stringify(z));
+  soltarCas();
+  const r = await enCurso;
+  const s0 = JSON.parse(ls.getItem("kylia_zonas"))[0].siembras[0];
+  ok(s0.sync.token === "tok-OTRO" && s0.sync.confirmada === null,
+     "instancia sustituida durante el CAS: NO hereda la confirmación");
+  ok(r.confirmadas.length === 3, `y solo se marcan las otras tres (${r.confirmadas.length})`);
+}
+
+console.log("\n── 15. E · camino estable ──");
+{
+  const ls = almacen({ kylia_zonas: JSON.stringify(zonasTrasB1()) });
+  const app = cargarApp({ ls, filas: filasB1(), guardaConfig: async () => ({ ok: true, persisted: true, status: 200 }) });
+  ok(app.clasificar().pendientes_sincronizacion.length === 4, "antes: 4 pendientes");
+  const r = await app.confirmar();
+  ok(r.confirmadas.length === 4 && !r.no_guardado, "el CAS confirma las 4");
+  const c = app.clasificar();
+  ok(c.confirmadas.length === 4 && c.pendientes_sincronizacion.length === 0 &&
+     c.pendientes_reparacion.length === 0 && c.sin_cultivo.length === 0,
+     "4 confirmadas · 0 · 0 · 0");
+  const app2 = cargarApp({ ls, filas: filasB1(), guardaConfig: async () => ({ ok: true, persisted: true }) });
+  const c2 = app2.clasificar();
+  ok(c2.confirmadas.length === 4 && c2.pendientes_sincronizacion.length === 0,
+     "y tras recargar siguen las 4 confirmadas");
 }
 
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES\n" : `\n❌ ${fallos} FALLOS\n`);

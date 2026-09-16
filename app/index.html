@@ -5291,59 +5291,106 @@
       return dif;
     }
 
-    window.kyliaConfirmarHistoricas = async function (ids) {
-      // La lista es explícita a propósito. Sin argumento, las cuatro de B.1.
-      const lista = Array.isArray(ids) && ids.length ? ids : HISTORICAS_B1;
-      const informe = { confirmadas: [], sin_fila: [], divergentes: [], no_guardado: null };
-      const dueno = window.kyliaSync?.userId;
-      const zonas = zonasGuardadas();
-      const marcas = [];
+    // Busca una siembra por id DENTRO de un array dado, no en localStorage.
+    function buscarEn(zonas, id) {
+      for (const z of zonas) for (const s of (z.siembras || [])) if (s && s.id === id) return { z, s };
+      return null;
+    }
 
+    // Interna y parametrizable para poder probarla, pero con la lista cerrada por
+    // dentro: un id que no esté en HISTORICAS_B1 aborta la llamada entera. El
+    // envoltorio público no acepta argumentos, así que desde la consola no hay
+    // forma de colar una quinta.
+    async function confirmarHistoricas(ids) {
+      const lista = Array.isArray(ids) ? ids : [];
+      const informe = { confirmadas: [], sin_fila: [], divergentes: [], no_guardado: null };
+      const ajenos = lista.filter(id => !HISTORICAS_B1.includes(id));
+      if (!lista.length || ajenos.length) {
+        return { ...informe, motivo: `solo las históricas de B.1${ajenos.length ? ": fuera de lista " + ajenos.join(", ") : ""}` };
+      }
+      const dueno = window.kyliaSync?.userId;
+
+      // ─ A · PLAN, desde el estado de AHORA ─
+      const plan = [];
       for (const id of lista) {
         const v = buscarSiembra(id);
         if (!v || !v.s.cultivo || !syncValido(v.s.sync)) { informe.sin_fila.push(id); continue; }
-        const payload = payloadSiembra(v.z, v.s, cfgFinca, dueno);
+        const payload = payloadSiembra(v.z, v.s, fincaVigente(), dueno);
+        plan.push({ id, token: v.s.sync.token, payload, huella: huellaPayload(payload) });
+      }
 
+      // ─ B · VERIFICACIÓN contra el servidor (aquí hay awaits) ─
+      for (const p of plan) {
         let fila = null;
         try {
-          const r = await fetch(`/api/campo?vista=verificar&usuario_id=${encodeURIComponent(id)}`,
+          const r = await fetch(`/api/campo?vista=verificar&usuario_id=${encodeURIComponent(p.id)}`,
                                 { cache: "no-store" });
           if (r.ok) fila = (await r.json())?.parcela || null;
         } catch (_) { fila = null; }
-        if (!fila) { informe.sin_fila.push(id); continue; }
-
-        const dif = mismaParcela(payload, fila);
-        if (dif.length) { informe.divergentes.push({ id, campos: dif }); continue; }
-
-        marcas.push({ id, huella: huellaPayload(payload), token: v.s.sync.token });
+        if (!fila) { informe.sin_fila.push(p.id); continue; }
+        const dif = mismaParcela(p.payload, fila);
+        if (dif.length) informe.divergentes.push({ id: p.id, campos: dif });
       }
-
-      // TODO O NADA: si una sola diverge, no se confirma ninguna. Confirmar las
-      // buenas y dejar la mala colgando invita a olvidarse de ella.
       if (informe.divergentes.length || informe.sin_fila.length) {
         try { console.warn("[kylia-b2] no se confirma nada:", JSON.stringify(informe)); } catch (_) {}
         return { ...informe, motivo: "alguna no coincide con el servidor" };
       }
-      if (!marcas.length) return { ...informe, motivo: "nada que confirmar" };
+      if (!plan.length) return { ...informe, motivo: "nada que confirmar" };
 
-      for (const m of marcas) {
-        for (const z of zonas) for (const s of (z.siembras || [])) {
-          if (s && s.id === m.id) {
-            // Exclusivamente las marcas. Ni un campo más de la siembra ni de la zona.
-            s.sync = { nueva: false, vista: m.huella, confirmada: m.huella, token: m.token };
-          }
+      // ─ C · REVALIDAR DESPUÉS DE LOS AWAITS ─
+      // Entre el plan y aquí han pasado cuatro peticiones. El agricultor ha
+      // podido cambiar el área de una parcela en ese rato, y volcar la foto de
+      // antes se lo borraría. Se relee el estado ACTUAL y se comprueba que cada
+      // una sigue siendo la misma cosa; si algo cambió, GANA LA EDICIÓN y B.2 se
+      // aborta entera: 0 CAS y 0 marcas.
+      const zonasAhora = zonasGuardadas();
+      const candidato = JSON.parse(JSON.stringify(zonasAhora));   // solo en memoria
+      for (const p of plan) {
+        const v = buscarEn(candidato, p.id);
+        if (!v || !v.s.sync || v.s.sync.token !== p.token) {
+          return { ...informe, motivo: `la siembra ${p.id} ya no es la misma instancia` };
         }
-        informe.confirmadas.push(m.id);
+        if (huellaPayload(payloadSiembra(v.z, v.s, fincaVigente(), dueno)) !== p.huella) {
+          return { ...informe, motivo: `la siembra ${p.id} cambió mientras se verificaba: gana la edición local` };
+        }
+        // Exclusivamente las marcas, y sobre el CANDIDATO, que aún no se guarda.
+        v.s.sync = { nueva: false, vista: p.huella, confirmada: p.huella, token: p.token };
       }
-      if (!guardarZonasSinSubir(zonas)) return { ...informe, motivo: "no se pudo escribir kylia_zonas" };
 
+      // ─ D · CAS PRIMERO, LOCAL DESPUÉS ─
+      // Antes se escribían las marcas y luego se llamaba al CAS: con un 409, la
+      // pantalla decía "4 confirmadas" y el servidor no tenía nada. Una UI que
+      // miente sobre lo que está guardado es peor que una que no guarda.
       const r = await window.kyliaSync.guardarConfigServidor({
-        finca: cfgFinca, zonas: zonasGuardadas(),
+        finca: fincaVigente(), zonas: candidato,
         zonaActiva: zonaActiva || null, modo: window.kyliaSync?.modo || null,
       });
-      if (!r || !r.persisted) informe.no_guardado = { status: r?.status, error: r?.error };
+      if (!r || !r.persisted) {
+        return { ...informe, no_guardado: { status: r?.status, error: r?.error },
+                 motivo: "el CAS no confirmó: no se toca nada en local" };
+      }
+
+      // ─ E · ÉXITO · aplicar SOLO las marcas sobre el estado de AHORA ─
+      // Durante el CAS también ha podido editar. No se vuelca el candidato: se
+      // releen las zonas y se posa la marca encima, dejando el dato agronómico
+      // como esté. Y la marca lleva la huella que CONFIRMÓ el servidor, no la de
+      // una edición posterior — así una siembra editada durante el vuelo queda
+      // con confirmada=H1 y actual=H2, o sea pendiente de sincronizar, que es la
+      // verdad.
+      const zonasFinal = zonasGuardadas();
+      for (const p of plan) {
+        const v = buscarEn(zonasFinal, p.id);
+        if (!v || !v.s.sync || v.s.sync.token !== p.token) continue;   // otra instancia: no se toca
+        v.s.sync = { nueva: false, vista: p.huella, confirmada: p.huella, token: p.token };
+        informe.confirmadas.push(p.id);
+      }
+      if (!guardarZonasSinSubir(zonasFinal)) return { ...informe, motivo: "no se pudo escribir kylia_zonas" };
       return { ...informe, config_version: leerBase()?.base_version ?? null };
-    };
+    }
+
+    // Envoltorio público SIN argumentos: la lista es la de B.1 y no se puede
+    // sustituir desde la consola.
+    window.kyliaConfirmarHistoricas = () => confirmarHistoricas(HISTORICAS_B1);
 
     // DIAGNÓSTICO PURO. Llamaba a sincronizarZonas(), o sea que "mirar" escribía
     // y podía dar de alta parcelas. Ahora solo clasifica: 0 fetch, 0 POST, 0
