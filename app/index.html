@@ -381,69 +381,126 @@
                                   { cache: "no-store" });
           if (!res.ok) return;
           const d = await res.json();
-          if (d?.ok && Number.isFinite(Number(d.config_version))) configVersion = Number(d.config_version);
+          if (d?.ok && typeof d.propietario?.config_version === "number"
+              && Number.isSafeInteger(d.propietario.config_version) && d.propietario.config_version >= 0) {
+            configVersion = d.propietario.config_version;
+          }
           if (d?.ok && d.config && restaurarConfig(d.config, null)) location.reload();
         } catch (_) { /* sin cobertura: se sigue con lo local, que es nada */ }
       }
 
       // ─── Guardado de config con compare-and-set ────────────────────
-      // La versión sobre la que escribimos. La cola de app/index.html serializa
-      // lo que sale de ESTE navegador, pero no puede hacer nada contra otro
+      // La versión sobre la que escribimos. La cola de encolarConfig serializa lo
+      // que sale de ESTE navegador, pero no puede hacer nada contra otro
       // dispositivo ni contra una petición que el servidor procese tarde después
       // de que la hayamos abortado por timeout: abortar aquí no detiene al
       // servidor. El orden lo pone el UPDATE condicional, no nosotros.
-      let configVersion = null;                 // null = todavía no la sabemos
-      // Identidad de ESTA carga de la app. Sirve para distinguir un conflicto
-      // causado por una petición nuestra anterior —reintentable— de uno causado
-      // por otro dispositivo, que NO se resuelve sobrescribiendo.
-      const SESION_CONFIG = (crypto?.randomUUID ? crypto.randomUUID() : String(Math.random())).slice(0, 36);
-      window.kyliaSync.versionConfig = () => configVersion;
+      //
+      // `null` = DESCONOCIDA, y desconocida significa NO ESCRIBIR. Nunca se
+      // sustituye por 0: un 0 inventado es una base falsa.
+      let configVersion = null;
+      const TIMEOUT_VERSION_MS = 8000;
 
-      async function versionVigente() {
-        if (configVersion != null) return configVersion;
+      // Una versión es un entero no negativo, y nada más. Ni "0", ni "", ni null,
+      // ni 1.5, ni Infinity. Se comprueba por TIPO: `Number("0")` es 0 y colaría
+      // una cadena como versión válida, que es exactamente cómo se cuela una base
+      // que nadie ha comprobado.
+      const esVersion = (v) => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+
+      // ─── Conflicto de configuración ────────────────────────────────
+      // Cuando el servidor dice 409, otro dispositivo escribió. NO se reintenta.
+      // Se guarda lo necesario para diagnosticar y se CIERRA la escritura remota
+      // de config hasta que exista una política de resolución. Prefiero un
+      // conflicto visible a un cambio perdido: el nombre que puso el otro
+      // dispositivo se queda como está.
+      let conflictoConfig = null;
+      window.kyliaSync.conflictoConfig = () => (conflictoConfig ? { ...conflictoConfig } : null);
+      window.kyliaSync.versionConfig   = () => configVersion;
+
+      function marcarConflicto(base, r, fotoLocal) {
+        conflictoConfig = {
+          detectado: new Date().toISOString(),
+          base_intentada: base,
+          version_servidor: esVersion(Number(r?.datos?.config_version)) ? Number(r.datos.config_version) : null,
+          guardado_servidor: r?.datos?.guardado || null,
+          foto_local_sin_guardar: fotoLocal,        // la última que no pudo escribirse
+          config_servidor: null,                    // se rellena con el diagnóstico
+        };
+        try {
+          console.warn("[kylia-config] CONFLICTO: otro dispositivo escribió la configuración. " +
+            "Las escrituras remotas de config quedan detenidas. " +
+            "Mira window.kyliaSync.conflictoConfig().", conflictoConfig);
+        } catch (_) {}
+        // Diagnóstico, NO autorización: se lee el estado del servidor para poder
+        // enseñarlo, y no para rebasar encima de él.
+        leerConfigServidor().then(d => {
+          if (conflictoConfig && d) {
+            conflictoConfig.config_servidor = d.propietario?.config ?? d.config ?? null;
+            if (esVersion(d.propietario?.config_version)) {
+              conflictoConfig.version_servidor = d.propietario.config_version;
+            }
+          }
+        }).catch(() => {});
+      }
+
+      // GET de vista=config CON TOPE. Sin él, esta lectura puede quedarse colgada
+      // antes incluso del POST y dejar la cola esperando para siempre.
+      async function leerConfigServidor() {
+        const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+        const reloj = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (_) {} }, TIMEOUT_VERSION_MS) : null;
         try {
           const res = await fetch(`/api/campo?vista=config&usuario_id=${encodeURIComponent(userId)}`,
-                                  { cache: "no-store" });
+                                  { cache: "no-store", ...(ctrl ? { signal: ctrl.signal } : {}) });
           if (!res.ok) return null;
-          const d = await res.json();
-          if (d?.ok && Number.isFinite(Number(d.config_version))) {
-            configVersion = Number(d.config_version);
-            return configVersion;
-          }
-        } catch (_) {}
+          return await res.json();
+        } catch (_) {
+          return null;              // vencido o caído: la versión sigue DESCONOCIDA
+        } finally {
+          if (reloj) clearTimeout(reloj);
+        }
+      }
+
+      async function versionVigente() {
+        if (esVersion(configVersion)) return configVersion;
+        const d = await leerConfigServidor();
+        // Solo del bloque del propietario, que es el que corresponde a la fila
+        // contra la que se hace el CAS. Nada de fabricar un 0 si no viene.
+        if (d?.ok && esVersion(d.propietario?.config_version)) {
+          configVersion = d.propietario.config_version;
+          return configVersion;
+        }
         return null;
       }
 
       window.kyliaSync.guardarConfigServidor = async function (config, opts) {
+        // Con un conflicto abierto no se escribe NADA, ni siquiera un guardado
+        // nuevo del usuario: saltárselo en silencio sería el lost update que
+        // estamos evitando. Se conserva la última foto para cuando haya política
+        // de resolución.
+        if (conflictoConfig) {
+          conflictoConfig.foto_local_sin_guardar = config;
+          return { ok: false, status: 0, persisted: false, error: "conflicto_config", datos: null };
+        }
         const base = await versionVigente();
         if (base == null) {
-          // Sin base no se manda: el servidor rechazaría igual, y mandar sin ella
-          // sería pedirle que sobrescriba a ciegas.
-          return { ok: false, status: 0, persisted: false, error: "sin_version_base", datos: null };
+          // Desconocida: 0 POST. Mandar sin base es pedirle al servidor que
+          // sobrescriba a ciegas, y mandar con un 0 inventado es peor.
+          return { ok: false, status: 0, persisted: false, error: "version_desconocida", datos: null };
         }
-        const enviar = (v) => post("/api/log",
-          { recurso: "config-app", propietario_id: userId, config, base_version: v, sesion: SESION_CONFIG },
-          opts);
 
-        let r = await enviar(base);
-        if (r.ok && r.persisted && Number.isFinite(Number(r.datos?.config_version))) {
+        const r = await post("/api/log",
+          { recurso: "config-app", propietario_id: userId, config, base_version: base }, opts);
+
+        if (r.ok && r.persisted && esVersion(Number(r.datos?.config_version))) {
           configVersion = Number(r.datos.config_version);
           return r;
         }
-        if (r.status === 409 && Number.isFinite(Number(r.datos?.config_version))) {
-          configVersion = Number(r.datos.config_version);      // la de ahora, venga de quien venga
-          // REINTENTO SOLO SI PODEMOS DEMOSTRAR QUE EL CONFLICTO ES NUESTRO. Si
-          // la versión que hay la escribió esta misma sesión, la carrera fue
-          // contra una petición propia anterior y volver a escribir encima es
-          // seguro. Si la escribió otro dispositivo, NO se sobrescribe: un
-          // conflicto visible es mejor que un cambio perdido en silencio.
-          if (r.datos.sesion && r.datos.sesion === SESION_CONFIG) {
-            const r2 = await enviar(configVersion);
-            if (r2.ok && r2.persisted && Number.isFinite(Number(r2.datos?.config_version))) {
-              configVersion = Number(r2.datos.config_version);
-            }
-            return r2;
-          }
+        if (r.status === 409) {
+          // NO se adopta la versión nueva y NO se reintenta. Adoptarla dejaría a
+          // la siguiente foto de la cola escribiendo sobre una base que nadie ha
+          // conciliado, que es rebasar automáticamente con otro nombre.
+          marcarConflicto(base, r, config);
+          return r;
         }
         return r;
       };

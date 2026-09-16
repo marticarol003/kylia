@@ -276,39 +276,66 @@ async function vistaMadurez(res, u) {
 // Si la fila consultada no tiene foto pero es una ZONA (su propietario es otra
 // fila), se mira la del propietario — que es donde vive siempre. Así funciona
 // aunque el dispositivo pregunte con el id de una zona.
+// Versión válida o NADA. Nunca se fabrica un 0: un 0 inventado es una base de
+// CAS falsa, y con ella el cliente escribiría creyendo que parte de cero cuando
+// en realidad no sabe de dónde parte. PostgREST puede devolver un bigint como
+// número o como cadena, así que se acepta cualquiera de los dos y se normaliza a
+// número; lo que no sea una versión de verdad sale como null.
+function versionValida(v) {
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? v : null;
+  if (typeof v === "string" && /^\d+$/.test(v)) {
+    const n = Number(v);
+    return Number.isSafeInteger(n) ? n : null;
+  }
+  return null;
+}
+
 async function vistaConfig(res, u) {
+  // ─── EL BLOQUE DEL PROPIETARIO, que es el único válido para el CAS ───
+  // La config global es del PROPIETARIO, y el compare-and-set se hace contra SU
+  // fila. Antes la respuesta podía mezclar: `config` de una zona y
+  // `config_version` de otra fila, o un 0 fabricado. Con una base que no
+  // corresponde a la foto, el CAS deja de proteger nada. Lo cazó Codex.
+  //
+  // Por eso estos tres campos salen SIEMPRE de la misma fila, y si el propietario
+  // no tiene config se devuelve null con SU versión — sin buscarla en otro sitio.
+  const propietarioId = u.propietario_id || u.id;
+  let filaDueno = u;
+  if (propietarioId !== u.id) {
+    const dueños = await supabaseSelect("usuarios", `id=eq.${propietarioId}&select=*`);
+    filaDueno = dueños?.[0] || null;
+  }
+  const propietario = {
+    id:             propietarioId,
+    config:         filaDueno?.config_app || null,
+    config_version: filaDueno ? versionValida(filaDueno.config_version) : null,
+  };
+
+  // ─── La foto para RESTAURAR, que es otra cosa y puede venir de más sitios ───
+  // Esto no se usa como base de escritura: solo para que un dispositivo nuevo
+  // abra con algo en vez de en blanco.
   let config = u.config_app || null;
   let de = u.id;
-  // La versión sobre la que el cliente escribirá después (compare-and-set, ver
-  // db/config-version-cas-2026-09-16.sql). Va SIEMPRE junto a la foto, y de la
-  // MISMA fila de la que sale la foto: una versión de otra fila no serviría de
-  // base para nada.
-  let version = Number.isFinite(Number(u.config_version)) ? Number(u.config_version) : 0;
-
-  if (!config && u.propietario_id && u.propietario_id !== u.id) {
-    const dueños = await supabaseSelect("usuarios",
-      `id=eq.${u.propietario_id}&select=*`);
-    const dueño = dueños?.[0];
-    const suya = dueño && (dueño.config_app || configDesdeFila(dueño));
-    if (suya) {
-      config = suya; de = dueño.id;
-      version = Number.isFinite(Number(dueño.config_version)) ? Number(dueño.config_version) : 0;
-    }
+  if (!config && filaDueno && filaDueno.id !== u.id) {
+    const suya = filaDueno.config_app || configDesdeFila(filaDueno);
+    if (suya) { config = suya; de = filaDueno.id; }
   }
-
-  // Último recurso: la finca reconstruida desde la propia fila. `config_app`
-  // solo se escribe cuando el agricultor cambia algo, así que quien configuró su
-  // campo antes de que existiera esa columna la tiene vacía — y sin esto abriría
-  // la app en blanco teniendo la parcela guardada. Ver _config-app.js.
+  // Último recurso: la finca reconstruida desde la propia fila. `config_app` solo
+  // se escribe cuando el agricultor cambia algo, así que quien configuró su campo
+  // antes de que existiera esa columna la tiene vacía — y sin esto abriría la app
+  // en blanco teniendo la parcela guardada. Ver _config-app.js.
   if (!config) config = configDesdeFila(u);
 
   return res.status(200).json({
     ok: true, vista: "config",
-    propietario_id: u.propietario_id || u.id,
-    config,                                   // null = este propietario nunca guardó
+    propietario_id: propietarioId,
+    config,                                   // foto para RESTAURAR (puede venir de otra fila)
     guardado: config?.guardado || null,
-    config_version: version,                  // base del próximo guardado
-    de,                                       // de qué fila salió (la propia o la del propietario)
+    de,                                       // de qué fila salió esa foto
+    // Lo único que vale para guardar: los tres de la fila del propietario.
+    propietario,
+    // null = versión desconocida. El cliente NO debe escribir con esto.
+    config_version: propietario.config_version,
   });
 }
 

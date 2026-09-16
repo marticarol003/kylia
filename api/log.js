@@ -297,10 +297,11 @@ async function handleConfigApp(req, res, body) {
   }
 
   const foto = { ...config, guardado: new Date().toISOString() };
-  // Quién escribe. Sirve para que el cliente distinga un conflicto causado por su
-  // propia petición anterior —reintentable— de uno causado por otro dispositivo,
-  // que NO se puede resolver sobrescribiendo.
-  if (typeof body.sesion === "string" && body.sesion.length <= 64) foto.sesion = body.sesion;
+  // NO se guarda ninguna marca de "quién escribe". La había, y el cliente la
+  // usaba para decidir si un conflicto era suyo y reintentar encima. Pero ese
+  // campo lo controla el cliente: no es una prueba de autoría, es una afirmación
+  // suya. Un atacante —o un bug— que la repita se autoriza a sobrescribir la
+  // configuración de otro dispositivo. Lo cazó Codex. Fuera.
 
   try {
     // UN SOLO STATEMENT. El filtro y la escritura de la versión van juntos, así
@@ -330,9 +331,6 @@ async function handleConfigApp(req, res, body) {
     return res.status(409).json({
       ok: false, persisted: false, error: "conflicto_version",
       config_version: fila.config_version,
-      // De quién es la versión que hay ahora: si es de esta misma sesión, el
-      // conflicto lo causó una petición propia anterior.
-      sesion: fila.config_app?.sesion || null,
       guardado: fila.config_app?.guardado || null,
     });
   } catch (err) {

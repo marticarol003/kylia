@@ -116,10 +116,15 @@ ok(!/subirConfig\(\)[\s\S]{0,80}arranque|restaurarSiVacio[\s\S]{0,200}subirConfi
 
 console.log("── la lectura del servidor ──");
 const vista = campo.slice(campo.indexOf("async function vistaConfig"), campo.indexOf("async function vistaPerfil"));
-ok(/u\.propietario_id !== u\.id/.test(vista),
+ok(/propietarioId !== u\.id/.test(vista),
    "si preguntas con el id de una zona, se mira la config del propietario (que es donde vive)");
-ok(/config,\s*\/\/ null = este propietario nunca guardó/.test(vista),
+ok(/config,\s*\/\/ foto para RESTAURAR/.test(vista),
    "distingue 'no hay nada guardado' de un error");
+// Desde db/config-version-cas-2026-09-16.sql la respuesta lleva además el bloque
+// del propietario, que es el ÚNICO válido para el compare-and-set: mezclar la
+// foto de una zona con la versión de otra fila deja el CAS sin proteger nada.
+ok(/const propietario = \{/.test(vista) && /config_version: filaDueno \? versionValida/.test(vista),
+   "y un bloque `propietario` con config y versión de la MISMA fila");
 ok(/vista === "config"/.test(campo), "la vista está enrutada en /api/campo");
 
 console.log("── la migración ──");
