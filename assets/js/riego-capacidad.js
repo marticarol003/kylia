@@ -121,6 +121,12 @@
     const no = (motivo) => ({ capacidad_mmh: null, puede_ejecutar: false,
                               clase: "no_ejecutable", fuente: r.fuente || null,
                               confianza: r.confianza || null, motivo });
+    // SIN MÉTODO NO HAY CAPACIDAD, y no hay excepción. Antes la compatibilidad
+    // solo se comprobaba si venía método (`if (metodo && ...)`), así que un
+    // método ausente se saltaba el chequeo entero y 6,7 salía fiable sin que
+    // supiéramos con qué se riega. Una capacidad es valor + método + fuente +
+    // confianza: si falta una de las cuatro, no es nada.
+    if (!metodo || !UNIDAD_ORDEN[metodo]) return no("sin_metodo");
     if (valor === null) {
       return no(r.capacidad_mmh === null || r.capacidad_mmh === undefined
                 ? "sin_capacidad" : "valor_no_valido");
@@ -133,7 +139,7 @@
       // Una capacidad derivada de una cinta de goteo no dice NADA sobre un
       // aspersor: si el método no cuadra con la fuente, el número no vale ni
       // como provisional.
-      if (metodo && !metodosOk.includes(metodo)) return no("metodo_incompatible");
+      if (!metodosOk.includes(metodo)) return no("metodo_incompatible");
       if (confianza !== "alta") {
         return { capacidad_mmh: valor, puede_ejecutar: false, clase: "provisional",
                  fuente, confianza, motivo: "confianza_insuficiente" };
@@ -308,9 +314,14 @@
   // dejan la configuración sin capacidad hasta volver a medir o derivar.
   function riegoTrasCambioDeMetodo(previo = {}, metodoNuevo) {
     const metodoPrevio = previo.metodoRiego || null;
+    const metodoDestino = metodoNuevo || null;
     const sinCambio = { caudal: previo.caudal ?? null, riego: previo.riego || null,
                         invalidado: false, metodo_anterior: metodoPrevio };
-    if (!metodoNuevo || !metodoPrevio || metodoNuevo === metodoPrevio) return sinCambio;
+    // ⚠️ `null` NO significa "no ha habido cambio". Significa que ya no hay
+    // sistema de riego configurado, y una capacidad sin sistema al que
+    // pertenecer no es una capacidad. Deseleccionar el método en el panel dejaba
+    // el 6,7 de goteo vivo y fiable, colgando de la nada.
+    if (metodoDestino === metodoPrevio) return sinCambio;
 
     // Lo anterior se guarda como HISTÓRICO, anidado. `capacidadVigente` lee
     // `riego.capacidad_mmh`, `.fuente`, `.confianza` y `.datos` del primer
@@ -326,7 +337,7 @@
       riego: { capacidad_mmh: null, unidad: "mm/h",
                fuente: "invalidada_por_cambio_de_metodo", confianza: "baja", datos: null,
                metodo_anterior: metodoPrevio,
-               estimacion_mmh: POR_DEFECTO_MMH[metodoNuevo] ?? null,
+               estimacion_mmh: POR_DEFECTO_MMH[metodoDestino] ?? null,
                anterior: historico },
       invalidado: true,
       metodo_anterior: metodoPrevio,
@@ -339,6 +350,9 @@
   // pregunta no aplica y la respuesta es que sí: su orden no depende del caudal.
   // A goteo, aspersión y manguera solo si hay un caudal operativo de verdad.
   function puedeDarMinutos(metodo, valor) {
+    // Sin método válido no hay orden que dar: ni minutos, ni viajes, ni nada que
+    // dependa de cómo se riega.
+    if (!metodo || !UNIDAD_ORDEN[metodo]) return false;
     if (UNIDAD_ORDEN[metodo] !== "min") return true;
     // MISMA puerta que todo lo demás. Antes esto aceptaba >= 0,1 mientras
     // `capacidadVigente` aceptaba cualquier número: con capacidad 0 el estado
@@ -358,7 +372,21 @@
     const metodo = opts.metodoRiego;
     // `clase` la pone quien llama, desde capacidadVigente. Sin ella se asume
     // provisional: es la lectura conservadora.
-    const clase = opts.clase || (opts.caudalMmh != null ? "provisional" : "no_ejecutable");
+    let clase = opts.clase || (opts.caudalMmh != null ? "provisional" : "no_ejecutable");
+
+    // ── DEFENSA EN PROFUNDIDAD ──────────────────────────────────────────────
+    // No basta con que quien llama diga "fiable": esta función vuelve a exigir
+    // las condiciones duras. Un estado incoherente —legacy, una config a medias,
+    // un `clase` heredado de otra pantalla— no puede producir unos minutos con
+    // cara de medidos solo porque exista un número.
+    //
+    // Es literalmente el caso que se escapó: método deseleccionado, capacidad
+    // 6,7 marcada fiable, y la presentación decía "72 min".
+    if (!metodo || !UNIDAD_ORDEN[metodo]) {
+      return lamina(mmBruto, "Falta definir cómo riegas para convertirlo a tiempo");
+    }
+    if (capacidadOperativa(opts.caudalMmh) === null && clase === "fiable") clase = "no_ejecutable";
+
     if (puedeDarMinutos(metodo, opts.caudalMmh)) {
       const p = presentarRiego(mmBruto, opts);
       if (p.unidad !== "min" || clase === "fiable") return { ...p, clase: p.unidad === "min" ? clase : "fiable" };
@@ -368,12 +396,18 @@
                texto: `Aproximadamente ${p.texto}`,
                aviso: "Capacidad de riego pendiente de validar" };
     }
+    return lamina(mmBruto, "Falta validar la capacidad de tu sistema para convertirlo a tiempo");
+  }
+
+  // La lámina tal cual la decidió el motor. No se pierde información: L/m² es
+  // exactamente lo que hay que aplicar. Lo que no se da es una precisión que no
+  // tenemos.
+  function lamina(mmBruto, aviso) {
     const mm = Number(mmBruto);
     const v = Number.isFinite(mm) ? Math.max(0, mm) : 0;
     return { unidad: "l_m2", valor: Math.round(v), mm: Math.round(v * 10) / 10,
              sinCapacidad: true, clase: "no_ejecutable",
-             texto: `Aplica ${Math.round(v)} L/m²`,
-             aviso: "Falta validar la capacidad de tu sistema para convertirlo a tiempo" };
+             texto: `Aplica ${Math.round(v)} L/m²`, aviso };
   }
 
   // ─── Completitud ─────────────────────────────────────────────────────────

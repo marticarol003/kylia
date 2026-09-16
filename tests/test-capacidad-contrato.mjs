@@ -57,6 +57,45 @@ const estado = (s, finca = { suelo: "franco" }) =>
   R.estadoSiembra({ ...BASE, ...s }, finca, { cultivosSoportados: CULTIVOS, hoy: HOY });
 
 // ══════════════════════════════════════════════════════════════════
+// El panel real, disponible para todas las secciones.
+const dom = (valores = {}) => ({
+  getElementById: (id) => (id in valores ? { value: valores[id] } : null),
+  querySelector: () => null, querySelectorAll: () => [],
+});
+
+// `editado` modela si el agricultor ha TOCADO el campo de caudal después de
+// cambiar de método. El input viene precargado con el caudal anterior, así que
+// esa distinción es justo el bug: sin ella, el 6,7 de goteo volvía como
+// `declarado` en aspersión sin que nadie escribiera nada.
+function panel(ls, domValores, editado = false) {
+  const cuerpo = `
+    const window = { KyliaRiego: R, kyliaSync: { registroUsuario: async () => ({ ok: true }) }, kyliaTrack: () => {} };
+    const STORAGE_KEY = "kylia_config";
+    let cfgFinca = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    let zonaActiva = null;
+    const panel = { classList: { remove: () => {} } };
+    let caudalEditado = EDITADO;
+    // Solo transporte y pintado. La lógica bajo prueba —el bloque que decide
+    // qué pasa con la capacidad al cambiar de método— es la real, recortada
+    // de app/index.html sin tocar.
+    const actualizarHeader = () => {}, setFeedback = () => {};
+    const cargarDatos = async () => {}, cargarNDVI = () => {}, cargarHumedadSuelo = () => {};
+    const cargarET0 = () => {}, renderZonas = () => {}, renderZonasTabs = () => {}, renderHoy = () => {};
+    const nombreCultivo = (c) => c;
+    const subirConfig = () => {};
+    let cfg = null;
+    ${recorta("function zonasGuardadas(")}
+    ${recorta("function parcelasDisponibles(")}
+    ${recorta("function parcelaActiva(")}
+    ${recorta("function configEfectiva(")}
+    function saveConfig(n) { cfgFinca = n; localStorage.setItem(STORAGE_KEY, JSON.stringify(n)); cfg = configEfectiva(); }
+    ${recorta("async function guardarYActualizar(")}
+    return { guardarYActualizar, leer: () => cfgFinca };
+  `;
+  return new Function("R", "localStorage", "document", "EDITADO", cuerpo)(R, ls, dom(domValores), editado);
+}
+
+
 console.log("\n── B · una ESTIMACIÓN no cruza, ni al motor ni al estado ──");
 {
   // El caso exacto de Codex.
@@ -155,43 +194,6 @@ console.log("\n── A · PANEL NORMAL: cambiar de método invalida la capacida
   // La cadena real del panel: guardarYActualizar → saveConfig → localStorage,
   // y después una lectura desde cero, como al recargar. Solo se sustituye el
   // DOM y el transporte; la lógica bajo prueba es la de app/index.html.
-  const dom = (valores = {}) => ({
-    getElementById: (id) => (id in valores ? { value: valores[id] } : null),
-    querySelector: () => null, querySelectorAll: () => [],
-  });
-
-  // `editado` modela si el agricultor ha TOCADO el campo de caudal después de
-  // cambiar de método. El input viene precargado con el caudal anterior, así que
-  // esa distinción es justo el bug: sin ella, el 6,7 de goteo volvía como
-  // `declarado` en aspersión sin que nadie escribiera nada.
-  function panel(ls, domValores, editado = false) {
-    const cuerpo = `
-      const window = { KyliaRiego: R, kyliaSync: { registroUsuario: async () => ({ ok: true }) }, kyliaTrack: () => {} };
-      const STORAGE_KEY = "kylia_config";
-      let cfgFinca = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-      let zonaActiva = null;
-      const panel = { classList: { remove: () => {} } };
-      let caudalEditado = EDITADO;
-      // Solo transporte y pintado. La lógica bajo prueba —el bloque que decide
-      // qué pasa con la capacidad al cambiar de método— es la real, recortada
-      // de app/index.html sin tocar.
-      const actualizarHeader = () => {}, setFeedback = () => {};
-      const cargarDatos = async () => {}, cargarNDVI = () => {}, cargarHumedadSuelo = () => {};
-      const cargarET0 = () => {}, renderZonas = () => {}, renderZonasTabs = () => {}, renderHoy = () => {};
-      const nombreCultivo = (c) => c;
-      const subirConfig = () => {};
-      let cfg = null;
-      ${recorta("function zonasGuardadas(")}
-      ${recorta("function parcelasDisponibles(")}
-      ${recorta("function parcelaActiva(")}
-      ${recorta("function configEfectiva(")}
-      function saveConfig(n) { cfgFinca = n; localStorage.setItem(STORAGE_KEY, JSON.stringify(n)); cfg = configEfectiva(); }
-      ${recorta("async function guardarYActualizar(")}
-      return { guardarYActualizar, leer: () => cfgFinca };
-    `;
-    return new Function("R", "localStorage", "document", "EDITADO", cuerpo)(R, ls, dom(domValores), editado);
-  }
-
   // Estado de partida: goteo con 6,7 derivado de la cinta.
   const inicial = { lat: 41.3, lon: 2.0, suelo: "franco", cultivos: ["lechuga"],
                     metodoRiego: "goteo", caudal: 6.7,
@@ -265,6 +267,90 @@ console.log("\n── LEGACY: las históricas no se mueven ──");
   const pres = R.presentarRiegoSeguro(MOTOR.presentarRiego, 8, { metodoRiego: "goteo", caudalMmh: R.caudalMotor(vieja, finca) });
   ok(pres.unidad === "min", `y SIGUE recibiendo minutos: "${pres.texto}"`);
   ok(R.caudalMotor({ ...BASE, caudal: 9 }, finca) === 9, "un caudal propio legacy también");
+}
+
+console.log("\n── MÉTODO NULL · deseleccionar el riego invalida la capacidad ──");
+{
+  // Reproducido en Chrome por Codex sobre 168e5ce: goteo + 6,7 derivado_goteo
+  // con confianza alta, se DESELECCIONA el método, se guarda, se recarga — y la
+  // capacidad seguía viva y fiable, con la presentación diciendo "72 min".
+  //
+  // La causa: `null` se trataba como "no ha habido cambio". Y no lo es: es que
+  // ya no hay sistema de riego al que esa capacidad pueda pertenecer.
+  const fiable = { capacidad_mmh: 6.7, fuente: "derivado_goteo", confianza: "alta" };
+
+  // ── A · goteo → null, por la cadena real del panel ──
+  const inicial = { lat: 41.3, lon: 2.0, suelo: "franco", cultivos: ["lechuga"],
+                    metodoRiego: "goteo", caudal: 6.7,
+                    riego: { ...fiable, unidad: "mm/h", datos: { l_h_gotero: 2 }, medido: "2026-09-10" } };
+  const ls = almacen({ kylia_config: inicial, kylia_zonas: [] });
+  const p = panel(ls, { "input-caudal": "6.7", "input-tarifa": "", "input-area": "", "input-capacidad-regadera": "" }, false);
+  await p.guardarYActualizar({ ...inicial, metodoRiego: null });      // ← deselecciona y guarda
+
+  const tras = JSON.parse(ls.getItem("kylia_config"));                 // ← reload
+  ok(tras.metodoRiego === null, `A · el método queda en null (${tras.metodoRiego})`);
+  ok(tras.caudal === null, `A · la capacidad se invalida: ${tras.caudal} (antes seguía en 6,7)`);
+  ok(tras.riego.fuente === "invalidada_por_cambio_de_metodo",
+     "A · y la procedencia de goteo deja de estar activa");
+  ok(tras.riego.anterior?.capacidad_mmh === 6.7,
+     "A · el 6,7 solo queda en riego.anterior, como metadato");
+  const capA = R.capacidadVigente({ metodoRiego: tras.metodoRiego, caudal: tras.caudal, riego: tras.riego }, {});
+  ok(capA.operativo === null && capA.motor === null, "A · capacidad operativa null tras recargar");
+  const eA = R.estadoSiembra({ ...BASE, metodoRiego: null, caudal: tras.caudal, riego: tras.riego },
+                             { suelo: "franco" }, { cultivosSoportados: CULTIVOS, hoy: HOY });
+  ok(eA.lista_para_ejecutar_riego === false, "A · lista_para_ejecutar_riego = false");
+  ok(eA.faltan.includes("metodo_riego"), "A · y el método aparece como lo que falta");
+  const presA = R.presentarRiegoSeguro(MOTOR.presentarRiego, 8, { metodoRiego: null, caudalMmh: tras.caudal, clase: capA.clase });
+  ok(presA.unidad === "l_m2", `A · sin minutos: "${presA.texto}"`);
+
+  // ── B · lo mismo desde aspersión ──
+  const iniB = { ...inicial, metodoRiego: "aspersion", caudal: 11.2,
+                 riego: { capacidad_mmh: 11.2, fuente: "medido_vaso", confianza: "alta", unidad: "mm/h" } };
+  const lsB = almacen({ kylia_config: iniB, kylia_zonas: [] });
+  const pB = panel(lsB, { "input-caudal": "11.2", "input-tarifa": "", "input-area": "", "input-capacidad-regadera": "" }, false);
+  await pB.guardarYActualizar({ ...iniB, metodoRiego: null });
+  const trasB = JSON.parse(lsB.getItem("kylia_config"));
+  ok(trasB.caudal === null && trasB.riego.fuente === "invalidada_por_cambio_de_metodo",
+     "B · aspersión → null invalida igual");
+  const presB = R.presentarRiegoSeguro(MOTOR.presentarRiego, 8, { metodoRiego: null, caudalMmh: trasB.caudal });
+  ok(presB.unidad === "l_m2", `B · sin minutos: "${presB.texto}"`);
+
+  // Todas las direcciones hacia null.
+  for (const de of ["goteo", "aspersion", "manguera", "surco", "regadera"]) {
+    const r = R.riegoTrasCambioDeMetodo({ metodoRiego: de, caudal: 6.7, riego: fiable }, null);
+    ok(r.invalidado === true && r.caudal === null, `${de} → null invalida`);
+  }
+
+  // ── C · DEFENSA EN PROFUNDIDAD: estado incoherente construido a mano ──
+  // Aunque alguien consiga fabricar "método null + capacidad 6,7 fiable" —una
+  // config legacy, una pantalla que pase un `clase` viejo—, ninguna de las dos
+  // puertas puede dejarlo pasar. No se confía en quien llama.
+  ok(R.evaluarCapacidadRiego(fiable, null).puede_ejecutar === false,
+     "C · evaluarCapacidadRiego con método null → NO ejecutable");
+  ok(R.evaluarCapacidadRiego(fiable, null).capacidad_mmh === null,
+     "C · y sin capacidad, aunque el número sea válido y la fuente fiable");
+  ok(R.evaluarCapacidadRiego(fiable, null).motivo === "sin_metodo", "C · con el motivo dicho");
+  const forzado = R.presentarRiegoSeguro(MOTOR.presentarRiego, 8,
+    { metodoRiego: null, caudalMmh: 6.7, clase: "fiable" });   // ← se le MIENTE a la función
+  ok(forzado.unidad === "l_m2" && forzado.clase === "no_ejecutable",
+     `C · presentarRiegoSeguro ignora un "fiable" falso: "${forzado.texto}"`);
+  ok(/cómo riegas/.test(forzado.aviso || ""), "C · y dice qué falta");
+  ok(R.puedeDarMinutos(null, 6.7) === false, "C · puedeDarMinutos con método null → false");
+  // Y con un método inventado, igual.
+  ok(R.evaluarCapacidadRiego(fiable, "teletransporte").puede_ejecutar === false,
+     "C · un método desconocido tampoco habilita nada");
+
+  // El invariante que pedía el encargo, sobre el barrido de métodos.
+  let rotas = 0;
+  for (const m of [null, undefined, "", "goteo", "aspersion", "manguera", "surco", "regadera", "inventado"]) {
+    const e = R.estadoSiembra({ ...BASE, metodoRiego: m, riego: fiable },
+                              { suelo: "franco" }, { cultivosSoportados: CULTIVOS, hoy: HOY });
+    const pres = R.presentarRiegoSeguro(MOTOR.presentarRiego, 8,
+      { metodoRiego: m, caudalMmh: R.caudalMotor({ ...BASE, metodoRiego: m, riego: fiable }, {}), clase: e.capacidad?.clase });
+    // minutos fiables ⇒ lista_para_ejecutar_riego
+    if (pres.unidad === "min" && pres.clase === "fiable" && e.lista_para_ejecutar_riego !== true) rotas++;
+  }
+  ok(rotas === 0, "invariante: unos minutos fiables implican SIEMPRE lista_para_ejecutar_riego");
 }
 
 console.log("\n── C–F · la fuente y la confianza mandan, no solo el número ──");
