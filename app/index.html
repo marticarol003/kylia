@@ -5164,6 +5164,10 @@
         caudalMmh:          c.caudal,
         areaM2:             c.areaParcela,
         capacidadRegaderaL: c.capacidadRegadera,
+        // La clase sale de la MISMA evaluación que el estado: fiable,
+        // provisional o no_ejecutable. Sin ella, una alta nueva con caudal
+        // tecleado se vería igual que una derivada de la geometría.
+        clase:              c.capacidadRiego?.clase || null,
       }).texto;
     }
     function fmtRiego(litrosBrutoMm) { return fmtRiegoCon(litrosBrutoMm, cfg); }
@@ -9903,7 +9907,7 @@
           ...nuevoCfg,
           suelo:             sueloSel ? sueloSel.dataset.suelo : (nuevoCfg.suelo ?? null),
           fechaPlantacion:   (fechaPlant && fechaPlant.value) ? fechaPlant.value : (nuevoCfg.fechaPlantacion ?? null),
-          caudal:            numCfg("input-caudal",              nuevoCfg.caudal),
+          caudal:            numCfg("input-caudal",              nuevoCfg.caudal),   // el cambio de método lo pisa abajo
           tarifaAgua:        numCfg("input-tarifa",              nuevoCfg.tarifaAgua),
           areaParcela:       numCfg("input-area",                nuevoCfg.areaParcela),
           capacidadRegadera: numCfg("input-capacidad-regadera",  nuevoCfg.capacidadRegadera),
@@ -9926,7 +9930,10 @@
           // Si en el MISMO guardado ha tecleado un caudal, ese sí es suyo y es
           // para el método nuevo: se respeta, pero como `declarado` — sirve para
           // dar minutos y no para llamarlos validados.
+          // SOLO si lo ha editado DESPUÉS del cambio. El valor precargado no
+          // cuenta: es el caudal del método anterior mirándonos desde el campo.
           const tecleado = (() => {
+            if (!caudalEditado) return null;
             const el = document.getElementById("input-caudal");
             const v = el ? parseFloat(el.value) : NaN;
             return (Number.isFinite(v) && v > 0) ? v : null;
@@ -9938,6 +9945,7 @@
           const inp = document.getElementById("input-caudal");
           if (inp && !tecleado) inp.value = "";
         }
+        caudalEditado = false;
         const eraPrimerUso = !localStorage.getItem(STORAGE_KEY);
         saveConfig(nuevoCfg);
         actualizarHeader();
@@ -10040,6 +10048,14 @@
       }
       // Muestra solo el campo relevante: caudal (goteo/aspersión/manguera),
       // regadera (regadera) o ninguno (surco). La superficie se mantiene siempre.
+      // ⚠️ EL INPUT DE CAUDAL VIENE PRECARGADO con cfgFinca.caudal. Sin esto,
+      // cambiar de goteo a aspersión y guardar SIN tocar el campo leía el 6,7
+      // precargado y lo reescribía como `declarado`: el número volvía por la
+      // puerta de atrás con procedencia nueva. Un valor precargado NO es una
+      // declaración del agricultor.
+      let caudalEditado = false;
+      document.getElementById("input-caudal")?.addEventListener("input", () => { caudalEditado = true; });
+
       function actualizarCamposCaudal(metodo) {
         const wrapCaudal   = document.getElementById("wrap-caudal");
         const wrapRegadera = document.getElementById("wrap-regadera");
@@ -10078,7 +10094,16 @@
           const yaActivo = btn.classList.contains("activo");
           document.querySelectorAll("#metodo-riego-grid .btn-cultivo").forEach(x => x.classList.remove("activo"));
           if (!yaActivo) btn.classList.add("activo");
-          actualizarCamposCaudal(yaActivo ? null : btn.dataset.metodo);
+          // Cambiar de método invalida la capacidad: se limpia lo que se ve y se
+          // olvida que hubiera algo escrito. Lo que quede en el campo a partir
+          // de aquí sí es suyo.
+          const nuevoMetodo = yaActivo ? null : btn.dataset.metodo;
+          if (nuevoMetodo !== (cfgFinca.metodoRiego || null)) {
+            const inp = document.getElementById("input-caudal");
+            if (inp) inp.value = "";
+            caudalEditado = false;
+          }
+          actualizarCamposCaudal(nuevoMetodo);
         });
       });
 

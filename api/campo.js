@@ -19,8 +19,39 @@ const { balanceHidrico, decisionRiego, presentarRiego, laminaRiego, laminaDeAcci
 // con CAUDAL_DEFAULT_MMH y devuelve unos minutos con la misma cara de seguridad
 // que si estuvieran medidos. El bancal real medía 5,4 mm/h donde esa tabla dice
 // 10, o sea el doble de agua. Con `caudal` nulo esto devuelve L/m².
-const { presentarRiegoSeguro } = require("../assets/js/riego-capacidad.js");
+const { presentarRiegoSeguro, evaluarCapacidadRiego } = require("../assets/js/riego-capacidad.js");
 const presentar = (mm, opts) => presentarRiegoSeguro(presentarRiego, mm, opts);
+
+// La PROCEDENCIA de la capacidad no vive en la fila: vive en `config_app` del
+// propietario, dentro de la siembra. La fila solo tiene el número, así que el
+// servidor no podía distinguir un caudal derivado de la geometría de uno
+// tecleado a mano — y daba minutos exactos para los dos.
+//
+// Esto la recupera de la configuración canónica que YA existe. Sin migración:
+// solo una lectura más, y si falla se cae al lado conservador (provisional).
+async function capacidadDeSiembra(u) {
+  const riego = { capacidad_mmh: u.caudal, fuente: "heredado_finca", confianza: "baja" };
+  try {
+    const dueno = u.propietario_id || u.id;
+    const filas = await supabaseSelect("usuarios", `id=eq.${dueno}&select=config_app`);
+    const cfg = filas?.[0]?.config_app;
+    for (const z of (cfg?.zonas || [])) {
+      for (const sb of (z.siembras || [])) {
+        if (sb.id !== u.id) continue;
+        // Declaró su riego: manda lo suyo, sea lo que sea.
+        if (sb.riego) return evaluarCapacidadRiego(sb.riego, u.metodo_riego);
+        if (sb.caudal != null) {
+          return evaluarCapacidadRiego({ capacidad_mmh: sb.caudal, fuente: "declarado", confianza: "media" }, u.metodo_riego);
+        }
+      }
+    }
+    // Parcela principal: su riego vive en `finca`.
+    if (cfg?.finca?.riego && (u.propietario_id == null || u.propietario_id === u.id)) {
+      return evaluarCapacidadRiego(cfg.finca.riego, u.metodo_riego);
+    }
+  } catch (_) { /* sin config: se queda en lo conservador */ }
+  return evaluarCapacidadRiego(riego, u.metodo_riego);
+}
 const { construirReveal, motivoClimaNoPublicable } = require("./_reveal.js");
 const { necesidadNutrientes, creditoResiduosN } = require("./_motor-nutricion.js");
 const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
@@ -105,7 +136,10 @@ async function vistaHoy(res, u) {
                  // huecos que importan, los de los extremos.
                  ventana: { desde: u.fecha_plantacion ? String(u.fecha_plantacion).slice(0, 10) : (serie[0]?.date || null),
                             hasta: hoy } };
-  const presOpts = { metodoRiego: u.metodo_riego, caudalMmh: u.caudal,
+  // MISMA evaluación que el cliente: fiable | provisional | no_ejecutable.
+  const cap = await capacidadDeSiembra(u);
+  const presOpts = { metodoRiego: u.metodo_riego, caudalMmh: cap.capacidad_mmh,
+                     clase: cap.clase,
                      areaM2: u.area_m2, capacidadRegaderaL: u.capacidad_regadera };
 
   const idxHoy = serie.findIndex(s => s.date === hoy);
@@ -190,6 +224,11 @@ async function vistaHoy(res, u) {
     usuario: { ciudad: u.ciudad, cultivo: cultivoId,
                area_m2: u.area_m2, capacidad_regadera: u.capacidad_regadera,
                metodo_riego: u.metodo_riego, caudal: u.caudal },
+    // La clasificación, explícita, para que cliente y servidor se puedan
+    // comparar en vez de esperar que coincidan por casualidad.
+    capacidad_riego: { clase: cap.clase, capacidad_mmh: cap.capacidad_mmh,
+                       fuente: cap.fuente, confianza: cap.confianza,
+                       puede_ejecutar: cap.puede_ejecutar, motivo: cap.motivo },
     hoy: {
       fecha: hoy, nivel: decHoy.nivel, regar: decHoy.nivel === "alta",
       texto: decHoy.texto, presentacion: presHoy,
