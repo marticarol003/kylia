@@ -62,6 +62,53 @@
   // caudal operativo de 0 — o sea, en un dato. Es el mismo tropiezo que hizo que
   // `base_version: null` fuera un UPDATE incondicional en el CAS. Aquí solo
   // pasan números de verdad y cadenas que contengan uno.
+  // ─── LA WHITELIST ────────────────────────────────────────────────────────
+  // Qué PROCEDENCIAS pueden declarar los minutos como fiables. Es una lista
+  // blanca, no negra, a propósito: con `fuente !== "estimado_metodo"` cualquier
+  // fuente nueva que alguien añada mañana entraría sola, y entraría en silencio.
+  // Aquí, para que una fuente habilite minutos hay que escribirla aquí.
+  //
+  // Están las dos en las que SABEMOS cómo se obtuvo el número:
+  //   · derivado_goteo → de la geometría real de la instalación
+  //   · medido_vaso    → medido por el agricultor con un pluviómetro improvisado
+  //
+  // NO está `declarado` (tecleado a mano en mm/h, sin saber de dónde salió), ni
+  // `heredado_finca`, ni `estimado_metodo`, ni `no_lo_se`, ni `sin_datos`.
+  const FUENTES_OPERATIVAS = ["derivado_goteo", "medido_vaso"];
+
+  // Y una SEGUNDA lista blanca, porque son dos decisiones distintas y mezclarlas
+  // rompe una de las dos:
+  //
+  //   · ¿puede este número CRUZAR al motor?      → FUENTES_AL_MOTOR
+  //   · ¿podemos llamar FIABLES a esos minutos?  → FUENTES_OPERATIVAS
+  //
+  // Un agricultor de siempre que tecleó su caudal en el panel, o una siembra
+  // antigua que hereda el de su finca, siguen recibiendo minutos — es lo que
+  // hacían y romperlo no arregla nada. Lo que NO hacemos es decir que están
+  // validados: su estado es `pendiente_validacion`.
+  //
+  // Lo que no cruza por ninguna de las dos es lo que nos hemos inventado
+  // nosotros: `estimado_metodo`, `no_lo_se`, `sin_datos` y la capacidad
+  // invalidada al cambiar de método. Esas viven en `estimacion_mmh` y ahí se
+  // quedan.
+  const FUENTES_AL_MOTOR = [...FUENTES_OPERATIVAS, "declarado", "heredado_finca"];
+
+  // ─── LA PUERTA, y solo una ───────────────────────────────────────────────
+  // Todo lo que decide si una capacidad vale —`capacidadVigente`,
+  // `caudalOperativo`, `puedeDarMinutos`, `estadoSiembra` y la presentación—
+  // pasa por AQUÍ. Cuatro validaciones parecidas es cómo se acaba teniendo
+  // `estado: completa` con capacidad 0 y una presentación que no puede dar
+  // minutos: cada una decidía por su cuenta y decidían distinto.
+  //
+  // Rechaza, y esto es la lista entera: null, undefined, "", 0, "0", NaN,
+  // Infinity, negativos, booleanos y cualquier cosa fuera del rango agronómico.
+  function capacidadOperativa(valor) {
+    const n = num(valor);
+    if (n === null) return null;
+    if (!(n > MMH_MIN && n < MMH_MAX)) return null;
+    return Math.round(n * 10) / 10;
+  }
+
   const num = (v) => {
     if (v === null || v === undefined || v === "" || typeof v === "boolean") return null;
     const n = Number(v);
@@ -177,39 +224,94 @@
     const estimacion = est.ok ? est.valor : null;
     const base = { unidad: "mm/h", estimacion_mmh: estimacion };
 
-    // ── Alta nueva: declaró su riego. No hereda nada.
+    // Empaqueta SIEMPRE por la misma puerta. `operativo` solo existe si el
+    // número pasa el filtro Y su fuente está en la whitelist; si no, es null y
+    // el valor se conserva como estimación, que es lo único que era.
+    const resolver = (valor, fuente, confianza, datos, nivel, declarada) => {
+      const v = capacidadOperativa(valor);
+      const admisible = FUENTES_OPERATIVAS.includes(fuente);
+      const alMotor   = FUENTES_AL_MOTOR.includes(fuente);
+      return { ...base,
+               // Habilita declarar los minutos FIABLES. Whitelist estricta.
+               operativo: (v !== null && admisible) ? v : null,
+               // El número que puede cruzar al motor. Más ancho, pero también
+               // whitelist: lo que nos hemos inventado nosotros no entra.
+               motor:     (v !== null && alMotor)   ? v : null,
+               valor: v, fuente, confianza, datos, nivel, declarada, admisible };
+    };
+
+    // ── Alta nueva: declaró su riego. No hereda nada, pase lo que pase.
     if (s.riego) {
-      const v = num(s.riego.capacidad_mmh);
-      if (v != null) {
-        return { ...base, operativo: v, fuente: s.riego.fuente || "declarado",
-                 confianza: s.riego.confianza || "media",
-                 datos: s.riego.datos || null, nivel: "siembra", declarada: true };
+      const v = capacidadOperativa(s.riego.capacidad_mmh);
+      if (v !== null) {
+        return resolver(v, s.riego.fuente || "declarado",
+                        s.riego.confianza || "media", s.riego.datos || null,
+                        "siembra", true);
       }
-      // Dijo "no lo sé". Se queda sin caudal operativo, a propósito.
-      return { ...base, operativo: null, fuente: s.riego.fuente || "no_lo_se",
-               confianza: "baja", datos: null, nivel: "ninguno", declarada: true };
+      // Dijo "no lo sé", o el número no pasa el filtro (0, negativo, fuera de
+      // rango). Se queda sin caudal, a propósito.
+      return resolver(null, s.riego.fuente || "no_lo_se", "baja", null, "ninguno", true);
     }
 
     // ── Legacy: exactamente lo de siempre.
-    if (num(s.caudal) != null) {
-      return { ...base, operativo: num(s.caudal), fuente: "declarado",
-               confianza: "media", datos: null, nivel: "siembra", declarada: false };
+    if (capacidadOperativa(s.caudal) !== null) {
+      return resolver(s.caudal, "declarado", "media", null, "siembra", false);
     }
-    if (num(finca.caudal) != null) {
-      return { ...base, operativo: num(finca.caudal), fuente: "heredado_finca",
-               confianza: "baja", datos: null, nivel: "finca", declarada: false };
+    if (capacidadOperativa(finca.caudal) !== null) {
+      return resolver(finca.caudal, "heredado_finca", "baja", null, "finca", false);
     }
-    // Ni suyo ni de la finca: tampoco se inventa. El motor lo rellenaría solo,
-    // y eso es justo lo que no puede pasar.
-    return { ...base, operativo: null, fuente: "sin_datos", confianza: "baja",
-             datos: null, nivel: "ninguno", declarada: false };
+    return resolver(null, "sin_datos", "baja", null, "ninguno", false);
   }
 
-  // El número que puede cruzar la puerta del motor, y nada más. Es LA función
-  // que deben usar `configEfectiva` y `payloadSiembra`: si cada uno resuelve la
-  // precedencia por su cuenta, se separan en cuanto alguien toque una.
-  function caudalOperativo(s = {}, finca = {}) {
-    return capacidadVigente(s, finca).operativo;
+  // El número que se le puede pasar al MOTOR. Ver las dos listas blancas de
+  // arriba: esto es `FUENTES_AL_MOTOR`, no `FUENTES_OPERATIVAS`.
+  function caudalMotor(s = {}, finca = {}) {
+    return capacidadVigente(s, finca).motor;
+  }
+
+  // Compatibilidad de nombre: es el caudal que se le da al motor.
+  const caudalOperativo = caudalMotor;
+
+  // ─── Cambiar de método invalida la capacidad ─────────────────────────────
+  //
+  // Un caudal de 6,7 mm/h derivado de la geometría de una cinta de goteo no dice
+  // NADA sobre un aspersor. Conservarlo al cambiar de método es peor que no
+  // tener dato: es un número con procedencia creíble aplicado a una instalación
+  // que no es la suya.
+  //
+  // El alta ya invalidaba al cambiar de chip, pero el PANEL normal no: cambiabas
+  // de goteo a aspersión, guardabas, y te quedabas con 6,7 y `derivado_goteo`.
+  // Esta función es la puerta única para que no dependa de que cada pantalla se
+  // acuerde.
+  //
+  // MVP: invalidación SEGURA, sin intentar adivinar si el número podría
+  // reutilizarse. goteo→aspersión, aspersión→goteo, goteo→manguera: todas
+  // dejan la configuración sin capacidad hasta volver a medir o derivar.
+  function riegoTrasCambioDeMetodo(previo = {}, metodoNuevo) {
+    const metodoPrevio = previo.metodoRiego || null;
+    const sinCambio = { caudal: previo.caudal ?? null, riego: previo.riego || null,
+                        invalidado: false, metodo_anterior: metodoPrevio };
+    if (!metodoNuevo || !metodoPrevio || metodoNuevo === metodoPrevio) return sinCambio;
+
+    // Lo anterior se guarda como HISTÓRICO, anidado. `capacidadVigente` lee
+    // `riego.capacidad_mmh`, `.fuente`, `.confianza` y `.datos` del primer
+    // nivel: nada de lo que hay bajo `anterior` puede volver a activarse solo.
+    const historico = previo.riego && previo.riego.capacidad_mmh != null
+      ? { metodo: metodoPrevio, capacidad_mmh: previo.riego.capacidad_mmh,
+          fuente: previo.riego.fuente || null, medido: previo.riego.medido || null }
+      : (previo.caudal != null ? { metodo: metodoPrevio, capacidad_mmh: previo.caudal,
+                                   fuente: "declarado", medido: null } : null);
+
+    return {
+      caudal: null,
+      riego: { capacidad_mmh: null, unidad: "mm/h",
+               fuente: "invalidada_por_cambio_de_metodo", confianza: "baja", datos: null,
+               metodo_anterior: metodoPrevio,
+               estimacion_mmh: POR_DEFECTO_MMH[metodoNuevo] ?? null,
+               anterior: historico },
+      invalidado: true,
+      metodo_anterior: metodoPrevio,
+    };
   }
 
   // ¿Se le pueden dar MINUTOS a este cultivo?
@@ -217,10 +319,13 @@
   // A regadera y surco no se les dan minutos nunca (viajes y L/m²), así que la
   // pregunta no aplica y la respuesta es que sí: su orden no depende del caudal.
   // A goteo, aspersión y manguera solo si hay un caudal operativo de verdad.
-  function puedeDarMinutos(metodo, operativo) {
+  function puedeDarMinutos(metodo, valor) {
     if (UNIDAD_ORDEN[metodo] !== "min") return true;
-    const v = num(operativo);
-    return v != null && v >= 0.1;
+    // MISMA puerta que todo lo demás. Antes esto aceptaba >= 0,1 mientras
+    // `capacidadVigente` aceptaba cualquier número: con capacidad 0 el estado
+    // decía "completa, lista para ejecutar" y esta función decía que no se
+    // podían dar minutos. Las dos cosas a la vez, sobre la misma siembra.
+    return capacidadOperativa(valor) !== null;
   }
 
   // LA ÚNICA PUERTA AL MOTOR para presentar un riego. Se le pasa la
@@ -303,12 +408,26 @@
       // Un caudal HEREDADO de la finca sí es operativo (es lo que hacían las
       // siembras antiguas y hay que respetarlo), pero no habilita los minutos
       // como fiables: sale del cultivo de al lado, no de este.
-      const fiable = cap && cap.operativo != null
-                     && cap.fuente !== "estimado_metodo" && cap.fuente !== "heredado_finca";
-      if (fiable) lista_para_ejecutar_riego = lista_para_calcular_agua;
-      else if (cap && cap.fuente === "heredado_finca") {
+      // `cap.operativo` YA lleva dentro las tres condiciones —número finito y
+      // positivo, dentro de rango, y fuente en la whitelist—, así que aquí no se
+      // vuelve a decidir nada. Antes esta línea repetía el criterio con nombres
+      // de fuente ("!== estimado_metodo"), y por ahí se colaba una capacidad 0.
+      //
+      // INVARIANTE 1: capacidad operativa null ⇒ lista_para_ejecutar_riego false.
+      const fiable = !!cap && cap.operativo !== null;
+      // INVARIANTE 2: si se declara ejecutable, la presentación TIENE que poder
+      // dar minutos. Se comprueba con la misma función que usa la presentación,
+      // no con una copia del criterio.
+      if (fiable && puedeDarMinutos(metodo, cap.operativo)) {
+        lista_para_ejecutar_riego = lista_para_calcular_agua;
+      } else if (cap && cap.fuente === "heredado_finca") {
         incertidumbres.push({ dato: "capacidad_riego", motivo: "heredada_de_la_finca",
                               efecto: "los minutos salen del caudal de otro cultivo", confianza: "baja" });
+      } else if (cap && cap.valor !== null && !cap.admisible) {
+        // Hay un número, pero no sabemos de dónde salió (tecleado a mano, o una
+        // estimación nuestra). Sirve para orientar; no para prometer minutos.
+        incertidumbres.push({ dato: "capacidad_riego", motivo: `fuente_no_operativa:${cap.fuente}`,
+                              efecto: "los minutos no se pueden declarar fiables", confianza: "baja" });
       } else {
         incertidumbres.push({ dato: "capacidad_riego", motivo: "sin_capacidad_declarada",
                               efecto: "no se pueden dar minutos: solo L/m²", confianza: "baja" });
@@ -354,7 +473,9 @@
     MMH_MIN, MMH_MAX, UNIDAD_ORDEN, POR_DEFECTO_MMH,
     REGADERA_MIN_L, REGADERA_MAX_L,
     capacidadGoteo, capacidadVaso, capacidadDeclarada, capacidadEstimada, derivar,
-    capacidadVigente, caudalOperativo, puedeDarMinutos, presentarRiegoSeguro,
+    FUENTES_OPERATIVAS, FUENTES_AL_MOTOR, capacidadOperativa,
+    capacidadVigente, caudalOperativo, caudalMotor, puedeDarMinutos, presentarRiegoSeguro,
+    riegoTrasCambioDeMetodo,
     estadoSiembra, estadoDecision,
   };
 });

@@ -355,7 +355,15 @@ console.log("\n── 12. la capacidad vigente sale de un solo sitio ──");
 
   // Legacy intacto: sin `riego` se hereda como siempre.
   const heredado = R.capacidadVigente({ metodoRiego: "goteo" }, { caudal: 11 });
-  ok(heredado.operativo === 11 && heredado.nivel === "finca", "sin el suyo y sin declarar, el de la finca");
+  // ⚠️ DOS COSAS DISTINTAS, y por eso hay dos campos:
+  //   · `motor`     → el número CRUZA al motor, así que sigue dando minutos.
+  //   · `operativo` → null, porque `heredado_finca` no está en la whitelist:
+  //                    no vamos a llamar validados unos minutos que salen del
+  //                    caudal del cultivo de al lado.
+  ok(heredado.motor === 11 && heredado.nivel === "finca",
+     "sin el suyo y sin declarar, el de la finca SÍ llega al motor (legacy intacto)");
+  ok(heredado.operativo === null,
+     "pero no habilita minutos fiables: heredado_finca no está en FUENTES_OPERATIVAS");
   ok(heredado.declarada === false, "marcado como no declarado");
 
   const nada = R.capacidadVigente({ metodoRiego: "goteo" }, {});

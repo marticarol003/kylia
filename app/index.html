@@ -9908,6 +9908,36 @@
           areaParcela:       numCfg("input-area",                nuevoCfg.areaParcela),
           capacidadRegadera: numCfg("input-capacidad-regadera",  nuevoCfg.capacidadRegadera),
         };
+
+        // ⚠️ CAMBIAR DE MÉTODO INVALIDA LA CAPACIDAD, también aquí.
+        //
+        // El alta ya lo hacía al cambiar de chip; el panel NO. Se podía pasar de
+        // goteo a aspersión, guardar, y quedarse con 6,7 mm/h y la procedencia
+        // `derivado_goteo` colgando de un aspersor. Un caudal derivado de la
+        // geometría de una cinta de goteo no dice nada sobre un aspersor: eso no
+        // es un dato aproximado, es un número creíble aplicado a otra cosa.
+        //
+        // La decisión vive en riego-capacidad.js para que no dependa de que cada
+        // pantalla se acuerde por su cuenta.
+        const tras = window.KyliaRiego.riegoTrasCambioDeMetodo(
+          { metodoRiego: cfgFinca.metodoRiego, caudal: cfgFinca.caudal, riego: cfgFinca.riego },
+          nuevoCfg.metodoRiego);
+        if (tras.invalidado) {
+          // Si en el MISMO guardado ha tecleado un caudal, ese sí es suyo y es
+          // para el método nuevo: se respeta, pero como `declarado` — sirve para
+          // dar minutos y no para llamarlos validados.
+          const tecleado = (() => {
+            const el = document.getElementById("input-caudal");
+            const v = el ? parseFloat(el.value) : NaN;
+            return (Number.isFinite(v) && v > 0) ? v : null;
+          })();
+          nuevoCfg = { ...nuevoCfg, caudal: tecleado, riego: tecleado
+            ? { capacidad_mmh: tecleado, unidad: "mm/h", fuente: "declarado",
+                confianza: "media", datos: null, metodo_anterior: tras.metodo_anterior }
+            : tras.riego };
+          const inp = document.getElementById("input-caudal");
+          if (inp && !tecleado) inp.value = "";
+        }
         const eraPrimerUso = !localStorage.getItem(STORAGE_KEY);
         saveConfig(nuevoCfg);
         actualizarHeader();
