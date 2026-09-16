@@ -276,6 +276,32 @@ async function vistaMadurez(res, u) {
 // Si la fila consultada no tiene foto pero es una ZONA (su propietario es otra
 // fila), se mira la del propietario — que es donde vive siempre. Así funciona
 // aunque el dispositivo pregunte con el id de una zona.
+// Los campos ESTRUCTURALES de una parcela, geometría incluida, para poder
+// contrastarla contra la configuración canónica sin adivinar. `vista=hoy` no
+// devuelve el contorno —y no debe: es el endpoint que más se llama y un polígono
+// por respuesta lo engorda— así que esto va aparte y solo lo pide quien verifica.
+// No calcula nada: es un espejo de la fila.
+function vistaVerificar(res, u) {
+  return res.status(200).json({
+    ok: true, vista: "verificar",
+    parcela: {
+      id:               u.id,
+      propietario_id:   u.propietario_id || null,
+      nombre:           u.nombre || null,
+      ciudad:           u.ciudad || null,
+      lat:              u.lat ?? null,
+      lon:              u.lon ?? null,
+      cultivos:         u.cultivos || [],
+      parcela:          u.parcela || null,        // el contorno, tal cual
+      area_m2:          u.area_m2 ?? null,
+      fecha_plantacion: u.fecha_plantacion || null,
+      suelo:            u.suelo || null,
+      metodo_riego:     u.metodo_riego || null,
+      caudal:           u.caudal ?? null,
+    },
+  });
+}
+
 // Versión válida o NADA. Nunca se fabrica un 0: un 0 inventado es una base de
 // CAS falsa, y con ella el cliente escribiría creyendo que parte de cero cuando
 // en realidad no sabe de dónde parte. PostgREST puede devolver un bigint como
@@ -1007,6 +1033,7 @@ module.exports = async (req, res) => {
     }
     if (permiso.motivo === "sin_sesion") console.log("[campo] acceso sin sesión:", vista);
 
+    if (vista === "verificar")   return vistaVerificar(res, u);
     if (vista === "config")      return await vistaConfig(res, u);
     if (vista === "reveal")      return await vistaReveal(req, res, u);
     if (vista === "comparativa") return await vistaComparativa(req, res, u);
