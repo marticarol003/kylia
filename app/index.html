@@ -2694,6 +2694,26 @@
     .perfil-barra span { display: block; height: 100%; background: var(--verde, #013A27); border-radius: 3px; }
     .perfil-sig { font-size: .86rem; margin: 14px 0 0; line-height: 1.5; }
     .perfil-nota { font-size: .78rem; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
+
+    /* Comprobación del alta. Cada dato con su procedencia: lo que ha dicho el
+       agricultor, lo que hemos obtenido solos, lo que hemos calculado y lo que
+       nos estamos inventando tienen que verse distinto. */
+    .comp-fila { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+                 padding: 7px 0; border-bottom: 1px solid var(--linea, #E6E6E1); }
+    .comp-fila:last-of-type { border-bottom: 0; }
+    .comp-ok  { flex: 0 0 auto; font-weight: 700; color: var(--verde, #013A27); }
+    .comp-txt { flex: 1 1 auto; font-size: .9rem; line-height: 1.4; }
+    .comp-proc { flex: 0 0 auto; font-size: .68rem; letter-spacing: .02em;
+                 padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+    .proc-tuyo { background: #EEF3F0; color: #3B5A4C; }
+    .proc-auto { background: #E9F0F6; color: #35566F; }
+    .proc-calc { background: #EDF2E6; color: #48632B; }
+    /* La estimación se marca en ámbar a propósito: es el único de los cuatro
+       que NO es un dato, y el que hasta hoy se presentaba como si lo fuera. */
+    .proc-est  { background: #FBF0DC; color: #7A5A17; }
+    .comp-listo   { font-size: .88rem; line-height: 1.55; margin: 14px 0 0; }
+    .comp-parcial { font-size: .88rem; line-height: 1.55; margin: 14px 0 0;
+                    padding: 10px 12px; border-radius: 10px; background: #FBF0DC; color: #6B4E14; }
     .alta-preg { font-weight: 700; margin: 22px 0 10px; color: var(--verde, #013A27); }
     /* Solo la PRIMERA pregunta del paso pierde el margen. Antes bastaba con
        :first-of-type, pero ahora cada pregunta vive en su propio div revelable
@@ -2860,6 +2880,7 @@
           <button type="button" class="alta-chip ancho" id="alta-fecha-btn">Elegir fecha</button>
         </div>
         <input type="date" class="alta-input" id="alta-fecha" hidden style="margin-top:8px">
+        <p class="alta-nota" id="alta-fecha-err" hidden style="color:#8A2B20"></p>
         <p class="alta-nota">Con una fecha aproximada nos vale para empezar. Se puede afinar luego.</p>
         </div>
         <button type="button" class="alta-btn" id="alta-b1" disabled data-ir="4">Seguir</button>
@@ -2914,18 +2935,60 @@
              su agua real en vez de una suposición, pero el alta no puede
              depender de un número que la mayoría no sabe: nace oculto detrás de
              "lo sé" y el botón de seguir no lo mira nunca. -->
+        <!-- ⚠️ ESTO YA NO PREGUNTA mm/h. Antes era "¿sabes cuánta agua echa tu
+             riego?" y un campo numérico: una pregunta que el agricultor casi
+             nunca puede contestar, y que cuando la contesta suele contestarla
+             mal (el vaso bajo un gotero sobreestima ×29). Ahora se preguntan
+             cosas que se ven mirando el bancal y el número lo saca Kylia. -->
         <div id="alta-q-caudal" hidden>
-          <p class="alta-preg">¿Sabes cuánta agua echa tu riego?</p>
-          <div class="alta-chips" id="alta-sabe-caudal">
-            <button type="button" class="alta-chip" data-sabe="1">Sí, lo sé</button>
-            <button type="button" class="alta-chip" data-sabe="0">No, ya lo mediré</button>
+          <p class="alta-preg" id="alta-cap-tit">¿Cuánta agua echa tu riego?</p>
+
+          <div id="alta-cap-goteo" hidden>
+            <p class="alta-nota" style="margin-top:0">Está impreso en la cinta de goteo.</p>
+            <p class="alta-preg" style="font-size:.9rem">Litros por hora de cada gotero</p>
+            <div class="alta-chips" id="alta-cap-q">
+              <button type="button" class="alta-chip" data-q="1.6">1,6 L/h</button>
+              <button type="button" class="alta-chip" data-q="2">2 L/h</button>
+              <button type="button" class="alta-chip" data-q="4">4 L/h</button>
+            </div>
+            <p class="alta-preg" style="font-size:.9rem">¿Cada cuánto hay un gotero?</p>
+            <div class="alta-chips" id="alta-cap-sep">
+              <button type="button" class="alta-chip" data-sep="0.2">20 cm</button>
+              <button type="button" class="alta-chip" data-sep="0.3">30 cm</button>
+              <button type="button" class="alta-chip" data-sep="0.5">50 cm</button>
+            </div>
+            <p class="alta-preg" style="font-size:.9rem">¿Qué separación hay entre las líneas?</p>
+            <div class="alta-chips" id="alta-cap-lin">
+              <button type="button" class="alta-chip" data-lin="0.5">50 cm</button>
+              <button type="button" class="alta-chip" data-lin="0.8">80 cm</button>
+              <button type="button" class="alta-chip" data-lin="1">1 m</button>
+              <button type="button" class="alta-chip" data-lin="1.5">1,5 m</button>
+            </div>
           </div>
-          <div id="alta-caudal-campo" hidden style="margin-top:10px">
-            <label class="alta-preg" for="alta-caudal" style="font-size:.95rem">Litros por metro cuadrado en una hora</label>
-            <input type="number" class="alta-input" id="alta-caudal" min="0.5" max="80" step="0.1"
-                   inputmode="decimal" placeholder="Ej: 10,9">
-            <p class="alta-nota" id="alta-caudal-nota">Si no lo tienes a mano, sáltalo: se mide en diez minutos cuando estés regando.</p>
+
+          <div id="alta-cap-vaso" hidden>
+            <p class="alta-nota" style="margin-top:0">Pon un vaso recto en medio de la zona mojada y riega 15 minutos. ¿Cuánta agua se acumula?</p>
+            <div class="alta-chips" id="alta-cap-cm">
+              <button type="button" class="alta-chip" data-cm="0.5">Medio cm</button>
+              <button type="button" class="alta-chip" data-cm="1">Un cm</button>
+              <button type="button" class="alta-chip" data-cm="2">Dos cm</button>
+              <button type="button" class="alta-chip" data-cm="3">Tres o más</button>
+            </div>
           </div>
+
+          <div id="alta-cap-regadera" hidden>
+            <p class="alta-nota" style="margin-top:0">Para contarte los viajes que tienes que dar.</p>
+            <div class="alta-chips" id="alta-cap-reg">
+              <button type="button" class="alta-chip" data-reg="5">5 litros</button>
+              <button type="button" class="alta-chip" data-reg="10">10 litros</button>
+              <button type="button" class="alta-chip" data-reg="15">15 litros</button>
+            </div>
+          </div>
+
+          <div class="alta-chips" style="margin-top:10px">
+            <button type="button" class="alta-chip ancho" id="alta-cap-nolose">No lo sé todavía</button>
+          </div>
+          <p class="alta-nota" id="alta-cap-res"></p>
         </div>
 
         <p class="alta-nota">No hace falta que sepas litros ni caudales. Con tu rutina nos basta.</p>
@@ -3210,6 +3273,57 @@
             <button type="button" class="alta-chip" data-ult="3">Hace 2–3 días</button>
             <button type="button" class="alta-chip" data-ult="7">Hace más</button>
           </div>
+        </div>
+
+        <!-- ── Capacidad de aplicación de ESTE cultivo ──────────────────
+             La pregunta que no se puede hacer de frente. Nadie sabe sus mm/h de
+             memoria, así que no se preguntan: se preguntan cosas que se ven
+             mirando el bancal y el número lo saca Kylia (assets/js/riego-capacidad.js).
+             Sin esto, los minutos salen de una tabla nuestra: el bancal real
+             medía 5,4 mm/h y la tabla dice 10. -->
+        <div id="ec-q-cap" hidden>
+          <p class="alta-preg" style="font-size:.95rem" id="ec-cap-tit">¿Cuánta agua echa tu riego?</p>
+
+          <div id="ec-cap-goteo" hidden>
+            <p class="alta-nota" style="margin-top:0">Está impreso en la cinta. Si no, se mide con una botella debajo de un gotero.</p>
+            <p class="alta-preg" style="font-size:.85rem">Litros por hora de cada gotero</p>
+            <div class="alta-chips" id="ec-cap-q">
+              <button type="button" class="alta-chip" data-q="1.6">1,6 L/h</button>
+              <button type="button" class="alta-chip" data-q="2">2 L/h</button>
+              <button type="button" class="alta-chip" data-q="4">4 L/h</button>
+            </div>
+            <p class="alta-preg" style="font-size:.85rem">¿Cada cuánto hay un gotero?</p>
+            <div class="alta-chips" id="ec-cap-sep">
+              <button type="button" class="alta-chip" data-sep="0.2">20 cm</button>
+              <button type="button" class="alta-chip" data-sep="0.3">30 cm</button>
+              <button type="button" class="alta-chip" data-sep="0.5">50 cm</button>
+            </div>
+            <p class="alta-preg" style="font-size:.85rem">¿Qué separación hay entre las líneas?</p>
+            <div class="alta-chips" id="ec-cap-lin">
+              <button type="button" class="alta-chip" data-lin="0.5">50 cm</button>
+              <button type="button" class="alta-chip" data-lin="0.8">80 cm</button>
+              <button type="button" class="alta-chip" data-lin="1">1 m</button>
+              <button type="button" class="alta-chip" data-lin="1.5">1,5 m</button>
+            </div>
+          </div>
+
+          <div id="ec-cap-vaso" hidden>
+            <p class="alta-nota" style="margin-top:0">Pon un vaso recto en medio de la zona mojada y riega 15 minutos. ¿Cuánta agua se acumula?</p>
+            <div class="alta-chips" id="ec-cap-cm">
+              <button type="button" class="alta-chip" data-cm="0.5">Medio cm</button>
+              <button type="button" class="alta-chip" data-cm="1">Un cm</button>
+              <button type="button" class="alta-chip" data-cm="2">Dos cm</button>
+              <button type="button" class="alta-chip" data-cm="3">Tres o más</button>
+            </div>
+          </div>
+
+          <!-- "No lo sé" es una respuesta legítima y tiene que estar. Obligar a
+               elegir un chip cualquiera para poder seguir es cómo se fabrica un
+               dato falso con pinta de confirmado. -->
+          <div class="alta-chips" style="margin-top:10px">
+            <button type="button" class="alta-chip ancho" id="ec-cap-nolose">No lo sé todavía</button>
+          </div>
+          <p class="alta-nota" id="ec-cap-res"></p>
         </div>
 
         <div class="editor-acciones">
@@ -3742,6 +3856,7 @@
        lo reexporta). Antes estaba duplicado dentro de este HTML y las dos copias
        decidían distinto sobre los mismos datos. -->
   <script src="/assets/js/motor-riego.js"></script>
+  <script src="/assets/js/riego-capacidad.js"></script>
   <!-- Reglas de clima: el MISMO fichero que hace require api/_clima.js. Aquí
        vivía la cuarta copia de "qué día es hoy" y "qué fuente manda", y su
        hoyISO iba en UTC — entre las 00:00 y las 02:00 locales eso hace que el
@@ -3896,7 +4011,12 @@
         // El de la siembra si lo tiene: el servidor calcula su propio balance y
         // con el método de la finca le daría otra eficiencia.
         metodo_riego:     s.metodoRiego || base.metodoRiego || null,
-        caudal:           base.caudal ?? null,
+        // MISMA puerta que configEfectiva, para que la fila del servidor y lo que
+        // decide el móvil no puedan discrepar. Para las siembras que ya existían
+        // da EXACTAMENTE el mismo valor que antes (no llevan `riego` ni
+        // `caudal` propio), así que la huella no se mueve y desplegar no dispara
+        // una ronda de sincronización de todo el histórico.
+        caudal:           window.KyliaRiego.caudalOperativo(s, base),
       };
     }
     // Serialización ESTABLE y RECURSIVA. La versión anterior usaba
@@ -3999,6 +4119,15 @@
             parcelaNombre: z.nombre || null,
             cultivo: s.cultivo, area_m2: s.area_m2, fechaPlantacion: s.fechaPlantacion,
             metodoRiego: s.metodoRiego || null, riegoMinutos: s.riegoMinutos ?? null,
+            // ⚠️ SU CAUDAL Y SU PROCEDENCIA. Faltaban, y son lo que hace que el
+            // riego sea de verdad del cultivo: `configEfectiva` lee de AQUÍ, no
+            // de la siembra, así que sin estas dos líneas `p.caudal` era siempre
+            // undefined y todos los cultivos volvían a caer al caudal de la
+            // finca — el defecto entero, intacto, detrás de una función que
+            // parecía arreglada. Lo cazó el test que va del alta al motor
+            // pasando por la cadena real en vez de sustituir parcelaActiva.
+            caudal: s.caudal ?? null,
+            riego: s.riego || null,
             // El contorno propio si la zona se partió; el del recinto entero si
             // ese cultivo lo ocupa solo; ninguno si comparte recinto sin partir
             // (ahí la medida del satélite saldría mezclada, ver renderZonas).
@@ -4027,7 +4156,15 @@
 
     function configEfectiva() {
       const p = parcelaActiva();
-      if (!p || p.id === null) return { ...cfgFinca };
+      // La parcela principal lee cfgFinca directamente, pero la regla del caudal
+      // operativo es la MISMA: si el alta escribió `riego` con capacidad nula
+      // (dijo "no lo sé"), no se cuela el caudal que hubiera antes en la finca.
+      if (!p || p.id === null) {
+        return { ...cfgFinca,
+                 caudal:         window.KyliaRiego.caudalOperativo(cfgFinca, {}),
+                 riegoInfo:      cfgFinca.riego || null,
+                 capacidadRiego: window.KyliaRiego.capacidadVigente(cfgFinca, {}) };
+      }
       return {
         ...cfgFinca,
         cultivos:        p.cultivo ? [p.cultivo] : [],
@@ -4042,6 +4179,35 @@
         // el de la finca, que es lo que hacían.
         metodoRiego:     p.metodoRiego  || cfgFinca.metodoRiego || null,
         riegoMinutos:    p.riegoMinutos ?? cfgFinca.riegoMinutos ?? null,
+        // Y SU CAPACIDAD DE APLICACIÓN. Era lo único del riego que seguía siendo
+        // de la finca: `metodoRiego` ya se heredaba por siembra desde julio, así
+        // que un bancal a goteo y otro a aspersión tenían eficiencias distintas
+        // pero COMPARTÍAN los mm/h — y de los mm/h salen los minutos. Un cultivo
+        // nuevo heredaba en silencio el caudal del vecino.
+        //
+        // No hace falta migración: `usuarios.caudal` YA es por fila y cada
+        // siembra ES una fila. Lo que faltaba era que el cliente escribiera el
+        // suyo en vez de copiar el de la finca en todas.
+        //
+        // Las siembras antiguas no tienen `caudal` propio y siguen cayendo al de
+        // la finca, que es exactamente lo que hacían.
+        //
+        // ⚠️ SALE DE `caudalOperativo`, no de un `??` escrito aquí. Una
+        // estimación NO puede acabar siendo el caudal operativo: el motor no
+        // sabe de dónde viene el número y, ante un caudal ausente, rellena con
+        // su tabla por defecto y devuelve unos minutos con la misma cara de
+        // seguridad que si estuvieran medidos. El bancal real medía 5,4 donde
+        // esa tabla dice 10.
+        //
+        // Una siembra del alta nueva SIEMPRE lleva `riego`, y si dijo "no lo sé"
+        // se queda con caudal null a propósito: no hereda el del cultivo de al
+        // lado. Las antiguas no llevan `riego` y siguen heredando como siempre.
+        caudal:          window.KyliaRiego.caudalOperativo(p, cfgFinca),
+        // La procedencia NO viaja a la columna: vive en config_app, junto a la
+        // siembra. El motor solo quiere el número; quien necesita saber si ese
+        // número está medido o supuesto es la pantalla.
+        riegoInfo:       p.riego || null,
+        capacidadRiego:  window.KyliaRiego.capacidadVigente(p, cfgFinca),
       };
     }
 
@@ -4601,6 +4767,61 @@
       btn.disabled = !(ecR.cuanto && ecCabe && ecR.metodo && ecR.cada && ecR.minutos && ecR.ultimo != null);
     }
 
+    // ─── Capacidad de aplicación: qué se pregunta y qué sale ──────────────
+    // El método decide la pregunta. A surco no se le pregunta nada porque su
+    // orden se da en L/m² y no necesita caudal; a goteo se le preguntan tres
+    // cosas que se ven; a aspersión y manguera, el vaso, que ahí sí es un
+    // pluviómetro válido.
+    function ecPintarCapacidad() {
+      const m = ecR.metodo;
+      const esGoteo = m === "goteo";
+      const esVaso  = m === "aspersion" || m === "manguera";
+      const g = document.getElementById("ec-cap-goteo");
+      const v = document.getElementById("ec-cap-vaso");
+      const q = document.getElementById("ec-q-cap");
+      if (!g || !v || !q) return;
+      g.hidden = !esGoteo;
+      v.hidden = !esVaso;
+      // Cambiar de método invalida lo contestado para el anterior.
+      delete ecR.capQ; delete ecR.capSep; delete ecR.capLin; delete ecR.capCm;
+      ecR.cap = null;
+      document.getElementById("ec-cap-res").textContent = "";
+      document.getElementById("ec-cap-nolose")?.classList.remove("sel");
+      q.querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+      // Si el método no lleva capacidad, el bloque entero sobra.
+      if (!esGoteo && !esVaso) q.hidden = true;
+      const tit = document.getElementById("ec-cap-tit");
+      if (tit) tit.textContent = esGoteo
+        ? "¿Cuánta agua echa tu goteo?"
+        : "¿Cuánta agua echa tu riego?";
+    }
+
+    function ecCalcularCapacidad() {
+      document.getElementById("ec-cap-nolose")?.classList.remove("sel");
+      const out = document.getElementById("ec-cap-res");
+      const r = window.KyliaRiego.derivar(ecR.metodo, {
+        l_h_gotero:   ecR.capQ,
+        sep_goteros_m: ecR.capSep,
+        sep_lineas_m:  ecR.capLin,
+        cm:            ecR.capCm,
+        minutos:       15,
+      });
+      if (!r.ok) {
+        ecR.cap = null;
+        // Faltan respuestas: no es un error, es que aún no ha terminado.
+        out.textContent = r.motivo === "datos_incompletos" ? ""
+          : r.motivo === "fuera_de_rango"
+            ? `Sale ${r.valor} L/m² cada hora, que no es creíble para un riego. Repasa las respuestas.`
+            : "Con esas respuestas no sale un número creíble. Repásalas.";
+        return;
+      }
+      ecR.cap = r;
+      // En la unidad del agricultor, no en la nuestra. "mm/h" no significa nada
+      // para quien riega; "L/m² cada hora" sí, y es el mismo número.
+      out.innerHTML = `Tu riego echa <strong>${r.valor} L/m² cada hora</strong>. `
+        + "Con esto los avisos te salen en minutos.";
+    }
+
     // Toda la parcela, o un trozo que él dibuja. Lo primero es lo corriente y no
     // cuesta ni un toque de mapa; lo segundo saca el cuadrilátero.
     function elegirCuanto(modo) {
@@ -4655,6 +4876,16 @@
       z.siembras = z.siembras || [];
       const id = uuidZona();
       const cultivo = document.getElementById("ec-cultivo").value;
+      // EL MOTOR CONOCE OCHO CULTIVOS Y SOLO OCHO. Uno que no esté en FAO_KC no
+      // da una recomendación peor: no da ninguna — sin Kc no hay ETc, y el
+      // balance saldría plano. Se bloquea aquí, en voz alta, en vez de dejar que
+      // nazca una siembra que el motor no puede calcular.
+      if (!cultivo || !FAO_KC[cultivo]) {
+        const nota = document.getElementById("ec-nota");
+        if (nota) nota.textContent = "Ese cultivo todavía no lo sabemos calcular. "
+          + "Elige uno de la lista y nos ponemos con el resto.";
+        return;
+      }
       z.siembras.push(nuevaSiembra(area, {
         id, cultivo, fechaPlantacion: plantado, geometria: ecGeom,
         // Su propio riego. No se hereda el de la finca: suponer que todos los
@@ -4663,6 +4894,26 @@
         // que llega a la raíz (de 0,60 a 0,90 según el método).
         metodoRiego: ecR.metodo,
         riegoMinutos: Number(ecR.minutos) || null,
+        // SU capacidad de aplicación, no la de la finca. `caudal` es el número
+        // plano que quiere el motor (y la columna `usuarios.caudal`, que ya es
+        // por fila); `riego` es de dónde salió ese número, y vive solo en
+        // config_app. Si no la sabe, NO se rellena: heredar el caudal del
+        // cultivo de al lado sería inventarle un dato.
+        // SIEMPRE se escribe `riego`, también cuando ha dicho "no lo sé". Ese
+        // campo ES la marca de "esta siembra declaró su riego": sin él, un
+        // cultivo nuevo heredaría en silencio el caudal del de al lado, que es
+        // justo lo que veníamos a arreglar. Con capacidad nula se queda sin
+        // caudal operativo y la app lo dice en vez de inventárselo.
+        caudal: (ecR.cap && ecR.cap.ok) ? ecR.cap.valor : null,
+        riego: (ecR.cap && ecR.cap.ok)
+          ? { capacidad_mmh: ecR.cap.valor, unidad: ecR.cap.unidad,
+              fuente: ecR.cap.fuente, confianza: ecR.cap.confianza,
+              datos: ecR.cap.datos, medido: KyliaClima.hoyISO() }
+          : { capacidad_mmh: null, unidad: "mm/h", fuente: "no_lo_se",
+              confianza: "baja", datos: null,
+              // Solo para orientar en pantalla. NUNCA es el caudal operativo:
+              // vive en otro campo para que no pueda confundirse por descuido.
+              estimacion_mmh: window.KyliaRiego.POR_DEFECTO_MMH[ecR.metodo] ?? null },
       }));
       localStorage.setItem(ZONAS_KEY, JSON.stringify(zonas));
 
@@ -4670,7 +4921,9 @@
       // cultivo nace sin balance y su primer aviso no dice nada.
       const suyos = reconstruirRiegos({
         cultivo, plantado, cada: ecR.cada, minutos: ecR.minutos,
-        ultimo: ecR.ultimo, metodo: ecR.metodo, caudal: Number(cfgFinca.caudal) || 0,
+        ultimo: ecR.ultimo, metodo: ecR.metodo,
+        // El suyo si lo ha dado; el de la finca solo como resto legacy.
+        caudal: (ecR.cap && ecR.cap.ok ? ecR.cap.valor : Number(cfgFinca.caudal)) || 0,
       }, ultimoET0);
       try { localStorage.setItem(`kylia_riegos_${id}`, JSON.stringify(suyos)); } catch (_) {}
       localStorage.removeItem("kylia_quiere_mas_cultivos");
@@ -4902,7 +5155,11 @@
     // Con la config de una parcela concreta: los metros y el cultivo cambian
     // entre ellas, y los minutos que salen dependen de eso.
     function fmtRiegoCon(litrosBrutoMm, c) {
-      return MOTOR.presentarRiego(litrosBrutoMm, {
+      // ⚠️ POR LA PUERTA SEGURA, no directo al motor. Sin caudal operativo,
+      // `presentarRiego` rellena con CAUDAL_DEFAULT_MMH y devuelve minutos que
+      // parecen medidos. Aquí sale la lámina en L/m², que es exactamente lo que
+      // el motor ha decidido — lo que no se da es una precisión que no tenemos.
+      return window.KyliaRiego.presentarRiegoSeguro(MOTOR.presentarRiego, litrosBrutoMm, {
         metodoRiego:        c.metodoRiego,
         caudalMmh:          c.caudal,
         areaM2:             c.areaParcela,
@@ -8145,15 +8402,15 @@
     // ⚠️ RESTAURADA. `93efc3e` (el punto 1, sincronización de siembras) borró
     // esta función y dejó viva su ÚNICA llamada, en initMapaParcela. Desde
     // entonces `initMapaParcela` reventaba con "cargarRecintos is not defined"
-    // — y como el alta, el borrado de cuenta y todo lo que hay entre medias
-    // viven DENTRO de esa función, nada de eso llegaba a registrarse:
-    // `window.abrirAlta` no existía y EL ALTA NO SE ABRÍA NUNCA.
+    // en la línea 8437 — y como el alta, el borrado de cuenta y todo lo que hay
+    // entre medias viven DENTRO de esa función, nada de eso llegaba a
+    // registrarse: `window.abrirAlta` no existía y EL ALTA NO SE ABRÍA NUNCA.
     //
     // Comprobado en producción el 16-sep con un navegador real sobre
     // https://kylia.app/app?alta=1 → abrirAlta: undefined, window.__A: false,
     // alta invisible, y un único error de página: cargarRecintos is not defined.
     //
-    // Va IDÉNTICA a como estaba en `93efc3e~1`. No es un rediseño: es devolver
+    // Va idéntica a como estaba en `93efc3e~1`. No es un rediseño: es devolver
     // lo que se cayó. Su try/catch propio es lo que evita que un SIGPAC caído
     // vuelva a tumbar el alta entera.
     async function cargarRecintos(lat, lon) {
@@ -8479,7 +8736,12 @@
         const caja = document.getElementById("alta");
         if (!caja) return;
         const A = { cultivo: null, plantado: null, lat: null, lon: null, ciudad: null,
-                    metodo: null, cada: null, minutos: null, ultimo: null };
+                    metodo: null, cada: null, minutos: null, ultimo: null,
+                    // Capacidad de aplicación: las respuestas crudas y el
+                    // resultado derivado. `cap` lleva la procedencia; `caudal`
+                    // es el número plano que quiere el motor.
+                    capQ: null, capSep: null, capLin: null, capCm: null,
+                    capRegadera: null, cap: null, caudal: null };
         let paso = 0;
 
         const $ = id => document.getElementById(id);
@@ -8547,10 +8809,25 @@
         });
         $("alta-fecha-btn").addEventListener("click", () => {
           const f = $("alta-fecha");
+          f.max = hoyISO();
           f.hidden = false; f.max = hoyISO(); f.focus();
         });
         $("alta-fecha").addEventListener("change", ev => {
           if (!ev.target.value) return;
+          // UNA PLANTACIÓN NO PUEDE SER FUTURA. De esa fecha cuelga el reloj
+          // fenológico entero y la ventana de clima: con una fecha por delante
+          // el balance arranca en un día que no ha pasado y el motor devuelve
+          // un ciclo negativo. `max` en el input no basta — al teclear la fecha
+          // a mano el navegador lo deja pasar.
+          const err = $("alta-fecha-err");
+          if (ev.target.value > hoyISO()) {
+            A.plantado = null;
+            err.hidden = false;
+            err.textContent = "Esa fecha todavía no ha llegado. Dinos cuándo lo plantaste de verdad.";
+            revisar1(); pintarAvance();
+            return;
+          }
+          err.hidden = true;
           A.plantado = ev.target.value;
           pintarAvance();
           $("alta-cuando").querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
@@ -8706,6 +8983,19 @@
           arcilloso: "arcilloso — retiene bien el agua",
         };
 
+        const NOMBRE_METODO = {
+          goteo: "goteo", aspersion: "aspersión", manguera: "manguera",
+          surco: "a manta o surco", regadera: "regadera",
+        };
+        // Fecha civil, legible. `T12:00:00` y no medianoche: a las 00:30 en
+        // España una fecha ISO leída como UTC retrocede un día.
+        const fechaLarga = (iso) => {
+          try {
+            return new Date(`${iso}T12:00:00`)
+              .toLocaleDateString("es-ES", { day: "numeric", month: "long" });
+          } catch (_) { return iso; }
+        };
+
         // Pinta lo que haya llegado. Se llama cada vez que responde una
         // consulta y al entrar en el paso, así que sirve para las dos cosas:
         // rellenar según llegan y encontrarlo puesto si ya llegaron.
@@ -8796,6 +9086,7 @@
         // ── paso 3 · riego ──
         grupo("alta-metodo", "metodo", "metodo", () => {
           revelar("alta-q-cada");
+          altaPintarCapacidad();
           // A regadera no se le pregunta "cuánto rato": se cuenta por viajes.
           const esRato = A.metodo !== "regadera";
           $("alta-preg-rato").textContent = esRato
@@ -8926,6 +9217,75 @@
               + ` <i><span style="width:${c.pct}%"></span></i>`;
         }
 
+        // ── Comprobación: qué sabe Kylia de este cultivo y de dónde lo sabe ──
+        // Cada línea lleva su PROCEDENCIA. Un dato que el agricultor ha medido y
+        // uno que hemos supuesto nosotros valen distinto, y hasta hoy salían
+        // iguales en pantalla: el caudal por defecto de la tabla se presentaba
+        // como si fuera suyo. Aquí no.
+        const PROC = {
+          tuyo:      { txt: "lo has dicho tú",        clase: "proc-tuyo" },
+          auto:      { txt: "obtenido automáticamente", clase: "proc-auto" },
+          calculado: { txt: "calculado por Kylia",     clase: "proc-calc" },
+          estimado:  { txt: "estimación nuestra",      clase: "proc-est" },
+        };
+        function filaComp(etiqueta, valor, proc) {
+          const pr = PROC[proc] || PROC.tuyo;
+          return `<div class="comp-fila">
+              <span class="comp-ok" aria-hidden="true">${proc === "estimado" ? "≈" : "✓"}</span>
+              <span class="comp-txt"><b>${esc(etiqueta)}:</b> ${esc(valor)}</span>
+              <span class="comp-proc ${pr.clase}">${pr.txt}</span>
+            </div>`;
+        }
+        function pintarComprobacion() {
+          // El estado se calcula con el MISMO núcleo que usará la app después
+          // (assets/js/riego-capacidad.js), no con una segunda lista de reglas
+          // que se separaría de la primera en cuanto alguien tocara una.
+          const siembra = {
+            cultivo: A.cultivo, fechaPlantacion: A.plantado,
+            lat: A.lat, lon: A.lon, area_m2: A.areaCultivada,
+            metodoRiego: A.metodo, suelo: A.suelo,
+            caudal: A.caudal, riego: A.cap ? { capacidad_mmh: A.cap.valor,
+              fuente: A.cap.fuente, confianza: A.cap.confianza } : null,
+            capacidadRegaderaL: A.capRegadera,
+          };
+          const est = window.KyliaRiego.estadoSiembra(siembra, {}, {
+            cultivosSoportados: Object.keys(FAO_KC), hoy: hoyISO(),
+          });
+
+          const filas = [];
+          if (A.areaCultivada) filas.push(filaComp("Parcela",
+            `${Number(A.areaCultivada).toLocaleString("es-ES")} m²`,
+            A.descRecinto ? "calculado" : "tuyo"));
+          if (A.cultivo)  filas.push(filaComp("Cultivo", nombreCultivo(A.cultivo), "tuyo"));
+          if (A.plantado) filas.push(filaComp("Plantación", fechaLarga(A.plantado), "tuyo"));
+          if (A.ciudad)   filas.push(filaComp("Lugar", A.ciudad, A.descClima ? "auto" : "tuyo"));
+          if (A.suelo)    filas.push(filaComp("Suelo", NOMBRE_SUELO[A.suelo] || A.suelo,
+            A.descSuelo ? "auto" : "estimado"));
+          if (A.metodo)   filas.push(filaComp("Riego", NOMBRE_METODO[A.metodo] || A.metodo, "tuyo"));
+
+          // La línea que importa: la intensidad. Si es nuestra, lo dice.
+          const cap = est.capacidad;
+          if (est.unidad_orden === "regaderas" && A.capRegadera) {
+            filas.push(filaComp("Regadera", `${A.capRegadera} litros`, "tuyo"));
+          } else if (est.unidad_orden === "min" && cap && cap.valor != null) {
+            const suyo = cap.fuente === "derivado_goteo" || cap.fuente === "medido_vaso";
+            filas.push(filaComp("Intensidad de riego", `${cap.valor} L/m² cada hora`,
+              suyo ? "calculado" : "estimado"));
+          }
+
+          // Y el veredicto en dos niveles, que es lo que evita prometer de más.
+          const cierre = est.lista_para_ejecutar_riego
+            ? `<p class="comp-listo">Con esto ya podemos decirte <b>cuánta agua</b> necesita y
+                 <b>cuántos minutos</b> tienes que regar.</p>`
+            : est.lista_para_calcular_agua
+              ? `<p class="comp-parcial">Con esto ya podemos decirte <b>cuánta agua</b> necesita cada día.
+                   Para convertirlo en <b>minutos</b> nos falta saber cuánta agua echa tu riego —
+                   se mide en diez minutos y lo puedes añadir cuando quieras desde los ajustes.</p>`
+              : `<p class="comp-parcial">Todavía nos falta algo para poder decidir por ti.</p>`;
+
+          return `<p class="perfil-tit">Tu cultivo</p>` + filas.join("") + cierre;
+        }
+
         function pintarPerfil() {
           const caja = $("alta-perfil");
           if (!caja) return;
@@ -8952,7 +9312,8 @@
           };
           caja.hidden = false;
           caja.innerHTML =
-              `<p class="perfil-tit">Lo que Kylia sabe de este cultivo</p>`
+              pintarComprobacion()
+            + `<p class="perfil-tit" style="margin-top:18px">Lo que Kylia sabe de este cultivo</p>`
             + barra("Riego", r) + barra("Abonado", a)
             + (sig && COMO[sig.clave]
                 ? `<p class="perfil-sig"><b>Lo que más te aportaría:</b> ${esc(COMO[sig.clave])}</p>` : "")
@@ -9005,22 +9366,75 @@
           } catch (_) { /* el campo ya está guardado en el móvil */ }
         }
 
-        grupo("alta-sabe-caudal", "sabe", "sabeCaudal", () => {
-          const lo_sabe = A.sabeCaudal === "1";
-          $("alta-caudal-campo").hidden = !lo_sabe;
-          if (lo_sabe) requestAnimationFrame(() => $("alta-caudal").focus());
-          else A.caudal = null;
-        });
-        $("alta-caudal").addEventListener("input", ev => {
-          // Mismo rango que el cálculo por geometría: los pilotos reales van de
-          // 5,4 a 15 mm/h y por encima de 80 hay un error de lectura seguro.
-          const v = Number(String(ev.target.value).replace(",", "."));
-          const pasa = v > 0.5 && v < 80;
-          A.caudal = pasa ? v : null;
+        // ── Capacidad de aplicación, derivada y nunca preguntada de frente ──
+        // El mismo núcleo que usa el editor de cultivos: assets/js/riego-capacidad.js.
+        // Lo que se guarda no es solo el número, es de dónde salió — si no, un
+        // valor medido y uno inventado por nosotros son indistinguibles.
+        function altaPintarCapacidad() {
+          const m = A.metodo;
+          const esGoteo = m === "goteo";
+          const esVaso  = m === "aspersion" || m === "manguera";
+          const esReg   = m === "regadera";
+          $("alta-cap-goteo").hidden    = !esGoteo;
+          $("alta-cap-vaso").hidden     = !esVaso;
+          $("alta-cap-regadera").hidden = !esReg;
+          // Cambiar de método invalida lo contestado para el anterior.
+          A.capQ = A.capSep = A.capLin = A.capCm = null;
+          A.caudal = null; A.cap = null;
+          $("alta-cap-res").textContent = "";
+          $("alta-cap-nolose").classList.remove("sel");
+          $("alta-q-caudal").querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+          $("alta-cap-tit").textContent = esGoteo ? "¿Cuánta agua echa tu goteo?"
+                                        : esReg   ? "¿Cuántos litros caben en tu regadera?"
+                                        : "¿Cuánta agua echa tu riego?";
+          // Surco no lleva capacidad: su orden se da en L/m².
+          $("alta-q-caudal").hidden = !(esGoteo || esVaso || esReg);
+        }
+
+        function altaCalcularCapacidad() {
+          $("alta-cap-nolose").classList.remove("sel");
+          const r = window.KyliaRiego.derivar(A.metodo, {
+            l_h_gotero: A.capQ, sep_goteros_m: A.capSep, sep_lineas_m: A.capLin,
+            cm: A.capCm, minutos: 15,
+          });
+          if (!r.ok) {
+            A.caudal = null; A.cap = null;
+            $("alta-cap-res").textContent = r.motivo === "datos_incompletos" ? ""
+              : r.motivo === "fuera_de_rango"
+                ? `Sale ${r.valor} L/m² cada hora, que no es creíble para un riego. Repasa las respuestas.`
+                : "Con esas respuestas no sale un número creíble. Repásalas.";
+          } else {
+            A.cap = r; A.caudal = r.valor;
+            $("alta-cap-res").innerHTML = `Tu riego echa <strong>${r.valor} L/m² cada hora</strong>. `
+              + "Con esto los avisos te salen en minutos.";
+          }
           pintarAvance();
-          $("alta-caudal-nota").textContent = (ev.target.value && !pasa)
-            ? "Ese número no es creíble para un riego. Déjalo vacío y lo medimos luego."
-            : "Si no lo tienes a mano, sáltalo: se mide en diez minutos cuando estés regando.";
+        }
+
+        grupo("alta-cap-q",   "q",   "capQ",   altaCalcularCapacidad);
+        grupo("alta-cap-sep", "sep", "capSep", altaCalcularCapacidad);
+        grupo("alta-cap-lin", "lin", "capLin", altaCalcularCapacidad);
+        grupo("alta-cap-cm",  "cm",  "capCm",  altaCalcularCapacidad);
+        // La regadera no tiene mm/h: tiene litros, y con la superficie salen los
+        // viajes. Va por su propio campo (capacidadRegadera), no por `caudal`.
+        grupo("alta-cap-reg", "reg", "capRegadera", () => {
+          $("alta-cap-nolose").classList.remove("sel");
+          $("alta-cap-res").textContent = `Con ${A.capRegadera} litros te diremos cuántas regaderas echar.`;
+          pintarAvance();
+        });
+        // "No lo sé" es una respuesta, no un callejón. Ni bloquea el alta ni se
+        // rellena con la tabla por defecto a escondidas: se queda vacío y la
+        // pantalla de comprobación dirá que los minutos son una estimación.
+        $("alta-cap-nolose").addEventListener("click", () => {
+          ["alta-cap-q", "alta-cap-sep", "alta-cap-lin", "alta-cap-cm", "alta-cap-reg"]
+            .forEach(id => $(id)?.querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel")));
+          A.capQ = A.capSep = A.capLin = A.capCm = A.capRegadera = null;
+          A.caudal = null; A.cap = null;
+          $("alta-cap-nolose").classList.add("sel");
+          $("alta-cap-res").textContent =
+            "Sin problema. Te diremos cuánta agua necesita en L/m²; para darte los minutos "
+            + "hará falta este dato, y se mide en diez minutos cuando estés al lado del riego.";
+          pintarAvance();
         });
         function revisar3() {
           $("alta-b3").disabled = !(A.metodo && A.cada && A.minutos && A.ultimo != null);
@@ -9038,8 +9452,25 @@
             // eso "he regado" ya no es un toque a ciegas: si además conocemos
             // el caudal, esos minutos son milímetros exactos.
             riegoMinutos: Number(A.minutos) || null,
-            // Solo si lo ha declarado él. Nunca deducido: ver sembrarHistorial.
-            caudal: A.caudal ?? cfg.caudal ?? null,
+            // Derivado de lo que ha contestado, nunca preguntado en mm/h y nunca
+            // rellenado con la tabla por defecto. Si dijo "no lo sé", se queda
+            // null y la app lo declara como estimación en la comprobación.
+            caudal: A.caudal ?? null,
+            // De dónde salió ese número. En el alta hay un solo cultivo y es la
+            // parcela principal, que lee cfgFinca directamente: o sea que esto
+            // YA es la capacidad de ESE cultivo. Cuando aparezca un segundo,
+            // nacerá con la suya propia por el editor de cultivos.
+            riego: A.cap
+              ? { capacidad_mmh: A.cap.valor, unidad: A.cap.unidad,
+                  fuente: A.cap.fuente, confianza: A.cap.confianza,
+                  datos: A.cap.datos, medido: hoyISO() }
+              // "No lo sé" se GUARDA como tal. Antes caía a `cfg.riego`, que en
+              // un alta nueva no existe, y el caudal quedaba a merced del `??`.
+              : { capacidad_mmh: null, unidad: "mm/h", fuente: "no_lo_se",
+                  confianza: "baja", datos: null,
+                  estimacion_mmh: window.KyliaRiego.POR_DEFECTO_MMH[A.metodo] ?? null },
+            // La regadera no tiene mm/h: tiene litros. Campo aparte.
+            capacidadRegadera: A.capRegadera ?? cfg.capacidadRegadera ?? null,
             lat: A.lat, lon: A.lon,
             ciudad: A.ciudad || cfg.ciudad || null,
             // La geometría del recinto sirve para que el satélite mida DENTRO de
@@ -10237,10 +10668,31 @@
 
       // Selector de zona (delegación: las pestañas se repintan al guardar).
       ecGrupo("ec-cuanto", "cuanto", "cuanto", () => elegirCuanto(ecR.cuanto));
-      ecGrupo("ec-metodo", "metodo", "metodo", () => ecRevelar("ec-q-cada"));
+      ecGrupo("ec-metodo", "metodo", "metodo", () => { ecRevelar("ec-q-cada"); ecPintarCapacidad(); });
       ecGrupo("ec-cada",   "cada",   "cada",   () => ecRevelar("ec-q-rato"));
       ecGrupo("ec-rato",   "min",    "minutos", () => ecRevelar("ec-q-ultimo"));
-      ecGrupo("ec-ultimo", "ult",    "ultimo");
+      ecGrupo("ec-ultimo", "ult",    "ultimo", () => ecRevelar("ec-q-cap"));
+
+      // ── Capacidad de aplicación de este cultivo ─────────────────────────
+      // Los tres grupos del goteo y el vaso de la aspersión. Cada cambio
+      // recalcula: el agricultor ve el número salir mientras contesta, que es la
+      // única forma de que "6,7 L/m² cada hora" signifique algo para él.
+      ecGrupo("ec-cap-q",   "q",   "capQ",   ecCalcularCapacidad);
+      ecGrupo("ec-cap-sep", "sep", "capSep", ecCalcularCapacidad);
+      ecGrupo("ec-cap-lin", "lin", "capLin", ecCalcularCapacidad);
+      ecGrupo("ec-cap-cm",  "cm",  "capCm",  ecCalcularCapacidad);
+      document.getElementById("ec-cap-nolose")?.addEventListener("click", () => {
+        // Se limpian las respuestas a medias: media respuesta no es un dato.
+        ["ec-cap-q", "ec-cap-sep", "ec-cap-lin", "ec-cap-cm"].forEach(id =>
+          document.getElementById(id)?.querySelectorAll(".alta-chip")
+            .forEach(x => x.classList.remove("sel")));
+        delete ecR.capQ; delete ecR.capSep; delete ecR.capLin; delete ecR.capCm;
+        document.getElementById("ec-cap-nolose")?.classList.add("sel");
+        ecR.cap = null;
+        document.getElementById("ec-cap-res").textContent =
+          "Sin problema. Te diremos cuánta agua necesita en L/m²; para darte los minutos "
+          + "hará falta este dato, y se mide en diez minutos cuando estés al lado del riego.";
+      });
       document.getElementById("btn-anadir-cultivo")?.addEventListener("click", () => abrirEditorCultivo());
       document.getElementById("btn-anadir-parcela")?.addEventListener("click", pedirOtraParcela);
       document.getElementById("btn-mapa-pantalla")?.addEventListener("click", alternarPantallaMapa);

@@ -30,15 +30,18 @@ function trozo(marca) {
   throw new Error("sin cerrar: " + marca);
 }
 // El payload y la huella REALES, con un localStorage que podemos cambiar.
+// El cliente resuelve el caudal operativo por una puerta única
+// (assets/js/riego-capacidad.js), así que el arnés tiene que darle su `window`.
+const KRIEGO = createRequire(import.meta.url)("../assets/js/riego-capacidad.js");
 function motorCon(almacen) {
-  return new Function("localStorage", `
+  return new Function("localStorage", "window", `
     ${/const CULTIVOS = \[[\s\S]*?\n    \];/.exec(APP)[0]}
     ${trozo("function nombreCultivo(")}
     ${trozo("function payloadSiembra(")}
     ${trozo("function estable(")}
     ${trozo("function huellaPayload(")}
     return { payloadSiembra, huellaPayload };
-  `)({ getItem: (k) => (k in almacen ? almacen[k] : null) });
+  `)({ getItem: (k) => (k in almacen ? almacen[k] : null) }, { KyliaRiego: KRIEGO });
 }
 const FINCA = { ciudad: "Sant Boi", lat: 41.34, lon: 2.03, suelo: "franco", metodoRiego: "aspersion", caudal: 1.8 };
 const ZONA  = { referencia: "R1", geometria: { type: "Polygon", coordinates: [[[0, 0], [1, 1], [0, 0]]] },

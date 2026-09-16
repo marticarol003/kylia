@@ -10,12 +10,14 @@
 //
 // PUNTO 1 = CONSISTENCIA PROSPECTIVA, opción (b). Lo nuevo y lo modificado se
 // sincroniza; lo histórico se DECLARA y no se crea — eso es el punto 2.
+import { createRequire } from "module";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FUENTE = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+const KRIEGO = createRequire(import.meta.url)("../assets/js/riego-capacidad.js");
 
 let fallos = 0;
 const ok = (c, m) => { if (c) console.log("  ✓", m); else { console.log("  ✗", m); fallos++; } };
@@ -54,6 +56,9 @@ function monta({ zonas, finca = {}, responde = () => ({ ok: true, persisted: tru
   const ls = almacen({ kylia_zonas: zonas, kylia_user_email: "a@b.c" });
   const enviados = [];
   const win = {
+    // El cliente resuelve el caudal operativo por una puerta única
+    // (assets/js/riego-capacidad.js): el arnés tiene que dársela.
+    KyliaRiego: KRIEGO,
     kyliaSync: {
       userId: "dueno-1",
       registroUsuario: async (payload) => { enviados.push(payload); return responde(payload); },

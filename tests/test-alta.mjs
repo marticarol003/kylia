@@ -45,7 +45,11 @@ console.log("\n── seis pantallas, una pregunta cada vez ──");
 for (const n of [0,1,2,3,4,5]) ok(new RegExp(`data-paso="${n}"`).test(app), `existe la pantalla ${n}`);
 // Ojo: la copia SÍ menciona la palabra "caudales", pero para decir que no hacen
 // falta. Lo que se comprueba es que no se le PIDA ninguno.
-const pantallas = app.slice(app.indexOf('id="alta"'), app.indexOf('id="gate"'));
+// SIN COMENTARIOS. El comentario que explica por qué el alta ya NO pregunta mm/h
+// contiene, necesariamente, la cadena "mm/h" — y el guard lo contaba como si se
+// la estuviera enseñando al agricultor. Lo que se comprueba es la COPIA.
+const pantallas = app.slice(app.indexOf('id="alta"'), app.indexOf('id="gate"'))
+  .replace(/<!--[\s\S]*?-->/g, "");
 ok(!/mm\/h/.test(pantallas) && !/data-caudal/.test(pantallas),
    "no se le pide ningún caudal ni se le enseña un mm/h en toda el alta");
 ok(/No hace falta que sepas litros ni caudales/.test(pantallas),
@@ -241,17 +245,40 @@ console.log("\n── el caudal se ofrece, nunca se exige ──");
 // Condición del usuario: no puede bloquear el alta. Quien lo sepa lo pone,
 // quien no, sigue y lo mide luego.
 ok(/id="alta-q-caudal" hidden/.test(app), "nace oculto");
-ok(/¿Sabes cuánta agua echa tu riego\?/.test(app), "y se pregunta antes de pedir el número");
-ok(/No, ya lo mediré/.test(app), "con salida explícita");
+// YA NO SE PREGUNTA EL CAUDAL, se deriva. La pregunta directa ("¿sabes cuánta
+// agua echa tu riego?" + un campo en L/m²·h) era una pregunta que casi nadie
+// sabe contestar, y quien la contestaba solía contestarla mal: en Breda salieron
+// 32 mm/h calculados a mano contra 10,9 medidos. Ahora se preguntan tres cosas
+// que se ven mirando el bancal y el número lo saca assets/js/riego-capacidad.js.
+ok(!/¿Sabes cuánta agua echa tu riego\?/.test(app),
+   "la pregunta directa por el caudal ya no existe");
+ok(/id="alta-cap-q"/.test(app) && /id="alta-cap-sep"/.test(app) && /id="alta-cap-lin"/.test(app),
+   "en su lugar: litros por gotero, separación de goteros y separación de líneas");
+ok(/id="alta-cap-nolose"/.test(app) && /No lo sé todavía/.test(app),
+   "con salida explícita: \"no lo sé\" es una respuesta, no un callejón");
 const rev3 = alta.slice(alta.indexOf("function revisar3()"), alta.indexOf("function revisar3()") + 220);
 ok(!/caudal/i.test(rev3),
    "revisar3 NO mira el caudal: el botón de seguir se enciende sin él");
-ok(/const pasa = v > 0\.5 && v < 80;/.test(alta),
-   "mismo rango de credibilidad que el cálculo por geometría");
-ok(/Ese número no es creíble para un riego/.test(alta),
-   "un disparate se rechaza y se dice");
-ok(/caudal: A\.caudal \?\? cfg\.caudal \?\? null/.test(alta),
-   "solo se guarda si lo ha declarado él");
+// El rango de credibilidad ya no está copiado en el alta: vive en el módulo, que
+// es el único sitio donde se deriva. Tenerlo en dos sitios era garantizar que se
+// separaran.
+const RCAP = require("../assets/js/riego-capacidad.js");
+ok(RCAP.MMH_MIN === 0.5 && RCAP.MMH_MAX === 80,
+   "mismo rango de credibilidad que el cálculo por geometría, y en UN solo sitio");
+ok(RCAP.capacidadGoteo({ l_h_gotero: 4, sep_goteros_m: 0.05, sep_lineas_m: 0.1 }).motivo === "fuera_de_rango",
+   "un disparate se rechaza");
+ok(/que no es creíble para un riego/.test(alta),
+   "y se dice");
+// Antes era `A.caudal ?? cfg.caudal ?? null`. El `?? cfg.caudal` sobraba y hacía
+// daño: en un alta nueva arrastraba el caudal que hubiera quedado de antes, y
+// entonces "no lo sé" no significaba nada. Ahora, si no ha salido de sus
+// respuestas, se queda vacío.
+ok(/caudal: A\.caudal \?\? null/.test(alta) && !/caudal: A\.caudal \?\? cfg\.caudal/.test(alta),
+   "solo se guarda si ha salido de sus respuestas: no se arrastra un caudal anterior");
+ok(/fuente: "no_lo_se"/.test(alta),
+   'y "no lo sé" se GUARDA como tal, para que la siembra no herede el caudal de al lado');
+ok(/riego: A\.cap \?/.test(alta),
+   "y con su procedencia al lado: un número medido y uno supuesto no valen igual");
 
 console.log("\n── la aritmética del sembrado, con el motor real ──");
 // Réplica: lechuga de 21 días en franco, goteo cada 2 días, 30 min.

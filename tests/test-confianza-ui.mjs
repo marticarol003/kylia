@@ -73,7 +73,10 @@ const PRELUDIO = `
   function formatearFechaCorta(f) { return String(f); }
   function generarDetalleHoy() { return ""; }
 `;
-const fabricaApp = new Function("MOTOR", "KyliaClima", "document",
+// `fmtRiegoCon` pasa por la puerta que decide si se pueden dar MINUTOS
+// (assets/js/riego-capacidad.js), así que el arnés necesita su `window`.
+const VENTANA = { KyliaRiego: createRequire(import.meta.url)("../assets/js/riego-capacidad.js") };
+const fabricaApp = new Function("MOTOR", "KyliaClima", "document", "window",
   PRELUDIO + REALES.map(n => cuerpo(app, n)).join("\n\n") + `
   return {
     montar(ctx, serie, prevision) { CTX = ctx; cfg = ctx.cfg; cfgFinca = ctx.cfg;
@@ -96,7 +99,7 @@ const CFG = { suelo: "franco", cultivos: ["lechuga"], metodoRiego: "aspersion",
 
 function pintar(riegos) {
   const dom = nuevoDom();
-  const a = fabricaApp(MOTOR, KyliaClima, dom);
+  const a = fabricaApp(MOTOR, KyliaClima, dom, VENTANA);
   a.montar({ cfg: CFG, riegos, ndmi: null }, serie, []);
   const bal = a.calcularBalanceHidrico();
   a.renderHoy();
@@ -140,7 +143,7 @@ ok(conCifra2.oculta === true, "y ahí la tarjeta sí se oculta, como siempre");
 console.log("\n── 5. y el caudal de hoy no puede resucitar el aviso ──");
 // Remedir el caudal no cambia si SE SABE cuánta agua fue: son cosas distintas.
 const CFG2 = { ...CFG, caudal: 5.4 };
-const dom2 = nuevoDom(); const a2 = fabricaApp(MOTOR, KyliaClima, dom2);
+const dom2 = nuevoDom(); const a2 = fabricaApp(MOTOR, KyliaClima, dom2, VENTANA);
 a2.montar({ cfg: CFG2, riegos: [{ date: d(30), litros: 30, duracion: null }], ndmi: null }, serie, []);
 a2.calcularBalanceHidrico(); a2.renderHoy();
 ok(!dom2.els["hoy-contenido"].innerHTML.includes(AVISO),

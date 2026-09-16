@@ -13,6 +13,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
+const KRIEGO = createRequire(import.meta.url)("../assets/js/riego-capacidad.js");
 const require = createRequire(import.meta.url);
 const LOG = readFileSync(join(RAIZ, "api", "log.js"), "utf8");
 const APP = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
@@ -253,7 +254,7 @@ function cargarApp({ ls, filas, guardaConfig, uid = "owner", retenVerificar = nu
     const zonaActiva = null;
     const nombreCultivo = (c) => ({ brassica: "Col / Coliflor", lechuga: "Lechuga", calabacin: "Calabacín" }[c] || c);
     const kyliaSync = { userId: uid, guardarConfigServidor: async (cfg) => guardaConfig(cfg) };
-    const window = { kyliaSync };
+    const window = { kyliaSync, KyliaRiego: KRIEGO };
     ${/const esVersion = [^\n]+/.exec(APP)[0]}
     ${trozo("function zonasGuardadas(")}
     ${trozo("function guardarZonasSinSubir(")}
@@ -276,7 +277,7 @@ function cargarApp({ ls, filas, guardaConfig, uid = "owner", retenVerificar = nu
              payload: (z, s) => payloadSiembra(z, s, FINCA, uid),
              huella: (p) => huellaPayload(p) };
   `;
-  const f = new Function("uid", "localStorage", "FINCA", "fetch", "console", "guardaConfig", "leerBase", cuerpo);
+  const f = new Function("uid", "localStorage", "FINCA", "fetch", "console", "guardaConfig", "leerBase", "KRIEGO", cuerpo);
   const fetchFalso = async (url) => {
     peticiones.push(url);
     if (retenVerificar) await retenVerificar;
@@ -285,7 +286,7 @@ function cargarApp({ ls, filas, guardaConfig, uid = "owner", retenVerificar = nu
     return fila ? { ok: true, json: async () => ({ ok: true, parcela: fila }) } : { ok: false };
   };
   return { ...f(uid, ls, FINCA_REAL, fetchFalso, { warn: () => {} }, guardaConfig,
-                () => ({ owner_id: "owner", base_version: 3 })), peticiones };
+                () => ({ owner_id: "owner", base_version: 3 }), KRIEGO), peticiones };
 }
 const FINCA_REAL = { ciudad: "Sant Boi de Llobregat", lat: 41.32, lon: 2.06,
                      suelo: "franco", metodoRiego: "goteo", caudal: 1.8 };

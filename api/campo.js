@@ -14,6 +14,13 @@
 
 const { isConfigured, supabaseSelect, supabaseUpdate, preludio } = require("./_supabase.js");
 const { balanceHidrico, decisionRiego, presentarRiego, laminaRiego, laminaDeAccion, simularKylia, faseDelDia, ventanaMadurez, curvaFenologica } = require("./_motor-riego.js");
+// La puerta que decide si se pueden dar MINUTOS. Vive fuera del motor porque el
+// motor no sabe de dónde viene el caudal que le pasan: ante uno ausente rellena
+// con CAUDAL_DEFAULT_MMH y devuelve unos minutos con la misma cara de seguridad
+// que si estuvieran medidos. El bancal real medía 5,4 mm/h donde esa tabla dice
+// 10, o sea el doble de agua. Con `caudal` nulo esto devuelve L/m².
+const { presentarRiegoSeguro } = require("../assets/js/riego-capacidad.js");
+const presentar = (mm, opts) => presentarRiegoSeguro(presentarRiego, mm, opts);
 const { construirReveal, motivoClimaNoPublicable } = require("./_reveal.js");
 const { necesidadNutrientes, creditoResiduosN } = require("./_motor-nutricion.js");
 const { cuadernoFertilizacion } = require("./_motor-cuaderno-fert.js");
@@ -109,7 +116,7 @@ async function vistaHoy(res, u) {
   // corta en hoy (arriba); esto solo ajusta la cantidad por la lluvia que viene,
   // para no llenar el depósito y que el agua de mañana se pierda. Ver decisionRiego.
   const decHoy  = decisionRiego(balHoy, { lluviaPrevista: serie.slice(corte + 1) });
-  const presHoy = decHoy.nivel === "alta" ? presentarRiego(decHoy.cantidad_l_m2, presOpts) : null;
+  const presHoy = decHoy.nivel === "alta" ? presentar(decHoy.cantidad_l_m2, presOpts) : null;
   const climaHoy = serie[corte] || {};
 
   // El PRÓXIMO riego se proyecta con las mismas reglas que el de hoy, incluida
@@ -123,7 +130,7 @@ async function vistaHoy(res, u) {
     const d = decisionRiego(b, { lluviaPrevista: serie.slice(i + 1) });
     if (d.nivel === "alta") {
       proximo = { fecha: serie[i].date,
-                  presentacion: presentarRiego(d.cantidad_l_m2, presOpts),
+                  presentacion: presentar(d.cantidad_l_m2, presOpts),
                   Dr: Number(b.Dr.toFixed(1)) };
       break;
     }

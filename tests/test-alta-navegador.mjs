@@ -54,15 +54,35 @@ try {
   await pag.evaluate(() => localStorage.setItem("kylia_user_email", "prueba@kylia.app"));
   await pag.goto(`http://127.0.0.1:${port}/app?alta=1`, { waitUntil: "networkidle2", timeout: 30000 });
 
-  const r = await pag.evaluate(() => ({
-    abrirAlta: typeof window.abrirAlta,
-    registrada: !!window.__A,
-    visible:    document.getElementById("alta")?.hidden === false,
-    pasoActivo: document.querySelector("#alta .alta-paso.activo")?.dataset?.paso ?? null,
-    // La función que se cayó. Si vuelve a desaparecer, esto lo dice por su
-    // nombre en vez de dejar un ReferenceError suelto.
-    cargarRecintos: typeof cargarRecintos !== "undefined" ? "definida" : "AUSENTE",
-  }));
+  const r = await pag.evaluate(() => {
+    const clic = (sel) => { const e = document.querySelector(sel); if (!e) return false; e.click(); return true; };
+    const o = {
+      abrirAlta: typeof window.abrirAlta,
+      registrada: !!window.__A,
+      visible:    document.getElementById("alta")?.hidden === false,
+      pasoActivo: document.querySelector("#alta .alta-paso.activo")?.dataset?.paso ?? null,
+      modulo:     typeof window.KyliaRiego,
+    };
+    const A = window.__A || {};
+    // ── se contesta el alta como lo haría el agricultor ──
+    o.contesta = clic('[data-cultivo="lechuga"]') && clic('[data-hace="21"]') && clic('[data-metodo="goteo"]');
+    o.goteoVisible = !document.getElementById("alta-cap-goteo")?.hidden;
+    o.vasoOculto   = document.getElementById("alta-cap-vaso")?.hidden === true;
+    clic('#alta-cap-q [data-q="2"]'); clic('#alta-cap-sep [data-sep="0.3"]'); clic('#alta-cap-lin [data-lin="1"]');
+    o.caudal = A.caudal; o.fuente = A.cap?.fuente;
+    o.texto  = document.getElementById("alta-cap-res")?.textContent || "";
+    // cambiar de método invalida lo contestado para el anterior
+    clic('[data-metodo="aspersion"]');
+    o.trasCambio  = A.caudal;
+    o.vasoVisible = !document.getElementById("alta-cap-vaso")?.hidden;
+    clic('#alta-cap-cm [data-cm="0.5"]');
+    o.vasoCaudal = A.caudal;
+    // "no lo sé"
+    clic("#alta-cap-nolose");
+    o.noLose = A.caudal;
+    o.noLoseTexto = document.getElementById("alta-cap-res")?.textContent || "";
+    return o;
+  });
 
   console.log("── el alta existe y se abre ──");
   ok(r.abrirAlta === "function",
@@ -70,6 +90,28 @@ try {
   ok(r.registrada === true, "el alta se ha registrado");
   ok(r.visible === true, "y ?alta=1 la abre de verdad");
   ok(r.pasoActivo === "0", `arranca en el primer paso (${r.pasoActivo})`);
+
+  console.log("\n── el método decide qué se pregunta ──");
+  ok(r.modulo === "object", "KyliaRiego está cargado en la página");
+  ok(r.contesta, "se puede contestar cultivo, fecha y método");
+  ok(r.goteoVisible === true, "con goteo se enseñan las tres preguntas de la cinta");
+  ok(r.vasoOculto === true,
+     "y NO el vaso: bajo un gotero sobreestima ×29 (10,9 mm/h reales contra 312 de lectura)");
+
+  console.log("\n── los mm/h salen de lo que ha contestado ──");
+  ok(r.caudal === 6.7, `2 L/h, goteros a 30 cm, líneas a 1 m → 6,7 mm/h (${r.caudal})`);
+  ok(r.fuente === "derivado_goteo", "con su procedencia, no como número suelto");
+  ok(/6\.7 L\/m² cada hora/.test(r.texto), "y se le enseña en su unidad, no en mm/h");
+  ok(r.trasCambio === null,
+     "pasar de goteo a aspersión BORRA el caudal: las respuestas eran de otro sistema");
+  ok(r.vasoVisible === true, "y se cambia el juego de preguntas");
+  ok(r.vasoCaudal === 20, `medio cm en 15 min → 20 mm/h (${r.vasoCaudal})`);
+
+  console.log("\n── \"no lo sé\" es una respuesta, no un callejón ──");
+  ok(r.noLose === null,
+     "deja el caudal vacío en vez de rellenarlo con la tabla por defecto");
+  ok(/L\/m²/.test(r.noLoseTexto) && /minutos/.test(r.noLoseTexto),
+     "y explica qué se puede dar sin ese dato y qué no");
 
   console.log("\n── sin errores de JavaScript ──");
   // La causa raíz, nombrada. `cargarRecintos` es la única llamada de
