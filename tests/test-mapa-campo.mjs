@@ -133,8 +133,11 @@ ok(/ecRevelar\("ec-q-cada"\)/.test(app) && /ecRevelar\("ec-q-rato"\)/.test(app),
 console.log("\n── y siembra con la MISMA función que el alta ──");
 // Estaba dentro del alta; se sacó fuera para que las dos puertas no se separen.
 ok(/function reconstruirRiegos\(r, clima\)/.test(app), "la función vive fuera del alta");
-ok((app.match(/reconstruirRiegos\(\{/g) || []).length === 2,
-   "y la llaman exactamente dos sitios: el alta y añadir cultivo");
+// Tres puertas desde el asistente de parcela → cultivos: el alta, "añadir
+// cultivo" y el asistente. Las TRES tienen que sembrar igual — un cultivo sin
+// historial no tiene balance, y su primer aviso no vale nada.
+ok((app.match(/reconstruirRiegos\(\{/g) || []).length === 3,
+   "y la llaman exactamente tres sitios: el alta, añadir cultivo y el asistente de parcelas");
 ok(/localStorage\.setItem\(`kylia_riegos_\$\{id\}`/.test(app),
    "el historial va a la clave de ESA parcela");
 

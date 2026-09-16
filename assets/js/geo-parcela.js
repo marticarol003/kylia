@@ -300,6 +300,96 @@
     return dentro;
   }
 
+  // ─── Un cultivo dentro de su parcela, sin pisar a los vecinos ────────────
+  //
+  // Hacía falta para repartir un recinto entre varios cultivos: hasta ahora solo
+  // se sabía si un PUNTO caía dentro (contieneAlPunto), y con eso no se puede
+  // impedir que un cultivo se salga de la parcela ni que se solape con otro.
+  //
+  // Todo en grados, con el mismo criterio que el resto del fichero: a estas
+  // escalas (un bancal, una hectárea) la distorsión es irrelevante para decidir
+  // dentro/fuera, y las áreas siguen calculándose con areaM2, que sí proyecta.
+
+  // ¿Se cruzan los segmentos AB y CD? Incluye el caso de tocarse en un punto.
+  function segmentosCruzan(a, b, c, d) {
+    const cruz = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+    const enCaja = (p, q, r) =>
+      Math.min(p[0], q[0]) <= r[0] && r[0] <= Math.max(p[0], q[0]) &&
+      Math.min(p[1], q[1]) <= r[1] && r[1] <= Math.max(p[1], q[1]);
+    const d1 = cruz(a, b, c), d2 = cruz(a, b, d), d3 = cruz(c, d, a), d4 = cruz(c, d, b);
+    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+        ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+    // Colineales: basta con que el punto caiga dentro del otro segmento.
+    if (d1 === 0 && enCaja(a, b, c)) return true;
+    if (d2 === 0 && enCaja(a, b, d)) return true;
+    if (d3 === 0 && enCaja(c, d, a)) return true;
+    if (d4 === 0 && enCaja(c, d, b)) return true;
+    return false;
+  }
+
+  const lados = (ring) => ring.map((p, i) => [p, ring[(i + 1) % ring.length]]);
+
+  // MUESTRAS ENCOGIDAS. El problema de decidir dentro/fuera con los vértices tal
+  // cual es que en el campo los bordes COINCIDEN: un cultivo que ocupa toda la
+  // parcela comparte los cuatro lados con ella, y dos bancales vecinos comparten
+  // la linde. Con un test de cruce de segmentos, lo primero salía "fuera de la
+  // parcela" y lo segundo "se solapan" — las dos cosas, falsas.
+  //
+  // Se toman puntos del polígono tirados un pelín hacia su propio centro (0,5%).
+  // Un punto así está siempre ESTRICTAMENTE dentro del polígono del que sale, y
+  // eso convierte "compartir borde" en "no compartir área", que es lo que de
+  // verdad queremos saber. A la escala de un bancal ese 0,5% son centímetros.
+  const ENCOGE = 0.005;
+  function muestras(geom) {
+    const ring = anilloExterior(geom);
+    if (ring.length < 3) return [];
+    const cx = ring.reduce((s, p) => s + p[0], 0) / ring.length;
+    const cy = ring.reduce((s, p) => s + p[1], 0) / ring.length;
+    const haciaDentro = ([x, y]) => [x + (cx - x) * ENCOGE, y + (cy - y) * ENCOGE];
+    const pts = [[cx, cy]];
+    for (const [a, b] of lados(ring)) {
+      pts.push(haciaDentro(a));
+      // También a lo largo del lado: una "pajarita" que sale y vuelve a entrar
+      // puede tener todos los vértices dentro y el lado fuera.
+      for (const t of [0.25, 0.5, 0.75]) {
+        pts.push(haciaDentro([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]));
+      }
+    }
+    return pts;
+  }
+
+  // ¿Está `interior` ENTERO dentro de `exterior`? Si algún punto suyo se sale,
+  // no lo está. Ocupar la parcela entera SÍ vale: es el caso corriente.
+  function contenidoEn(interior, exterior) {
+    const pts = muestras(interior);
+    if (!pts.length) return false;
+    return pts.every(p => contieneAlPunto(exterior, p));
+  }
+
+  // ¿Se pisan dos cultivos? Comparten ÁREA, no solo borde. Dos bancales pegados
+  // por la linde es lo normal en un campo y no es un solape.
+  function seSolapan(a, b) {
+    const pa = muestras(a), pb = muestras(b);
+    if (!pa.length || !pb.length) return false;
+    if (pa.some(p => contieneAlPunto(b, p))) return true;
+    if (pb.some(p => contieneAlPunto(a, p))) return true;
+    return false;
+  }
+
+  // La comprobación que usa el editor, con el motivo dicho para poder enseñarlo.
+  function validarCultivo(geom, parcela, ocupados = []) {
+    if (!geom || !parcela) return { ok: false, motivo: "sin_geometria" };
+    if (!esSimple(geom)) return { ok: false, motivo: "se_cruza_consigo_mismo" };
+    if (!contenidoEn(geom, parcela)) return { ok: false, motivo: "fuera_de_la_parcela" };
+    for (let i = 0; i < ocupados.length; i++) {
+      if (ocupados[i] && seSolapan(geom, ocupados[i])) {
+        return { ok: false, motivo: "se_solapa", con: i };
+      }
+    }
+    return { ok: true, motivo: null, area_m2: Math.round(areaM2(anilloExterior(geom))) };
+  }
+
   return { areaM2, anilloExterior, partirPorLinea, R_TIERRA, contieneAlPunto,
-           esSimple, moverVertice, insertarVertice, quitarVertice, rectanguloCentrado };
+           esSimple, moverVertice, insertarVertice, quitarVertice, rectanguloCentrado,
+           segmentosCruzan, contenidoEn, seSolapan, validarCultivo };
 });

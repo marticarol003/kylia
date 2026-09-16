@@ -110,8 +110,12 @@ ok(/clearTimeout\(subidaPendiente\)/.test(app) && /setTimeout\(\(\) => \{/.test(
 // siembra — o sea, un cambio de zonas por otra puerta. Si aparece un cuarto,
 // que salte: subirConfig desde cualquier sitio es la vía rápida a saturar la red.
 const llamadas = (app.match(/subirConfig\(\);/g) || []).length;
-ok(llamadas === 4,
-   `se sube al cambiar la finca, las zonas, al añadir un cultivo y al renombrar una parcela (${llamadas})`);
+// El quinto es el asistente de parcela → cultivos, al terminar: acaba de crear
+// una parcela con sus cultivos y si no sube, el cron mediría algo que en el
+// servidor no existe. Sigue siendo el mismo criterio de siempre —cambió la
+// finca o cambiaron las zonas— por una puerta más.
+ok(llamadas === 5,
+   `se sube al cambiar la finca, las zonas, al añadir un cultivo, al renombrar una parcela y al cerrar el asistente (${llamadas})`);
 ok(/subirConfig\(\);/.test(app.slice(app.indexOf("function guardarNombreParcela"), app.indexOf("let mapaLleno"))),
    "el nombre nuevo viaja al servidor: si no, se pierde al restaurar en otro móvil");
 const trasGuardar = app.slice(app.indexOf("function guardarCultivoNuevo"), app.indexOf("function cambiarZona"));

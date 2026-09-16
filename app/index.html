@@ -2712,6 +2712,35 @@
        que NO es un dato, y el que hasta hoy se presentaba como si lo fuera. */
     .proc-est  { background: #FBF0DC; color: #7A5A17; }
     .comp-listo   { font-size: .88rem; line-height: 1.55; margin: 14px 0 0; }
+    /* ── Parcela → cultivos ─────────────────────────────────────────────── */
+    .pc-mapa { width: 100%; height: 46vh; min-height: 240px; border-radius: 12px;
+               overflow: hidden; margin: 10px 0; background: #E8EDE8; }
+    .pc-cerrar { position: absolute; top: 8px; right: 12px; z-index: 5; border: 0;
+                 background: transparent; font-size: 1.6rem; line-height: 1;
+                 color: var(--muted); cursor: pointer; padding: 4px 8px; }
+    .pc-link { display: block; margin: 8px auto 0; border: 0; background: transparent;
+               color: var(--verde, #013A27); font-size: .86rem; text-decoration: underline;
+               cursor: pointer; }
+    .pc-sel-txt { font-size: .95rem; margin: 6px 0 10px; line-height: 1.45; }
+    /* Sugerencias del buscador de cultivos. */
+    .pc-sug { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+    .pc-sug button { text-align: left; border: 1px solid var(--linea, #E6E6E1);
+                     background: #fff; border-radius: 10px; padding: 10px 12px;
+                     font-size: .95rem; cursor: pointer; display: flex;
+                     justify-content: space-between; align-items: center; gap: 8px; }
+    .pc-sug button:hover, .pc-sug button.sel { border-color: var(--verde, #013A27); }
+    /* Un cultivo que el motor no sabe calcular se REGISTRA igual, y se dice.
+       Nunca se le presta el Kc de otro parecido. */
+    .pc-sin-motor { font-size: .68rem; padding: 2px 7px; border-radius: 999px;
+                    background: #FBF0DC; color: #7A5A17; white-space: nowrap; }
+    .pc-fila { display: flex; align-items: baseline; gap: 10px; padding: 9px 0;
+               border-bottom: 1px solid var(--linea, #E6E6E1); font-size: .92rem; }
+    .pc-fila:last-child { border-bottom: 0; }
+    .pc-fila b { flex: 1 1 auto; }
+    .pc-fila span { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .pc-libre { color: var(--muted); font-style: italic; }
+    .pc-mal { color: #8A2B20; }
+
     .comp-parcial { font-size: .88rem; line-height: 1.55; margin: 14px 0 0;
                     padding: 10px 12px; border-radius: 10px; background: #FBF0DC; color: #6B4E14; }
     .alta-preg { font-weight: 700; margin: 22px 0 10px; color: var(--verde, #013A27); }
@@ -3074,6 +3103,166 @@
       <div class="alta-puntos" id="alta-puntos" aria-hidden="true"></div>
     </div>
   </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       PARCELA → CULTIVOS
+       ══════════════════════════════════════════════════════════════════
+       El alta anterior preguntaba "¿cultivas todo el recinto o solo una
+       parte?", y esa pregunta ya decide por el agricultor: induce a pensar en
+       UN cultivo. Un recinto con lechuga, col y un pasillo sin plantar no cabía
+       en ella.
+
+       Aquí la parcela es el SITIO y los cultivos se añaden de uno en uno, cada
+       uno con su trozo, su fecha y su riego. La misma pantalla sirve para el
+       primer alta, para "+ Añadir parcela" y para "+ Añadir cultivo": si fueran
+       tres implementaciones, divergirían.
+
+       El vocabulario es el del campo: parcela y cultivo. Ni siembra, ni
+       geometría, ni recinto SIGPAC salvo donde haga falta nombrarlo. -->
+  <div id="pc" class="alta" role="dialog" aria-modal="true" aria-label="Añadir parcela y cultivos" hidden>
+    <div class="alta-caja">
+      <button type="button" class="pc-cerrar" id="pc-cerrar" aria-label="Cerrar">×</button>
+      <div class="alta-avance"><span id="pc-avance"></span></div>
+
+      <!-- 1 · El mapa, con los recintos ya dibujados -->
+      <section class="alta-paso activo" data-pc="parcela">
+        <p class="alta-preg">¿Dónde está tu parcela?</p>
+        <p class="alta-nota" id="pc-mapa-nota">Buscando las parcelas de tu zona…</p>
+        <div id="pc-mapa" class="pc-mapa"></div>
+        <div id="pc-sel" hidden>
+          <p class="pc-sel-txt" id="pc-sel-txt"></p>
+          <button type="button" class="alta-btn" id="pc-confirmar">Esta es mi parcela</button>
+        </div>
+        <button type="button" class="pc-link" id="pc-ubicarme">Usar mi ubicación</button>
+      </section>
+
+      <!-- 2 · Cuántos cultivos -->
+      <section class="alta-paso" data-pc="cuantos">
+        <button type="button" class="alta-atras" data-pc-ir="parcela">‹ Atrás</button>
+        <p class="alta-preg">¿Cuántos cultivos tienes en esta parcela?</p>
+        <p class="alta-nota" id="pc-cuantos-nota"></p>
+        <div class="alta-chips">
+          <button type="button" class="alta-chip ancho" data-cuantos="uno">1 cultivo</button>
+          <button type="button" class="alta-chip ancho" data-cuantos="varios">Más de uno</button>
+          <button type="button" class="alta-chip ancho" data-cuantos="ninguno">Ahora mismo ninguno</button>
+        </div>
+      </section>
+
+      <!-- 3 · Qué cultiva -->
+      <section class="alta-paso" data-pc="cultivo">
+        <button type="button" class="alta-atras" data-pc-ir="cuantos">‹ Atrás</button>
+        <p class="alta-preg" id="pc-cultivo-preg">¿Qué cultivas aquí?</p>
+        <input type="text" class="alta-input" id="pc-cultivo-txt" autocomplete="off"
+               placeholder="Escribe un cultivo…" aria-label="Cultivo">
+        <div class="pc-sug" id="pc-sug"></div>
+        <p class="alta-nota" id="pc-cultivo-nota"></p>
+        <button type="button" class="alta-btn" id="pc-b-cultivo" disabled>Seguir</button>
+      </section>
+
+      <!-- 4 · Qué parte ocupa -->
+      <section class="alta-paso" data-pc="superficie">
+        <button type="button" class="alta-atras" data-pc-ir="cultivo">‹ Atrás</button>
+        <p class="alta-preg">¿Qué parte de la parcela ocupa?</p>
+        <div id="pc-mapa2" class="pc-mapa"></div>
+        <p class="alta-nota" id="pc-sup-nota"></p>
+        <button type="button" class="alta-chip ancho" id="pc-todo">Usar toda la superficie disponible</button>
+        <button type="button" class="alta-btn" id="pc-b-sup" disabled>Seguir</button>
+      </section>
+
+      <!-- 5 · Cuándo lo plantó -->
+      <section class="alta-paso" data-pc="fecha">
+        <button type="button" class="alta-atras" data-pc-ir="superficie">‹ Atrás</button>
+        <p class="alta-preg" id="pc-fecha-preg">¿Cuándo lo plantaste o trasplantaste?</p>
+        <div class="alta-chips" id="pc-cuando">
+          <button type="button" class="alta-chip" data-hace="5">Esta semana</button>
+          <button type="button" class="alta-chip" data-hace="21">Hace 2–4 semanas</button>
+          <button type="button" class="alta-chip" data-hace="50">Hace más de un mes</button>
+        </div>
+        <input type="date" class="alta-input" id="pc-fecha" style="margin-top:10px">
+        <p class="alta-nota" id="pc-fecha-nota">Con una fecha aproximada nos vale para empezar.</p>
+        <button type="button" class="alta-btn" id="pc-b-fecha" disabled>Seguir</button>
+      </section>
+
+      <!-- 6 · Cómo lo riega · una pregunta cada vez -->
+      <section class="alta-paso" data-pc="riego">
+        <button type="button" class="alta-atras" data-pc-ir="fecha">‹ Atrás</button>
+        <p class="alta-preg">¿Cómo riegas este cultivo?</p>
+        <div class="alta-chips" id="pc-metodo">
+          <button type="button" class="alta-chip" data-metodo="goteo">Goteo</button>
+          <button type="button" class="alta-chip" data-metodo="aspersion">Aspersión</button>
+          <button type="button" class="alta-chip" data-metodo="manguera">Manguera</button>
+          <button type="button" class="alta-chip" data-metodo="surco">A manta o surco</button>
+          <button type="button" class="alta-chip" data-metodo="regadera">Regadera</button>
+        </div>
+
+        <!-- Goteo: tres cosas que se ven mirando el bancal, de una en una. -->
+        <div id="pc-g1" hidden>
+          <p class="alta-preg">¿Cuántos litros por hora da cada gotero?</p>
+          <p class="alta-nota" style="margin-top:0">Está impreso en la cinta.</p>
+          <div class="alta-chips" id="pc-gq">
+            <button type="button" class="alta-chip" data-q="1.6">1,6 L/h</button>
+            <button type="button" class="alta-chip" data-q="2">2 L/h</button>
+            <button type="button" class="alta-chip" data-q="4">4 L/h</button>
+          </div>
+        </div>
+        <div id="pc-g2" hidden>
+          <p class="alta-preg">¿Cada cuántos centímetros hay un gotero?</p>
+          <div class="alta-chips" id="pc-gsep">
+            <button type="button" class="alta-chip" data-sep="0.2">20 cm</button>
+            <button type="button" class="alta-chip" data-sep="0.3">30 cm</button>
+            <button type="button" class="alta-chip" data-sep="0.5">50 cm</button>
+          </div>
+        </div>
+        <div id="pc-g3" hidden>
+          <p class="alta-preg">¿Qué distancia hay entre las líneas?</p>
+          <div class="alta-chips" id="pc-glin">
+            <button type="button" class="alta-chip" data-lin="0.5">50 cm</button>
+            <button type="button" class="alta-chip" data-lin="0.8">80 cm</button>
+            <button type="button" class="alta-chip" data-lin="1">1 m</button>
+            <button type="button" class="alta-chip" data-lin="1.5">1,5 m</button>
+          </div>
+        </div>
+
+        <div id="pc-vaso" hidden>
+          <p class="alta-preg">Pon un vaso recto donde riegas y déjalo 15 minutos</p>
+          <p class="alta-nota" style="margin-top:0">¿Cuánta agua se acumula dentro?</p>
+          <div class="alta-chips" id="pc-cm">
+            <button type="button" class="alta-chip" data-cm="0.5">Medio cm</button>
+            <button type="button" class="alta-chip" data-cm="1">Un cm</button>
+            <button type="button" class="alta-chip" data-cm="2">Dos cm</button>
+            <button type="button" class="alta-chip" data-cm="3">Tres o más</button>
+          </div>
+        </div>
+
+        <div id="pc-reg" hidden>
+          <p class="alta-preg">¿Cuántos litros caben en tu regadera?</p>
+          <div class="alta-chips" id="pc-regl">
+            <button type="button" class="alta-chip" data-reg="5">5 litros</button>
+            <button type="button" class="alta-chip" data-reg="10">10 litros</button>
+            <button type="button" class="alta-chip" data-reg="15">15 litros</button>
+          </div>
+        </div>
+
+        <div class="alta-chips" id="pc-nolose-caja" hidden style="margin-top:10px">
+          <button type="button" class="alta-chip ancho" id="pc-nolose">No lo sé todavía</button>
+        </div>
+        <p class="alta-nota" id="pc-riego-res"></p>
+        <details id="pc-tecnico" hidden><summary>Detalles técnicos</summary>
+          <p class="alta-nota" id="pc-tecnico-txt"></p></details>
+        <button type="button" class="alta-btn" id="pc-b-riego" disabled>Guardar cultivo</button>
+      </section>
+
+      <!-- 7 · Resumen de la parcela -->
+      <section class="alta-paso" data-pc="resumen">
+        <p class="alta-preg" id="pc-res-tit">Tu parcela</p>
+        <div id="pc-mapa3" class="pc-mapa"></div>
+        <div id="pc-lista"></div>
+        <button type="button" class="alta-chip ancho" id="pc-otro">+ Añadir otro cultivo</button>
+        <button type="button" class="alta-btn" id="pc-listo">Listo</button>
+      </section>
+    </div>
+  </div>
+
 
   <div id="gate" class="gate-overlay" role="dialog" aria-modal="true" aria-labelledby="gate-title" aria-describedby="gate-desc" hidden>
     <div class="gate-card">
@@ -3865,6 +4054,8 @@
   <!-- Partir un recinto por una recta, para separar cultivos en fincas grandes.
        Núcleo puro compartido con los tests (tests/test-geo-parcela.mjs). -->
   <script src="/assets/js/geo-parcela.js"></script>
+  <script src="/assets/js/cultivos.js"></script>
+  <script src="/assets/js/parcela-cultivos.js"></script>
   <script>
     // ─── Constantes ───────────────────────────────────────────────────────────
     const REFRESH_MS  = 30 * 60 * 1000;
@@ -4310,6 +4501,16 @@
     // col, mosca blanca y araña roja) que clasificaban el riesgo en BAJO/MEDIO/
     // ALTO. El consejo del 24-jul congeló el pilar entero: el modelo que vale
     // necesita clima HORARIO y validación, no umbrales de máximas diarias.
+
+    // Cómo se llama cada método de riego EN CRISTIANO. Vivía dentro del IIFE del
+    // alta, así que el asistente de parcelas no lo alcanzaba y su resumen
+    // reventaba con "NOMBRE_METODO is not defined" — sin romper la página, pero
+    // dejando la lista de cultivos en blanco. Lo cazó el test de navegador; un
+    // test que lea el fuente no lo habría visto nunca.
+    const NOMBRE_METODO = {
+      goteo: "goteo", aspersion: "aspersión", manguera: "manguera",
+      surco: "a manta o surco", regadera: "regadera",
+    };
 
     const CULTIVOS = [
       { id: "lechuga",   nombre: "Lechuga" },
@@ -8987,10 +9188,7 @@
           arcilloso: "arcilloso — retiene bien el agua",
         };
 
-        const NOMBRE_METODO = {
-          goteo: "goteo", aspersion: "aspersión", manguera: "manguera",
-          surco: "a manta o surco", regadera: "regadera",
-        };
+        // (NOMBRE_METODO vive fuera: lo usan el alta y el asistente de parcelas.)
         // Fecha civil, legible. `T12:00:00` y no medianoche: a las 00:30 en
         // España una fecha ISO leída como UTC retrocede un día.
         const fechaLarga = (iso) => {
@@ -10748,7 +10946,26 @@
           "Sin problema. Te diremos cuánta agua necesita en L/m²; para darte los minutos "
           + "hará falta este dato, y se mide en diez minutos cuando estés al lado del riego.";
       });
-      document.getElementById("btn-anadir-cultivo")?.addEventListener("click", () => abrirEditorCultivo());
+      // ⚠️ LAS DOS PUERTAS USAN EL MISMO FLUJO que el alta de una parcela nueva
+      // (window.kyliaParcelaNueva / kyliaCultivoNuevo, ver el bloque
+      // "PARCELA → CULTIVOS"). Tener aquí un formulario aparte era garantizar
+      // que los dos caminos dijeran cosas distintas al tercer cambio.
+      //
+      // El editor viejo (abrirEditorCultivo) se queda como respaldo mientras el
+      // flujo nuevo se prueba en campo: si no hay recinto elegido todavía, es lo
+      // único que sabe partir un contorno a mano.
+      document.getElementById("btn-anadir-cultivo")?.addEventListener("click", () => {
+        const z = zonaConRecinto();
+        if (z?.referencia && window.kyliaCultivoNuevo) window.kyliaCultivoNuevo(z.referencia);
+        else abrirEditorCultivo();
+      });
+      document.getElementById("btn-anadir-parcela")?.addEventListener("click", (ev) => {
+        if (!window.kyliaParcelaNueva) return;
+        // Se adelanta al manejador viejo: el flujo nuevo ya hace lo que hacía
+        // aquel (elegir recinto) y además pregunta por los cultivos.
+        ev.stopImmediatePropagation();
+        window.kyliaParcelaNueva({ lat: cfgFinca.lat, lon: cfgFinca.lon });
+      }, true);
       document.getElementById("btn-anadir-parcela")?.addEventListener("click", pedirOtraParcela);
       document.getElementById("btn-mapa-pantalla")?.addEventListener("click", alternarPantallaMapa);
       document.getElementById("mapa-titulo")?.addEventListener("click", abrirRenombrar);
@@ -11095,6 +11312,605 @@
       });
 
     });
+
+    // ══════════════════════════════════════════════════════════════════
+    // PARCELA → CULTIVOS
+    // ══════════════════════════════════════════════════════════════════
+    // UNA SOLA IMPLEMENTACIÓN para las tres puertas: el alta de la primera
+    // parcela, "+ Añadir parcela" y "+ Añadir cultivo". Si fueran tres, al
+    // tercer cambio ya dirían cosas distintas.
+    //
+    // Toda la lógica que se puede probar sin navegador vive fuera:
+    //   · assets/js/parcela-cultivos.js → el reparto y los pasos
+    //   · assets/js/cultivos.js         → el catálogo y el buscador
+    //   · assets/js/geo-parcela.js      → dentro / se solapa / área
+    //   · assets/js/riego-capacidad.js  → el contrato de riego, SIN reabrir
+    // Aquí queda el pegamento con el DOM y el mapa, que es lo único que de
+    // verdad necesita un navegador.
+    (function () {
+      const caja = document.getElementById("pc");
+      if (!caja) return;
+      const $ = (id) => document.getElementById(id);
+      const GEO = window.KyliaGeo, CAT = window.KyliaCultivos;
+      const FLUJO = window.KyliaParcela, RIEGO = window.KyliaRiego;
+
+      let F = null;                 // el flujo (ver parcela-cultivos.js)
+      // Sonda para los tests de navegador, como window.__A en el alta. Es una
+      // función y no una copia: así siempre devuelve el flujo VIGENTE.
+      window.__PCF = () => F;
+      let recintos = [];            // los de SIGPAC alrededor
+      let seleccionada = null;      // la que ha tocado, aún sin confirmar
+      let mapa = null, mapa2 = null, mapa3 = null;
+      let capaRec = null, capaSup = null, tiradores = [];
+      let alCerrar = null;
+
+      const m2 = (n) => Math.round(Number(n) || 0).toLocaleString("es-ES");
+      const hoyISO = () => KyliaClima.hoyISO();
+
+      // ── navegación ──────────────────────────────────────────────────────
+      const PASOS = ["parcela", "cuantos", "cultivo", "superficie", "fecha", "riego", "resumen"];
+      function ir(paso) {
+        caja.querySelectorAll("[data-pc]").forEach(sec =>
+          sec.classList.toggle("activo", sec.dataset.pc === paso));
+        caja.querySelector(".alta-caja").scrollTop = 0;
+        $("pc-avance").textContent = paso === "resumen" ? "" :
+          `Paso ${PASOS.indexOf(paso) + 1} de ${PASOS.length - 1}`;
+        if (paso === "superficie") setTimeout(pintarSuperficie, 60);
+        if (paso === "resumen")    { pintarResumen(); setTimeout(pintarResumenMapa, 60); }
+        if (paso === "parcela")    setTimeout(pintarMapa, 60);
+      }
+
+      // ── 1 · el mapa, con los recintos YA dibujados ───────────────────────
+      // Al abrirlo se ven los polígonos de alrededor, como en SIGPAC. Sin
+      // pedirle antes ninguna acción rara para descubrirlos.
+      async function cargarZona(lat, lon) {
+        $("pc-mapa-nota").textContent = "Buscando las parcelas de tu zona…";
+        try {
+          const r = await fetch(`/api/sigpac?lat=${lat}&lon=${lon}&vecinos=1`);
+          const d = await r.json();
+          recintos = Array.isArray(d.recintos) ? d.recintos : [];
+        } catch (_) { recintos = []; }
+        $("pc-mapa-nota").textContent = recintos.length
+          ? "Toca la que trabajas tú."
+          : "No hemos encontrado parcelas aquí. Prueba a moverte por el mapa o usa tu ubicación.";
+        pintarMapa();
+      }
+
+      async function pintarMapa() {
+        await cargarLeaflet();
+        if (!mapa) {
+          mapa = L.map("pc-mapa", { zoomControl: true, attributionControl: false });
+          L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                      { maxZoom: 20 }).addTo(mapa);
+          mapa.setView([cfgFinca.lat || 41.38, cfgFinca.lon || 2.17], 17);
+        }
+        mapa.invalidateSize();
+        if (capaRec) mapa.removeLayer(capaRec);
+        if (!recintos.length) return;
+        capaRec = L.geoJSON(recintos.map(r => ({
+          type: "Feature", geometry: r.geometria, properties: { ref: r.referencia },
+        })), {
+          style: (f) => (seleccionada && f.properties.ref === seleccionada.referencia)
+            ? { color: "#013A27", weight: 3, fillOpacity: 0.35, fillColor: "#013A27" }
+            : { color: "#ffffff", weight: 1.4, fillOpacity: 0.08, fillColor: "#ffffff", dashArray: "4 3" },
+          onEachFeature: (f, capa) => capa.on("click", (ev) => {
+            L.DomEvent.stopPropagation(ev);
+            elegir(f.properties.ref);
+          }),
+        }).addTo(mapa);
+        try { mapa.fitBounds(capaRec.getBounds(), { padding: [20, 20], maxZoom: 18 }); } catch (_) {}
+      }
+
+      function elegir(ref) {
+        seleccionada = recintos.find(r => r.referencia === ref) || null;
+        if (!seleccionada) return;
+        $("pc-sel").hidden = false;
+        $("pc-sel-txt").innerHTML =
+          `Parcela de <strong>${m2(seleccionada.superficie_m2)} m²</strong>.`;
+        if (capaRec) capaRec.setStyle((f) => (f.properties.ref === ref)
+          ? { color: "#013A27", weight: 3, fillOpacity: 0.35, fillColor: "#013A27" }
+          : { color: "#ffffff", weight: 1.4, fillOpacity: 0.08, fillColor: "#ffffff", dashArray: "4 3" });
+      }
+
+      $("pc-confirmar").addEventListener("click", () => {
+        if (!seleccionada) return;
+        // Si esta parcela ya existe, se sigue con sus cultivos en vez de
+        // empezar de cero: "+ Añadir parcela" sobre una que ya tenías no puede
+        // borrarte lo que había.
+        const previa = zonasGuardadas().find(z => z.referencia === seleccionada.referencia);
+        F = FLUJO.elegirParcela(FLUJO.nuevoFlujo(), {
+          referencia: seleccionada.referencia, nombre: previa?.nombre || null,
+          superficie_m2: seleccionada.superficie_m2, geometria: seleccionada.geometria,
+          uso: seleccionada.uso, satelite: seleccionada.satelite,
+        });
+        if (previa?.siembras?.length) {
+          F = { ...F, cultivos: previa.siembras.filter(s => s.cultivo), paso: "resumen" };
+          return ir("resumen");
+        }
+        $("pc-cuantos-nota").textContent = `${m2(seleccionada.superficie_m2)} m² en total.`;
+        ir("cuantos");
+      });
+
+      $("pc-ubicarme").addEventListener("click", () => {
+        if (!navigator.geolocation) return;
+        $("pc-mapa-nota").textContent = "Buscando tu ubicación…";
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { mapa?.setView([pos.coords.latitude, pos.coords.longitude], 18);
+                     cargarZona(pos.coords.latitude, pos.coords.longitude); },
+          () => { $("pc-mapa-nota").textContent = "No hemos podido leer tu ubicación. Muévete por el mapa."; },
+          { timeout: 8000 });
+      });
+
+      // ── 2 · cuántos cultivos ─────────────────────────────────────────────
+      caja.querySelector("[data-pc='cuantos'] .alta-chips").addEventListener("click", (ev) => {
+        const b = ev.target.closest("[data-cuantos]");
+        if (!b || !F) return;
+        F = FLUJO.responderCuantos(F, b.dataset.cuantos);
+        if (F.paso === "resumen") return ir("resumen");
+        limpiarCultivo();
+        ir("cultivo");
+      });
+
+      // ── 3 · qué cultiva · autocompletado ────────────────────────────────
+      function limpiarCultivo() {
+        $("pc-cultivo-txt").value = "";
+        $("pc-sug").innerHTML = "";
+        $("pc-cultivo-nota").textContent = "";
+        $("pc-b-cultivo").disabled = true;
+        sugerir("");
+      }
+      function sugerir(q) {
+        const lista = CAT.buscar(q);
+        $("pc-sug").innerHTML = lista.map(c =>
+          `<button type="button" data-cid="${esc(c.id)}">${esc(c.nombre)}`
+          + (CAT.soportado(c) ? "" : `<span class="pc-sin-motor">sin recomendación de riego</span>`)
+          + `</button>`).join("");
+      }
+      $("pc-cultivo-txt").addEventListener("input", (ev) => {
+        sugerir(ev.target.value);
+        // Lo que escriba vale aunque no esté en la lista: su explotación no
+        // puede depender de que nosotros hayamos previsto su cultivo.
+        const c = CAT.desdeTexto(ev.target.value);
+        if (c) fijarCultivo(c, false);
+        else { $("pc-b-cultivo").disabled = true; }
+      });
+      $("pc-sug").addEventListener("click", (ev) => {
+        const b = ev.target.closest("[data-cid]");
+        if (!b) return;
+        const c = CAT.porId(b.dataset.cid);
+        if (!c) return;
+        $("pc-cultivo-txt").value = c.nombre;
+        fijarCultivo(c, true);
+      });
+      function fijarCultivo(c, cerrarLista) {
+        if (!F?.borrador) return;
+        F = { ...F, borrador: { ...F.borrador, cultivoId: c.id, cultivo: c.nombre,
+                                soportado: CAT.soportado(c) } };
+        $("pc-b-cultivo").disabled = false;
+        if (cerrarLista) $("pc-sug").innerHTML = "";
+        // ⚠️ Se DICE. Nunca se le presta el Kc de un cultivo parecido: una
+        // lechuga y una alcachofa no gastan lo mismo, y un número inventado con
+        // cara de cálculo es peor que decir "todavía no".
+        $("pc-cultivo-nota").innerHTML = CAT.soportado(c)
+          ? `Perfecto, sabemos calcular el riego de ${esc(c.nombre.toLowerCase())}.`
+          : `Apuntamos ${esc(c.nombre.toLowerCase())} en tu explotación. Todavía no sabemos `
+            + `calcular su riego, así que para este cultivo no habrá recomendación — el resto sí.`;
+      }
+      $("pc-b-cultivo").addEventListener("click", () => { F = FLUJO.avanzar(F); ir("superficie"); });
+
+      // ── 4 · qué parte ocupa ──────────────────────────────────────────────
+      // Se ve la parcela entera, los cultivos ya añadidos y lo que queda.
+      async function pintarSuperficie() {
+        await cargarLeaflet();
+        if (!mapa2) {
+          mapa2 = L.map("pc-mapa2", { zoomControl: true, attributionControl: false });
+          L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                      { maxZoom: 20 }).addTo(mapa2);
+        }
+        mapa2.invalidateSize();
+        if (capaSup) { mapa2.removeLayer(capaSup); capaSup = null; }
+        tiradores.forEach(t => mapa2.removeLayer(t)); tiradores = [];
+
+        const b = F?.borrador;
+        if (!b || !F.parcela?.geometria) return;
+        if (!b.geometria) {
+          const g = proponerContorno();
+          // ⚠️ CON SU SUPERFICIE. Sin esto el contorno se dibujaba pero
+          // `area_m2` seguía en null, así que "Seguir" no se encendía nunca a
+          // menos que el agricultor arrastrase una esquina — y si el rectángulo
+          // ya le valía, no tenía por qué tocar nada. Se quedaba encallado en
+          // esa pantalla. Lo cazó el test de navegador.
+          if (g) F = { ...F, borrador: { ...b, geometria: g,
+            area_m2: Math.round(GEO.areaM2(GEO.anilloExterior(g))) } };
+        }
+        const capas = [
+          L.geoJSON(F.parcela.geometria, { style: { color: "#fff", weight: 2, fillOpacity: 0.05, dashArray: "5 4" } }),
+          ...F.cultivos.filter(c => c.geometria).map(c =>
+            L.geoJSON(c.geometria, { style: { color: "#6B7A5E", weight: 2, fillOpacity: 0.3, fillColor: "#6B7A5E" } })),
+          L.geoJSON(F.borrador.geometria, { style: { color: "#B23B2E", weight: 3, fillOpacity: 0.32, fillColor: "#B23B2E" } }),
+        ];
+        capaSup = L.layerGroup(capas).addTo(mapa2);
+        try { mapa2.fitBounds(L.geoJSON(F.parcela.geometria).getBounds(), { padding: [24, 24] }); } catch (_) {}
+        pintarTiradores();
+        revisarSuperficie();
+      }
+
+      // Mueve un contorno dx/dy grados. Con un bancal, a estas escalas, basta.
+      function desplazar(geom, dx, dy) {
+        const anillo = GEO.anilloExterior(geom).map(([lo, la]) => [lo + dx, la + dy]);
+        return { type: "Polygon", coordinates: [[...anillo, anillo[0]]] };
+      }
+
+      // ⚠️ EL CONTORNO PROPUESTO TIENE QUE NACER EN UN HUECO LIBRE.
+      // Antes nacía siempre en el centro de la parcela, así que el segundo
+      // cultivo aparecía ENCIMA del primero: el solape se detectaba —bien— pero
+      // "Seguir" se quedaba apagado y el agricultor no tenía forma de saber que
+      // lo único que hacía falta era arrastrarlo a otro sitio. Se encallaba.
+      //
+      // Se prueban un puñado de sitios y se coge el primero que cabe. Si no cabe
+      // ninguno, se deja el del centro y la nota explica qué pasa: mejor eso que
+      // un contorno escondido fuera de la vista.
+      function proponerContorno() {
+        const libre = Math.max(20, FLUJO.libres(F));
+        const anillo = GEO.anilloExterior(F.parcela.geometria);
+        const lons = anillo.map(p => p[0]), lats = anillo.map(p => p[1]);
+        const ancho = Math.max(...lons) - Math.min(...lons);
+        const alto  = Math.max(...lats) - Math.min(...lats);
+        for (const fraccion of [0.5, 0.3, 0.15]) {
+          const base = GEO.rectanguloCentrado(F.parcela.geometria, libre * fraccion)?.geometria;
+          if (!base) continue;
+          const saltos = [[0, 0]];
+          for (const d of [0.22, 0.34]) {
+            saltos.push([ancho * d, 0], [-ancho * d, 0], [0, alto * d], [0, -alto * d],
+                        [ancho * d, alto * d], [-ancho * d, alto * d],
+                        [ancho * d, -alto * d], [-ancho * d, -alto * d]);
+          }
+          for (const [dx, dy] of saltos) {
+            const cand = dx || dy ? desplazar(base, dx, dy) : base;
+            const area = Math.round(GEO.areaM2(GEO.anilloExterior(cand)));
+            if (FLUJO.cabe(GEO, { geometria: cand, area_m2: area }, F.parcela, F.cultivos).ok) return cand;
+          }
+        }
+        return GEO.rectanguloCentrado(F.parcela.geometria, libre * 0.4)?.geometria || null;
+      }
+
+      function pintarTiradores() {
+        tiradores.forEach(t => mapa2.removeLayer(t)); tiradores = [];
+        const g = F?.borrador?.geometria;
+        if (!g) return;
+        GEO.anilloExterior(g).forEach(([lon, lat], i) => {
+          const t = L.marker([lat, lon], { draggable: true,
+            icon: L.divIcon({ className: "tirador", iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(mapa2);
+          t.on("drag", (ev) => moverPunto(i, ev.latlng, t));
+          t.on("dragend", () => pintarSuperficie());
+          tiradores.push(t);
+        });
+      }
+
+      function moverPunto(i, latlng, tirador) {
+        const r = GEO.moverVertice(F.borrador.geometria, i, [latlng.lng, latlng.lat]);
+        if (!r.ok) {
+          const a = GEO.anilloExterior(F.borrador.geometria)[i];
+          tirador.setLatLng([a[1], a[0]]);
+          return;
+        }
+        F = { ...F, borrador: { ...F.borrador, geometria: r.geometria, ocupaTodo: false,
+              area_m2: Math.round(GEO.areaM2(GEO.anilloExterior(r.geometria))) } };
+        revisarSuperficie();
+      }
+
+      function revisarSuperficie() {
+        let b = F?.borrador;
+        if (!b) return;
+        // Si hay contorno, la superficie SALE DE ÉL. Tenerlos por separado
+        // dejaba guardar un cultivo cuyo área decía una cosa y cuyo dibujo decía
+        // otra — y el satélite mide el dibujo.
+        if (b.geometria) {
+          const area = Math.round(GEO.areaM2(GEO.anilloExterior(b.geometria)));
+          if (area !== b.area_m2) { b = { ...b, area_m2: area }; F = { ...F, borrador: b }; }
+        }
+        const v = FLUJO.cabe(GEO, b, F.parcela, F.cultivos);
+        const rep = FLUJO.reparto(F.parcela, F.cultivos);
+        const nota = $("pc-sup-nota");
+        if (!v.ok) {
+          nota.className = "alta-nota pc-mal";
+          nota.textContent = FLUJO.explicar(v.motivo) || "Ese contorno no vale.";
+          $("pc-b-sup").disabled = true;
+          return;
+        }
+        nota.className = "alta-nota";
+        nota.innerHTML = `Este cultivo ocupa <strong>${m2(b.area_m2)} m²</strong>`
+          + (rep.sin_asignar ? ` · quedaban ${m2(rep.sin_asignar)} m² sin asignar.` : ".");
+        $("pc-b-sup").disabled = !(Number(b.area_m2) > 0);
+      }
+
+      $("pc-todo").addEventListener("click", () => {
+        F = FLUJO.usarTodoLoLibre(F);
+        pintarSuperficie();
+      });
+      $("pc-b-sup").addEventListener("click", () => { F = FLUJO.avanzar(F); ir("fecha"); });
+
+      // ── 5 · su propia fecha ──────────────────────────────────────────────
+      // De ella cuelga el reloj fenológico de ESTE cultivo. No se guarda a nivel
+      // de parcela: dos cultivos del mismo recinto casi nunca se plantan el
+      // mismo día.
+      function fijarFecha(iso) {
+        if (!iso || iso > hoyISO()) {
+          $("pc-fecha-nota").className = "alta-nota pc-mal";
+          $("pc-fecha-nota").textContent = "Esa fecha todavía no ha llegado.";
+          $("pc-b-fecha").disabled = true;
+          return;
+        }
+        $("pc-fecha-nota").className = "alta-nota";
+        $("pc-fecha-nota").textContent = "Con una fecha aproximada nos vale para empezar.";
+        F = { ...F, borrador: { ...F.borrador, fechaPlantacion: iso } };
+        $("pc-b-fecha").disabled = false;
+      }
+      $("pc-cuando").addEventListener("click", (ev) => {
+        const b = ev.target.closest("[data-hace]");
+        if (!b) return;
+        $("pc-cuando").querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+        b.classList.add("sel");
+        const iso = KyliaClima.sumarDias(hoyISO(), -Number(b.dataset.hace));
+        $("pc-fecha").value = iso;
+        fijarFecha(iso);
+      });
+      $("pc-fecha").addEventListener("change", (ev) => {
+        $("pc-cuando").querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+        fijarFecha(ev.target.value);
+      });
+      $("pc-b-fecha").addEventListener("click", () => { F = FLUJO.avanzar(F); prepararRiego(); ir("riego"); });
+
+      // ── 6 · el riego, una pregunta cada vez ──────────────────────────────
+      // ⚠️ El contrato de capacidad (fiable / provisional / no_ejecutable) es el
+      // desplegado en 74260fe y NO se toca: aquí solo se recogen las respuestas
+      // y se llama a KyliaRiego.derivar.
+      let RG = {};
+      function prepararRiego() {
+        RG = {};
+        ["pc-metodo", "pc-gq", "pc-gsep", "pc-glin", "pc-cm", "pc-regl"].forEach(id =>
+          $(id)?.querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel")));
+        ["pc-g1", "pc-g2", "pc-g3", "pc-vaso", "pc-reg", "pc-nolose-caja"].forEach(id => { $(id).hidden = true; });
+        $("pc-nolose").classList.remove("sel");
+        $("pc-riego-res").textContent = "";
+        $("pc-tecnico").hidden = true;
+        $("pc-b-riego").disabled = true;
+      }
+      const grupoPC = (id, attr, campo, luego) => {
+        $(id)?.addEventListener("click", (ev) => {
+          const b = ev.target.closest(`[data-${attr}]`);
+          if (!b) return;
+          $(id).querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel"));
+          b.classList.add("sel");
+          RG[campo] = b.dataset[attr];
+          luego && luego();
+        });
+      };
+      grupoPC("pc-metodo", "metodo", "metodo", () => {
+        const m = RG.metodo;
+        // Cambiar de método invalida lo contestado para el anterior: las
+        // preguntas eran de otro sistema de riego.
+        RG = { metodo: m };
+        ["pc-g1", "pc-g2", "pc-g3", "pc-vaso", "pc-reg"].forEach(id => { $(id).hidden = true; });
+        ["pc-gq", "pc-gsep", "pc-glin", "pc-cm", "pc-regl"].forEach(id =>
+          $(id)?.querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel")));
+        $("pc-riego-res").textContent = "";
+        $("pc-tecnico").hidden = true;
+        $("pc-nolose").classList.remove("sel");
+        if (m === "goteo") $("pc-g1").hidden = false;
+        else if (m === "aspersion" || m === "manguera") $("pc-vaso").hidden = false;
+        else if (m === "regadera") $("pc-reg").hidden = false;
+        $("pc-nolose-caja").hidden = (m === "surco" || m === "regadera");
+        // A surco no se le pregunta capacidad: su orden se da en L/m².
+        $("pc-b-riego").disabled = m !== "surco";
+        if (m === "surco") calcularRiego();
+      });
+      grupoPC("pc-gq",   "q",   "q",   () => { $("pc-g2").hidden = false; calcularRiego(); });
+      grupoPC("pc-gsep", "sep", "sep", () => { $("pc-g3").hidden = false; calcularRiego(); });
+      grupoPC("pc-glin", "lin", "lin", calcularRiego);
+      grupoPC("pc-cm",   "cm",  "cm",  calcularRiego);
+      grupoPC("pc-regl", "reg", "reg", () => {
+        $("pc-riego-res").textContent = `Con ${RG.reg} litros te diremos cuántas regaderas echar.`;
+        $("pc-b-riego").disabled = false;
+      });
+      $("pc-nolose").addEventListener("click", () => {
+        ["pc-gq", "pc-gsep", "pc-glin", "pc-cm"].forEach(id =>
+          $(id)?.querySelectorAll(".alta-chip").forEach(x => x.classList.remove("sel")));
+        delete RG.q; delete RG.sep; delete RG.lin; delete RG.cm;
+        RG.noLoSe = true;
+        $("pc-nolose").classList.add("sel");
+        $("pc-tecnico").hidden = true;
+        $("pc-riego-res").textContent =
+          "Sin problema. Te diremos cuánta agua necesita en litros por metro cuadrado; "
+          + "para darte los minutos hará falta este dato, y se mide en diez minutos.";
+        $("pc-b-riego").disabled = false;
+      });
+      function calcularRiego() {
+        if (RG.metodo === "surco") {
+          $("pc-riego-res").textContent = "A manta te daremos el agua en litros por metro cuadrado.";
+          $("pc-b-riego").disabled = false;
+          return;
+        }
+        RG.noLoSe = false;
+        $("pc-nolose").classList.remove("sel");
+        const r = RIEGO.derivar(RG.metodo, {
+          l_h_gotero: RG.q, sep_goteros_m: RG.sep, sep_lineas_m: RG.lin,
+          cm: RG.cm, minutos: 15,
+        });
+        if (!r.ok) {
+          RG.cap = null;
+          $("pc-tecnico").hidden = true;
+          $("pc-riego-res").textContent = r.motivo === "datos_incompletos" ? ""
+            : "Con esas respuestas no sale un número creíble. Repásalas.";
+          $("pc-b-riego").disabled = true;
+          return;
+        }
+        RG.cap = r;
+        // En su idioma. Los mm/h son nuestros, no suyos: van en "detalles".
+        $("pc-riego-res").textContent = "Perfecto. Ya podemos calcular cómo aplica agua tu sistema.";
+        $("pc-tecnico").hidden = false;
+        $("pc-tecnico-txt").textContent =
+          `Tu riego aplica ${r.valor} L/m² cada hora (${r.valor} mm/h). Con esto los avisos salen en minutos.`;
+        $("pc-b-riego").disabled = false;
+      }
+
+      $("pc-b-riego").addEventListener("click", () => {
+        const cap = RG.cap;
+        F = { ...F, borrador: { ...F.borrador,
+          metodoRiego: RG.metodo,
+          caudal: cap && cap.ok ? cap.valor : null,
+          capacidadRegaderaL: RG.reg ? Number(RG.reg) : null,
+          // Se guarda SIEMPRE, también el "no lo sé": ese campo es la marca de
+          // que este cultivo declaró su riego, y por eso no hereda el del vecino.
+          riego: cap && cap.ok
+            ? { capacidad_mmh: cap.valor, unidad: cap.unidad, fuente: cap.fuente,
+                confianza: cap.confianza, datos: cap.datos, medido: hoyISO() }
+            : { capacidad_mmh: null, unidad: "mm/h", fuente: "no_lo_se", confianza: "baja",
+                datos: null, estimacion_mmh: RIEGO.POR_DEFECTO_MMH[RG.metodo] ?? null },
+        } };
+        F = FLUJO.avanzar(F);
+        ir("resumen");
+      });
+
+      // ── 7 · resumen ──────────────────────────────────────────────────────
+      function pintarResumen() {
+        const rep = FLUJO.reparto(F.parcela, F.cultivos);
+        $("pc-res-tit").textContent = F.parcela?.nombre || "Tu parcela";
+        const fecha = (iso) => { try {
+          return new Date(`${iso}T12:00:00`).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+        } catch (_) { return iso; } };
+        $("pc-lista").innerHTML =
+          `<div class="pc-fila"><b>Parcela</b><span>${m2(rep.total)} m²</span></div>`
+          + F.cultivos.map(c => {
+              const cap = RIEGO.evaluarCapacidadRiego(c.riego, c.metodoRiego);
+              const marca = !c.soportado ? ` <span class="pc-sin-motor">sin recomendación</span>`
+                          : cap.clase === "fiable" ? ""
+                          : ` <span class="pc-sin-motor">riego por validar</span>`;
+              return `<div class="pc-fila"><b>${esc(CAT.nombreDe(c.cultivo))}${marca}<br>`
+                + `<span style="font-size:.8rem;color:var(--muted)">Plantado ${esc(fecha(c.fechaPlantacion))}`
+                + ` · ${esc(NOMBRE_METODO[c.metodoRiego] || c.metodoRiego || "")}</span></b>`
+                + `<span>${m2(c.area_m2)} m²</span></div>`;
+            }).join("")
+          + (rep.sin_asignar
+              ? `<div class="pc-fila"><b class="pc-libre">Sin asignar</b><span>${m2(rep.sin_asignar)} m²</span></div>`
+              : "");
+        $("pc-otro").hidden = FLUJO.libres(F) < 10;
+      }
+
+      async function pintarResumenMapa() {
+        await cargarLeaflet();
+        if (!mapa3) {
+          mapa3 = L.map("pc-mapa3", { zoomControl: false, attributionControl: false });
+          L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                      { maxZoom: 20 }).addTo(mapa3);
+        }
+        mapa3.invalidateSize();
+        mapa3.eachLayer(l => { if (l instanceof L.GeoJSON) mapa3.removeLayer(l); });
+        if (!F?.parcela?.geometria) return;
+        L.geoJSON(F.parcela.geometria, { style: { color: "#fff", weight: 2, fillOpacity: 0.05, dashArray: "5 4" } }).addTo(mapa3);
+        const COLORES = ["#6B7A5E", "#B23B2E", "#3B6E8F", "#8A6D3B", "#4E7A57"];
+        F.cultivos.filter(c => c.geometria).forEach((c, i) => {
+          L.geoJSON(c.geometria, { style: { color: COLORES[i % COLORES.length], weight: 2,
+                                            fillOpacity: 0.35, fillColor: COLORES[i % COLORES.length] } })
+            .bindTooltip(`${CAT.nombreDe(c.cultivo)} · ${m2(c.area_m2)} m²`, { direction: "center" })
+            .addTo(mapa3);
+        });
+        try { mapa3.fitBounds(L.geoJSON(F.parcela.geometria).getBounds(), { padding: [20, 20] }); } catch (_) {}
+      }
+
+      $("pc-otro").addEventListener("click", () => {
+        F = FLUJO.anadirOtro(F);
+        limpiarCultivo();
+        ir("cultivo");
+      });
+
+      // ── guardar ──────────────────────────────────────────────────────────
+      // Se escribe en kylia_zonas con el MISMO constructor de siembras que el
+      // resto de la app (nuevaSiembra), para que cada cultivo nazca con su id y
+      // su token de sincronización. No se toca el contrato de sync.
+      $("pc-listo").addEventListener("click", () => {
+        if (!F?.parcela) return cerrar();
+        const zonas = zonasGuardadas();
+        let z = zonas.find(x => x.referencia === F.parcela.referencia);
+        if (!z) {
+          z = { referencia: F.parcela.referencia, nombre: F.parcela.nombre || null,
+                superficie_m2: F.parcela.superficie_m2, uso: F.parcela.uso,
+                satelite: F.parcela.satelite, geometria: F.parcela.geometria, siembras: [] };
+          zonas.push(z);
+        }
+        z.siembras = z.siembras || [];
+        for (const c of F.cultivos) {
+          if (c.id && z.siembras.some(s => s.id === c.id)) continue;   // ya estaba
+          // `siembras.push(nuevaSiembra(` literal, y no una variable por medio:
+          // hay una guarda en tests/test-sincronizar-zonas.mjs que exige que
+          // TODO push pase por el constructor único, y tiene razón — es lo que
+          // garantiza que ninguna siembra nazca sin su token de sincronización.
+          z.siembras.push(nuevaSiembra(c.area_m2, {
+            cultivo: c.cultivo, fechaPlantacion: c.fechaPlantacion,
+            geometria: c.geometria || null,
+            metodoRiego: c.metodoRiego, caudal: c.caudal ?? null, riego: c.riego || null,
+          }));
+          const s = z.siembras[z.siembras.length - 1];
+          // Y su historial, con la MISMA función que el alta: un cultivo sin
+          // balance no tiene primer aviso que dar.
+          try {
+            const suyos = reconstruirRiegos({
+              cultivo: c.cultivo, plantado: c.fechaPlantacion, cada: "2",
+              minutos: "30", ultimo: "1", metodo: c.metodoRiego,
+              caudal: Number(c.caudal) || 0,
+            }, ultimoET0);
+            localStorage.setItem(`kylia_riegos_${s.id}`, JSON.stringify(suyos));
+          } catch (_) { /* sin clima aún: el balance se rehará al cargarlo */ }
+        }
+        localStorage.setItem(ZONAS_KEY, JSON.stringify(zonas));
+        cerrar();
+        try { renderZonasTabs(); renderHoy(); } catch (_) {}
+        subirConfig();
+      });
+
+      function cerrar() {
+        caja.hidden = true;
+        const cb = alCerrar; alCerrar = null;
+        if (typeof cb === "function") cb();
+      }
+      $("pc-cerrar").addEventListener("click", cerrar);
+      caja.querySelectorAll("[data-pc-ir]").forEach(b =>
+        b.addEventListener("click", () => ir(b.dataset.pcIr)));
+
+      // ── las tres puertas ─────────────────────────────────────────────────
+      // MISMO flujo, distinto punto de entrada. Nada de un formulario aparte
+      // para "añadir parcela": eso es lo que hace que dos caminos diverjan.
+      window.kyliaParcelaNueva = function (opts = {}) {
+        F = null; seleccionada = null; recintos = [];
+        alCerrar = opts.alCerrar || null;
+        caja.hidden = false;
+        $("pc-sel").hidden = true;
+        ir("parcela");
+        const lat = opts.lat ?? cfgFinca.lat, lon = opts.lon ?? cfgFinca.lon;
+        if (lat != null && lon != null) cargarZona(lat, lon);
+        else $("pc-mapa-nota").textContent = "Busca tu parcela en el mapa o usa tu ubicación.";
+      };
+
+      // "+ Añadir cultivo" sobre una parcela que ya existe: se salta el mapa de
+      // recintos y entra directo al cultivo, con su contexto — contorno, lo ya
+      // ocupado y lo que queda.
+      window.kyliaCultivoNuevo = function (referencia, opts = {}) {
+        const z = zonasGuardadas().find(x => x.referencia === referencia);
+        if (!z?.geometria) return;
+        alCerrar = opts.alCerrar || null;
+        F = FLUJO.elegirParcela(FLUJO.nuevoFlujo(), {
+          referencia: z.referencia, nombre: z.nombre || null,
+          superficie_m2: z.superficie_m2, geometria: z.geometria,
+          uso: z.uso, satelite: z.satelite,
+        });
+        F = { ...F, cultivos: (z.siembras || []).filter(s => s.cultivo),
+              paso: "cultivo", borrador: FLUJO.nuevoBorrador(F.parcela, false) };
+        caja.hidden = false;
+        limpiarCultivo();
+        ir("cultivo");
+      };
+    })();
+
   </script>
 </body>
 </html>
