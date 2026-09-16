@@ -381,67 +381,74 @@
                                   { cache: "no-store" });
           if (!res.ok) return;
           const d = await res.json();
-          if (d?.ok && typeof d.propietario?.config_version === "number"
-              && Number.isSafeInteger(d.propietario.config_version) && d.propietario.config_version >= 0) {
-            configVersion = d.propietario.config_version;
-          }
+          // Adoptar la foto del servidor es adoptar también SU versión: a partir
+          // de aquí, esta copia local está construida sobre ella.
+          if (d?.ok) window.kyliaSync.adoptarBaseConfig(d);
           if (d?.ok && d.config && restaurarConfig(d.config, null)) location.reload();
         } catch (_) { /* sin cobertura: se sigue con lo local, que es nada */ }
       }
 
       // ─── Guardado de config con compare-and-set ────────────────────
-      // La versión sobre la que escribimos. La cola de encolarConfig serializa lo
-      // que sale de ESTE navegador, pero no puede hacer nada contra otro
-      // dispositivo ni contra una petición que el servidor procese tarde después
-      // de que la hayamos abortado por timeout: abortar aquí no detiene al
-      // servidor. El orden lo pone el UPDATE condicional, no nosotros.
+      // LA BASE VIVE CON LA FOTO, Y PERSISTE. No basta con recordar en memoria
+      // "estoy en la versión v": al recargar se perdía y la foto local quedaba
+      // huérfana, lista para escribirse sobre cualquier versión que hubiera. Lo
+      // que se guarda es la RELACIÓN: esta configuración local se construyó o se
+      // adoptó cuando el servidor de ESTE propietario estaba en esta versión.
       //
-      // `null` = DESCONOCIDA, y desconocida significa NO ESCRIBIR. Nunca se
-      // sustituye por 0: un 0 inventado es una base falsa.
-      let configVersion = null;
+      //   kylia_config_base = { owner_id, base_version, adoptada }
+      //
+      // Una edición local NO la mueve: editar no te pone al día con el servidor.
+      // Solo un CAS confirmado la avanza.
+      const BASE_KEY       = "kylia_config_base";
+      const CONFLICTO_KEY  = "kylia_config_conflicto";
       const TIMEOUT_VERSION_MS = 8000;
 
-      // Una versión es un entero no negativo, y nada más. Ni "0", ni "", ni null,
-      // ni 1.5, ni Infinity. Se comprueba por TIPO: `Number("0")` es 0 y colaría
-      // una cadena como versión válida, que es exactamente cómo se cuela una base
-      // que nadie ha comprobado.
+      // Una versión es un entero no negativo, y nada más. Se comprueba por TIPO
+      // en TODOS los caminos, también tras un éxito: `Number("1")` es 1 y colaría
+      // una cadena como versión, que es exactamente cómo se cuela una base que
+      // nadie ha comprobado.
       const esVersion = (v) => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+      const esOwner   = (v) => typeof v === "string" && v.length > 0;
 
-      // ─── Conflicto de configuración ────────────────────────────────
-      // Cuando el servidor dice 409, otro dispositivo escribió. NO se reintenta.
-      // Se guarda lo necesario para diagnosticar y se CIERRA la escritura remota
-      // de config hasta que exista una política de resolución. Prefiero un
-      // conflicto visible a un cambio perdido: el nombre que puso el otro
-      // dispositivo se queda como está.
-      let conflictoConfig = null;
-      window.kyliaSync.conflictoConfig = () => (conflictoConfig ? { ...conflictoConfig } : null);
-      window.kyliaSync.versionConfig   = () => configVersion;
-
-      function marcarConflicto(base, r, fotoLocal) {
-        conflictoConfig = {
-          detectado: new Date().toISOString(),
-          base_intentada: base,
-          version_servidor: esVersion(Number(r?.datos?.config_version)) ? Number(r.datos.config_version) : null,
-          guardado_servidor: r?.datos?.guardado || null,
-          foto_local_sin_guardar: fotoLocal,        // la última que no pudo escribirse
-          config_servidor: null,                    // se rellena con el diagnóstico
-        };
+      function leerBase() {
         try {
-          console.warn("[kylia-config] CONFLICTO: otro dispositivo escribió la configuración. " +
-            "Las escrituras remotas de config quedan detenidas. " +
-            "Mira window.kyliaSync.conflictoConfig().", conflictoConfig);
-        } catch (_) {}
-        // Diagnóstico, NO autorización: se lee el estado del servidor para poder
-        // enseñarlo, y no para rebasar encima de él.
-        leerConfigServidor().then(d => {
-          if (conflictoConfig && d) {
-            conflictoConfig.config_servidor = d.propietario?.config ?? d.config ?? null;
-            if (esVersion(d.propietario?.config_version)) {
-              conflictoConfig.version_servidor = d.propietario.config_version;
-            }
-          }
-        }).catch(() => {});
+          const b = JSON.parse(localStorage.getItem(BASE_KEY));
+          if (!b || typeof b !== "object" || Array.isArray(b)) return null;
+          if (!esOwner(b.owner_id) || !esVersion(b.base_version)) return null;
+          return { owner_id: b.owner_id, base_version: b.base_version };
+        } catch (_) { return null; }
       }
+      function guardarBase(owner_id, base_version) {
+        if (!esOwner(owner_id) || !esVersion(base_version)) return false;
+        try {
+          localStorage.setItem(BASE_KEY, JSON.stringify(
+            { owner_id, base_version, adoptada: new Date().toISOString() }));
+          return true;
+        } catch (_) { return false; }
+      }
+      // Se llama al ADOPTAR configuración del servidor (restaurar, canjear).
+      window.kyliaSync.adoptarBaseConfig = (d) => {
+        const p = d && d.propietario;
+        return p && esOwner(p.id) && esVersion(p.config_version)
+          ? guardarBase(p.id, p.config_version) : false;
+      };
+
+      function leerConflicto() {
+        try {
+          const c = JSON.parse(localStorage.getItem(CONFLICTO_KEY));
+          return c && typeof c === "object" && !Array.isArray(c) ? c : null;
+        } catch (_) { return null; }
+      }
+      function guardarConflicto(c) {
+        try { localStorage.setItem(CONFLICTO_KEY, JSON.stringify(c)); } catch (_) {}
+        try {
+          console.warn("[kylia-config] CONFLICTO: la configuración del servidor ha cambiado " +
+            "bajo esta copia local. Las escrituras remotas de config quedan detenidas. " +
+            "Mira window.kyliaSync.conflictoConfig().", c);
+        } catch (_) {}
+      }
+      window.kyliaSync.conflictoConfig = () => leerConflicto();
+      window.kyliaSync.baseConfig      = () => leerBase();
 
       // GET de vista=config CON TOPE. Sin él, esta lectura puede quedarse colgada
       // antes incluso del POST y dejar la cola esperando para siempre.
@@ -454,53 +461,89 @@
           if (!res.ok) return null;
           return await res.json();
         } catch (_) {
-          return null;              // vencido o caído: la versión sigue DESCONOCIDA
+          return null;              // vencido o caído: no sabemos nada, no se escribe
         } finally {
           if (reloj) clearTimeout(reloj);
         }
       }
 
-      async function versionVigente() {
-        if (esVersion(configVersion)) return configVersion;
-        const d = await leerConfigServidor();
-        // Solo del bloque del propietario, que es el que corresponde a la fila
-        // contra la que se hace el CAS. Nada de fabricar un 0 si no viene.
-        if (d?.ok && esVersion(d.propietario?.config_version)) {
-          configVersion = d.propietario.config_version;
-          return configVersion;
-        }
-        return null;
+      function anotarConflicto(base, srv, config, motivo) {
+        guardarConflicto({
+          motivo,
+          detectado: new Date().toISOString(),
+          owner_id: base ? base.owner_id : (srv && srv.id) || null,
+          base_local: base ? base.base_version : null,
+          version_servidor: srv && esVersion(srv.config_version) ? srv.config_version : null,
+          config_servidor: srv ? srv.config ?? null : null,     // diagnóstico, NO autorización
+          foto_local_sin_guardar: config,
+        });
       }
 
       window.kyliaSync.guardarConfigServidor = async function (config, opts) {
         // Con un conflicto abierto no se escribe NADA, ni siquiera un guardado
-        // nuevo del usuario: saltárselo en silencio sería el lost update que
-        // estamos evitando. Se conserva la última foto para cuando haya política
-        // de resolución.
-        if (conflictoConfig) {
-          conflictoConfig.foto_local_sin_guardar = config;
+        // nuevo del usuario: saltárselo sería el lost update que evitamos.
+        const abierto = leerConflicto();
+        if (abierto) {
+          abierto.foto_local_sin_guardar = config;
+          guardarConflicto(abierto);
           return { ok: false, status: 0, persisted: false, error: "conflicto_config", datos: null };
         }
-        const base = await versionVigente();
-        if (base == null) {
-          // Desconocida: 0 POST. Mandar sin base es pedirle al servidor que
-          // sobrescriba a ciegas, y mandar con un 0 inventado es peor.
+
+        // Estado del servidor ANTES de escribir. No es un rebase: es comprobar
+        // que la base con la que se construyó esta foto sigue siendo la vigente.
+        const d = await leerConfigServidor();
+        const srv = d && d.ok ? d.propietario : null;
+        if (!srv || !esOwner(srv.id) || !esVersion(srv.config_version)) {
           return { ok: false, status: 0, persisted: false, error: "version_desconocida", datos: null };
         }
 
-        const r = await post("/api/log",
-          { recurso: "config-app", propietario_id: userId, config, base_version: base }, opts);
+        let base = leerBase();
+        // ÚNICA excepción al "sin base no se escribe": el servidor no tiene NADA
+        // (config null en la versión 0). No hay nada que pisar, así que adoptar 0
+        // no puede perder el trabajo de nadie — y si otro escribe antes, el CAS
+        // lo rechaza igual. Cualquier otro caso exige base persistida.
+        if (!base && srv.config == null && srv.config_version === 0) {
+          if (guardarBase(srv.id, 0)) base = leerBase();
+        }
+        if (!base) {
+          return { ok: false, status: 0, persisted: false, error: "base_desconocida", datos: null };
+        }
+        // La versión se obtuvo PARA un propietario. Usarla contra otro UUID sería
+        // escribir con una base que no es suya.
+        if (base.owner_id !== srv.id) {
+          anotarConflicto(base, srv, config, "owner_no_coincide");
+          return { ok: false, status: 0, persisted: false, error: "owner_no_coincide", datos: null };
+        }
+        // La comprobación que hace que esto sobreviva a un reload: si el servidor
+        // se ha movido desde que se construyó esta foto, es conflicto AUNQUE no
+        // hayamos visto nunca un 409.
+        if (srv.config_version !== base.base_version) {
+          anotarConflicto(base, srv, config, "servidor_adelantado");
+          return { ok: false, status: 0, persisted: false, error: "conflicto_config", datos: null };
+        }
 
-        if (r.ok && r.persisted && esVersion(Number(r.datos?.config_version))) {
-          configVersion = Number(r.datos.config_version);
-          return r;
+        // El POST va contra el PROPIETARIO, no contra la zona activa: la config
+        // global es suya y el CAS se hace sobre su fila.
+        const r = await post("/api/log",
+          { recurso: "config-app", propietario_id: base.owner_id, config,
+            base_version: base.base_version }, opts);
+
+        if (r.ok && r.persisted) {
+          // SIN COERCIÓN tampoco aquí. Una respuesta "con éxito" que trae "8" o
+          // null no confirma nada: no se avanza la base y no se habilita la
+          // escritura siguiente.
+          if (esVersion(r.datos?.config_version)) {
+            guardarBase(base.owner_id, r.datos.config_version);
+            return r;
+          }
+          anotarConflicto(base, srv, config, "version_no_confirmable");
+          return { ok: false, status: r.status, persisted: false,
+                   error: "version_no_confirmable", datos: r.datos };
         }
         if (r.status === 409) {
-          // NO se adopta la versión nueva y NO se reintenta. Adoptarla dejaría a
-          // la siguiente foto de la cola escribiendo sobre una base que nadie ha
-          // conciliado, que es rebasar automáticamente con otro nombre.
-          marcarConflicto(base, r, config);
-          return r;
+          // La base local se queda donde estaba: adoptar la del servidor sería
+          // rebasar automáticamente con otro nombre.
+          anotarConflicto(base, srv, config, "conflicto_cas");
         }
         return r;
       };

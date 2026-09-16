@@ -197,44 +197,41 @@ console.log("\n── 8. vista=config no fabrica versiones ──");
 
 console.log("\n── 9. el cliente: base obligatoria y CERO reintentos ──");
 {
-  const APP = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
-  const g = /window\.kyliaSync\.guardarConfigServidor = async function[\s\S]*?\n      \};/.exec(APP)[0];
-  ok(/base_version: base/.test(g), "manda base_version");
-  ok(!/sesion/.test(g), "y NINGUNA marca de sesión: el cliente la controlaba, no probaba nada");
-  ok(/error: "version_desconocida"/.test(g), "sin versión válida no manda nada");
-  ok(/marcarConflicto\(base, r, config\)/.test(g), "un 409 marca conflicto");
-  ok(!/enviar\(configVersion\)|await enviar\(/.test(g), "y NO reintenta: no hay segundo envío");
+  const A = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+  const g = /window\.kyliaSync\.guardarConfigServidor = async function[\s\S]*?\n      \};/.exec(A)[0];
+  ok(/base_version: base\.base_version/.test(g), "manda la base PERSISTIDA, no una de memoria");
+  ok(/propietario_id: base\.owner_id/.test(g), "y el POST va al owner de esa base");
+  ok(!/sesion/.test(g), "ninguna marca de sesión: el cliente la controlaba, no probaba nada");
+  ok(/error: "base_desconocida"/.test(g), "sin base persistida no manda nada");
+  ok(/anotarConflicto\(/.test(g), "un conflicto se anota");
+  ok(!/await post\([\s\S]*await post\(/.test(g), "y NO reintenta: un solo POST en toda la función");
   const rama409 = g.slice(g.indexOf("r.status === 409"));
-  ok(!/configVersion\s*=/.test(rama409), "ni adopta la versión del servidor tras un 409");
-  const i409 = g.indexOf("r.status === 409");
-  const iOk  = g.indexOf("r.ok && r.persisted");
-  ok(iOk > -1 && i409 > iOk, "configVersion solo avanza en el camino de éxito");
-  ok(/if \(conflictoConfig\)/.test(g), "y con un conflicto abierto no se escribe nada");
-  ok(/conflictoConfig\.foto_local_sin_guardar = config/.test(g),
+  ok(!/guardarBase\(/.test(rama409), "tras un 409 la base local no se mueve");
+  ok(/if \(abierto\)/.test(g), "con un conflicto abierto no se escribe nada");
+  ok(/abierto\.foto_local_sin_guardar = config/.test(g),
      "conservando la última foto local que no pudo guardarse");
+  ok(/srv\.config_version !== base\.base_version/.test(g),
+     "y se compara la versión del servidor contra la base local ANTES de escribir");
 }
 {
-  const APP = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
-  const esV = /const esVersion = [^\n]+/.exec(APP)[0];
+  const A = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+  const esV = /const esVersion = [^\n]+/.exec(A)[0];
   ok(/typeof v === "number"/.test(esV) && /Number\.isSafeInteger\(v\)/.test(esV) && /v >= 0/.test(esV),
      "esVersion comprueba por TIPO, no con Number()");
-  // Y se ejecuta, que es lo que cuenta.
   const f = new Function("return " + esV.replace("const esVersion = ", ""))();
   const CASOS = [[0, true], [7, true], [null, false], ["", false], ["0", false], [undefined, false],
                  [-1, false], [1.5, false], [Infinity, false], [NaN, false], [{}, false], [true, false]];
   for (const [v, esperado] of CASOS) {
     ok(f(v) === esperado, `esVersion(${JSON.stringify(v) ?? String(v)}) = ${esperado}`);
   }
+  ok(!/esVersion\(Number\(/.test(A), "y en NINGÚN camino se le pasa un Number(): cero coerción");
 }
 {
-  const APP = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
-  const leer = /async function leerConfigServidor\(\)[\s\S]*?\n      \}/.exec(APP)[0];
+  const A = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+  const leer = /async function leerConfigServidor\(\)[\s\S]*?\n      \}/.exec(A)[0];
   ok(/AbortController/.test(leer), "la LECTURA de versión también lleva AbortController");
   ok(/TIMEOUT_VERSION_MS/.test(leer), "con su tope explícito");
-  ok(/return null;/.test(leer), "y al vencer devuelve null: versión DESCONOCIDA, nunca 0");
-  const ver = /async function versionVigente\(\)[\s\S]*?\n      \}/.exec(APP)[0];
-  ok(/d\.propietario\?\.config_version/.test(ver), "la versión se toma del bloque del PROPIETARIO");
-  ok(!/\|\| 0|\?\? 0/.test(ver), "y no hay ningún fallback a 0");
+  ok(/return null;/.test(leer), "y al vencer devuelve null: no se escribe, nunca se asume 0");
 }
 
 console.log("\n── 10. vista=config: foto y versión de la MISMA fila propietaria ──");
@@ -303,97 +300,184 @@ console.log("\n── 11. la migración es idempotente y no degrada nada ──"
      "y config_app no se toca en ningún punto");
 }
 
-console.log("\n── 12. Mac y móvil: el conflicto CIERRA las escrituras ──");
-// Ejecuta el guardarConfigServidor REAL del cliente contra un servidor de
-// mentira, para que no sea una lectura del fuente sino comportamiento.
-function clienteConfig({ versionInicial, responde }) {
-  const APP = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
-  const trozo = (marca) => {
-    const i = APP.indexOf(marca);
-    if (i < 0) throw new Error("no encuentro: " + marca);
-    let k = APP.indexOf("{", APP.indexOf("(", i));
-    let prof = 0;
-    for (let j = k; j < APP.length; j++) {
-      if (APP[j] === "{") prof++;
-      else if (APP[j] === "}" && --prof === 0) return APP.slice(i, j + 1);
-    }
-    throw new Error("sin cerrar: " + marca);
-  };
+console.log("\n── 12. la BASE local persiste, y es lo que detecta el conflicto ──");
+// Arnés: instancias REALES del cliente sobre un localStorage compartido. Un
+// "reload" es construir otra instancia con el mismo almacén, no reasignar dos
+// variables a mano — que es justo lo que ocultaría que la garantía vivía en
+// memoria.
+const APP = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+function trozo(marca) {
+  const i = APP.indexOf(marca);
+  if (i < 0) throw new Error("no encuentro: " + marca);
+  let k = APP.indexOf("{", APP.indexOf("(", i)), prof = 0;
+  for (let j = k; j < APP.length; j++) {
+    if (APP[j] === "{") prof++;
+    else if (APP[j] === "}" && --prof === 0) return APP.slice(i, j + 1);
+  }
+  throw new Error("sin cerrar: " + marca);
+}
+function almacenCompartido(inicial = {}) {
+  const m = new Map(Object.entries(inicial));
+  return { getItem: k => (m.has(k) ? m.get(k) : null),
+           setItem: (k, v) => m.set(k, String(v)),
+           removeItem: k => m.delete(k), _m: m };
+}
+// Cada llamada = una carga nueva de la app.
+function cargarApp({ almacen, servidor, responde, uid = "zone-1" }) {
   const enviados = [];
   const cuerpo = `
-    const userId = "u-1";
+    const userId = uid;
     const encodeURIComponent = (x) => x;
-    let configVersion = versionInicial;
+    ${/const BASE_KEY\s+= "[^"]+";/.exec(APP)[0]}
+    ${/const CONFLICTO_KEY\s+= "[^"]+";/.exec(APP)[0]}
     ${/const TIMEOUT_VERSION_MS = \d+;/.exec(APP)[0]}
     ${/const esVersion = [^\n]+/.exec(APP)[0]}
-    let conflictoConfig = null;
+    ${/const esOwner   = [^\n]+/.exec(APP)[0]}
     const post = async (p, d) => { enviados.push(d); return responde(d); };
-    ${trozo("function marcarConflicto(")}
-    ${trozo("async function leerConfigServidor(")}
-    ${trozo("async function versionVigente(")}
     const kyliaSync = {};
-    ${trozo("window.kyliaSync.guardarConfigServidor = async function").replace("window.kyliaSync.", "kyliaSync.")}
+    ${trozo("function leerBase()")}
+    ${trozo("function guardarBase(")}
+    ${/window\.kyliaSync\.adoptarBaseConfig = [\s\S]*?\n      \};/.exec(APP)[0].replace("window.kyliaSync.", "kyliaSync.")}
+    ${trozo("function leerConflicto()")}
+    ${trozo("function guardarConflicto(")}
+    ${trozo("async function leerConfigServidor(")}
+    ${trozo("function anotarConflicto(")}
+    ${/window\.kyliaSync\.guardarConfigServidor = async function[\s\S]*?\n      \};/.exec(APP)[0].replace("window.kyliaSync.", "kyliaSync.")}
     return { guardar: kyliaSync.guardarConfigServidor,
-             conflicto: () => conflictoConfig, version: () => configVersion };
+             adoptar: kyliaSync.adoptarBaseConfig,
+             base: leerBase, conflicto: leerConflicto };
   `;
-  const f = new Function("versionInicial", "responde", "enviados", "fetch", "console", cuerpo);
-  return { ...f(versionInicial, responde, enviados, async () => ({ ok: false }), { warn: () => {} }), enviados };
+  const f = new Function("uid", "localStorage", "responde", "enviados", "fetch", "console", cuerpo);
+  const fetchFalso = async () => ({ ok: true, json: async () => servidor() });
+  return { ...f(uid, almacen, responde, enviados, fetchFalso, { warn: () => {} }), enviados };
+}
+const OK_CAS = (v) => async () => ({ ok: true, persisted: true, status: 200, datos: { ok: true, config_version: v } });
+const vistaOwner = (id, version, config) => () => ({ ok: true, propietario: { id, config_version: version, config } });
+
+{
+  // Mac y móvil en 7. Mac escribe 8. El móvil manda, recibe 409, RECARGA, y
+  // vuelve a guardar: sigue sin poder escribir.
+  const ls = almacenCompartido();
+  let versionServidor = 7;
+  const srv = () => ({ ok: true, propietario: { id: "owner", config_version: versionServidor, config: { n: "del servidor" } } });
+  const a1 = cargarApp({ almacen: ls, servidor: srv,
+    responde: async () => ({ ok: false, status: 409, persisted: false, datos: { config_version: 8 } }) });
+  a1.adoptar({ propietario: { id: "owner", config_version: 7, config: {} } });
+  ok(a1.base().base_version === 7 && a1.base().owner_id === "owner", "el móvil adopta base 7 del owner");
+
+  versionServidor = 7;                                  // aún no ha llegado lo de Mac
+  const r1 = await a1.guardar({ n: "B del móvil" });
+  ok(r1.status === 409, "el móvil manda con base 7 y recibe 409");
+  ok(a1.enviados[0].base_version === 7 && a1.enviados[0].propietario_id === "owner",
+     "el POST fue al OWNER con base 7");
+  ok(a1.base().base_version === 7, "y la base local SIGUE en 7, no adopta la 8");
+
+  // RELOAD: instancia nueva, mismo localStorage.
+  versionServidor = 8;
+  const a2 = cargarApp({ almacen: ls, servidor: srv, responde: OK_CAS(9) });
+  ok(a2.base().base_version === 7, "tras recargar, la base local sigue siendo 7");
+  const r2 = await a2.guardar({ n: "C tras recargar" });
+  ok(r2.error === "conflicto_config", `y el guardado no sale: ${r2.error}`);
+  ok(a2.enviados.length === 0, `0 POST (${a2.enviados.length})`);
+  ok(a2.base().base_version === 7, "la base sigue sin moverse");
 }
 {
-  // Mac y móvil parten de 7. Mac escribe 8. El móvil manda B y recibe 409, y
-  // tenía C ya en cola. Ni B ni C pueden escribir con base 8.
-  const c = clienteConfig({
-    versionInicial: 7,
-    responde: async () => ({ ok: false, status: 409, persisted: false, error: "conflicto_version",
-                             datos: { ok: false, config_version: 8, guardado: "2026-09-16T10:00:00Z" } }),
-  });
-  const rB = await c.guardar({ finca: { nombre: "B del móvil" } });
-  ok(rB.status === 409, "B recibe 409");
-  ok(c.enviados.length === 1 && c.enviados[0].base_version === 7, "B se mandó con base 7, no con 8");
-  ok(c.conflicto() !== null, "queda marcado el conflicto");
-
-  const rC = await c.guardar({ finca: { nombre: "C del móvil" } });
-  ok(rC.error === "conflicto_config", `C NO sale: ${rC.error}`);
-  ok(c.enviados.length === 1, `y no se manda ninguna petición más (${c.enviados.length})`);
-  ok(c.version() === 7, `configVersion NO adopta la 8 del servidor (sigue en ${c.version()})`);
-  ok(c.conflicto().foto_local_sin_guardar.finca.nombre === "C del móvil",
-     "se conserva la ÚLTIMA foto local que no pudo guardarse");
-  ok(c.conflicto().version_servidor === 8, "y se anota la versión del servidor, para diagnóstico");
-
-  // Un guardado posterior del usuario tampoco se salta el bloqueo.
-  const rD = await c.guardar({ finca: { nombre: "D, más tarde" } });
-  ok(rD.error === "conflicto_config" && c.enviados.length === 1,
-     "un guardado posterior tampoco escribe: el bloqueo no se salta en silencio");
-  ok(c.conflicto().foto_local_sin_guardar.finca.nombre === "D, más tarde",
-     "pero la foto pendiente se actualiza a la última");
+  // Igual, pero SIN guardar después del 409 antes del reload. El conflicto se
+  // detecta igual, porque la base lo dice.
+  const ls = almacenCompartido();
+  const a1 = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 7, {}), responde: OK_CAS(8) });
+  a1.adoptar({ propietario: { id: "owner", config_version: 7, config: {} } });
+  const a2 = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 8, { n: "de Mac" }), responde: OK_CAS(9) });
+  const r = await a2.guardar({ n: "del móvil" });
+  ok(r.error === "conflicto_config", "servidor en 8 y base local en 7 → conflicto SIN haber visto un 409");
+  ok(a2.enviados.length === 0, "0 POST");
+  ok(a2.conflicto()?.motivo === "servidor_adelantado", `y se anota el motivo (${a2.conflicto()?.motivo})`);
+  ok(a2.conflicto()?.foto_local_sin_guardar.n === "del móvil", "con la foto local que no pudo guardarse");
 }
 {
-  // Versión desconocida en todas sus formas → 0 POST.
-  for (const [etiqueta, v] of [["null", null], ['""', ""], ['"0"', "0"], ["undefined", undefined],
-                               ["-1", -1], ["1.5", 1.5], ["Infinity", Infinity]]) {
-    const c = clienteConfig({ versionInicial: v, responde: async () => ({ ok: true, persisted: true, datos: {} }) });
-    const r = await c.guardar({ finca: { nombre: "x" } });
-    ok(r.error === "version_desconocida" && c.enviados.length === 0,
-       `versión ${etiqueta} → desconocida y 0 POST`);
+  // Base ausente o corrupta → 0 POST, y NUNCA se adopta la versión del servidor.
+  for (const [etiqueta, valor] of [["ausente", null], ["basura", "{{"], ["sin owner", '{"base_version":7}'],
+                                   ["sin versión", '{"owner_id":"owner"}'],
+                                   ['versión "7"', '{"owner_id":"owner","base_version":"7"}'],
+                                   ["versión -1", '{"owner_id":"owner","base_version":-1}']]) {
+    const ls = almacenCompartido(valor === null ? {} : { kylia_config_base: valor });
+    const a = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 7, { n: "hay algo" }), responde: OK_CAS(8) });
+    const r = await a.guardar({ n: "x" });
+    ok(r.error === "base_desconocida" && a.enviados.length === 0,
+       `base ${etiqueta} → base_desconocida y 0 POST`);
+    ok(a.base() === null, "y no se le asocia la versión actual del servidor");
   }
-  // Y el 0 numérico SÍ vale.
-  const c0 = clienteConfig({ versionInicial: 0,
-    responde: async () => ({ ok: true, persisted: true, status: 200, datos: { config_version: 1 } }) });
-  const r0 = await c0.guardar({ finca: { nombre: "x" } });
-  ok(r0.persisted === true && c0.enviados[0].base_version === 0, "el 0 numérico sí es una base válida");
-  ok(c0.version() === 1, "y la versión avanza a 1");
 }
 {
-  // El GET de versión se queda colgado: vence, no se escribe, y la versión sigue
-  // desconocida. Nunca se asume 0.
-  const APP = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
-  const c = clienteConfig({ versionInicial: null, responde: async () => ({ ok: true, persisted: true, datos: {} }) });
-  const t0 = Date.now();
-  const r = await c.guardar({ finca: { nombre: "x" } });
-  ok(r.error === "version_desconocida", "con la lectura caída, versión desconocida");
-  ok(c.enviados.length === 0, "y 0 POST de config");
-  ok(c.version() === null, "la versión sigue en null, no en 0");
-  ok(Date.now() - t0 < 2000, "sin quedarse colgado esperando");
+  // Éxito 7→8: la base pasa a 8 y sobrevive al reload.
+  const ls = almacenCompartido();
+  const a1 = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 7, {}), responde: OK_CAS(8) });
+  a1.adoptar({ propietario: { id: "owner", config_version: 7, config: {} } });
+  const r = await a1.guardar({ n: "mío" });
+  ok(r.persisted === true, "el CAS confirma");
+  ok(a1.base().base_version === 8, "la base local pasa a 8");
+  const a2 = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 8, {}), responde: OK_CAS(9) });
+  ok(a2.base().base_version === 8, "y sobrevive al reload");
+  const r2 = await a2.guardar({ n: "otro" });
+  ok(r2.persisted === true && a2.enviados[0].base_version === 8, "el guardado siguiente usa la 8");
+}
+{
+  // Servidor virgen: config null en versión 0. Es la ÚNICA excepción.
+  const ls = almacenCompartido();
+  const a = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 0, null), responde: OK_CAS(1) });
+  const r = await a.guardar({ n: "primera vez" });
+  ok(r.persisted === true && a.enviados[0].base_version === 0,
+     "sin config en el servidor se puede arrancar en base 0: no hay nada que pisar");
+  ok(a.base().base_version === 1, "y la base queda en 1");
+}
+{
+  // Pero con config en el servidor y sin base local, NO.
+  const ls = almacenCompartido();
+  const a = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 0, { n: "algo hay" }), responde: OK_CAS(1) });
+  const r = await a.guardar({ n: "x" });
+  ok(r.error === "base_desconocida" && a.enviados.length === 0,
+     "con config en el servidor y sin base local: 0 POST aunque la versión sea 0");
+}
+
+console.log("\n── 13. tipado estricto TAMBIÉN tras el éxito ──");
+{
+  for (const [etiqueta, v] of [['"1"', "1"], ["null", null], ["true", true], ['""', ""], ["1.5", 1.5], ["undefined", undefined]]) {
+    const ls = almacenCompartido({ kylia_config_base: JSON.stringify({ owner_id: "owner", base_version: 7 }) });
+    const a = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 7, {}),
+      responde: async () => ({ ok: true, persisted: true, status: 200, datos: { ok: true, config_version: v } }) });
+    const r = await a.guardar({ n: "x" });
+    ok(r.error === "version_no_confirmable", `éxito con versión ${etiqueta} → no confirmable`);
+    ok(a.base().base_version === 7, "la base NO avanza");
+    const r2 = await a.guardar({ n: "y" });
+    ok(r2.error === "conflicto_config" && a.enviados.length === 1,
+       "y la escritura siguiente queda bloqueada");
+  }
+  // El 1 numérico sí.
+  const ls = almacenCompartido({ kylia_config_base: JSON.stringify({ owner_id: "owner", base_version: 7 }) });
+  const a = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 7, {}), responde: OK_CAS(8) });
+  ok((await a.guardar({ n: "x" })).persisted === true && a.base().base_version === 8,
+     "y un 8 numérico sí confirma y avanza la base");
+}
+
+console.log("\n── 14. la tupla owner+versión+foto es inseparable ──");
+{
+  // userId = zone; owner en 7; zone en 2. El POST tiene que ir al OWNER con 7.
+  const ls = almacenCompartido();
+  const a = cargarApp({ almacen: ls, uid: "zone",
+    servidor: vistaOwner("owner", 7, { n: "del dueño" }), responde: OK_CAS(8) });
+  a.adoptar({ propietario: { id: "owner", config_version: 7, config: {} } });
+  const r = await a.guardar({ n: "x" });
+  ok(r.persisted === true, "escribe");
+  ok(a.enviados[0].propietario_id === "owner", `y va al OWNER (${a.enviados[0].propietario_id}), no a la zona`);
+  ok(a.enviados[0].base_version === 7, "con la base 7 del owner, no la 2 de la zona");
+}
+{
+  // La versión se obtuvo para otro owner: no se reutiliza.
+  const ls = almacenCompartido({ kylia_config_base: JSON.stringify({ owner_id: "otro-dueno", base_version: 7 }) });
+  const a = cargarApp({ almacen: ls, servidor: vistaOwner("owner", 7, {}), responde: OK_CAS(8) });
+  const r = await a.guardar({ n: "x" });
+  ok(r.error === "owner_no_coincide" && a.enviados.length === 0,
+     "una base obtenida para otro UUID no autoriza a escribir aquí");
 }
 
 console.log(fallos === 0 ? "\n✅ TODOS LOS TESTS VERDES\n" : `\n❌ ${fallos} FALLOS\n`);
