@@ -130,15 +130,22 @@ console.log("\n── 3. carrera concurrente: una crea, la otra 409 ──");
   ok(srv.log.every(x => x.op !== "update"), "y nadie hizo UPDATE: cero overwrite");
 }
 
-console.log("\n── 4. email y origen se heredan del propietario, no del cuerpo ──");
+console.log("\n── 4. email y origen NO se escriben, ni del cuerpo ni heredados ──");
 {
+  // Este test pedía lo contrario —que se heredaran del dueño— hasta que la
+  // auditoría concluyó que no son campos de la parcela: el correo es del
+  // agricultor y `origen` es de qué anuncio vino el dispositivo. Tenerlos en la
+  // fila de cada zona es lo que hacía que varias parcelas compartieran correo y
+  // que `email=eq.<x>&limit=1` devolviera una cualquiera.
   const srv = servidor([{ id: OWNER, email: "dueño@real.es", origen: "ferias" }]);
   const h = montaHandler(srv);
   await crear(h, { email: "atacante@otro.com", origen: "inyectado" });
   const f = srv.ver(SIEMBRA);
-  ok(f.email === "dueño@real.es", `email del dueño (${f.email})`);
-  ok(f.origen === "ferias", `origen del dueño (${f.origen})`);
-  ok(f.email !== "atacante@otro.com", "el del cuerpo se ignora: abrir la reparación desde otro navegador no cambia la parcela");
+  ok(!("email" in f) || f.email == null, `la parcela nace sin email (${f.email})`);
+  ok(!("origen" in f) || f.origen == null, `y sin origen (${f.origen})`);
+  ok(f.email !== "atacante@otro.com", "el del cuerpo se ignora");
+  ok(f.email !== "dueño@real.es", "y tampoco se hereda del dueño: la identidad vive en SU fila");
+  ok(f.cultivos[0] === "brassica" && f.area_m2 === 1880, "lo que sí es de la parcela se escribe igual");
 }
 
 console.log("\n── 5. validaciones que paran antes de escribir ──");

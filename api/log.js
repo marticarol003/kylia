@@ -174,10 +174,11 @@ async function handleRegistroUsuario(req, res, body) {
 // overwrite. El duplicado se devuelve como 409 para que el llamante RELEA en vez
 // de reintentar.
 //
-// `email` y `origen` NO se aceptan del cuerpo: se heredan de la fila del
-// propietario. Son datos de dispositivo —en la app salen de localStorage— y
-// dejar que los mande quien repara haría que abrir la reparación desde otro
-// navegador cambiara el contenido de la parcela.
+// `email` y `origen` NO se escriben, ni del cuerpo ni heredados. No son campos de
+// la parcela: el correo es del agricultor y `origen` es de qué anuncio vino el
+// dispositivo. La identidad de la persona vive en la fila del propietario, que es
+// donde la buscan _acceso.js y recordatorio-wizard.js. Una parcela creada aquí
+// nace sin ellos, igual que las que sincroniza el Punto 1.
 async function handleCrearParcela(req, res, body) {
   const id = (body.id || "").toString().trim();
   const propietario_id = (body.propietario_id || "").toString().trim();
@@ -193,7 +194,7 @@ async function handleCrearParcela(req, res, body) {
 
   try {
     const dueños = await supabaseSelect("usuarios",
-      `id=eq.${propietario_id}&select=id,email,origen,piloto_sombra`);
+      `id=eq.${propietario_id}&select=id,email,piloto_sombra,propietario_id`);
     const dueño = dueños?.[0];
     if (!dueño) return res.status(404).json({ ok: false, persisted: false, error: "propietario no encontrado" });
 
@@ -217,9 +218,6 @@ async function handleCrearParcela(req, res, body) {
       suelo:            SUELOS.has(body.suelo) ? body.suelo : null,
       metodo_riego:     METODOS_RIEGO.has(body.metodo_riego) ? body.metodo_riego : null,
       caudal:           numOrNull(body.caudal),
-      // Heredados de la fila del propietario, NO del cuerpo.
-      email:            dueño.email  ?? null,
-      origen:           dueño.origen ?? null,
     };
 
     const filas = await supabaseInsert("usuarios", fila);      // ← SIN upsert

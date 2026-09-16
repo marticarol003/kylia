@@ -93,15 +93,22 @@ async function pedir(body, ip) {
     return respuesta;   // callado a propósito: por fuera es indistinguible
   }
 
-  // Cualquier fila de `usuarios` con ese email identifica a la persona; su
-  // propietario_id es el que agrupa todas sus zonas.
-  const filas = await supabaseSelect("usuarios",
-    `email=eq.${encodeURIComponent(email)}&select=id,propietario_id&limit=1`);
-  const dueño = filas?.[0];
-  if (!dueño) {
-    console.log("[acceso] email sin parcelas:", email);
-    return respuesta;   // ídem: no se confirma ni se desmiente
+  // Resolución DETERMINISTA del propietario. Antes era `select=id&limit=1` y se
+  // usaba esa fila como si fuera la del dueño; con varias parcelas compartiendo
+  // correo, PostgREST devuelve una cualquiera. Ahora se colapsa por
+  // propietario_id: si todas apuntan al mismo, ese es. Si apuntan a dueños
+  // distintos, no se elige a dedo — se para.
+  const quien = await propietarioPorEmail(email);
+  if (quien.conflicto) {
+    console.error("[acceso] email con varios propietarios, no se manda enlace:",
+      JSON.stringify({ email, dueños: quien.conflicto }));
+    return respuesta;   // por fuera, indistinguible: no se confirma ni se desmiente
   }
+  if (quien.vacio) {
+    console.log("[acceso] email sin parcelas:", email);
+    return respuesta;   // ídem
+  }
+  const dueño = { id: quien.propietario_id, propietario_id: quien.propietario_id };
 
   const { token, hash } = nuevoToken();
   await supabaseInsert("accesos", {

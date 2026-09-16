@@ -60,13 +60,19 @@ async function enviarEmail({ to, nombre }) {
 async function yaRespondioHoy(email) {
   if (!isConfigured() || !email) return false;
   try {
-    // 1) buscar uuid en usuarios por email
-    const usuarios = await supabaseSelect(
-      "usuarios",
-      `email=eq.${encodeURIComponent(email.toLowerCase())}&select=id`
-    );
-    if (!usuarios.length) return false;
-    const usuarioId = usuarios[0].id;
+    // 1) resolver el PROPIETARIO, no "una fila con ese correo". Antes era
+    //    `select=id` y se cogía usuarios[0]: con varias parcelas compartiendo
+    //    email —las de zona heredaban el del agricultor— podía salir una zona, y
+    //    entonces se miraba la jornada de la zona en vez de la suya. El aviso
+    //    salía o no salía por sorteo. Ver api/_propietario.js.
+    const quien = await propietarioPorEmail(email);
+    if (quien.conflicto) {
+      console.error("[recordatorio-wizard] email con varios propietarios:",
+        JSON.stringify({ email, dueños: quien.conflicto }));
+      return false;      // ante duda, enviar: mejor un recordatorio de más
+    }
+    if (quien.vacio) return false;
+    const usuarioId = quien.propietario_id;
 
     // 2) buscar jornada de hoy
     // Día CIVIL en Europe/Madrid: la jornada la cierra el agricultor en su hora.

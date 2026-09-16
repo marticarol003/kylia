@@ -3868,10 +3868,21 @@
       // polígono para cada cultivo y les daría a todos el mismo NDVI mezclado.
       // Si el agricultor marcó la separación, cada siembra lleva SU trozo.
       const geomZona = (z.siembras || []).length === 1 ? z.geometria : null;
+      // ⚠️ NI `email` NI `origen`. Estaban aquí y salían de localStorage, así que la
+      // huella —que se calcula sobre este payload— dependía del NAVEGADOR: la
+      // misma siembra daba huellas distintas en el móvil y en el portátil, y cada
+      // uno creía que el otro la había modificado. Y no son datos de la parcela:
+      // el correo es del agricultor y `origen` es de qué anuncio vino el
+      // dispositivo. La identidad de la persona vive en la fila del propietario,
+      // que es donde la buscan _acceso.js y recordatorio-wizard.js.
+      //
+      // No hace falta excluirlos del cálculo de la huella: no están en el payload,
+      // y payload y huella siguen saliendo de la MISMA función, sin listas
+      // paralelas. Que un campo ausente no se escribe lo garantiza `siViene()` en
+      // registro-usuario, así que esto NO borra los email que ya existan.
       return {
         id:               s.id,
         propietario_id:   dueno,
-        email:            localStorage.getItem("kylia_user_email") || null,
         nombre:           `${nombreCultivo(s.cultivo)} · ${(s.area_m2 || 0).toLocaleString("es-ES")} m²`,
         ciudad:           base.ciudad,
         lat:              base.lat,
@@ -3886,7 +3897,6 @@
         // con el método de la finca le daría otra eficiencia.
         metodo_riego:     s.metodoRiego || base.metodoRiego || null,
         caudal:           base.caudal ?? null,
-        origen:           localStorage.getItem("kylia_origen"),
       };
     }
     // Serialización ESTABLE y RECURSIVA. La versión anterior usaba
