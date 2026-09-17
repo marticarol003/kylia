@@ -288,5 +288,31 @@ console.log("\n── 3 · UN HISTORIAL VACÍO NO ES \"NO HA REGADO\" ──");
      "y `nuevaSiembra` lo sella al crear el cultivo");
 }
 
+console.log("\n── 4 · EL CAMINO DE LA API TAMBIÉN LLEVA LA MARCA ──");
+{
+  // El cliente ya declaraba la incertidumbre; el servidor NO, y es el que
+  // alimenta /campo y los recordatorios. Un camino que pierde la marca vuelve a
+  // presentar como confirmada una necesidad que no lo es.
+  const API = readFileSync(join(RAIZ, "api", "campo.js"), "utf8");
+  ok(/historialDesde: ctxSiembra\.registradoEl/.test(API),
+     "api/campo.js pasa `historialDesde` al balance");
+  ok(/registradoEl = sb\.registradoEl/.test(API),
+     "y lo saca de config_app, de la misma lectura que la capacidad: sin columna nueva");
+  ok(/balance_confianza: \{/.test(API),
+     "la respuesta lleva la confianza del BALANCE, aparte de la de la capacidad");
+  ok(/balance_incierto: balanceIncierto/.test(API),
+     "y marca la recomendación de hoy");
+  ok(/Quizá toque regar/.test(API) && /quizá \$\{presHoy\.texto\}/.test(API),
+     "el TEXTO principal deja de afirmar, no solo un campo aparte");
+  // Y el consumidor real de ese texto.
+  const CAMPO = readFileSync(join(RAIZ, "campo", "index.html"), "utf8");
+  ok(/h\.balance_incierto/.test(CAMPO),
+     "campo/index.html usa la marca en el titular, en vez de componer \"Riega ~quizá…\"");
+  ok(/presentacion\?\.aviso/.test(CAMPO), "y enseña el aviso debajo");
+  // Las dos confianzas son ejes distintos y no se mezclan.
+  ok(/capacidad_riego: \{ clase: cap\.clase/.test(API) && /confianza: balHoy\.confianzaBalance/.test(API),
+     "capacidad del riego y confianza del balance viajan por separado");
+}
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

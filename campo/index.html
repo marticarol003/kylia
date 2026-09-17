@@ -384,11 +384,21 @@
     }
 
     const h = data.hoy, u = USUARIO, n = NIVEL[h.nivel] || NIVEL.baja;
-    const titular = h.nivel === "alta" && h.presentacion ? `Riega ~${h.presentacion.texto}` : n.titular;
+    // ⚠️ EL TITULAR NO AFIRMA SI EL BALANCE NO SE PUEDE AFIRMAR. Cuando no
+    // sabemos lo que regó entre la plantación y el alta, esto no es una orden:
+    // es una estimación sobre un suelo cuyo estado no conocemos. El aviso va
+    // debajo, pero el titular es lo único que mucha gente lee.
+    const titular = h.nivel === "alta" && h.presentacion
+      ? (h.balance_incierto
+          ? `Quizá toque regar ~${String(h.presentacion.texto).replace(/^quizá /, "")}`
+          : `Riega ~${h.presentacion.texto}`)
+      : n.titular;
 
     let html = `
       <h1>${campoActual().titulo}</h1>
       <div class="sub">${esc(u.ciudad || "")}${u.cultivo ? " · " + esc(u.cultivo) : ""} · ${fmtFecha(h.fecha)}</div>
+      ${h.balance_incierto && h.presentacion?.aviso
+          ? `<div class="sub">${esc(h.presentacion.aviso)}</div>` : ""}
       <div class="estado ${h.nivel}">
         <span class="tag">${n.tag}</span>
         <div class="titular">${titular}</div>

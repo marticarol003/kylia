@@ -29,8 +29,14 @@ const presentar = (mm, opts) => presentarRiegoSeguro(presentarRiego, mm, opts);
 //
 // Esto la recupera de la configuración canónica que YA existe. Sin migración:
 // solo una lectura más, y si falla se cae al lado conservador (provisional).
-async function capacidadDeSiembra(u) {
+// ⚠️ DEVUELVE LAS DOS COSAS EN UNA SOLA LECTURA: la capacidad de riego y desde
+// cuándo hay registro de riegos. La segunda faltaba, y por eso el servidor —que
+// alimenta /campo, los recordatorios y el cron— seguía presentando como
+// confirmada una necesidad de riego calculada sobre un periodo del que no
+// sabemos nada. El cliente ya lo declaraba; este camino perdía la marca.
+async function contextoDeSiembra(u) {
   const riego = { capacidad_mmh: u.caudal, fuente: "heredado_finca", confianza: "baja" };
+  let registradoEl = null;
   try {
     const dueno = u.propietario_id || u.id;
     const filas = await supabaseSelect("usuarios", `id=eq.${dueno}&select=config_app`);
@@ -38,19 +44,24 @@ async function capacidadDeSiembra(u) {
     for (const z of (cfg?.zonas || [])) {
       for (const sb of (z.siembras || [])) {
         if (sb.id !== u.id) continue;
+        registradoEl = sb.registradoEl || null;
         // Declaró su riego: manda lo suyo, sea lo que sea.
-        if (sb.riego) return evaluarCapacidadRiego(sb.riego, u.metodo_riego);
+        if (sb.riego) return { capacidad: evaluarCapacidadRiego(sb.riego, u.metodo_riego), registradoEl };
         if (sb.caudal != null) {
-          return evaluarCapacidadRiego({ capacidad_mmh: sb.caudal, fuente: "declarado", confianza: "media" }, u.metodo_riego);
+          return { capacidad: evaluarCapacidadRiego({ capacidad_mmh: sb.caudal, fuente: "declarado", confianza: "media" }, u.metodo_riego), registradoEl };
         }
+        return { capacidad: evaluarCapacidadRiego(riego, u.metodo_riego), registradoEl };
       }
     }
     // Parcela principal: su riego vive en `finca`.
-    if (cfg?.finca?.riego && (u.propietario_id == null || u.propietario_id === u.id)) {
-      return evaluarCapacidadRiego(cfg.finca.riego, u.metodo_riego);
+    if (u.propietario_id == null || u.propietario_id === u.id) {
+      registradoEl = cfg?.finca?.registradoEl || null;
+      if (cfg?.finca?.riego) {
+        return { capacidad: evaluarCapacidadRiego(cfg.finca.riego, u.metodo_riego), registradoEl };
+      }
     }
   } catch (_) { /* sin config: se queda en lo conservador */ }
-  return evaluarCapacidadRiego(riego, u.metodo_riego);
+  return { capacidad: evaluarCapacidadRiego(riego, u.metodo_riego), registradoEl };
 }
 const { construirReveal, motivoClimaNoPublicable } = require("./_reveal.js");
 const { necesidadNutrientes, creditoResiduosN } = require("./_motor-nutricion.js");
@@ -128,6 +139,12 @@ async function vistaHoy(res, u) {
   // son 145). Si esto falla o viene vacío, el motor vuelve solo al calendario.
   const termica = await serieTermica(u.lat, u.lon, u.fecha_plantacion).catch(() => []);
 
+  // MISMA evaluación que el cliente: fiable | provisional | no_ejecutable. Y de
+  // paso, desde cuándo hay registro de riegos — las dos salen de la misma
+  // lectura de config_app. Va ANTES de `opts` porque `opts` lo usa.
+  const ctxSiembra = await contextoDeSiembra(u);
+  const cap = ctxSiembra.capacidad;
+
   const opts = { suelo: u.suelo, cultivoId: (u.cultivos || [])[0] || null,
                  metodoRiego: u.metodo_riego, fechaPlantacion: u.fecha_plantacion,
                  serieTermica: termica,
@@ -135,9 +152,12 @@ async function vistaHoy(res, u) {
                  // la serie contra la propia serie hace invisibles justo los
                  // huecos que importan, los de los extremos.
                  ventana: { desde: u.fecha_plantacion ? String(u.fecha_plantacion).slice(0, 10) : (serie[0]?.date || null),
-                            hasta: hoy } };
-  // MISMA evaluación que el cliente: fiable | provisional | no_ejecutable.
-  const cap = await capacidadDeSiembra(u);
+                            hasta: hoy },
+                 // Desde cuándo hay registro de sus riegos. Si plantó antes de
+                 // darse de alta y no hay nada apuntado en ese tramo, el balance
+                 // lo declara incierto en vez de contar esos días como si no
+                 // hubiera entrado agua.
+                 historialDesde: ctxSiembra.registradoEl };
   const presOpts = { metodoRiego: u.metodo_riego, caudalMmh: cap.capacidad_mmh,
                      clase: cap.clase,
                      areaM2: u.area_m2, capacidadRegaderaL: u.capacidad_regadera };
@@ -150,7 +170,23 @@ async function vistaHoy(res, u) {
   // corta en hoy (arriba); esto solo ajusta la cantidad por la lluvia que viene,
   // para no llenar el depósito y que el agua de mañana se pierda. Ver decisionRiego.
   const decHoy  = decisionRiego(balHoy, { lluviaPrevista: serie.slice(corte + 1) });
-  const presHoy = decHoy.nivel === "alta" ? presentar(decHoy.cantidad_l_m2, presOpts) : null;
+  let presHoy = decHoy.nivel === "alta" ? presentar(decHoy.cantidad_l_m2, presOpts) : null;
+  // ⚠️ SI NO CONOCEMOS LOS APORTES ANTERIORES, ESTO NO ES UNA ORDEN.
+  //
+  // El cliente ya lo decía; este camino no, y es el que alimentan /campo y los
+  // recordatorios: `presentacion.texto` es literalmente el titular que lee el
+  // agricultor ("Riega ~330 min"). Dejarlo afirmando con un campo aparte que
+  // avise es confiar en que alguien mire el campo aparte.
+  //
+  // Se toca el TEXTO y se marca, no la decisión: el déficit calculado es el que
+  // es. Lo que deja de ser firme es lo que podemos afirmar sobre él.
+  const balanceIncierto = (balHoy.aportesPreviosDesconocidos || 0) > 0;
+  if (balanceIncierto && presHoy) {
+    presHoy = { ...presHoy, balance_incierto: true,
+                texto: `quizá ${presHoy.texto}`,
+                aviso: `Sin saber lo que regaste en los ${balHoy.aportesPreviosDesconocidos} días `
+                     + `entre la plantación y el alta, esto es orientativo.` };
+  }
   const climaHoy = serie[corte] || {};
 
   // El PRÓXIMO riego se proyecta con las mismas reglas que el de hoy, incluida
@@ -229,9 +265,25 @@ async function vistaHoy(res, u) {
     capacidad_riego: { clase: cap.clase, capacidad_mmh: cap.capacidad_mmh,
                        fuente: cap.fuente, confianza: cap.confianza,
                        puede_ejecutar: cap.puede_ejecutar, motivo: cap.motivo },
+    // ⚠️ LA CONFIANZA DEL BALANCE ES OTRA COSA que la de la capacidad. Se puede
+    // saber a qué ritmo riega y no tener ni idea de cuánto regó antes de darse
+    // de alta. Quien consuma esto tiene que poder distinguirlas.
+    balance_confianza: {
+      confianza: balHoy.confianzaBalance || null,
+      aportes_previos_desconocidos: balHoy.aportesPreviosDesconocidos ?? 0,
+      reanclado_en: balHoy.balanceReancladoEn || null,
+      riegos_sin_cantidad: balHoy.riegosSinCantidad ?? 0,
+    },
     hoy: {
       fecha: hoy, nivel: decHoy.nivel, regar: decHoy.nivel === "alta",
-      texto: decHoy.texto, presentacion: presHoy,
+      texto: balanceIncierto
+        ? decHoy.texto.replace(/^Regar hoy/, "Quizá toque regar") + " · sin saber lo que regaste antes del alta"
+        : decHoy.texto,
+      presentacion: presHoy,
+      // La confianza del BALANCE, aparte de la de la capacidad: se puede saber a
+      // qué ritmo riega y no saber cuánto regó.
+      balance_incierto: balanceIncierto,
+      aportes_previos_desconocidos: balHoy.aportesPreviosDesconocidos ?? 0,
       deficit_mm: Number(balHoy.Dr.toFixed(1)), umbral_mm: Number(balHoy.raw.toFixed(1)),
       et0: Number((climaHoy.et0 ?? 0).toFixed(1)),
       // null = no se sabe si llovió, que no es lo mismo que 0 mm medidos.
