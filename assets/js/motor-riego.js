@@ -632,7 +632,12 @@
   // Devuelve { Dr, taw, raw, efic, kcActual, etcAcum, et0Acum, lluviaAcum, sinFenologia }.
   function balanceHidrico(serie, riegos, opts = {}) {
     const { suelo, cultivoId = null, metodoRiego, fechaPlantacion = null,
-            serieTermica = null, termico = true, ventana = null } = opts;
+            serieTermica = null, termico = true, ventana = null,
+            // Desde cuándo tenemos REGISTRO de lo que se ha regado en esta
+            // parcela. No es lo mismo que la plantación: un agricultor que da de
+            // alta hoy una lechuga plantada hace dos semanas no nos ha contado
+            // —ni tiene por qué— lo que regó en esas dos semanas.
+            historialDesde = null } = opts;
     const efic = EFIC_RIEGO[metodoRiego] ?? EFIC_DEFAULT;
     // Reloj del cultivo: calor si se puede, calendario si no. curvaFenologica
     // devuelve null en cuanto falta algo, y entonces esto se comporta EXACTAMENTE
@@ -746,6 +751,26 @@
     const cicloDias = FAO_KC[cultivoId] ? FAO_KC[cultivoId].L.reduce((a, b) => a + b, 0) : null;
     const cicloCompletado = cicloDias != null && diasFin != null && diasFin >= cicloDias;
     const cob = huecosDeSerie(orden, ventana);
+    // ── ¿Sabemos lo que entró antes de empezar a registrar? ────────────────
+    // Se sale de la incertidumbre por EVIDENCIA, nunca por el paso del tiempo:
+    //   · la plantación es posterior (o igual) al inicio del registro, o sea que
+    //     llevamos apuntando desde el día cero; o
+    //   · hay al menos un riego apuntado dentro de ese tramo previo.
+    // Si no, el hueco sigue abierto y el balance lo dice. Nada se borra solo.
+    const diasPreviosSinRegistro = (() => {
+      if (!historialDesde || !fechaPlantacion) return 0;
+      if (String(fechaPlantacion) >= String(historialDesde)) return 0;
+      const hayRiegoPrevio = (riegos || []).some((r) => {
+        const f = String(r?.date || r?.fecha || "").slice(0, 10);
+        return f && f >= String(fechaPlantacion) && f < String(historialDesde);
+      });
+      if (hayRiegoPrevio) return 0;
+      // `diasEntre` resta una FECHA, no una cadena: pasarle el ISO da NaN, y
+      // NaN > 0 es false — el hueco se habría declarado como inexistente.
+      const hasta = new Date(`${String(historialDesde).slice(0, 10)}T12:00:00`);
+      return Math.max(0, diasEntre(fechaPlantacion, hasta) || 0);
+    })();
+
     return {
       Dr: sinPlantar ? 0 : Dr, taw, raw, efic, sinPlantar,
       cicloCompletado,
@@ -789,9 +814,19 @@
       //   incierto  — los supuestos pesan lo bastante como para no publicar un
       //               número sobre esto
       // No cambia ninguna decisión: cambia lo que se puede AFIRMAR con ella.
+      // ⚠️ UN HISTORIAL VACÍO NO ES "NO HA REGADO". Es "no sabemos si regó".
+      // Una lechuga dada de alta hoy pero plantada hace dos semanas salía con
+      // `confianzaBalance: "conocido"` y una necesidad de 32 L/m²: el motor
+      // contaba catorce días de evaporación sin una sola entrada de agua y
+      // presentaba esa suposición como un déficit medido.
+      aportesPreviosDesconocidos: diasPreviosSinRegistro,
       confianzaBalance: (() => {
         const n = orden.length || 1;
         const dudosos = sinCantidad.size + diasSinLluviaConocida;
+        // Lo que entró antes de empezar a registrar pesa sobre TODO el balance:
+        // el déficit de hoy arrastra el de entonces. Mientras eso no se
+        // resuelva, este balance no se puede afirmar.
+        if (diasPreviosSinRegistro > 0) return "incierto";
         if (dudosos === 0 && cob.cobertura >= 0.95) return "conocido";
         if (dudosos / n > 0.2 || cob.cobertura < 0.95) return "incierto";
         return "parcial";

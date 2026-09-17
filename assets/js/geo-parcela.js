@@ -211,7 +211,25 @@
 
   // Mueve un vértice. Devuelve {ok:false} si el resultado se cruza consigo mismo
   // — el que llama debe dejar el vértice donde estaba.
+  // ⚠️ LAS OPERACIONES DE VÉRTICE NO SABEN DE AGUJEROS, Y NO SE LO INVENTAN.
+  //
+  // Las tres —mover, insertar, quitar— trabajaban sobre `anilloExterior` y
+  // devolvían `polDe(anillo)`, o sea un Polygon de UN solo anillo. Sobre un
+  // recinto con agujero eso los BORRABA en silencio: medido sobre los dos
+  // fixtures reales de SIGPAC, un recinto de 9.378 m² pasaba a 10.004 y la
+  // caseta desaparecía del mapa.
+  //
+  // Para este MVP se RECHAZA la operación en vez de intentar arrastrar los
+  // agujeros detrás del exterior: mover una esquina puede dejar un hueco fuera,
+  // partirlo o hacerlo tocar el borde, y resolver eso bien es un editor de
+  // polígonos con agujeros que aquí no toca escribir. Rechazar no muta nada y
+  // no pierde nada; los polígonos sin agujeros se siguen editando igual.
+  const MOTIVO_AGUJEROS = "con_agujeros_no_editable";
+  const tieneAgujeros = (geometry) =>
+    !!geometry && geometry.type === "Polygon" && (geometry.coordinates || []).length > 1;
+
   function moverVertice(geometry, indice, destino) {
+    if (tieneAgujeros(geometry)) return { ok: false, motivo: MOTIVO_AGUJEROS };
     const ring = anilloExterior(geometry);
     if (!ring || indice < 0 || indice >= ring.length) return { ok: false, motivo: "indice" };
     const nuevo = ring.slice();
@@ -224,6 +242,7 @@
   // que convierte "cuatro esquinas" en un contorno que puede seguir la forma
   // real de un bancal.
   function insertarVertice(geometry, indiceLado) {
+    if (tieneAgujeros(geometry)) return { ok: false, motivo: MOTIVO_AGUJEROS };
     const ring = anilloExterior(geometry);
     if (!ring || indiceLado < 0 || indiceLado >= ring.length) return { ok: false, motivo: "indice" };
     const a = ring[indiceLado], b = ring[(indiceLado + 1) % ring.length];
@@ -234,6 +253,7 @@
 
   // Quita un vértice. Por debajo de 3 no hay polígono que valga.
   function quitarVertice(geometry, indice) {
+    if (tieneAgujeros(geometry)) return { ok: false, motivo: MOTIVO_AGUJEROS };
     const ring = anilloExterior(geometry);
     if (!ring || indice < 0 || indice >= ring.length) return { ok: false, motivo: "indice" };
     if (ring.length <= 3) return { ok: false, motivo: "minimo_3" };
@@ -552,7 +572,7 @@
 
   return { areaM2, anilloExterior, partirPorLinea, R_TIERRA, contieneAlPunto,
            esSimple, moverVertice, insertarVertice, quitarVertice, rectanguloCentrado,
-           crucePropio, situarEnAnillo, situarEnPoligono, anillosCompartenArea,
+           crucePropio, situarEnAnillo, situarEnPoligono, anillosCompartenArea, tieneAgujeros,
            normalizarGeometriaExterna, validarPolygonGeoJSON, areaDePolygon,
            contenidoEn, seSolapan, validarCultivo };
 });

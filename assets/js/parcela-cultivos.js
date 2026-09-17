@@ -174,6 +174,11 @@
       fechaPlantacion: b.fechaPlantacion || null,
       fechaPrecision: b.fechaPlantacion ? (b.fechaPrecision || "exacta") : null,
       metodoRiego: b.metodoRiego || null,
+      // ⚠️ MARCA EXPLÍCITA, no un valor falsy. Una alta nueva que dice "lo
+      // indicaré después" y una siembra histórica que nunca declaró su riego
+      // tienen los mismos campos a null, y por eso la nueva se interpretaba como
+      // legacy y heredaba el método y el caudal de la finca. Esto las distingue.
+      riegoPendiente: !!b.riegoPendiente,
       caudal: b.caudal ?? null, riego: b.riego || null,
       capacidadRegaderaL: b.capacidadRegaderaL ?? null,
     };

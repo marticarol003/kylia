@@ -94,8 +94,13 @@ ok(/rectanguloCentrado\(z\.geometria, s\.area_m2\)/.test(app),
    "un cultivo sin contorno arranca de un rectángulo con SUS metros, no de cero");
 ok(/if \(!r\.ok\) return;/.test(app),
    "un arrastre que cruzaría un lado no se aplica: el vértice se queda donde estaba");
-ok(/s\.geometria = c\.geometria; s\.area_m2 = c\.area_m2;/.test(app),
-   "al guardar, el contorno Y su superficie pasan a ser los del cultivo");
+// ⚠️ EL ÁREA SALE DEL POLÍGONO QUE SE GUARDA, no de lo que llevara `c.area_m2`
+// arrastrando. Abrir el editor sobre un recinto con hueco y guardar SIN MOVER
+// NADA subía el área de 4.598 a 4.998 m², porque `iniciarContorno` la calculaba
+// del anillo exterior pelado. Una sola verdad por cultivo.
+ok(/s\.area_m2 = KyliaGeo\.areaDePolygon\(c\.geometria\)/.test(app),
+   "al guardar, la superficie se deriva del contorno que se está guardando");
+ok(/s\.geometria = c\.geometria;/.test(app), "y el contorno pasa a ser el del cultivo");
 ok(/insertarVertice/.test(app) && /quitarVertice/.test(app),
    "se pueden añadir y quitar esquinas desde el mapa");
 ok(/mapaLeaflet\.dragging\.disable\(\)/.test(app),

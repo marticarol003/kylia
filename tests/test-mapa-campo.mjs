@@ -73,7 +73,10 @@ ok(/KyliaGeo\?\.rectanguloCentrado/.test(app),
    "el punto de partida sale de rectanguloCentrado, que ya existía y nace con la forma del recinto");
 ok(/KyliaGeo\.moverVertice\(ecGeom, i, \[latlng\.lng, latlng\.lat\]\)/.test(app),
    "cada arrastre pasa por moverVertice, que es quien valida");
-ok(/KyliaGeo\.areaM2/.test(app), "y el área sale de areaM2, no de una cuenta nueva");
+// `areaDePolygon` y no `areaM2(anilloExterior(...))`: la segunda ignora los
+// anillos interiores, y con un recinto con caseta contaba el hueco como campo.
+ok(/KyliaGeo\.areaDePolygon/.test(app),
+   "y el área sale de areaDePolygon, que descuenta los huecos");
 
 console.log("\n── el contorno no puede cruzarse consigo mismo ──");
 // Una \"pajarita\" tiene un área que NO es la del terreno, y esa cifra acaba en
@@ -153,12 +156,16 @@ console.log("\n── cada cultivo con su propio riego ──");
 // Un bancal a manta y otro a goteo no se riegan igual, y el método decide la
 // eficiencia de aplicación: de 0,60 a 0,90.
 ok(/metodoRiego: ecR\.metodo,/.test(app), "el método se guarda en la siembra");
-ok(/metodoRiego:     p\.metodoRiego  \|\| cfgFinca\.metodoRiego/.test(app),
-   "configEfectiva usa el suyo, y cae al de la finca si no lo tiene");
-ok(/metodoRiego: parcela\.metodoRiego \|\| cfgFinca\.metodoRiego/.test(app),
+// ⚠️ CON UNA EXCEPCIÓN: una alta nueva que dijo "lo indicaré después" NO
+// hereda. El `||` no distingue "no lo ha dicho nunca" (histórica: hereda, como
+// siempre) de "ha dicho que lo dirá después" (nueva: no hereda nada), y con la
+// finca a aspersión una lechuga recién dada de alta salía regando 43 minutos.
+ok(/metodoRiego:     p\.riegoPendiente \? null : \(p\.metodoRiego \|\| cfgFinca\.metodoRiego/.test(app),
+   "configEfectiva usa el suyo, cae al de la finca si nunca lo dijo, y NO hereda si está pendiente");
+ok(/metodoRiego: parcela\.riegoPendiente \? null/.test(app),
    "y ctxDe igual, para las acciones de todas las parcelas");
-ok(/metodo_riego:     s\.metodoRiego \|\| base\.metodoRiego/.test(app),
-   "también viaja al servidor: allí se calcula su propio balance");
+ok(/metodo_riego:     s\.riegoPendiente \? null : \(s\.metodoRiego \|\| base\.metodoRiego/.test(app),
+   "también viaja al servidor con la misma regla: nada de método prestado");
 ok(/siguen heredando\n\s+\/\/ el de la finca/.test(app),
    "los cultivos de antes no tienen el campo y siguen como estaban");
 

@@ -272,6 +272,16 @@
 
     // Qué `riego` rige. Una siembra del alta nueva SIEMPRE lleva el suyo y no
     // hereda; una antigua se sintetiza como provisional, que es lo que era.
+    // ⚠️ MARCA EXPLÍCITA DE "LO INDICARÉ DESPUÉS". Va antes que todo lo demás y
+    // no depende de que `riego` se haya escrito: un valor falsy nunca puede
+    // decidir por sí solo que toca heredar.
+    if (s.riegoPendiente === true) {
+      return { unidad: "mm/h", estimacion_mmh: estimacion, motor: null, operativo: null,
+               valor: null, clase: "no_ejecutable", motivo: "riego_pendiente",
+               fuente: "pendiente", confianza: "baja", datos: null,
+               nivel: "ninguno", declarada: true, admisible: false };
+    }
+
     let riego, nivel, declarada;
     if (s.riego)                                      { riego = s.riego; nivel = "siembra"; declarada = true; }
     else if (capacidadOperativa(s.caudal) !== null)   { riego = { capacidad_mmh: s.caudal, fuente: "declarado", confianza: "media" }; nivel = "siembra"; declarada = false; }

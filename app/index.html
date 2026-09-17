@@ -4299,7 +4299,10 @@
         suelo:            base.suelo || null,
         // El de la siembra si lo tiene: el servidor calcula su propio balance y
         // con el método de la finca le daría otra eficiencia.
-        metodo_riego:     s.metodoRiego || base.metodoRiego || null,
+        // Misma regla que configEfectiva: lo declarado pendiente no se rellena
+        // con lo de la finca. Para las históricas (sin la marca) no cambia nada,
+        // así que su huella no se mueve.
+        metodo_riego:     s.riegoPendiente ? null : (s.metodoRiego || base.metodoRiego || null),
         // MISMA puerta que configEfectiva, para que la fila del servidor y lo que
         // decide el móvil no puedan discrepar. Para las siembras que ya existían
         // da EXACTAMENTE el mismo valor que antes (no llevan `riego` ni
@@ -4417,6 +4420,10 @@
             // pasando por la cadena real en vez de sustituir parcelaActiva.
             caudal: s.caudal ?? null,
             riego: s.riego || null,
+            registradoEl: s.registradoEl ?? null,
+            // La marca de "lo indicaré después". Sin ella, `configEfectiva` no
+            // puede distinguir una alta nueva pendiente de una histórica legacy.
+            riegoPendiente: !!s.riegoPendiente,
             // El contorno propio si la zona se partió; el del recinto entero si
             // ese cultivo lo ocupa solo; ninguno si comparte recinto sin partir
             // (ahí la medida del satélite saldría mezclada, ver renderZonas).
@@ -4451,6 +4458,7 @@
       if (!p || p.id === null) {
         return { ...cfgFinca,
                  caudal:         window.KyliaRiego.caudalOperativo(cfgFinca, {}),
+                 registradoEl:   cfgFinca.registradoEl ?? null,
                  riegoInfo:      cfgFinca.riego || null,
                  capacidadRiego: window.KyliaRiego.capacidadVigente(cfgFinca, {}) };
       }
@@ -4466,7 +4474,12 @@
         // era suponer algo que no se había preguntado. Los cultivos dados de
         // alta antes de que esto existiera no tienen el campo y siguen heredando
         // el de la finca, que es lo que hacían.
-        metodoRiego:     p.metodoRiego  || cfgFinca.metodoRiego || null,
+        // ⚠️ UNA ALTA NUEVA PENDIENTE NO HEREDA. El `||` de toda la vida no
+        // distingue "no lo ha dicho nunca" (histórica: hereda, como siempre) de
+        // "ha dicho que lo dirá después" (nueva: no hereda nada). Con la finca a
+        // aspersión y 11,2, una lechuga recién dada de alta salía regando por
+        // aspersión 43 minutos sin que nadie hubiera declarado su riego.
+        metodoRiego:     p.riegoPendiente ? null : (p.metodoRiego || cfgFinca.metodoRiego || null),
         riegoMinutos:    p.riegoMinutos ?? cfgFinca.riegoMinutos ?? null,
         // Y SU CAPACIDAD DE APLICACIÓN. Era lo único del riego que seguía siendo
         // de la finca: `metodoRiego` ya se heredaba por siembra desde julio, así
@@ -4492,6 +4505,9 @@
         // se queda con caudal null a propósito: no hereda el del cultivo de al
         // lado. Las antiguas no llevan `riego` y siguen heredando como siempre.
         caudal:          window.KyliaRiego.caudalOperativo(p, cfgFinca),
+        // Desde cuándo hay registro de riegos de ESTE cultivo. Cae a la finca
+        // para las siembras antiguas, que no lo llevan.
+        registradoEl:    p.registradoEl ?? cfgFinca.registradoEl ?? null,
         // La procedencia NO viaja a la columna: vive en config_app, junto a la
         // siembra. El motor solo quiere el número; quien necesita saber si ese
         // número está medido o supuesto es la pantalla.
@@ -5025,7 +5041,7 @@
     }
 
     function actualizarNotaEditor() {
-      const area = Math.round(window.KyliaGeo.areaM2(window.KyliaGeo.anilloExterior(ecGeom)));
+      const area = window.KyliaGeo.areaDePolygon(ecGeom);
       const libres = metrosLibres(ecRecinto);
       const nota = document.getElementById("ec-nota");
       // LO QUE SABEMOS manda: el trozo no puede pasarse de los metros que
@@ -5161,7 +5177,7 @@
       if (!ecGeom || !ecRecinto) return;
       const area = ecAreaFijada != null
         ? ecAreaFijada
-        : Math.round(window.KyliaGeo.areaM2(window.KyliaGeo.anilloExterior(ecGeom)));
+        : window.KyliaGeo.areaDePolygon(ecGeom);
       if (!(area > 0) || area > metrosLibres(ecRecinto)) return;
       const hace = Number(document.getElementById("ec-cuando").value);
       // Fecha CIVIL: es la plantación, y de ella cuelga todo el reloj fenológico.
@@ -5582,6 +5598,11 @@
         metodoRiego:     cfg.metodoRiego,
         fechaPlantacion: plant,
         ventana,
+        // Desde cuándo llevamos apuntando sus riegos. Si plantó antes de darlo
+        // de alta y no hay ningún riego en ese tramo, el balance lo declara
+        // INCIERTO en vez de contar catorce días de evaporación sin una sola
+        // entrada de agua y llamar a eso un déficit medido.
+        historialDesde:  cfg.registradoEl || null,
       });
       const { Dr, taw, raw, etcAcum, et0Acum, lluviaAcum } = bal;
 
@@ -5617,6 +5638,10 @@
         riegosSinCantidad:      bal.riegosSinCantidad,
         ultimoRiegoSinCantidad: bal.ultimoRiegoSinCantidad,
         confianzaBalance:       bal.confianzaBalance,
+        // Días entre la plantación y el primer registro sin ningún riego
+        // apuntado. Si no viaja, la pantalla no puede decirlo — y un campo que
+        // no se propaga es un campo que no existe.
+        aportesPreviosDesconocidos: bal.aportesPreviosDesconocidos,
         coberturaClima:         bal.coberturaClima,
         diasSinClima:           bal.diasSinClima,
         diasEsperadosClima:     bal.diasEsperadosClima,
@@ -6473,8 +6498,15 @@
         cfg: { ...cfgFinca, cultivos: parcela.cultivo ? [parcela.cultivo] : [],
                fechaPlantacion: parcela.fechaPlantacion || null,
                areaParcela: parcela.area_m2 ?? null, parcela: parcela.geometria || null,
-               // Igual que configEfectiva: el riego propio si lo tiene.
-               metodoRiego: parcela.metodoRiego || cfgFinca.metodoRiego || null,
+               // Igual que configEfectiva, Y CON LA MISMA EXCEPCIÓN: una alta
+               // nueva que dijo "lo indicaré después" no hereda el método de la
+               // finca. Este camino alimenta las acciones del día, así que sin
+               // esto el cultivo pendiente seguía saliendo con riego prestado
+               // por la puerta de al lado.
+               metodoRiego: parcela.riegoPendiente ? null
+                          : (parcela.metodoRiego || cfgFinca.metodoRiego || null),
+               caudal: window.KyliaRiego.caudalOperativo(parcela, cfgFinca),
+               registradoEl: parcela.registradoEl ?? cfgFinca.registradoEl ?? null,
                riegoMinutos: parcela.riegoMinutos ?? cfgFinca.riegoMinutos ?? null },
         riegos: rs,
         ndmi: null,
@@ -6496,7 +6528,14 @@
       // riego desconocido llenó el suelo.
       accionesDeHoy.__confianzaBaja = parcelasReales().some(p => {
         const b = calcularBalanceHidrico(ctxDe(p));
-        return b && b.riegosSinCantidad > 0;
+        // Un historial desconocido cuenta igual que un riego sin cifra: en los
+        // dos casos el balance se apoya en algo que no sabemos, y "hoy no hay
+        // nada que hacer" tampoco se puede afirmar sobre eso.
+        return b && (b.riegosSinCantidad > 0 || b.aportesPreviosDesconocidos > 0);
+      });
+      accionesDeHoy.__sinHistorial = parcelasReales().some(p => {
+        const b = calcularBalanceHidrico(ctxDe(p));
+        return b && b.aportesPreviosDesconocidos > 0;
       });
       return acc.sort((a, b) => (b.urgente ? 1 : 0) - (a.urgente ? 1 : 0));
     }
@@ -6588,7 +6627,16 @@
           // que no se sabe. No es alarmismo: es no presentar como firme algo que
           // no lo es. Cuando se implemente la estrategia C (intervalo de estados)
           // esto se sustituye por el intervalo.
-          pie: (bal?.riegosSinCantidad > 0)
+          // ⚠️ UN HISTORIAL VACÍO NO ES "NO HA REGADO". Si plantó antes de darlo
+          // de alta y no hay ningún riego apuntado en ese tramo, este número
+          // sale de suponer que en esos días no entró agua — y eso no lo
+          // sabemos. Va PRIMERO porque es la duda más grande de las tres: las
+          // otras afinan el número, esta lo pone entero en cuestión.
+          pie: (bal?.aportesPreviosDesconocidos > 0)
+            ? `No sabemos cuánto regaste en los ${bal.aportesPreviosDesconocidos} días `
+              + `entre que lo plantaste y lo diste de alta, así que este número es `
+              + `orientativo. Si ya has regado estos días, apúntalo y lo ajustamos.`
+            : (bal?.riegosSinCantidad > 0)
             ? "Precisión reducida: falta conocer la cantidad de un riego anterior."
             : (Number(cfg.caudal) > 0) ? null
             : "Mientras riegas, pon una botella bajo un gotero diez minutos: con eso los próximos avisos te saldrán en minutos.",
@@ -6677,7 +6725,10 @@
       // que hace falta: si el motor cree el suelo lleno porque supuso que un
       // riego sin cifra lo llenó, el "no toca regar" ES la consecuencia de ese
       // supuesto, y es cuando más importa decirlo.
-      const PIE_CONFIANZA = "Precisión reducida: falta conocer la cantidad de un riego anterior.";
+      const PIE_CONFIANZA = accionesDeHoy.__sinHistorial
+        ? "Todavía no sabemos cuánto regaste antes de dar el cultivo de alta, así que "
+          + "esto es orientativo. Apunta tus riegos y se irá ajustando."
+        : "Precisión reducida: falta conocer la cantidad de un riego anterior.";
       if (!acc.length) {
         if (accionesDeHoy.__confianzaBaja) {
           card.hidden = false;
@@ -8051,6 +8102,11 @@
     function nuevaSiembra(areaM2, extra = {}) {
       return {
         id: uuidZona(), cultivo: null, area_m2: areaM2 || null, fechaPlantacion: null,
+        // Desde cuándo tenemos REGISTRO de lo que se riega aquí. No es la
+        // plantación: quien da de alta hoy una lechuga plantada hace dos semanas
+        // no nos ha contado —ni tiene por qué— lo que regó en esas dos semanas,
+        // y contar ese tramo como "no regó" es inventarse un dato.
+        registradoEl: (() => { try { return KyliaClima.hoyISO(); } catch (_) { return null; } })(),
         ...extra,
         // Va al final a propósito: `extra` no puede sobrescribirla por descuido.
         // `token` es la IDENTIDAD LÓGICA. Sin él, dos siembras recién creadas
@@ -8130,9 +8186,25 @@
       if (!geom) geom = z.geometria;
       if (!geom) return;
 
+      // ⚠️ CON AGUJEROS NO SE EDITA, Y SE DICE. Las operaciones de vértice
+      // trabajan sobre el anillo exterior: arrastrar una esquina dejaría el
+      // hueco fuera, lo partiría o lo haría tocar el borde, y nadie se
+      // enteraría. Rechazar conserva la geometría entera; el asistente nuevo ya
+      // lo hacía y este editor no.
+      if (KyliaGeo.tieneAgujeros(geom)) {
+        const ayuda = document.getElementById("zonas-ayuda");
+        if (ayuda) ayuda.textContent =
+          "Esta parcela tiene huecos que no se cultivan (una caseta, una balsa…). "
+          + "Los respetamos tal cual, así que su contorno no se puede ajustar a mano.";
+        return;
+      }
+
       contornoEnCurso = {
         ref, siembraId, geometria: geom,
-        area_m2: Math.round(KyliaGeo.areaM2(KyliaGeo.anilloExterior(geom))),
+        // ⚠️ DEL GeoJSON COMPLETO. Antes salía de `anilloExterior`, o sea del
+        // contorno pelado: abrir el editor y guardar SIN MOVER NADA subía el
+        // área de 4.598 a 4.998 m², porque el hueco pasaba a contar como campo.
+        area_m2: KyliaGeo.areaDePolygon(geom),
         capa: L.layerGroup().addTo(mapaLeaflet),
       };
       pintarContorno(true);
@@ -8220,7 +8292,12 @@
       if (!c) return;
       const z = zonasSel.get(c.ref);
       const s = z?.siembras?.find(x => x.id === c.siembraId);
-      if (s) { s.geometria = c.geometria; s.area_m2 = c.area_m2; }
+      if (s) {
+        s.geometria = c.geometria;
+        // La superficie SALE del polígono que se está guardando, no de lo que
+        // llevara `c.area_m2` arrastrando. Una sola verdad por cultivo.
+        s.area_m2 = KyliaGeo.areaDePolygon(c.geometria) ?? s.area_m2;
+      }
       cancelarContorno();
       saveZonas();
       renderZonas();
@@ -12116,11 +12193,18 @@
           // Se guarda SIEMPRE, también el "lo haré después": ese campo ES la
           // marca de que este cultivo declaró su riego, y por eso no hereda el
           // del vecino.
-          riego: pend ? null : (cap && cap.ok
-            ? { capacidad_mmh: cap.valor, unidad: cap.unidad, fuente: cap.fuente,
-                confianza: cap.confianza, datos: cap.datos, medido: hoyISO() }
-            : { capacidad_mmh: null, unidad: "mm/h", fuente: "no_lo_se", confianza: "baja",
-                datos: null, estimacion_mmh: RIEGO.POR_DEFECTO_MMH[RG.metodo] ?? null }),
+          // SIEMPRE se escribe `riego`, también con "lo indicaré después": ese
+          // campo ES la marca de que esta siembra declaró su riego —aunque lo
+          // declarara pendiente— y por eso no hereda el del vecino ni el de la
+          // finca. Antes aquí iba `null` y la siembra se leía como legacy.
+          riego: pend
+            ? { capacidad_mmh: null, unidad: "mm/h", fuente: "pendiente", confianza: "baja",
+                datos: null, estimacion_mmh: null }
+            : (cap && cap.ok
+              ? { capacidad_mmh: cap.valor, unidad: cap.unidad, fuente: cap.fuente,
+                  confianza: cap.confianza, datos: cap.datos, medido: hoyISO() }
+              : { capacidad_mmh: null, unidad: "mm/h", fuente: "no_lo_se", confianza: "baja",
+                  datos: null, estimacion_mmh: RIEGO.POR_DEFECTO_MMH[RG.metodo] ?? null }),
         } };
         F = FLUJO.avanzar(F, GEO);
         guardar();
@@ -12218,7 +12302,8 @@
               cultivo: c.cultivo, fechaPlantacion: c.fechaPlantacion,
               fechaPrecision: c.fechaPrecision,
               geometria: c.geometria,
-              metodoRiego: c.metodoRiego, caudal: c.caudal ?? null, riego: c.riego || null,
+              metodoRiego: c.metodoRiego, riegoPendiente: !!c.riegoPendiente,
+              caudal: c.caudal ?? null, riego: c.riego || null,
               capacidadRegadera: c.capacidadRegaderaL ?? null,
             }));
             const s = z.siembras[z.siembras.length - 1];

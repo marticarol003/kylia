@@ -72,7 +72,10 @@ try {
   await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });
   await pag.evaluate(() => {
     localStorage.setItem("kylia_user_email", "prueba@kylia.app");
-    localStorage.setItem("kylia_config", JSON.stringify({ lat: 41.3255, lon: 2.062, suelo: "franco", cultivos: [] }));
+    // ⚠️ LA FINCA TIENE RIEGO PROPIO a propósito: aspersión y 11,2 mm/h. Si una
+    // alta nueva que dice "lo indicaré después" lo hereda, se nota aquí.
+    localStorage.setItem("kylia_config", JSON.stringify({ lat: 41.3255, lon: 2.062, suelo: "franco",
+      cultivos: [], metodoRiego: "aspersion", caudal: 11.2 }));
   });
   await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "networkidle2", timeout: 30000 });
 
@@ -249,6 +252,34 @@ try {
 
     o.H_zonas=zonas().length;
     o.H_total_siembras=zonas().reduce((n,z)=>n+(z.siembras||[]).length,0);
+
+    // ── CASO I · "lo indicaré después" NO hereda el riego de la finca ───
+    // La finca está en aspersión y 11,2 mm/h. Una lechuga recién dada de alta
+    // que deja el riego para después no puede salir regando por aspersión.
+    window.kyliaCultivoNuevo("R1"); await sleep(400);
+    clic("#pc-habituales [data-cid='lechuga']"); await sleep(120);
+    clic("#pc-b-cultivo"); await sleep(1400);
+    clic("#pc-b-sup"); await sleep(250);
+    clic("#pc-cuando [data-hace='14']"); await sleep(150);   // plantada hace 2 semanas
+    clic("#pc-b-fecha"); await sleep(250);
+    clic("#pc-riego-luego"); await sleep(150);
+    clic("#pc-b-riego"); await sleep(1000);
+    o.I_tarjeta=$("pc-tarjeta").textContent.replace(/\s+/g," ").trim();
+    clic("#pc-listo"); await sleep(300);
+    const sI=zonas()[0].siembras.slice(-1)[0];
+    o.I_persistido={metodo:sI.metodoRiego,caudal:sI.caudal,pendiente:sI.riegoPendiente,
+                    fuente:sI.riego?.fuente,registradoEl:sI.registradoEl,fecha:sI.fechaPlantacion};
+    o.I_capacidad=window.KyliaRiego.capacidadVigente(sI,JSON.parse(localStorage.getItem("kylia_config")));
+    // Balance con clima controlado: 20 días de ET₀ 4 mm y sin lluvia.
+    const serie=[]; const ah=new Date();
+    for(let k=19;k>=0;k--){const d=new Date(ah.getTime()-k*86400000);
+      serie.push({date:d.toISOString().slice(0,10),et0:4,lluvia:0,tmax:26,tmin:15});}
+    const bal=window.KyliaMotor.balanceHidrico(serie,[],{suelo:"franco",cultivoId:"lechuga",
+      metodoRiego:sI.metodoRiego,fechaPlantacion:sI.fechaPlantacion,termico:false,
+      ventana:{desde:sI.fechaPlantacion,hasta:serie[serie.length-1].date},
+      historialDesde:sI.registradoEl});
+    o.I_confianza=bal.confianzaBalance; o.I_previos=bal.aportesPreviosDesconocidos;
+    o.I_lamina=window.KyliaMotor.decisionRiego(bal,{lluviaPrevista:[]}).cantidad_l_m2;
     return o;
   });
 
@@ -340,6 +371,19 @@ try {
   console.log("\n── CASO H · nada se toca por abrir el alta ──");
   ok(r.H_zonas === 2, `los dos terrenos usados (${r.H_zonas})`);
   ok(r.H_total_siembras === 6, `y sus ${r.H_total_siembras} cultivos, ninguno duplicado`);
+
+  console.log("\n── CASO I · pendiente no hereda, e historial desconocido se declara ──");
+  ok(r.I_persistido.metodo === null && r.I_persistido.caudal === null,
+     "lo persistido no lleva método ni caudal de la finca");
+  ok(r.I_persistido.pendiente === true && r.I_persistido.fuente === "pendiente",
+     "sino la marca explícita de \"lo indicaré después\"");
+  ok(r.I_capacidad.motor === null && r.I_capacidad.motivo === "riego_pendiente",
+     "y tras el reload NADA cruza al motor, con la finca en aspersión 11,2");
+  ok(!!r.I_persistido.registradoEl, `queda sellado desde cuándo hay registro (${r.I_persistido.registradoEl})`);
+  ok(r.I_previos === 14, `plantada 14 días antes de darla de alta: ${r.I_previos} días sin registro`);
+  ok(r.I_confianza === "incierto", `el balance NO se declara conocido (${r.I_confianza})`);
+  ok(r.I_lamina > 0, `y la lámina se sigue calculando (${r.I_lamina} L/m²): no se suprime nada`);
+  ok(/Falta decirnos cómo lo riegas/.test(r.I_tarjeta), "la tarjeta pide el riego que falta");
 
   console.log("\n── sin errores de JavaScript ──");
   ok(errores.length === 0, `0 errores de página (${errores.length ? errores.join(" · ") : "0"})`);
