@@ -37,6 +37,12 @@ const presentar = (mm, opts) => presentarRiegoSeguro(presentarRiego, mm, opts);
 async function contextoDeSiembra(u) {
   const riego = { capacidad_mmh: u.caudal, fuente: "heredado_finca", confianza: "baja" };
   let registradoEl = null;
+  // ⚠️ "NO LO HE PODIDO LEER" NO ES "NO HAY NADA QUE LEER". Si la consulta a
+  // config_app falla, antes se devolvía `registradoEl: null` — exactamente lo
+  // mismo que una configuración legacy — y el balance concluía que no había
+  // ningún tramo a oscuras. Un error de lectura se convertía en cobertura del
+  // historial y la recomendación salía como confirmada.
+  let contextoConocido = false;
   try {
     const dueno = u.propietario_id || u.id;
     const filas = await supabaseSelect("usuarios", `id=eq.${dueno}&select=config_app`);
@@ -45,23 +51,33 @@ async function contextoDeSiembra(u) {
       for (const sb of (z.siembras || [])) {
         if (sb.id !== u.id) continue;
         registradoEl = sb.registradoEl || null;
-        // Declaró su riego: manda lo suyo, sea lo que sea.
-        if (sb.riego) return { capacidad: evaluarCapacidadRiego(sb.riego, u.metodo_riego), registradoEl };
+        // La siembra está en la configuración: el contexto ES conocido, tenga o
+        // no `registradoEl`. Sin él es una siembra legacy y se comporta como
+        // siempre; con él, se declara el tramo previo.
+        contextoConocido = true;
+        if (sb.riego) return { capacidad: evaluarCapacidadRiego(sb.riego, u.metodo_riego), registradoEl, contextoConocido };
         if (sb.caudal != null) {
-          return { capacidad: evaluarCapacidadRiego({ capacidad_mmh: sb.caudal, fuente: "declarado", confianza: "media" }, u.metodo_riego), registradoEl };
+          return { capacidad: evaluarCapacidadRiego({ capacidad_mmh: sb.caudal, fuente: "declarado", confianza: "media" }, u.metodo_riego), registradoEl, contextoConocido };
         }
-        return { capacidad: evaluarCapacidadRiego(riego, u.metodo_riego), registradoEl };
+        return { capacidad: evaluarCapacidadRiego(riego, u.metodo_riego), registradoEl, contextoConocido };
       }
     }
     // Parcela principal: su riego vive en `finca`.
     if (u.propietario_id == null || u.propietario_id === u.id) {
       registradoEl = cfg?.finca?.registradoEl || null;
+      contextoConocido = true;
       if (cfg?.finca?.riego) {
-        return { capacidad: evaluarCapacidadRiego(cfg.finca.riego, u.metodo_riego), registradoEl };
+        return { capacidad: evaluarCapacidadRiego(cfg.finca.riego, u.metodo_riego), registradoEl, contextoConocido };
       }
     }
-  } catch (_) { /* sin config: se queda en lo conservador */ }
-  return { capacidad: evaluarCapacidadRiego(riego, u.metodo_riego), registradoEl };
+    // Se leyó la configuración y esta siembra no estaba en ella: es legacy, y
+    // el contexto queda igualmente determinado.
+    if (cfg) contextoConocido = true;
+  } catch (_) {
+    // Se queda en `contextoConocido = false`: no se inventa cobertura.
+    contextoConocido = false;
+  }
+  return { capacidad: evaluarCapacidadRiego(riego, u.metodo_riego), registradoEl, contextoConocido };
 }
 const { construirReveal, motivoClimaNoPublicable } = require("./_reveal.js");
 const { necesidadNutrientes, creditoResiduosN } = require("./_motor-nutricion.js");
@@ -157,7 +173,10 @@ async function vistaHoy(res, u) {
                  // darse de alta y no hay nada apuntado en ese tramo, el balance
                  // lo declara incierto en vez de contar esos días como si no
                  // hubiera entrado agua.
-                 historialDesde: ctxSiembra.registradoEl };
+                 historialDesde: ctxSiembra.registradoEl,
+                 // Si no se pudo leer la configuración, no se afirma nada sobre
+                 // el historial: ni que haya hueco ni que no lo haya.
+                 historialSinDeterminar: ctxSiembra.contextoConocido === false };
   const presOpts = { metodoRiego: u.metodo_riego, caudalMmh: cap.capacidad_mmh,
                      clase: cap.clase,
                      areaM2: u.area_m2, capacidadRegaderaL: u.capacidad_regadera };
@@ -180,12 +199,16 @@ async function vistaHoy(res, u) {
   //
   // Se toca el TEXTO y se marca, no la decisión: el déficit calculado es el que
   // es. Lo que deja de ser firme es lo que podemos afirmar sobre él.
-  const balanceIncierto = (balHoy.aportesPreviosDesconocidos || 0) > 0;
+  const balanceIncierto = (balHoy.aportesPreviosDesconocidos || 0) > 0
+                       || balHoy.historialSinDeterminar === true;
   if (balanceIncierto && presHoy) {
     presHoy = { ...presHoy, balance_incierto: true,
                 texto: `quizá ${presHoy.texto}`,
-                aviso: `Sin saber lo que regaste en los ${balHoy.aportesPreviosDesconocidos} días `
-                     + `entre la plantación y el alta, esto es orientativo.` };
+                aviso: balHoy.historialSinDeterminar
+                  ? "No hemos podido comprobar tu historial de riegos ahora mismo, así que "
+                    + "esto es orientativo."
+                  : `Sin saber lo que regaste en los ${balHoy.aportesPreviosDesconocidos} días `
+                    + `entre la plantación y el alta, esto es orientativo.` };
   }
   const climaHoy = serie[corte] || {};
 
@@ -271,7 +294,9 @@ async function vistaHoy(res, u) {
     balance_confianza: {
       confianza: balHoy.confianzaBalance || null,
       aportes_previos_desconocidos: balHoy.aportesPreviosDesconocidos ?? 0,
+      // Diagnóstico: dice cuándo se llenó el suelo. NO implica historial resuelto.
       reanclado_en: balHoy.balanceReancladoEn || null,
+      historial_sin_determinar: balHoy.historialSinDeterminar === true,
       riegos_sin_cantidad: balHoy.riegosSinCantidad ?? 0,
     },
     hoy: {
@@ -738,8 +763,25 @@ async function revealDeUsuario(u) {
     supabaseSelect("jornadas", `usuario_id=eq.${u.id}&select=fuente_decision`),
   ]);
 
+  // ⚠️ LA INCERTIDUMBRE VIAJA CON LA DECISIÓN. Sin estos tres campos, el reveal
+  // recibe una cifra pelada y la publica como confirmada aunque el Diario B la
+  // congelara sobre catorce días a oscuras. `contexto` es jsonb y ya los lleva
+  // desde diario-b; lo único que faltaba era no tirarlos aquí.
+  //
+  // `incierto: null` (no false) para las filas ANTIGUAS, que no tienen el campo:
+  // de esas no sabemos si el balance era conocido, y suponer que sí es
+  // exactamente el error que se está corrigiendo.
+  const marcaIncierta = (ctx) => {
+    if (!ctx || typeof ctx !== "object") return null;
+    if (ctx.aportes_previos_desconocidos === undefined
+        && ctx.historial_sin_determinar === undefined) return null;   // log antiguo
+    return (Number(ctx.aportes_previos_desconocidos) || 0) > 0
+        || ctx.historial_sin_determinar === true;
+  };
   const riegosKylia = (recs || []).filter(r => r.tipo === "riego")
-    .map(r => ({ dia: dia(r.fecha), l_m2: r.cantidad_l_m2, nivel: r.nivel }));
+    .map(r => ({ dia: dia(r.fecha), l_m2: r.cantidad_l_m2, nivel: r.nivel,
+                 incierto: marcaIncierta(r.contexto),
+                 confianza: r.contexto?.confianza ?? null }));
   const tratKylia = (recs || []).filter(r => r.tipo === "tratamiento" || r.tipo === "nutricion")
     .map(r => ({ dia: dia(r.fecha) }));
   const riegosReales = (acciones || []).filter(a => a.tipo === "riego")

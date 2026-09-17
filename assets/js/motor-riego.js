@@ -637,7 +637,12 @@
             // parcela. No es lo mismo que la plantación: un agricultor que da de
             // alta hoy una lechuga plantada hace dos semanas no nos ha contado
             // —ni tiene por qué— lo que regó en esas dos semanas.
-            historialDesde = null } = opts;
+            historialDesde = null,
+            // Cuando NO se ha podido determinar desde cuándo hay registro —por
+            // ejemplo porque falló la lectura de la configuración—, eso no es lo
+            // mismo que "no hay tramo a oscuras". Un error de lectura no puede
+            // convertirse en cobertura del historial.
+            historialSinDeterminar = false } = opts;
     const efic = EFIC_RIEGO[metodoRiego] ?? EFIC_DEFAULT;
     // Reloj del cultivo: calor si se puede, calendario si no. curvaFenologica
     // devuelve null en cuanto falta algo, y entonces esto se comporta EXACTAMENTE
@@ -780,22 +785,25 @@
       if (!historialDesde || !fechaPlantacion) return 0;
       // Llevamos apuntando desde el día cero: no hay tramo a oscuras.
       if (String(fechaPlantacion) >= String(historialDesde)) return 0;
-      // ⚠️ LA ÚNICA EVIDENCIA QUE CIERRA EL HUECO ES UN REANCLAJE.
+      // ⚠️ EL REANCLAJE NO CIERRA EL HUECO. Lo intentó y no se sostiene.
       //
-      // La versión anterior daba por cerrada la incertidumbre en cuanto había
-      // UN riego apuntado dentro del tramo. Eso no se sostiene: saber que regó
-      // un martes no dice nada de los otros trece días. Medido sobre esta misma
-      // serie, un riego de 1 L/m² bastaba para pasar de "incierto" a "conocido",
-      // y uno SIN CANTIDAD también — cuando ahí `Dr = 0` es una hipótesis
-      // nuestra, no una medida.
+      // La idea era: como `Dr` está acotado en [0, TAW], una entrada conocida de
+      // al menos TAW lo deja en 0 viniera de donde viniera, así que lo anterior
+      // deja de importar. Lo primero es cierto; lo segundo, no:
       //
-      // Lo que sí lo cierra: que en algún día una entrada CONOCIDA de al menos
-      // TAW haya llevado `Dr` a 0. Como `Dr` está acotado en [0, TAW], ese día
-      // el balance queda anclado viniera de donde viniera, y lo anterior deja de
-      // importar. Registrar un evento, conocer el historial entero y tener una
-      // referencia que lo hace irrelevante son tres cosas distintas; solo la
-      // tercera cierra esto.
-      if (reancladoEn) return 0;
+      //   · Un reanclaje el día 8 no dice NADA de los días 9 a 16. Medido:
+      //     añadir 20 L/m² el 12 mueve la recomendación del 17 de 26,8 a 18,6.
+      //   · Y ni siquiera limpia lo anterior del todo. `ks` se evalúa con el Dr
+      //     PREVIO al riego, así que la ETc de ese día todavía arrastra el
+      //     pasado. Medido con ET₀ 5,99 los dos últimos días: dos historias con
+      //     el mismo reanclaje dan Dr 9,667 y 11,186 contra un RAW de 11,165 —
+      //     "vigilar" en una y "regar 12,4 L/m²" en la otra. El residuo SÍ
+      //     cambia decisiones, y yo dije lo contrario sin haberlo barrido bien.
+      //
+      // Se conserva `balanceReancladoEn` como DATO DIAGNÓSTICO —dice cuándo el
+      // suelo se llenó— pero no implica "historial resuelto" ni "suelo
+      // conocido". Mientras haya un tramo sin registro, el balance es
+      // orientativo. Es preferible a afirmar sobre lo que no sabemos.
       // `diasEntre` resta una FECHA, no una cadena: pasarle el ISO da NaN, y
       // NaN > 0 es false — el hueco se habría declarado como inexistente.
       const hasta = new Date(`${String(historialDesde).slice(0, 10)}T12:00:00`);
@@ -851,6 +859,9 @@
       // contaba catorce días de evaporación sin una sola entrada de agua y
       // presentaba esa suposición como un déficit medido.
       aportesPreviosDesconocidos: diasPreviosSinRegistro,
+      // No se pudo determinar el contexto: ni se afirma que haya hueco ni que no
+      // lo haya. Lo que NO se hace es dar por bueno el balance.
+      historialSinDeterminar: !!historialSinDeterminar,
       // Día en que una entrada conocida ≥ TAW dejó el suelo lleno y ancló el
       // balance. Null si no ha pasado: es lo que permite explicar por qué se
       // sigue —o se deja de— dudar.
@@ -861,7 +872,7 @@
         // Lo que entró antes de empezar a registrar pesa sobre TODO el balance:
         // el déficit de hoy arrastra el de entonces. Mientras eso no se
         // resuelva, este balance no se puede afirmar.
-        if (diasPreviosSinRegistro > 0) return "incierto";
+        if (diasPreviosSinRegistro > 0 || historialSinDeterminar) return "incierto";
         if (dudosos === 0 && cob.cobertura >= 0.95) return "conocido";
         if (dudosos / n > 0.2 || cob.cobertura < 0.95) return "incierto";
         return "parcial";

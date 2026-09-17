@@ -234,20 +234,22 @@ console.log("\n── HISTORIAL DESCONOCIDO · lo que VE el agricultor ──");
   ok(E.bal.confianzaBalance === "conocido", "E · y el balance se puede afirmar");
   ok(!/Quizá toque regar/.test(E.texto), "E · la pantalla vuelve a afirmar");
 
-  console.log("\n  ── la ÚNICA evidencia que cierra el hueco: un reanclaje ──");
-  // `Dr` está acotado en [0, TAW]: una entrada CONOCIDA de al menos TAW deja
-  // Dr = 0 viniera de donde viniera, y lo anterior deja de importar.
+  console.log("\n  ── el reanclaje es DIAGNÓSTICO, no cierra el hueco ──");
+  // Se intentó usarlo como evidencia suficiente —`Dr` está acotado en [0, TAW],
+  // así que una entrada conocida de al menos TAW lo deja en 0— y no se sostiene:
+  // un reanclaje el día 7 no dice nada de los días 8 a 13, y ni siquiera limpia
+  // del todo lo anterior (`ks` se evalúa con el Dr PREVIO al riego). Se conserva
+  // el dato, se retira la conclusión.
   const taw = A.bal.taw;
   ok(taw > 0, `TAW de esta parcela: ${taw.toFixed(1)} mm`);
-  const justoDebajo = pintar2([{ date: d(7), litros: Math.floor(taw) - 2 }]);
-  ok(justoDebajo.bal.aportesPreviosDesconocidos === 14,
-     `un riego de ${Math.floor(taw) - 2} L/m² (por debajo de TAW) NO reancla`);
   const porEncima = pintar2([{ date: d(7), litros: Math.ceil(taw) + 25 }]);
-  ok(porEncima.bal.aportesPreviosDesconocidos === 0,
-     `uno de ${Math.ceil(taw) + 25} L/m² SÍ: el suelo queda lleno viniera de donde viniera`);
   ok(porEncima.bal.balanceReancladoEn === d(7),
-     `y queda anotado el día del reanclaje (${porEncima.bal.balanceReancladoEn})`);
-  ok(porEncima.bal.confianzaBalance !== "incierto", "a partir de ahí el balance se puede afirmar");
+     `se detecta y se anota cuándo se llenó el suelo (${porEncima.bal.balanceReancladoEn})`);
+  ok(porEncima.bal.aportesPreviosDesconocidos === 14,
+     "pero los 14 días previos SIGUEN sin registro");
+  ok(porEncima.bal.confianzaBalance === "incierto",
+     "así que el balance no se puede afirmar por eso");
+  ok(/Quizá toque regar/.test(porEncima.texto), "y la pantalla lo sigue diciendo");
 
   console.log("\n  ── capacidad medida ≠ balance conocido ──");
   const R2 = createRequire(import.meta.url)("../assets/js/riego-capacidad.js");

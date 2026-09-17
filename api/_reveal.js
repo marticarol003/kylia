@@ -169,6 +169,20 @@ function dimAgua(riegosReales, riegosKylia, contrafactual) {
   // no hay cobertura que mirar, pero sí riegos sin cifra y denominadores
   // diminutos.
   const razones = [];
+  // ⚠️ UNA DECISIÓN CONGELADA SOBRE UN BALANCE INCIERTO NO ES PUBLICABLE.
+  // El Diario B congela lo que Kylia habría decidido, y si lo decidió sin saber
+  // lo que se regó antes del alta, esa cifra no puede acabar en un informe como
+  // agua recomendada. Antes se perdía por el camino: el log la llevaba y aquí se
+  // tiraba.
+  const inciertas = decisiones.filter(d => d.incierto === true);
+  if (inciertas.length) {
+    razones.push(`${inciertas.length} de ${decisiones.length} decisiones se congelaron sin conocer `
+                 + "los riegos anteriores al alta");
+  }
+  // Los logs ANTIGUOS no llevan el metadato. No se les inventa confianza: se
+  // declara que no consta. No bloquean —son anteriores a que existiera— pero
+  // queda dicho en el informe.
+  const sinMetadato = decisiones.filter(d => d.incierto === null || d.incierto === undefined).length;
   if (sinCifra.length && sinCifra.length > enPeriodo.length * 0.2) {
     razones.push(`${sinCifra.length} de ${enPeriodo.length} riegos están apuntados sin cantidad`);
   }
@@ -228,6 +242,10 @@ function dimAgua(riegosReales, riegosKylia, contrafactual) {
     // sostenían. El detalle está en docs/tecnico/metricas.md.
     clase_metrica: "log_heredado",
     ahorro_demostrado: false,
+    // De qué se fía este informe, declarado y no deducido.
+    decisiones_inciertas: inciertas.length,
+    decisiones_sin_metadato_confianza: sinMetadato,
+    historial_declarado: sinMetadato === 0,
     cobertura_clima: cobertura,
     dias_sin_clima: null,
     riegos_sin_cantidad: sinCifra.length

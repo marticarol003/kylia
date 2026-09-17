@@ -19,6 +19,33 @@
 // Usa el MISMO motor que la app (api/_motor-riego.js) para que no deriven.
 
 const { isConfigured, supabaseSelect, supabaseInsert } = require("./_supabase.js");
+
+// ⚠️ EL CRON TAMBIÉN NECESITA EL CONTEXTO. Congela lo que Kylia habría decidido,
+// y eso es lo que acaba publicando el reveal: si congela "regar 32 L/m²" como si
+// el balance fuera conocido, la incertidumbre se pierde para siempre en una
+// tabla append-only. Que no pinte nada en pantalla no lo deja fuera.
+//
+// Devuelve las dos cosas que el balance necesita, y si la lectura falla lo DICE
+// en vez de devolver un null indistinguible de una configuración legacy.
+async function contextoHistorial(u) {
+  try {
+    const dueno = u.propietario_id || u.id;
+    const filas = await supabaseSelect("usuarios", `id=eq.${dueno}&select=config_app`);
+    const cfg = filas?.[0]?.config_app;
+    if (!cfg) return { registradoEl: null, contextoConocido: false };
+    for (const z of (cfg.zonas || [])) {
+      for (const sb of (z.siembras || [])) {
+        if (sb.id === u.id) return { registradoEl: sb.registradoEl || null, contextoConocido: true };
+      }
+    }
+    if (u.propietario_id == null || u.propietario_id === u.id) {
+      return { registradoEl: cfg.finca?.registradoEl || null, contextoConocido: true };
+    }
+    return { registradoEl: null, contextoConocido: true };   // legacy identificado
+  } catch (_) {
+    return { registradoEl: null, contextoConocido: false };
+  }
+}
 const { balanceHidrico, decisionRiego, laminaDeAccion, MOTOR_VERSION, MOTOR_REGLAS } = require("./_motor-riego.js");
 const { serieTermica } = require("./_clima-termico.js");
 const { climaSerie, hoyISO } = require("./_clima.js");
@@ -288,6 +315,7 @@ module.exports = async (req, res) => {
       // apunta) y súmalos al balance para que no se quede corto.
       const auto = await materializarGoteoAuto(u, riegos, hoy, dry);
       if (auto.length) r.goteo_auto = auto.length;
+      const ctxHist = await contextoHistorial(u);
       const bal = balanceHidrico(serie, riegos.concat(auto), {
         suelo:           u.suelo,
         cultivoId:       (u.cultivos || [])[0] || null,
@@ -300,6 +328,8 @@ module.exports = async (req, res) => {
         // 1,000 sobre un balance al que le faltaba un tercio del clima.
         ventana:         { desde: String(u.fecha_plantacion || "").slice(0, 10) || serie[0]?.date,
                            hasta: hoy },
+        historialDesde:  ctxHist.registradoEl,
+        historialSinDeterminar: ctxHist.contextoConocido === false,
       });
       const dec  = decisionRiego(bal);
       const hoyClima = serie[serie.length - 1] || {};
@@ -364,6 +394,14 @@ module.exports = async (req, res) => {
           riegos_sin_cantidad: bal.riegosSinCantidad || 0,
           ultimo_riego_sin_cantidad: bal.ultimoRiegoSinCantidad || null,
           confianza: bal.confianzaBalance || null,
+          // ⚠️ LA INCERTIDUMBRE VIAJA AL LOG. `recomendaciones_log` es
+          // append-only: lo que no se guarde aquí no se puede reconstruir
+          // después, y el reveal lee de esta tabla. Sin estos dos campos, un
+          // "regar 32 L/m²" calculado sobre catorce días a oscuras se publicaba
+          // como cifra confirmada.
+          aportes_previos_desconocidos: bal.aportesPreviosDesconocidos ?? 0,
+          historial_sin_determinar: bal.historialSinDeterminar === true,
+          balance_reanclado_en: bal.balanceReancladoEn || null,
           motivo:       dec.motivo || dec.nivel,
         },
       };

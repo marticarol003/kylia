@@ -243,21 +243,22 @@ console.log("\n── 3 · UN HISTORIAL VACÍO NO ES \"NO HA REGADO\" ──");
   ok(riegoPosterior.aportesPreviosDesconocidos === 14,
      "y un riego POSTERIOR no dice nada de lo que pasó antes");
 
-  // LO QUE SÍ LO CIERRA. `Dr` está acotado en [0, TAW], así que una entrada
-  // CONOCIDA de al menos TAW deja Dr = 0 viniera de donde viniera: a partir de
-  // ese día el balance queda anclado y lo anterior deja de importar.
+  // ⚠️ NI SIQUIERA UN REANCLAJE LO CIERRA. Se intentó: como `Dr` está acotado en
+  // [0, TAW], una entrada conocida de al menos TAW lo deja en 0 viniera de donde
+  // viniera. Cierto, e insuficiente — no dice nada de los días que vienen
+  // DESPUÉS, y `ks` se evalúa con el Dr previo, así que tampoco limpia del todo
+  // lo anterior. Se conserva como diagnóstico y se retira la conclusión; el
+  // detalle está en tests/test-historial-incierto.mjs.
   const reanclado = M.balanceHidrico(dias, [{ date: "2026-09-08", litros: Math.ceil(taw) + 25 }],
     { ...o, historialDesde: "2026-09-17" });
-  ok(reanclado.aportesPreviosDesconocidos === 0,
-     `una entrada conocida de ${Math.ceil(taw) + 25} L/m² (> TAW) SÍ reancla el balance`);
-  ok(reanclado.balanceReancladoEn === "2026-09-08", `y queda anotado el día (${reanclado.balanceReancladoEn})`);
-  const casi = M.balanceHidrico(dias, [{ date: "2026-09-08", litros: Math.floor(taw) - 2 }],
-    { ...o, historialDesde: "2026-09-17" });
-  ok(casi.aportesPreviosDesconocidos === 14, "justo por debajo de TAW, no: el umbral es el que es");
-  // La lluvia reancla igual.
+  ok(reanclado.balanceReancladoEn === "2026-09-08",
+     `se anota cuándo se llenó el suelo (${reanclado.balanceReancladoEn})`);
+  ok(reanclado.aportesPreviosDesconocidos === 14,
+     `pero NO cierra el hueco: siguen ${reanclado.aportesPreviosDesconocidos} días sin registro`);
+  ok(reanclado.confianzaBalance === "incierto", "y el balance sigue siendo orientativo");
   const conTormenta = dias.map((d, i) => (i === 5 ? { ...d, lluvia: taw + 20 } : d));
   const porLluvia = M.balanceHidrico(conTormenta, [], { ...o, historialDesde: "2026-09-17" });
-  ok(porLluvia.aportesPreviosDesconocidos === 0, "y una tormenta grande también lo reancla");
+  ok(porLluvia.aportesPreviosDesconocidos === 14, "una tormenta grande tampoco");
 
   console.log("\n  ── no se toca lo que ya funcionaba ──");
   const legacy = M.balanceHidrico(dias, [], o);        // sin historialDesde
