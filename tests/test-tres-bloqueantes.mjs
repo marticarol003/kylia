@@ -220,14 +220,44 @@ console.log("\n── 3 · UN HISTORIAL VACÍO NO ES \"NO HA REGADO\" ──");
   const mismoDia = M.balanceHidrico(dias, [], { ...o, historialDesde: "2026-09-03" });
   ok(mismoDia.aportesPreviosDesconocidos === 0 && mismoDia.confianzaBalance === "conocido",
      "plantada y dada de alta el mismo día: llevamos apuntando desde el día cero");
-  const conRiegoPrevio = M.balanceHidrico(dias, [{ date: "2026-09-08", litros: 20 }],
+
+  // ⚠️ UN RIEGO SUELTO NO CIERRA EL HUECO. La primera versión de este arreglo
+  // daba por cerrada la incertidumbre en cuanto había UN riego apuntado en el
+  // tramo, y eso no se sostiene: saber que regó un martes no dice nada de los
+  // otros trece días. Medido sobre esta misma serie, un riego de 1 L/m² bastaba
+  // para pasar de "incierto" a "conocido".
+  const taw = M.balanceHidrico(dias, [], o).taw;
+  const unRiego = M.balanceHidrico(dias, [{ date: "2026-09-08", litros: 20 }],
     { ...o, historialDesde: "2026-09-17" });
-  ok(conRiegoPrevio.aportesPreviosDesconocidos === 0 && conRiegoPrevio.confianzaBalance === "conocido",
-     "un riego apuntado DENTRO del tramo previo cierra el hueco");
+  ok(unRiego.aportesPreviosDesconocidos === 14,
+     `un riego de 20 L/m² dentro del tramo NO lo cierra (TAW = ${taw.toFixed(1)} mm)`);
+  const minusculo = M.balanceHidrico(dias, [{ date: "2026-09-08", litros: 1 }],
+    { ...o, historialDesde: "2026-09-17" });
+  ok(minusculo.aportesPreviosDesconocidos === 14, "y uno de 1 L/m², menos todavía");
+  const previoSinCifra = M.balanceHidrico(dias, [{ date: "2026-09-08", litros: null }],
+    { ...o, historialDesde: "2026-09-17" });
+  ok(previoSinCifra.aportesPreviosDesconocidos === 14,
+     "uno SIN CANTIDAD tampoco: ahí Dr = 0 es una hipótesis nuestra, no una medida");
   const riegoPosterior = M.balanceHidrico(dias, [{ date: "2026-09-17", litros: 20 }],
     { ...o, historialDesde: "2026-09-17" });
   ok(riegoPosterior.aportesPreviosDesconocidos === 14,
-     "pero un riego POSTERIOR no: no dice nada de lo que pasó antes");
+     "y un riego POSTERIOR no dice nada de lo que pasó antes");
+
+  // LO QUE SÍ LO CIERRA. `Dr` está acotado en [0, TAW], así que una entrada
+  // CONOCIDA de al menos TAW deja Dr = 0 viniera de donde viniera: a partir de
+  // ese día el balance queda anclado y lo anterior deja de importar.
+  const reanclado = M.balanceHidrico(dias, [{ date: "2026-09-08", litros: Math.ceil(taw) + 25 }],
+    { ...o, historialDesde: "2026-09-17" });
+  ok(reanclado.aportesPreviosDesconocidos === 0,
+     `una entrada conocida de ${Math.ceil(taw) + 25} L/m² (> TAW) SÍ reancla el balance`);
+  ok(reanclado.balanceReancladoEn === "2026-09-08", `y queda anotado el día (${reanclado.balanceReancladoEn})`);
+  const casi = M.balanceHidrico(dias, [{ date: "2026-09-08", litros: Math.floor(taw) - 2 }],
+    { ...o, historialDesde: "2026-09-17" });
+  ok(casi.aportesPreviosDesconocidos === 14, "justo por debajo de TAW, no: el umbral es el que es");
+  // La lluvia reancla igual.
+  const conTormenta = dias.map((d, i) => (i === 5 ? { ...d, lluvia: taw + 20 } : d));
+  const porLluvia = M.balanceHidrico(conTormenta, [], { ...o, historialDesde: "2026-09-17" });
+  ok(porLluvia.aportesPreviosDesconocidos === 0, "y una tormenta grande también lo reancla");
 
   console.log("\n  ── no se toca lo que ya funcionaba ──");
   const legacy = M.balanceHidrico(dias, [], o);        // sin historialDesde

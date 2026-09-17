@@ -686,6 +686,10 @@
 
     const orden = sanearSerie(serie);
     let Dr = 0, etcAcum = 0, et0Acum = 0, lluviaAcum = 0, lluviaUtilAcum = 0, diasEstres = 0;
+    // Primer día en que una entrada CONOCIDA reancla el balance (ver dentro del
+    // bucle). Null mientras no haya ocurrido: la incertidumbre sobre lo anterior
+    // sigue viva hasta que exista esa evidencia.
+    let reancladoEn = null;
     let riegoNetoAcum = 0, riegoUtilAcum = 0, diasSinLluviaConocida = 0;
     let taw = aguaSuelo(suelo).taw, raw = aguaSuelo(suelo).raw;
     for (const dia of orden) {
@@ -711,6 +715,17 @@
         if (r !== null) {
           riegoNetoAcum += r;
           riegoUtilAcum += Math.min(r, Dr);
+          // ⚠️ REANCLAJE DEMOSTRABLE. `Dr` está acotado en [0, TAW] (ver la
+          // línea de la lluvia, más abajo). Así que una entrada CONOCIDA de al
+          // menos TAW deja `Dr = max(0, Dr − r) = 0` sea cual sea el estado
+          // anterior: a partir de ese día el balance ya no depende de lo que
+          // pasara antes, y lo de antes deja de importar.
+          //
+          // Es la ÚNICA evidencia que hace irrelevante el historial previo. Un
+          // riego cualquiera no sirve: saber que regó un martes no dice nada de
+          // los otros trece días. Y un riego SIN cantidad tampoco — ahí `Dr = 0`
+          // es una hipótesis nuestra, no una medida.
+          if (r >= taw && !reancladoEn) reancladoEn = dia.date;
         }
         Dr = Math.max(0, Dr - r);
       }
@@ -722,6 +737,10 @@
       // como agua aprovechada sobre un suelo de 86 mm de capacidad es falso, y
       // ese número sale en los informes.
       const lluviaUtil = Math.min(pe, Math.max(0, Dr + etc));
+      // La lluvia reancla igual que el riego: si lo que infiltra supera la
+      // demanda del día en al menos TAW, `Dr` acaba en 0 viniera de donde
+      // viniera. Una tormenta grande borra el historial previo.
+      if (dia.lluviaConocida !== false && (pe - etc) >= taw && !reancladoEn) reancladoEn = dia.date;
       Dr = Math.min(taw, Math.max(0, Dr + etc - pe));
       etcAcum += etc; et0Acum += dia.et0; lluviaAcum += pe; lluviaUtilAcum += lluviaUtil;
     }
@@ -759,12 +778,24 @@
     // Si no, el hueco sigue abierto y el balance lo dice. Nada se borra solo.
     const diasPreviosSinRegistro = (() => {
       if (!historialDesde || !fechaPlantacion) return 0;
+      // Llevamos apuntando desde el día cero: no hay tramo a oscuras.
       if (String(fechaPlantacion) >= String(historialDesde)) return 0;
-      const hayRiegoPrevio = (riegos || []).some((r) => {
-        const f = String(r?.date || r?.fecha || "").slice(0, 10);
-        return f && f >= String(fechaPlantacion) && f < String(historialDesde);
-      });
-      if (hayRiegoPrevio) return 0;
+      // ⚠️ LA ÚNICA EVIDENCIA QUE CIERRA EL HUECO ES UN REANCLAJE.
+      //
+      // La versión anterior daba por cerrada la incertidumbre en cuanto había
+      // UN riego apuntado dentro del tramo. Eso no se sostiene: saber que regó
+      // un martes no dice nada de los otros trece días. Medido sobre esta misma
+      // serie, un riego de 1 L/m² bastaba para pasar de "incierto" a "conocido",
+      // y uno SIN CANTIDAD también — cuando ahí `Dr = 0` es una hipótesis
+      // nuestra, no una medida.
+      //
+      // Lo que sí lo cierra: que en algún día una entrada CONOCIDA de al menos
+      // TAW haya llevado `Dr` a 0. Como `Dr` está acotado en [0, TAW], ese día
+      // el balance queda anclado viniera de donde viniera, y lo anterior deja de
+      // importar. Registrar un evento, conocer el historial entero y tener una
+      // referencia que lo hace irrelevante son tres cosas distintas; solo la
+      // tercera cierra esto.
+      if (reancladoEn) return 0;
       // `diasEntre` resta una FECHA, no una cadena: pasarle el ISO da NaN, y
       // NaN > 0 es false — el hueco se habría declarado como inexistente.
       const hasta = new Date(`${String(historialDesde).slice(0, 10)}T12:00:00`);
@@ -820,6 +851,10 @@
       // contaba catorce días de evaporación sin una sola entrada de agua y
       // presentaba esa suposición como un déficit medido.
       aportesPreviosDesconocidos: diasPreviosSinRegistro,
+      // Día en que una entrada conocida ≥ TAW dejó el suelo lleno y ancló el
+      // balance. Null si no ha pasado: es lo que permite explicar por qué se
+      // sigue —o se deja de— dudar.
+      balanceReancladoEn: reancladoEn,
       confianzaBalance: (() => {
         const n = orden.length || 1;
         const dudosos = sinCantidad.size + diasSinLluviaConocida;

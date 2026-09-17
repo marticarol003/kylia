@@ -186,5 +186,76 @@ ok(pintarCampo("alta", 1).includes(AVISO), "nivel alta (toca regar): el aviso es
 ok(pintarCampo("baja", 1).includes(AVISO), "nivel baja (todo en orden): el aviso TAMBIÉN está");
 ok(!pintarCampo("alta", null).includes(AVISO), "y sin riegos sin cantidad no aparece (control)");
 
+console.log("\n── HISTORIAL DESCONOCIDO · lo que VE el agricultor ──");
+{
+  // Misma siembra: plantada hace 14 días, registrada HOY, clima completo y
+  // controlado, y capacidad de riego MEDIDA y fiable — para que quede claro que
+  // saber a qué ritmo riega no es saber cuánto regó.
+  const PLANT = d(14);
+  const CFG2 = { ...CFG, fechaPlantacion: PLANT, metodoRiego: "goteo", caudal: 6.7,
+                 registradoEl: hoy };
+  function pintar2(riegos, cfgExtra = {}) {
+    const dom = nuevoDom();
+    const a = fabricaApp(MOTOR, KyliaClima, dom, VENTANA);
+    a.montar({ cfg: { ...CFG2, ...cfgExtra }, riegos, ndmi: null }, serie, []);
+    const bal = a.calcularBalanceHidrico();
+    a.renderHoy();
+    const el = dom.els["hoy-contenido"];
+    return { bal, texto: (el ? el.innerHTML : "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() };
+  }
+
+  const A = pintar2([]);
+  ok(A.bal.aportesPreviosDesconocidos === 14, `A · sin riegos: ${A.bal.aportesPreviosDesconocidos} días a oscuras`);
+  ok(A.bal.confianzaBalance === "incierto", "A · el balance no se declara conocido");
+  // ⚠️ EL TITULAR, no un pie pequeño. Dejarlo en "Regar" con un aviso debajo es
+  // presentar como confirmada una necesidad que no lo está: el aviso lo lee
+  // quien ya duda, y el que no duda solo ve el verbo y el número.
+  ok(/Quizá toque regar/.test(A.texto), `A · el titular duda: "${A.texto.slice(0, 70)}…"`);
+  ok(!/>Regar</.test(A.texto), "A · y no dice \"Regar\" a secas");
+  ok(/No sabemos cuánto regaste/.test(A.texto), "A · y explica por qué, con sus días");
+  ok(/unos \d+ L\/m²/.test(A.texto), "A · la cantidad sale como aproximada");
+
+  const B = pintar2([{ date: d(7), litros: 20 }]);
+  ok(B.bal.aportesPreviosDesconocidos === 14,
+     "B · UN riego de 20 L/m² NO cierra el hueco: no dice nada de los otros 13 días");
+  ok(/Quizá toque regar/.test(B.texto), "B · y la pantalla lo sigue diciendo");
+
+  const C = pintar2([{ date: d(7), litros: null }]);
+  ok(C.bal.aportesPreviosDesconocidos === 14,
+     "C · un riego SIN CANTIDAD tampoco: ahí Dr = 0 es una hipótesis nuestra");
+
+  const D = pintar2([{ date: hoy, litros: 20 }]);
+  ok(D.bal.aportesPreviosDesconocidos === 14,
+     "D · un riego posterior al alta no demuestra nada de lo anterior");
+
+  const E = pintar2([{ date: d(7), litros: 12 }], { registradoEl: PLANT });
+  ok(E.bal.aportesPreviosDesconocidos === 0,
+     "E · plantada el mismo día del registro: llevamos apuntando desde el día cero");
+  ok(E.bal.confianzaBalance === "conocido", "E · y el balance se puede afirmar");
+  ok(!/Quizá toque regar/.test(E.texto), "E · la pantalla vuelve a afirmar");
+
+  console.log("\n  ── la ÚNICA evidencia que cierra el hueco: un reanclaje ──");
+  // `Dr` está acotado en [0, TAW]: una entrada CONOCIDA de al menos TAW deja
+  // Dr = 0 viniera de donde viniera, y lo anterior deja de importar.
+  const taw = A.bal.taw;
+  ok(taw > 0, `TAW de esta parcela: ${taw.toFixed(1)} mm`);
+  const justoDebajo = pintar2([{ date: d(7), litros: Math.floor(taw) - 2 }]);
+  ok(justoDebajo.bal.aportesPreviosDesconocidos === 14,
+     `un riego de ${Math.floor(taw) - 2} L/m² (por debajo de TAW) NO reancla`);
+  const porEncima = pintar2([{ date: d(7), litros: Math.ceil(taw) + 25 }]);
+  ok(porEncima.bal.aportesPreviosDesconocidos === 0,
+     `uno de ${Math.ceil(taw) + 25} L/m² SÍ: el suelo queda lleno viniera de donde viniera`);
+  ok(porEncima.bal.balanceReancladoEn === d(7),
+     `y queda anotado el día del reanclaje (${porEncima.bal.balanceReancladoEn})`);
+  ok(porEncima.bal.confianzaBalance !== "incierto", "a partir de ahí el balance se puede afirmar");
+
+  console.log("\n  ── capacidad medida ≠ balance conocido ──");
+  const R2 = createRequire(import.meta.url)("../assets/js/riego-capacidad.js");
+  const cap = R2.evaluarCapacidadRiego({ capacidad_mmh: 6.7, fuente: "derivado_goteo", confianza: "alta" }, "goteo");
+  ok(cap.puede_ejecutar === true, "la instalación está medida y da minutos fiables");
+  ok(A.bal.confianzaBalance === "incierto",
+     "y aun así el balance sigue siendo incierto: convertir unidades no es conocer el déficit");
+}
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

@@ -5642,6 +5642,10 @@
         // apuntado. Si no viaja, la pantalla no puede decirlo — y un campo que
         // no se propaga es un campo que no existe.
         aportesPreviosDesconocidos: bal.aportesPreviosDesconocidos,
+        // El día en que una entrada conocida ≥ TAW dejó el suelo lleno. Es lo
+        // que permite explicar por qué se deja de dudar, y sin propagarlo la
+        // pantalla no puede decirlo.
+        balanceReancladoEn:     bal.balanceReancladoEn,
         coberturaClima:         bal.coberturaClima,
         diasSinClima:           bal.diasSinClima,
         diasEsperadosClima:     bal.diasEsperadosClima,
@@ -6608,10 +6612,21 @@
         acc.push({
           id: parcela?.id ? `regar-${parcela.id}` : "regar",
           parcelaId: parcela?.id || null,
-          icono: "💧", verbo: "Regar" + deQuien,
-          urgente: !!alerta,
-          detalle: `${mm} L/m²` + (/L\/m²/.test(eq) ? "" : ` · ${eq}`),
-          razon: alerta
+          icono: "💧",
+          // ⚠️ EL TITULAR TAMBIÉN. Con los aportes anteriores desconocidos, esto
+          // no es una orden: es una estimación sobre un suelo cuyo estado no
+          // sabemos. Dejarlo en "Regar" con un aviso pequeño debajo es presentar
+          // como confirmada una necesidad que no lo está — el aviso lo leerá
+          // quien ya dude, y el que no dude solo ve el verbo y el número.
+          verbo: (bal?.aportesPreviosDesconocidos > 0 ? "Quizá toque regar" : "Regar") + deQuien,
+          // Y deja de ser urgente: la urgencia es una afirmación sobre el estado
+          // del suelo, y ese es justo el que no conocemos.
+          urgente: !!alerta && !(bal?.aportesPreviosDesconocidos > 0),
+          detalle: (bal?.aportesPreviosDesconocidos > 0 ? "unos " : "")
+                 + `${mm} L/m²` + (/L\/m²/.test(eq) ? "" : ` · ${eq}`),
+          razon: (bal?.aportesPreviosDesconocidos > 0)
+            ? `Contando desde que lo plantaste, sin saber lo que regaste antes de darlo de alta.`
+            : alerta
             ? `Desde ${alerta.desde} han evaporado ${alerta.et0.toFixed(0)} mm del suelo.`
             : "La planta empieza a notar la falta de agua.",
           // EL CAUDAL SE PIDE AQUÍ, no en el alta. Está de pie al lado del riego

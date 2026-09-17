@@ -33,7 +33,12 @@ ok(/if \(accionesDeHoy\.__confianzaBaja\) \{\s*\n\s*card\.hidden = false;/.test(
 ok(/function accionesDeHoy\(\)/.test(app), "hay una función que decide qué toca");
 
 console.log("\n── las acciones son verbos, y solo salen si tocan ──");
-ok(/verbo: "Regar"/.test(app), "Regar");
+// El verbo ya no es una cadena fija: con los aportes anteriores desconocidos
+// pasa a "Quizá toque regar", porque ahí no es una orden sino una estimación
+// sobre un suelo cuyo estado no sabemos. Dejarlo en "Regar" con un aviso
+// pequeño debajo era presentar como confirmada una necesidad que no lo está.
+ok(/\? "Quizá toque regar" : "Regar"\)/.test(app),
+   "Regar — y \"Quizá toque regar\" cuando no se conocen los aportes anteriores");
 ok(/verbo: "Abonar"/.test(app), "Abonar");
 ok(/abrirModalRiego\(\);/.test(app),
    "tocar Regar lleva al registro de un toque, no a otro formulario");
