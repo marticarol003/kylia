@@ -24,14 +24,14 @@
 
   // Los ocho con curva FAO-56 medida. `kcId` es la clave de FAO_KC.
   const SOPORTADOS = [
-    { id: "lechuga",   nombre: "Lechuga",         kcId: "lechuga",   alias: ["lechuga romana", "romana", "iceberg", "hoja de roble", "enciam"] },
-    { id: "espinaca",  nombre: "Espinaca",        kcId: "espinaca",  alias: ["espinacas", "espinac"] },
-    { id: "brassica",  nombre: "Col o coliflor",  kcId: "brassica",  alias: ["col", "coliflor", "brócoli", "brocoli", "repollo", "berza", "kale", "romanesco", "col rizada", "bròquil"] },
-    { id: "tomate",    nombre: "Tomate",          kcId: "tomate",    alias: ["tomatera", "cherry", "tomàquet", "tomaquet"] },
-    { id: "pimiento",  nombre: "Pimiento",        kcId: "pimiento",  alias: ["pimientos", "padrón", "padron", "pebrot"] },
-    { id: "berenjena",  nombre: "Berenjena",      kcId: "berenjena", alias: ["albergínia", "alberginia"] },
-    { id: "calabacin", nombre: "Calabacín",       kcId: "calabacin", alias: ["calabacines", "carabassó", "carabasso", "zucchini"] },
-    { id: "cebolla",   nombre: "Cebolla tierna",  kcId: "cebolla",   alias: ["cebolleta", "cebollino", "calçot", "calcot", "ceba"] },
+    { id: "lechuga", articulo: "la",   nombre: "Lechuga",         kcId: "lechuga",   alias: ["lechuga romana", "romana", "iceberg", "hoja de roble", "enciam"] },
+    { id: "espinaca", articulo: "la",  nombre: "Espinaca",        kcId: "espinaca",  alias: ["espinacas", "espinac"] },
+    { id: "brassica", articulo: "la",  nombre: "Col o coliflor",  kcId: "brassica",  alias: ["col", "coliflor", "brócoli", "brocoli", "repollo", "berza", "kale", "romanesco", "col rizada", "bròquil"] },
+    { id: "tomate", articulo: "el",    nombre: "Tomate",          kcId: "tomate",    alias: ["tomatera", "cherry", "tomàquet", "tomaquet"] },
+    { id: "pimiento", articulo: "el",  nombre: "Pimiento",        kcId: "pimiento",  alias: ["pimientos", "padrón", "padron", "pebrot"] },
+    { id: "berenjena", articulo: "la",  nombre: "Berenjena",      kcId: "berenjena", alias: ["albergínia", "alberginia"] },
+    { id: "calabacin", articulo: "el", nombre: "Calabacín",       kcId: "calabacin", alias: ["calabacines", "carabassó", "carabasso", "zucchini"] },
+    { id: "cebolla", articulo: "la",   nombre: "Cebolla tierna",  kcId: "cebolla",   alias: ["cebolleta", "cebollino", "calçot", "calcot", "ceba"] },
   ];
 
   // Lo que un agricultor de huerta mediterránea planta de verdad y el motor
@@ -77,6 +77,16 @@
 
   const nombreDe = (id) => porId(id)?.nombre || (id || "");
 
+  // "la lechuga", "el tomate". Los ocho del motor lo llevan declarado; para el
+  // resto se deduce de la terminación, que en castellano acierta casi siempre.
+  // No es gramática perfecta: es que "¿Dónde está lechuga?" suena a robot.
+  function conArticulo(id) {
+    const c = porId(id);
+    if (!c) return "tu cultivo";
+    const art = c.articulo || (/a$/i.test(c.nombre.split(" ")[0]) ? "la" : "el");
+    return `${art} ${c.nombre.toLowerCase()}`;
+  }
+
   // Lo que escribe el agricultor, convertido en un cultivo registrable. Si no
   // está en el catálogo se acepta igual: su explotación no puede depender de
   // que nosotros hayamos previsto su cultivo.
@@ -111,5 +121,5 @@
       .map(x => x.c);
   }
 
-  return { CATALOGO, SOPORTADOS, soportado, porId, nombreDe, desdeTexto, buscar, normaliza };
+  return { CATALOGO, SOPORTADOS, soportado, porId, nombreDe, conArticulo, desdeTexto, buscar, normaliza };
 });

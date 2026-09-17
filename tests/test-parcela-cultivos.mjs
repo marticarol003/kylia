@@ -1,13 +1,15 @@
-// Una parcela, varios cultivos, y cada uno con lo suyo.
+// Un terreno, los cultivos que el agricultor quiera llevar con Kylia.
 //   node tests/test-parcela-cultivos.mjs
 //
-// El alta anterior preguntaba "¿cultivas todo el recinto o solo una parte?" y
-// esa pregunta ya decidía por el agricultor: induce a pensar en UN cultivo. Un
-// recinto con lechuga, col y un pasillo sin plantar no cabía en ella.
+// ⚠️ YA NO SE PREGUNTA "¿CUÁNTOS CULTIVOS TIENES?". Obligaba a contarse el campo
+// antes de entender qué le íbamos a pedir, y además no es lo que queremos
+// saber: Kylia no gestiona su terreno entero, gestiona lo que él elija traer
+// aquí. Se añade uno, y luego otro si quiere.
 //
-// Se prueba EJECUTANDO los módulos reales: la geometría (assets/js/geo-parcela.js),
-// el catálogo (assets/js/cultivos.js) y el flujo (assets/js/parcela-cultivos.js).
-import { readFileSync } from "fs";
+// Se prueba EJECUTANDO los módulos reales: la geometría, el catálogo, el flujo
+// y el contrato de riego. El terreno de prueba mide de verdad lo que declara —
+// un cuadrado de 100 m de lado son 10.000 m²—, porque toda la superficie sale
+// del polígono y un fixture incoherente esconde fallos.
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { createRequire } from "module";
@@ -23,245 +25,226 @@ const MOTOR = require(join(RAIZ, "assets", "js", "motor-riego.js"));
 let fallos = 0;
 const ok = (c, m) => { if (c) console.log("  ✓", m); else { console.log("  ✗", m); fallos++; } };
 
-// Una parcela cuadrada de 10×10 unidades. Las áreas reales las calcula areaM2;
-// aquí lo que importa es el reparto y las reglas, así que la superficie oficial
-// se declara aparte, como hace SIGPAC.
-const cuad = (x0, y0, x1, y1) => ({ type: "Polygon", coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] });
-const PARCELA = { referencia: "R1", nombre: "El bancal de arriba",
-                  superficie_m2: 5226, geometria: cuad(0, 0, 10, 10) };
+const Y0 = 41.3, dLat = 100 / 111320, dLon = 100 / 83600;
+const pt = (x, y) => [x * dLon, Y0 + y * dLat];
+const poly = (...ps) => ({ type: "Polygon", coordinates: [[...ps.map(([x, y]) => pt(x, y)), pt(ps[0][0], ps[0][1])]] });
+const rect = (x0, y0, x1, y1) => poly([x0, y0], [x1, y0], [x1, y1], [x0, y1]);
+const GEOM = rect(0, 0, 1, 1);
+const TERRENO = { referencia: "R1", nombre: "El bancal de arriba",
+                  superficie_m2: G.areaDePolygon(GEOM), geometria: GEOM };
 
-// Recorre el mini-flujo de un cultivo con las funciones reales.
-function anadir(flujo, { cultivo, area, geometria, fecha, metodo, caudal, riego }) {
-  const c = C.desdeTexto(cultivo);
-  let f = { ...flujo, borrador: { ...flujo.borrador, cultivoId: c.id, soportado: C.soportado(c) } };
-  f = P.avanzar(f);
-  f = { ...f, borrador: { ...f.borrador, area_m2: area, geometria: geometria || null } };
-  f = P.avanzar(f);
-  f = { ...f, borrador: { ...f.borrador, fechaPlantacion: fecha } };
-  f = P.avanzar(f);
-  f = { ...f, borrador: { ...f.borrador, metodoRiego: metodo, caudal: caudal ?? null, riego: riego || null } };
-  return P.avanzar(f);
+function almacen() {
+  const m = new Map();
+  return { getItem: k => (m.has(k) ? m.get(k) : null),
+           setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) };
+}
+
+// Recorre el mini-flujo de un cultivo con las funciones REALES. La fecha y el
+// riego pueden quedarse pendientes: eso es una respuesta válida, no un hueco.
+function anadir(flujo, o = {}) {
+  const c = C.desdeTexto(o.cultivo);
+  let f = { ...flujo, borrador: { ...flujo.borrador, cultivoId: c.id, cultivo: c.nombre,
+                                  soportado: C.soportado(c) } };
+  f = P.avanzar(f, G);
+  f = { ...f, borrador: { ...f.borrador, geometria: o.geometria || null } };
+  f = P.avanzar(f, G);
+  f = { ...f, borrador: { ...f.borrador, fechaPlantacion: o.sinFecha ? null : o.fecha,
+        fechaPrecision: o.sinFecha ? null : (o.precision || "exacta"), fechaPendiente: !!o.sinFecha } };
+  f = P.avanzar(f, G);
+  f = { ...f, borrador: { ...f.borrador, metodoRiego: o.sinRiego ? null : o.metodo,
+        riegoPendiente: !!o.sinRiego, caudal: o.caudal ?? null, riego: o.riego || null,
+        capacidadRegaderaL: o.regadera ?? null } };
+  return P.avanzar(f, G);
 }
 
 // ══════════════════════════════════════════════════════════════════
-console.log("── 1 parcela + 1 cultivo ocupando TODO ──");
+console.log("── el flujo ya no pregunta cuántos cultivos ──");
 {
-  let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "uno");
-  ok(f.borrador.ocupaTodo === true, "con un solo cultivo se propone que ocupe la parcela entera");
-  ok(f.borrador.geometria === PARCELA.geometria, "con el contorno de la parcela, sin dibujar de cero");
-  // ⚠️ La superficie NO se declara: sale del polígono. La oficial del recinto y
-  // el área de su contorno no tienen por qué coincidir, y persistir la primera
-  // con el segundo debajo es guardar dos verdades sobre el mismo cultivo.
-  ok(f.borrador.area_m2 === null, "y sin superficie declarada: esa sale del contorno");
-  ok(G.areaDePolygon(f.borrador.geometria) > 0,
-     `el área del contorno es ${G.areaDePolygon(f.borrador.geometria)} m², y es la que vale`);
-  f = anadir(f, { cultivo: "Lechuga", area: 5226, geometria: PARCELA.geometria,
-                  fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
-  const r = P.reparto(PARCELA, f.cultivos);
-  ok(r.asignado === 5226 && r.sin_asignar === 0, "todo asignado, nada libre");
-  ok(f.paso === "resumen", "y se va al resumen");
-  // Ocupar la parcela entera es válido: comparte los cuatro lados con ella.
-  ok(G.contenidoEn(PARCELA.geometria, PARCELA.geometria) === true,
-     "un cultivo que ocupa toda la parcela NO se considera fuera de ella");
+  ok(typeof P.responderCuantos === "undefined", "la pregunta ha desaparecido del módulo");
+  ok(P.nuevoFlujo().paso === "terreno", "sin terreno, se arranca pidiéndolo");
+  const f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  ok(f.paso === "cultivo", "y elegir terreno lleva DIRECTO al primer cultivo");
+  ok(!!f.borrador && f.borrador.paso === "cultivo", "con su borrador listo");
+  ok(JSON.stringify(P.PASOS) === JSON.stringify(["terreno", "cultivo", "superficie", "fecha", "riego", "guardado"]),
+     "cinco preguntas y una pantalla final");
 }
 
-console.log("\n── 1 parcela + 1 cultivo ocupando SOLO UNA PARTE ──");
+console.log("\n── un cultivo que ocupa todo el terreno ──");
 {
-  let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "uno");
-  f = anadir(f, { cultivo: "Lechuga", area: 2000, geometria: cuad(0, 0, 5, 5),
-                  fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
-  const r = P.reparto(PARCELA, f.cultivos);
-  ok(r.asignado === 2000 && r.sin_asignar === 3226, `quedan ${r.sin_asignar} m² sin asignar`);
-  ok(r.excedido === 0, "y nada excedido");
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  ok(P.puedeUsarTodo(f) === true, "con el terreno vacío se puede usar entero");
+  f = P.usarTodoElTerreno(f);
+  ok(JSON.stringify(f.borrador.geometria) === JSON.stringify(GEOM),
+     "y copia su contorno EXACTO, sin dibujar de cero");
+  ok(f.borrador.area_m2 === null, "sin superficie declarada: esa sale del polígono");
+  f = anadir(f, { cultivo: "Lechuga", geometria: GEOM, fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
+  ok(f.cultivos[0].area_m2 === G.areaDePolygon(GEOM),
+     `el área guardada sale del GeoJSON (${f.cultivos[0].area_m2} m²)`);
+  ok(P.reparto(TERRENO, f.cultivos).sin_configurar === 0, "nada sin configurar");
+  ok(f.paso === "guardado", "y se va a la pantalla de guardado");
 }
 
-console.log("\n── 1 parcela + 3 cultivos, con superficie restante ──");
+console.log("\n── un terreno parcialmente gestionado (caso D) ──");
 {
-  let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "varios");
-  f = anadir(f, { cultivo: "Lechuga", area: 2174, geometria: cuad(0, 0, 4, 5), fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
-  f = P.anadirOtro(f);
-  f = anadir(f, { cultivo: "Col o coliflor", area: 1880, geometria: cuad(4, 0, 8, 5), fecha: "2026-09-08", metodo: "aspersion", caudal: 11.2 });
-  f = P.anadirOtro(f);
-  f = anadir(f, { cultivo: "Alcachofa", area: 1000, geometria: cuad(0, 5, 4, 9), fecha: "2026-08-20", metodo: "surco" });
-  ok(f.cultivos.length === 3, "tres cultivos en la misma parcela");
-  const r = P.reparto(PARCELA, f.cultivos);
-  ok(r.asignado === 5054, `asignado ${r.asignado} m²`);
-  ok(r.sin_asignar === 172, `sin asignar ${r.sin_asignar} m² — el pasillo, y NO es un error`);
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  f = anadir(f, { cultivo: "Lechuga", geometria: rect(0, 0, .4, .4), fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
+  const r = P.reparto(TERRENO, f.cultivos);
+  ok(r.asignado > 0 && r.sin_configurar > 0,
+     `${r.asignado} m² configurados y ${r.sin_configurar} m² sin configurar en Kylia`);
   ok(r.excedido === 0, "nada excedido");
-
-  console.log("\n── cada cultivo con SU fecha y SU riego ──");
-  const [a, b, c] = f.cultivos;
-  ok(a.fechaPlantacion === "2026-09-02" && b.fechaPlantacion === "2026-09-08" && c.fechaPlantacion === "2026-08-20",
-     "tres fechas distintas, ninguna a nivel de parcela");
-  ok(a.metodoRiego === "goteo" && b.metodoRiego === "aspersion" && c.metodoRiego === "surco",
-     "tres métodos distintos");
-  ok(a.caudal === 6.7 && b.caudal === 11.2 && c.caudal === null,
-     `tres caudales independientes (${a.caudal} / ${b.caudal} / ${c.caudal})`);
-  ok(new Set(f.cultivos.map(x => x.cultivo)).size === 3, "y tres cultivos distintos");
-
-  console.log("\n── cultivo soportado vs NO soportado ──");
-  ok(a.soportado === true && b.soportado === true, "lechuga y col: el motor los conoce");
-  ok(c.soportado === false, "alcachofa: se REGISTRA, pero el motor no la calcula");
-  ok(MOTOR.FAO_KC[c.cultivo] === undefined, "y efectivamente no tiene curva de Kc");
-  ok(C.porId(c.cultivo).kcId === null, "sin kcId: no se le asigna el de un cultivo parecido");
-  ok(C.soportado(C.desdeTexto("Alcachofa")) === false, "el catálogo lo dice claramente");
+  ok(f.paso === "guardado", "y el alta TERMINA igual: no se obliga a llenar el terreno");
+  ok(P.puedeUsarTodo(f) === false, "con un cultivo dentro ya no se ofrece usarlo entero");
+  const i = P.usarTodoElTerreno(P.anadirOtro(f));
+  ok(i.borrador.geometria === null && i.borrador.area_m2 === null,
+     "y si alguien llama la función igual, no asigna metros sin polígono");
 }
 
-console.log("\n── se impide lo imposible, no lo incompleto ──");
+console.log("\n── varios cultivos, cada uno con LO SUYO (caso B) ──");
 {
-  let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "varios");
-  f = anadir(f, { cultivo: "Lechuga", area: 2174, geometria: cuad(0, 0, 5, 5), fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
-
-  const solapa = P.cabe(G, { area_m2: 1000, geometria: cuad(3, 3, 8, 8) }, PARCELA, f.cultivos);
-  ok(solapa.ok === false && solapa.motivo === "se_solapa", "un cultivo que pisa a otro se rechaza");
-  ok(/pisa con otro cultivo/.test(P.explicar("se_solapa")), "y se dice en cristiano");
-
-  const fuera = P.cabe(G, { area_m2: 1000, geometria: cuad(8, 8, 14, 14) }, PARCELA, f.cultivos);
-  ok(fuera.ok === false && fuera.motivo === "fuera_de_la_parcela", "y uno que se sale de la parcela, también");
-
-  const pegado = P.cabe(G, { area_m2: 1000, geometria: cuad(5, 0, 9, 5) }, PARCELA, f.cultivos);
-  ok(pegado.ok === true, "pero dos bancales PEGADOS por la linde valen: es lo normal en un campo");
-
-  const pasa = P.cabe(G, { area_m2: 1000, geometria: cuad(0, 6, 4, 9) }, PARCELA, f.cultivos);
-  ok(pasa.ok === true, "y uno que cabe, pasa");
-
-  // Lo que NO se exige: llenar la parcela.
-  const r = P.reparto(PARCELA, f.cultivos);
-  ok(r.sin_asignar > 0, "queda superficie sin asignar y el flujo sigue: nadie obliga a llenarla");
-}
-
-console.log("\n── \"usar toda la superficie disponible\" ──");
-{
-  let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "varios");
-  f = anadir(f, { cultivo: "Lechuga", area: 2000, geometria: cuad(0, 0, 5, 5), fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
-  // ⚠️ CON VECINOS DENTRO EL ATAJO NO SE OFRECE. El trozo libre es la diferencia
-  // entre la parcela y lo ocupado: puede ser varios pedazos, cóncavo o con
-  // agujeros, y no sabemos dibujarlo. La versión anterior lo resolvía asignando
-  // los metros SIN geometría — y el satélite mide el dibujo, no el número.
-  const conVecino = P.anadirOtro(f);
-  ok(P.puedeUsarTodo(conVecino) === false, "con un cultivo dentro, el atajo NO se ofrece");
-  const intento = P.usarTodoLoLibre(conVecino);
-  ok(intento.borrador.geometria === null && intento.borrador.area_m2 === null,
-     "y si alguien lo llama igual, no asigna metros a ciegas");
-  // Con la parcela vacía sí: ahí "todo" ES el contorno de la parcela, exacto.
-  let g = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "varios");
-  ok(P.puedeUsarTodo(g) === true, "con la parcela vacía sí se ofrece");
-  g = P.usarTodoLoLibre(g);
-  ok(g.borrador.geometria === PARCELA.geometria, "y copia el contorno entero, tal cual");
-}
-
-console.log("\n── añadir un cultivo DESPUÉS, sobre una parcela ya hecha ──");
-{
-  let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "uno");
-  f = anadir(f, { cultivo: "Lechuga", area: 2000, geometria: cuad(0, 0, 5, 5), fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
-  ok(f.paso === "resumen", "el primero queda guardado");
-  const antes = f.cultivos.length;
-  f = P.anadirOtro(f);
-  ok(f.paso === "cultivo" && f.borrador.cultivo === null,
-     "añadir otro vuelve al flujo del cultivo, con el borrador limpio");
-  ok(f.parcela === PARCELA, "y SIN volver a preguntar la parcela");
-  f = anadir(f, { cultivo: "Espinaca", area: 1200, geometria: cuad(5, 0, 9, 4), fecha: "2026-09-10", metodo: "goteo", caudal: 4.5 });
-  ok(f.cultivos.length === antes + 1, "el segundo se añade al mismo sitio");
-  ok(f.cultivos[0].fechaPlantacion !== f.cultivos[1].fechaPlantacion, "sin contagiarle la fecha del primero");
-  ok(f.cultivos[0].caudal !== f.cultivos[1].caudal, "ni el caudal");
-}
-
-console.log("\n── añadir una PARCELA después: el mismo flujo ──");
-{
-  // "+ Añadir parcela" no puede ser otro formulario: es el mismo flujo,
-  // empezando por elegir parcela. Si fueran dos implementaciones, divergirían.
-  const f1 = P.nuevoFlujo();
-  ok(f1.paso === "parcela", "sin parcela, el flujo arranca pidiéndola");
-  const f2 = P.nuevoFlujo(PARCELA);
-  ok(f2.paso === "cuantos", "con parcela ya elegida, arranca en \"¿cuántos cultivos?\"");
-  // Y una parcela nueva no arrastra los cultivos de la anterior.
-  let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "uno");
-  f = anadir(f, { cultivo: "Lechuga", area: 2000, fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
-  const otra = P.elegirParcela(f, { referencia: "R2", superficie_m2: 900, geometria: cuad(20, 20, 24, 24) });
-  ok(otra.cultivos.length === 0, "elegir otra parcela empieza de cero");
-  ok(otra.parcela.referencia === "R2", "y con la parcela nueva");
-}
-
-console.log("\n── \"ahora mismo ninguno\" ──");
-{
-  const f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "ninguno");
-  ok(f.paso === "resumen" && f.cultivos.length === 0,
-     "una parcela puede quedarse registrada sin cultivos");
-  ok(P.reparto(PARCELA, f.cultivos).sin_asignar === 5226, "con toda su superficie sin asignar");
-}
-
-console.log("\n── no se puede saltar una pregunta ──");
-{
-  let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "varios");
-  const igual = P.avanzar(f);
-  ok(igual.borrador.paso === "cultivo", "sin cultivo no se pasa de pantalla");
-  f = { ...f, borrador: { ...f.borrador, cultivoId: "lechuga", soportado: true } };
-  f = P.avanzar(f);
-  ok(f.borrador.paso === "superficie", "con cultivo, sí");
-  ok(P.avanzar(f).borrador.paso === "superficie", "y sin superficie no se sigue");
-  ok(P.completo({ metodoRiego: null }, "riego") === false, "ni sin método de riego");
-}
-
-console.log("\n── el autocompletado ──");
-{
-  ok(C.buscar("le")[0].nombre === "Lechuga", "escribir \"le\" propone Lechuga la primera");
-  ok(C.buscar("alca").some(c => c.nombre === "Alcachofa"), "\"alca\" encuentra Alcachofa");
-  ok(C.buscar("col").some(c => c.nombre === "Col o coliflor"), "\"col\" encuentra la col");
-  ok(C.desdeTexto("enciam").id === "lechuga", "un sinónimo lleva al identificador canónico");
-  ok(C.desdeTexto("Tomàquet").id === "tomate", "también con acentos y en catalán");
-  const raro = C.desdeTexto("quinoa");
-  ok(raro.id.startsWith("otro:") && raro.kcId === null,
-     "un cultivo que no está en la lista SE REGISTRA igual, sin motor");
-  ok(C.buscar("")[0] && C.SOPORTADOS.includes(C.buscar("")[0]),
-     "con el campo vacío se proponen los que el motor sí sabe calcular");
-  // Ni un solo Kc prestado.
-  const sinMotor = C.CATALOGO.filter(c => !C.soportado(c));
-  ok(sinMotor.every(c => c.kcId === null), `los ${sinMotor.length} no soportados no tienen kcId`);
-  ok(C.SOPORTADOS.every(c => MOTOR.FAO_KC[c.kcId]), "y los 8 soportados sí tienen curva en el motor");
-}
-
-console.log("\n── el riego de cada cultivo respeta el contrato desplegado ──");
-{
-  // No se reabre la semántica de 74260fe: se usa tal cual.
-  let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "varios");
-  const cap = R.capacidadGoteo({ l_h_gotero: 2, sep_goteros_m: 0.30, sep_lineas_m: 1 });
-  f = anadir(f, { cultivo: "Lechuga", area: 2000, geometria: cuad(0, 0, 5, 5), fecha: "2026-09-02",
-                  metodo: "goteo", caudal: cap.valor,
-                  riego: { capacidad_mmh: cap.valor, fuente: cap.fuente, confianza: cap.confianza } });
-  f = P.anadirOtro(f);
-  f = anadir(f, { cultivo: "Alcachofa", area: 1000, geometria: cuad(5, 0, 9, 4), fecha: "2026-08-20",
-                  metodo: "goteo", caudal: null,
-                  riego: { capacidad_mmh: null, fuente: "no_lo_se", confianza: "baja" } });
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  f = anadir(f, { cultivo: "Lechuga", geometria: rect(0, 0, .4, .5), fecha: "2026-09-02",
+                  precision: "aproximada", metodo: "goteo", caudal: 6.7,
+                  riego: { capacidad_mmh: 6.7, fuente: "derivado_goteo", confianza: "alta" } });
+  f = anadir(P.anadirOtro(f), { cultivo: "tomàquet", geometria: rect(.4, 0, .8, .5), fecha: "2026-09-08",
+                  metodo: "aspersion", caudal: 11.2,
+                  riego: { capacidad_mmh: 11.2, fuente: "medido_vaso", confianza: "alta" } });
   const [a, b] = f.cultivos;
-  ok(R.evaluarCapacidadRiego(a.riego, a.metodoRiego).clase === "fiable", "el derivado sale fiable");
-  ok(R.evaluarCapacidadRiego(b.riego, b.metodoRiego).clase === "no_ejecutable", "el \"no lo sé\", no ejecutable");
-  ok(R.caudalMotor(a, {}) === 6.7 && R.caudalMotor(b, {}) === null,
-     "y al motor va el de cada uno, sin heredar del vecino");
+  ok(b.cultivo === "tomate", "un sinónimo en catalán lleva al identificador canónico");
+  ok(a.fechaPlantacion !== b.fechaPlantacion, "fechas propias");
+  ok(a.metodoRiego !== b.metodoRiego, "métodos propios");
+  ok(a.caudal !== b.caudal, `caudales propios (${a.caudal} / ${b.caudal})`);
+  ok(a.riego.fuente === "derivado_goteo" && b.riego.fuente === "medido_vaso", "procedencias propias");
+  ok(a.area_m2 !== b.area_m2 || a.geometria !== b.geometria, "geometrías propias");
+  ok(!G.seSolapan(a.geometria, b.geometria), "y no se pisan: están pegados por la linde");
+  ok(R.caudalMotor(a, {}) === 6.7 && R.caudalMotor(b, {}) === 11.2,
+     "al motor le llega el de cada uno, sin heredar del vecino");
+}
+
+console.log("\n── la fecha aproximada SIGUE siendo aproximada ──");
+{
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  f = anadir(f, { cultivo: "Lechuga", geometria: rect(0, 0, .4, .4),
+                  fecha: "2026-09-03", precision: "aproximada", metodo: "surco" });
+  ok(f.cultivos[0].fechaPrecision === "aproximada",
+     "\"hace unas dos semanas\" no se guarda como un día declarado por él");
+  let g = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  g = anadir(g, { cultivo: "Lechuga", geometria: rect(0, 0, .4, .4),
+                  fecha: "2026-09-03", precision: "exacta", metodo: "surco" });
+  ok(g.cultivos[0].fechaPrecision === "exacta", "y elegir fecha en el calendario, sí");
+}
+
+console.log("\n── datos pendientes: se registra igual (caso C) ──");
+{
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  f = anadir(f, { cultivo: "Lechuga", geometria: rect(0, 0, .4, .4), sinFecha: true, sinRiego: true });
+  const c = f.cultivos[0];
+  ok(f.paso === "guardado" && f.cultivos.length === 1, "el cultivo queda REGISTRADO");
+  ok(c.fechaPlantacion === null && c.fechaPrecision === null, "sin fecha inventada");
+  ok(c.metodoRiego === null, "y sin método inventado");
+  ok(c.area_m2 > 0 && !!c.geometria, "pero con su superficie y su contorno, que sí dijo");
+  const p = P.pendientesDe(c, R);
+  ok(p.some(x => x.clave === "fecha") && p.some(x => x.clave === "metodo"),
+     "y los pendientes se expresan como acción concreta");
+  ok(/Falta decirnos cuándo/.test(p[0].texto), `"${p[0].texto}"`);
+  // Sin método no hay minutos, ni fiables ni de ningún tipo.
+  ok(R.evaluarCapacidadRiego(c.riego, c.metodoRiego).puede_ejecutar === false,
+     "sin método, cero minutos");
+}
+
+console.log("\n── los TRES estados no son el mismo ──");
+{
+  const base = { lat: 41.3, lon: 2.0, area_m2: 1000, cultivo: "lechuga" };
+  const CUL = Object.keys(MOTOR.FAO_KC), HOY = "2026-09-17";
+  const est = (s) => R.estadoSiembra({ ...base, ...s }, { suelo: "franco" }, { cultivosSoportados: CUL, hoy: HOY });
+  const sinFecha = est({ fechaPlantacion: null, metodoRiego: "goteo" });
+  ok(sinFecha.lista_para_calcular_agua === false, "1 · registrado pero sin fecha: no se puede calcular agua");
+  const conAgua = est({ fechaPlantacion: "2026-09-02", metodoRiego: "goteo" });
+  ok(conAgua.lista_para_calcular_agua === true, "2 · con fecha y método: ya se puede calcular el agua");
+  ok(conAgua.lista_para_ejecutar_riego === false, "   pero no los minutos: falta medir la instalación");
+  const conTodo = est({ fechaPlantacion: "2026-09-02", metodoRiego: "goteo",
+    riego: { capacidad_mmh: 6.7, fuente: "derivado_goteo", confianza: "alta" } });
+  ok(conTodo.lista_para_ejecutar_riego === true, "3 · con la instalación medida: minutos fiables");
+  // Una caída de clima NO devuelve al agricultor al onboarding.
+  const d = R.estadoDecision(conTodo, { coberturaClima: 0.3 });
+  ok(conTodo.estado_configuracion === "completa" && d.estado_decision === "esperando_datos",
+     "y una caída del clima no convierte su configuración en incompleta");
+}
+
+console.log("\n── cultivo libre: se registra, no entra al motor (caso E) ──");
+{
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  f = anadir(f, { cultivo: "quinoa", geometria: rect(0, 0, .3, .3), fecha: "2026-08-20", metodo: "surco" });
+  const c = f.cultivos[0];
+  ok(c.cultivo === "otro:quinoa", "conserva su identidad");
+  ok(C.porId(c.cultivo).kcId === null, "con kcId null: no se le presta el Kc de otro");
+  ok(MOTOR.FAO_KC[c.cultivo] === undefined, "y el motor no lo conoce");
+  ok(c.soportado === false, "queda marcado como no soportado");
+  ok(P.pendientesDe(c, R).some(x => x.clave === "sin_motor"), "y se dice en sus pendientes");
+}
+
+console.log("\n── volver atrás no pierde nada ──");
+{
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  f = { ...f, borrador: { ...f.borrador, cultivoId: "lechuga", cultivo: "Lechuga", soportado: true } };
+  f = P.avanzar(f, G);
+  f = { ...f, borrador: { ...f.borrador, geometria: rect(0, 0, .4, .4) } };
+  f = P.avanzar(f, G);
+  f = { ...f, borrador: { ...f.borrador, fechaPlantacion: "2026-09-02", fechaPrecision: "exacta" } };
+  f = P.avanzar(f, G);
+  ok(f.borrador.paso === "riego", "estamos en el riego");
+  const atras = P.atras(f);
+  ok(atras.borrador.paso === "fecha", "atrás vuelve a la fecha");
+  ok(atras.borrador.cultivoId === "lechuga" && !!atras.borrador.geometria
+     && atras.borrador.fechaPlantacion === "2026-09-02",
+     "y CONSERVA cultivo, contorno y fecha: retroceder no borra");
+}
+
+console.log("\n── el borrador se guarda y se retoma (caso G) ──");
+{
+  const ls = almacen();
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  f = { ...f, borrador: { ...f.borrador, cultivoId: "lechuga", paso: "fecha",
+                          geometria: rect(0, 0, .4, .4) } };
+  ok(P.guardarBorrador(ls, f) === true, "se guarda");
+  const r = P.leerBorrador(ls);
+  ok(!!r && r.parcela.referencia === "R1" && r.borrador.paso === "fecha",
+     "y se recupera en el mismo paso");
+  ok(r.borrador.cultivoId === "lechuga" && !!r.borrador.geometria, "con lo contestado intacto");
+  // ⚠️ UN BORRADOR NO ES UNA SIEMBRA: recuperarlo no crea nada.
+  ok(r.cultivos.length === 0, "y no ha creado ningún cultivo por el camino");
+  ok(P.borrarBorrador(ls) === true && P.leerBorrador(ls) === null, "y se puede borrar");
+  ok(P.leerBorrador(almacen()) === null, "sin borrador guardado, no hay nada que retomar");
+}
+
+console.log("\n── guardar dos veces no duplica ──");
+{
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  f = anadir(f, { cultivo: "Lechuga", geometria: rect(0, 0, .4, .4), fecha: "2026-09-02", metodo: "surco" });
+  ok(f.cultivos.length === 1, "un cultivo");
+  const otra = P.guardarCultivo(f, G);
+  ok(otra.cultivos.length === 1, "y volver a guardar no lo duplica");
 }
 
 console.log("\n── reload: se conserva todo ──");
 {
-  let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "varios");
-  f = anadir(f, { cultivo: "Lechuga", area: 2174, geometria: cuad(0, 0, 4, 5), fecha: "2026-09-02", metodo: "goteo", caudal: 6.7,
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  f = anadir(f, { cultivo: "Lechuga", geometria: rect(0, 0, .4, .5), fecha: "2026-09-02",
+                  precision: "aproximada", metodo: "goteo", caudal: 6.7,
                   riego: { capacidad_mmh: 6.7, fuente: "derivado_goteo", confianza: "alta" } });
-  f = P.anadirOtro(f);
-  f = anadir(f, { cultivo: "Col o coliflor", area: 1880, geometria: cuad(4, 0, 8, 5), fecha: "2026-09-08", metodo: "aspersion", caudal: 11.2,
+  f = anadir(P.anadirOtro(f), { cultivo: "Col o coliflor", geometria: rect(.4, 0, .8, .5),
+                  sinFecha: true, metodo: "aspersion", caudal: 11.2,
                   riego: { capacidad_mmh: 11.2, fuente: "medido_vaso", confianza: "alta" } });
-
-  // Se serializa como se guardará en kylia_zonas y se vuelve a leer.
-  const zona = { referencia: PARCELA.referencia, nombre: PARCELA.nombre,
-                 superficie_m2: PARCELA.superficie_m2, geometria: PARCELA.geometria,
-                 siembras: f.cultivos };
-  const releido = JSON.parse(JSON.stringify([zona]))[0];
-  const [a, b] = releido.siembras;
-  ok(a.geometria && b.geometria && a.geometria.type === "Polygon", "las geometrías sobreviven");
-  ok(a.area_m2 === 2174 && b.area_m2 === 1880, "las superficies");
-  ok(a.fechaPlantacion === "2026-09-02" && b.fechaPlantacion === "2026-09-08", "las fechas, distintas");
-  ok(a.caudal === 6.7 && b.caudal === 11.2, "los caudales, distintos");
-  ok(a.riego.fuente === "derivado_goteo" && b.riego.fuente === "medido_vaso", "y su procedencia");
-  const r = P.reparto(releido, releido.siembras);
-  ok(r.asignado === 4054 && r.sin_asignar === 1172,
-     `y el reparto se recalcula solo: ${r.asignado} asignados, ${r.sin_asignar} sin asignar`);
+  const zona = { referencia: TERRENO.referencia, superficie_m2: TERRENO.superficie_m2,
+                 geometria: TERRENO.geometria, siembras: f.cultivos };
+  const releida = JSON.parse(JSON.stringify(zona));
+  const [a, b] = releida.siembras;
+  ok(a.area_m2 === G.areaDePolygon(a.geometria) && b.area_m2 === G.areaDePolygon(b.geometria),
+     "las áreas siguen coincidiendo con su GeoJSON");
+  ok(a.fechaPrecision === "aproximada" && b.fechaPlantacion === null,
+     "la precisión de la fecha y el pendiente sobreviven");
+  ok(a.caudal !== b.caudal && a.riego.fuente !== b.riego.fuente, "los riegos siguen separados");
+  const r = P.reparto(releida, releida.siembras);
+  ok(r.asignado === a.area_m2 + b.area_m2, "y el reparto se recalcula solo");
 }
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
