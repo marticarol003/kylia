@@ -46,6 +46,12 @@ function anadir(flujo, o = {}) {
   let f = { ...flujo, borrador: { ...flujo.borrador, cultivoId: c.id, cultivo: c.nombre,
                                   soportado: C.soportado(c) } };
   f = P.avanzar(f, G);
+  // La variedad SIEMPRE se contesta: o la sabe, o dice que no. Por defecto en
+  // las pruebas se contesta "no la sé", que es una respuesta, no un hueco.
+  f = { ...f, borrador: { ...f.borrador,
+        variedad: o.variedad ?? null,
+        variedadDesconocida: o.variedad ? false : true } };
+  f = P.avanzar(f, G);
   f = { ...f, borrador: { ...f.borrador, geometria: o.geometria || null } };
   f = P.avanzar(f, G);
   f = { ...f, borrador: { ...f.borrador, fechaPlantacion: o.sinFecha ? null : o.fecha,
@@ -54,7 +60,10 @@ function anadir(flujo, o = {}) {
   f = { ...f, borrador: { ...f.borrador, metodoRiego: o.sinRiego ? null : o.metodo,
         riegoPendiente: !!o.sinRiego, caudal: o.caudal ?? null, riego: o.riego || null,
         capacidadRegaderaL: o.regadera ?? null } };
-  return P.avanzar(f, G);
+  f = P.avanzar(f, G);                                  // riego → revisar
+  // Identificado: `avanzar` cierra el cultivo sin pasar por la pantalla del
+  // correo. Es el mismo camino que sigue quien ya tiene su correo guardado.
+  return P.avanzar(f, G, { identificado: true });       // revisar → guardado
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -65,8 +74,78 @@ console.log("── el flujo ya no pregunta cuántos cultivos ──");
   const f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
   ok(f.paso === "cultivo", "y elegir terreno lleva DIRECTO al primer cultivo");
   ok(!!f.borrador && f.borrador.paso === "cultivo", "con su borrador listo");
-  ok(JSON.stringify(P.PASOS) === JSON.stringify(["terreno", "cultivo", "superficie", "fecha", "riego", "guardado"]),
-     "cinco preguntas y una pantalla final");
+  ok(JSON.stringify(P.PASOS) === JSON.stringify(
+       ["terreno", "cultivo", "variedad", "superficie", "fecha", "riego",
+        "revisar", "identificacion", "guardado"]),
+     "el recorrido: terreno → cultivo → variedad → zona → fecha → riego → repaso → identificarse");
+}
+
+console.log("\n── §5 · la variedad se contesta, no se omite ──");
+{
+  const base = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  const conCultivo = P.avanzar({ ...base, borrador: { ...base.borrador,
+    cultivoId: "lechuga", cultivo: "Lechuga", soportado: true } }, G);
+  ok(conCultivo.borrador.paso === "variedad", "después del cultivo se pregunta la variedad");
+  ok(conCultivo.borrador.variedad === null && conCultivo.borrador.variedadDesconocida === null,
+     "y nace SIN CONTESTAR: ni escrita ni declarada desconocida");
+  ok(P.completo(conCultivo.borrador, "variedad") === false,
+     "dejarla en blanco NO deja seguir: la omisión silenciosa no es una respuesta");
+  ok(P.completo({ ...conCultivo.borrador, variedad: "   " }, "variedad") === false,
+     "ni escribir espacios");
+  ok(P.completo({ ...conCultivo.borrador, variedad: "Romana" }, "variedad") === true,
+     "escribirla deja seguir");
+  ok(P.completo({ ...conCultivo.borrador, variedadDesconocida: true }, "variedad") === true,
+     "y decir que no se sabe, también: es una respuesta");
+  // Se guarda como DESCONOCIDA, no como una variedad que se llame "No sé".
+  let f = anadir(base, { cultivo: "Lechuga", geometria: GEOM, fecha: "2026-09-02",
+                         metodo: "goteo", caudal: 6.7 });
+  ok(f.cultivos[0].variedad === null && f.cultivos[0].variedadDesconocida === true,
+     "\"no la sé\" se persiste como estado desconocido, no como nombre literal");
+  let g = anadir(base, { cultivo: "Lechuga", variedad: "Romana", geometria: GEOM,
+                         fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
+  ok(g.cultivos[0].variedad === "Romana" && g.cultivos[0].variedadDesconocida === false,
+     "y la que sí sabe se conserva tal cual");
+  // Volver atrás no la borra.
+  const atras = P.atras({ ...conCultivo, borrador: { ...conCultivo.borrador,
+    variedad: "Romana", variedadDesconocida: false, paso: "superficie" } });
+  ok(atras.borrador.variedad === "Romana", "y volver atrás la conserva");
+}
+
+console.log("\n── §1 · identificarse: solo quien no lo está ──");
+{
+  ok(P.siguientePaso("revisar", { identificado: false }) === "identificacion",
+     "sin identificar, después del repaso se pide el correo");
+  ok(P.siguientePaso("revisar", { identificado: true }) === "hecho",
+     "y quien ya tiene sesión NO vuelve a identificarse");
+  ok(P.PASOS.indexOf("identificacion") > P.PASOS.indexOf("revisar"),
+     "el correo se pide DESPUÉS de enseñar lo que se va a guardar, no antes");
+}
+
+console.log("\n── §9 · el resumen es editable y distingue lo desconocido ──");
+{
+  let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
+  f = { ...f, borrador: { ...f.borrador, cultivoId: "lechuga", cultivo: "Lechuga",
+        soportado: true, variedadDesconocida: true, geometria: GEOM,
+        area_m2: G.areaDePolygon(GEOM), fechaPlantacion: null, fechaPendiente: true,
+        metodoRiego: "goteo", riego: { capacidad_mmh: null }, paso: "revisar" } };
+  const r = P.resumen(f, (id) => (id === "lechuga" ? "Lechuga" : id));
+  const por = (k) => r.find(x => x.clave === k);
+  ok(por("cultivo").valor === "Lechuga", "el resumen nombra el cultivo");
+  ok(por("variedad").valor === "No la sabe" && por("variedad").conocido === false,
+     "la variedad desconocida se DICE, y se marca como no conocida");
+  ok(por("fecha").valor === "Lo dirá después" && por("fecha").conocido === false,
+     "la fecha pendiente igual: no se inventa un día");
+  ok(por("instalacion").valor === "Sin medir" && por("instalacion").conocido === false,
+     "y la instalación sin medir se distingue del método declarado");
+  ok(r.filter(x => x.paso).length >= 5, "cada línea corregible lleva a su pantalla");
+  // Corregir una cosa desde el resumen y volver AL RESUMEN.
+  const editando = P.irAPaso(f, "variedad");
+  ok(editando.borrador.paso === "variedad" && editando.borrador.volverARevisar === true,
+     "tocar una línea abre esa pantalla");
+  const vuelta = P.avanzar({ ...editando, borrador: { ...editando.borrador, variedad: "Romana" } }, G);
+  ok(vuelta.borrador.paso === "revisar",
+     "y al confirmarla se vuelve al repaso, no se recorre todo otra vez");
+  ok(vuelta.borrador.variedad === "Romana", "con el cambio hecho");
 }
 
 console.log("\n── un cultivo que ocupa todo el terreno ──");
@@ -187,6 +266,8 @@ console.log("\n── volver atrás no pierde nada ──");
   let f = P.elegirParcela(P.nuevoFlujo(), TERRENO);
   f = { ...f, borrador: { ...f.borrador, cultivoId: "lechuga", cultivo: "Lechuga", soportado: true } };
   f = P.avanzar(f, G);
+  f = { ...f, borrador: { ...f.borrador, variedad: "Romana", variedadDesconocida: false } };
+  f = P.avanzar(f, G);
   f = { ...f, borrador: { ...f.borrador, geometria: rect(0, 0, .4, .4) } };
   f = P.avanzar(f, G);
   f = { ...f, borrador: { ...f.borrador, fechaPlantacion: "2026-09-02", fechaPrecision: "exacta" } };
@@ -195,8 +276,9 @@ console.log("\n── volver atrás no pierde nada ──");
   const atras = P.atras(f);
   ok(atras.borrador.paso === "fecha", "atrás vuelve a la fecha");
   ok(atras.borrador.cultivoId === "lechuga" && !!atras.borrador.geometria
-     && atras.borrador.fechaPlantacion === "2026-09-02",
-     "y CONSERVA cultivo, contorno y fecha: retroceder no borra");
+     && atras.borrador.fechaPlantacion === "2026-09-02"
+     && atras.borrador.variedad === "Romana",
+     "y CONSERVA cultivo, variedad, contorno y fecha: retroceder no borra");
 }
 
 console.log("\n── el borrador se guarda y se retoma (caso G) ──");

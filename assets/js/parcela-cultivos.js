@@ -94,7 +94,15 @@
   //
   // Es un objeto plano a propósito: se serializa, se guarda como borrador y se
   // inspecciona en un test sin tener que instanciar nada.
-  const PASOS = ["terreno", "cultivo", "superficie", "fecha", "riego", "guardado"];
+  //   terreno → cultivo → variedad → superficie → fecha → riego → revisar
+  //           → identificacion (SOLO si hace falta) → guardado
+  //
+  // `identificacion` está en la lista pero NO siempre se pisa: quien ya tiene
+  // correo guardado no vuelve a dar el suyo. Va DESPUÉS de revisar y no antes,
+  // porque pedir el correo a alguien que todavía no ha visto qué guarda es
+  // pedirle un acto de fe.
+  const PASOS = ["terreno", "cultivo", "variedad", "superficie", "fecha", "riego",
+                 "revisar", "identificacion", "guardado"];
 
   function nuevoFlujo(parcela = null) {
     return { parcela, cultivos: [], borrador: parcela ? nuevoBorrador(parcela) : null,
@@ -110,6 +118,12 @@
   function nuevoBorrador(parcela) {
     return {
       cultivo: null, cultivoId: null, soportado: null,
+      // ⚠️ TRES ESTADOS, y `null` es uno de ellos: NO CONTESTADO. Un string
+      // vacío y un "no lo sé" no son lo mismo, y ninguno de los dos es "todavía
+      // no se lo hemos preguntado". `variedadDesconocida === true` es la
+      // respuesta explícita "no sé la variedad", que se guarda como
+      // DESCONOCIDO — no como una variedad que se llame "No sé".
+      variedad: null, variedadDesconocida: null,
       // La superficie sale del polígono, siempre. Aquí no se declara.
       area_m2: null, geometria: null, ocupaTodo: false,
       // `fechaPrecision` distingue tres cosas que no son lo mismo:
@@ -122,7 +136,17 @@
     };
   }
 
-  const SIGUIENTE = { cultivo: "superficie", superficie: "fecha", fecha: "riego", riego: "hecho" };
+  const SIGUIENTE = { cultivo: "variedad", variedad: "superficie", superficie: "fecha",
+                      fecha: "riego", riego: "revisar", revisar: "identificacion",
+                      identificacion: "hecho" };
+
+  // Quien ya se identificó no vuelve a identificarse. Es la única pantalla que
+  // se salta, y se salta MIRANDO EL ESTADO REAL, no una bandera de interfaz.
+  function siguientePaso(paso, ctx = {}) {
+    const n = SIGUIENTE[paso];
+    if (n === "identificacion" && ctx.identificado === true) return "hecho";
+    return n;
+  }
 
   // Qué hace falta para poder pasar de pantalla. Lo que se puede dejar para
   // después se deja: la fecha y el riego pueden quedar pendientes a propósito,
@@ -130,20 +154,44 @@
   function completo(borrador, paso) {
     if (!borrador) return false;
     if (paso === "cultivo")    return !!borrador.cultivoId;
+    // ⚠️ NO HAY OMISIÓN SILENCIOSA. O escribe la variedad, o dice que no la
+    // sabe. Dejarlo en blanco y seguir era guardar "sin variedad" sin que él
+    // hubiera dicho nunca que no la sabía.
+    if (paso === "variedad")   return !!(borrador.variedad && String(borrador.variedad).trim())
+                                      || borrador.variedadDesconocida === true;
     if (paso === "superficie") return !!borrador.geometria;
     // "No me acuerdo" es una respuesta válida: `fechaPendiente` lo marca.
     if (paso === "fecha")      return !!borrador.fechaPlantacion || borrador.fechaPendiente === true;
     // "Lo indicaré después" también.
     if (paso === "riego")      return !!borrador.metodoRiego || borrador.riegoPendiente === true;
+    // Revisar es LEER lo contestado: no añade ningún dato que pueda faltar.
+    if (paso === "revisar")    return true;
+    // Identificarse sí: sin ello no hay dónde guardar.
+    if (paso === "identificacion") return borrador.identificado === true;
     return false;
   }
 
-  function avanzar(flujo, geo = null) {
+  function avanzar(flujo, geo = null, ctx = {}) {
     const b = flujo.borrador;
     if (!completo(b, b?.paso)) return flujo;
-    const siguiente = SIGUIENTE[b.paso];
-    if (siguiente !== "hecho") return { ...flujo, borrador: { ...b, paso: siguiente } };
+    // Si vino del resumen a corregir UNA cosa, al confirmarla vuelve al resumen
+    // en vez de recorrer otra vez todo lo que ya había contestado.
+    const siguiente = (b.volverARevisar && b.paso !== "revisar")
+      ? "revisar" : siguientePaso(b.paso, ctx);
+    if (siguiente !== "hecho") {
+      return { ...flujo, borrador: { ...b, paso: siguiente,
+               volverARevisar: siguiente === "revisar" ? false : b.volverARevisar } };
+    }
     return guardarCultivo(flujo, geo);
+  }
+
+  // ⚠️ SALTAR A UN PASO CONCRETO, para que el resumen sea EDITABLE. Se llega
+  // desde "revisar" tocando la línea que se quiere cambiar, y se vuelve. No
+  // borra nada: es el mismo borrador, mirado por otra pantalla.
+  function irAPaso(flujo, paso) {
+    const b = flujo.borrador;
+    if (!b || !PASOS.includes(paso)) return flujo;
+    return { ...flujo, borrador: { ...b, paso, volverARevisar: paso !== "revisar" } };
   }
 
   function atras(flujo) {
@@ -170,6 +218,11 @@
     const cultivo = {
       id: b.id || null,
       cultivo: b.cultivoId, soportado: !!b.soportado,
+      // La variedad es del agricultor, no del motor: se conserva tal cual y
+      // NO autoriza a afinar ningún parámetro agronómico (ver `variedad` en
+      // pendientesDe y el comentario de `resumen`).
+      variedad: b.variedadDesconocida === true ? null : (b.variedad || null),
+      variedadDesconocida: b.variedadDesconocida === true,
       area_m2: area, geometria: b.geometria,
       fechaPlantacion: b.fechaPlantacion || null,
       fechaPrecision: b.fechaPlantacion ? (b.fechaPrecision || "exacta") : null,
@@ -212,6 +265,44 @@
     // tampoco la ocupa.
     return { ...flujo, borrador: { ...b, ocupaTodo: true,
              geometria: JSON.parse(JSON.stringify(flujo.parcela.geometria)), area_m2: null } };
+  }
+
+  // ─── El resumen de antes de guardar ──────────────────────────────────────
+  // Devuelve LÍNEAS, no HTML: así el test lee exactamente lo que verá el
+  // agricultor sin tener que parsear una pantalla, y la pantalla no puede
+  // enseñar una cosa distinta de la que se guarda.
+  //
+  // Cada línea lleva el `paso` al que salta si la toca: eso es lo que hace el
+  // resumen EDITABLE. Y `conocido: false` marca lo que está declarado como
+  // desconocido, que NO es lo mismo que un hueco.
+  function resumen(flujo, nombreDe = null) {
+    const b = flujo?.borrador;
+    if (!b) return [];
+    const nom = (id) => (nombreDe ? nombreDe(id) : id) || id;
+    const lineas = [
+      { clave: "terreno", paso: null, etiqueta: "Terreno",
+        valor: flujo.parcela?.nombre || flujo.parcela?.referencia || "—", conocido: true },
+      { clave: "cultivo", paso: "cultivo", etiqueta: "Cultivo",
+        valor: b.cultivoId ? nom(b.cultivoId) : "—", conocido: !!b.cultivoId },
+      { clave: "variedad", paso: "variedad", etiqueta: "Variedad",
+        valor: b.variedadDesconocida === true ? "No la sabe" : (b.variedad || "—"),
+        conocido: b.variedadDesconocida !== true && !!b.variedad },
+      { clave: "superficie", paso: "superficie", etiqueta: "Superficie",
+        valor: b.area_m2 != null ? `${Math.round(b.area_m2)} m²` : "—",
+        conocido: b.area_m2 != null },
+      { clave: "fecha", paso: "fecha", etiqueta: "Plantado",
+        valor: b.fechaPlantacion
+          ? (b.fechaPrecision === "aproximada" ? `${b.fechaPlantacion} (aproximada)` : b.fechaPlantacion)
+          : "Lo dirá después",
+        conocido: !!b.fechaPlantacion },
+      { clave: "metodo", paso: "riego", etiqueta: "Riego",
+        valor: b.riegoPendiente === true ? "Lo indicará después" : (b.metodoRiego || "—"),
+        conocido: b.riegoPendiente !== true && !!b.metodoRiego },
+      { clave: "instalacion", paso: "riego", etiqueta: "Instalación",
+        valor: b.riego && b.riego.capacidad_mmh != null ? "Medida" : "Sin medir",
+        conocido: !!(b.riego && b.riego.capacidad_mmh != null) },
+    ];
+    return lineas;
   }
 
   // ─── Los TRES estados, que no son el mismo ───────────────────────────────
@@ -268,8 +359,9 @@
   }
   const borrarBorrador = (almacen) => { try { almacen.removeItem(CLAVE_BORRADOR); return true; } catch (_) { return false; } };
 
-  return { PASOS, reparto, cabe, explicar, MOTIVOS,
+  return { PASOS, reparto, cabe, explicar, MOTIVOS, SIGUIENTE, siguientePaso,
            nuevoFlujo, elegirParcela, nuevoBorrador, completo, avanzar, atras,
+           irAPaso, resumen,
            guardarCultivo, anadirOtro, libres, usarTodoElTerreno, puedeUsarTodo,
            pendientesDe, CLAVE_BORRADOR, guardarBorrador, leerBorrador, borrarBorrador };
 });

@@ -2787,9 +2787,92 @@
     .pc-fila b { flex: 1 1 auto; }
     .pc-fila span { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 
+    /* ── Buscador de cultivo ────────────────────────────────────────────
+       El buscador es la entrada PRINCIPAL, así que se ve como tal: alto, con
+       aire y el primero de la pantalla. La parrilla de habituales queda debajo,
+       presentada como atajo. */
+    .pc-buscador { font-size: 1.05rem; min-height: 54px; }
+    .pc-atajo-tit { margin-top: 18px; margin-bottom: 2px; }
+    /* Lo ELEGIDO, separado de lo escrito: editar el texto no borra la elección,
+       y se ve cuál es sin depender del color. */
+    .pc-elegido { display: flex; align-items: center; justify-content: space-between;
+                  gap: 10px; margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+                  border: 1.5px solid var(--verde, #013A27); background: #EEF3F0; }
+    .pc-elegido[hidden] { display: none !important; }
+    .pc-elegido-txt { font-weight: 600; color: var(--verde, #013A27); font-size: .98rem; }
+    .pc-elegido-txt::before { content: "✓ "; }
+    .pc-elegido-x { flex: 0 0 auto; border: 0; background: transparent; cursor: pointer;
+                    color: var(--verde, #013A27); text-decoration: underline;
+                    font-size: .88rem; min-height: 44px; padding: 0 4px; }
+    /* Navegación con teclado por las sugerencias: la activa NO se marca solo
+       con color, lleva también el borde grueso y la flecha. */
+    .pc-sug button[aria-selected="true"] { border-color: var(--verde, #013A27);
+                                           border-width: 2px; background: #EEF3F0; font-weight: 600; }
+    .pc-sug button[aria-selected="true"]::after { content: "↵"; color: var(--verde, #013A27); }
+
+    /* ── Campos con unidad ──────────────────────────────────────────────
+       La unidad va PEGADA al campo, no en el texto de ayuda: leer "cm" tres
+       líneas más arriba y teclear metros es el error que produce un caudal 100
+       veces mayor con toda la cara de estar medido. */
+    .pc-campo { display: block; margin-top: 10px; }
+    .pc-campo-lab { display: block; font-size: .84rem; color: var(--muted); margin-bottom: 4px; }
+    .pc-campo-unidad { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .pc-campo-unidad .alta-input { flex: 1 1 140px; min-width: 0; }
+    .pc-unidad { flex: 0 0 auto; font-size: .92rem; color: var(--muted); white-space: nowrap; }
+    .pc-vasos .pc-campo-unidad { margin-top: 12px; }
+    .pc-vasos .pc-campo-lab { flex: 0 0 100%; margin-bottom: 0; }
+    /* Atajos debajo del campo: más pequeños, porque el campo manda. */
+    .pc-rapidas .pc-opcion { flex: 0 1 auto; min-height: 48px; padding: 10px 16px; font-size: .9rem; }
+
+    /* ── Dibujos de "qué se mide" ───────────────────────────────────────
+       Un dibujo de dos trazos evita la confusión que ningún texto evita: entre
+       goteros / entre líneas / entre plantas / entre filas son cuatro
+       distancias distintas y solo dos nos interesan. */
+    .pc-dibujo { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px;
+                 background: #F4F6F4; color: #3B5A4C; }
+    .pc-dibujo svg { display: block; width: 100%; height: auto; max-width: 320px; margin: 0 auto; }
+
+    /* Una pregunta cada vez: las demás no existen en el DOM visible. */
+    .pc-q[hidden] { display: none !important; }
+    .pc-ctx { font-size: .82rem; font-weight: 600; color: var(--muted);
+              margin: 0 0 4px; text-transform: none; }
+    .pc-ctx:empty { display: none; }
+
+    /* ── Resumen editable ───────────────────────────────────────────────── */
+    .pc-revision { list-style: none; padding: 0; margin: 10px 0 0; }
+    .pc-revision li { border-bottom: 1px solid var(--linea, #E6E6E1); }
+    .pc-revision li:last-child { border-bottom: 0; }
+    .pc-rev-fila { display: flex; align-items: baseline; gap: 10px; width: 100%;
+                   min-height: 52px; padding: 12px 2px; border: 0; background: transparent;
+                   text-align: left; font-size: .94rem; cursor: pointer; }
+    .pc-rev-fila[disabled] { cursor: default; }
+    .pc-rev-lab { flex: 0 0 34%; color: var(--muted); font-size: .86rem; }
+    .pc-rev-val { flex: 1 1 auto; color: var(--tinta, #1D2321); }
+    /* Lo declarado DESCONOCIDO no es un error: se marca en palabras, no en rojo. */
+    .pc-rev-val.desconocido { color: #7A5A17; }
+    .pc-rev-ed { flex: 0 0 auto; color: var(--verde, #013A27); text-decoration: underline;
+                 font-size: .84rem; }
+
     @media (max-width: 380px) {
       .pc-opcion { flex-basis: 100%; }
       .pc-cultivo { flex-basis: calc(50% - 8px); }
+      .pc-rev-lab { flex-basis: 42%; }
+      .pc-campo-unidad .alta-input { flex-basis: 100%; }
+    }
+
+    /* ── Ordenador ──────────────────────────────────────────────────────
+       MISMO recorrido y MISMO contenido: solo cambia el sitio que ocupa. La
+       columna se ensancha un poco —440 px en una pantalla de 1366 deja el mapa
+       diminuto— y los campos de texto dejan de estirarse de lado a lado, que es
+       lo que hace que un formulario parezca una hoja de cálculo. El mapa gana
+       alto porque es lo único que de verdad aprovecha la pantalla grande. */
+    @media (min-width: 760px) {
+      .alta-caja { max-width: 580px; }
+      .pc-mapa { height: 52vh; max-height: 520px; }
+      .alta-input { max-width: 420px; }
+      .pc-buscador, .pc-campo-unidad .alta-input { max-width: 100%; }
+      .pc-campo-unidad { max-width: 420px; }
+      .alta-btn { max-width: 420px; }
     }
 
     .comp-parcial { font-size: .88rem; line-height: 1.55; margin: 14px 0 0;
@@ -3227,29 +3310,74 @@
         </div>
       </section>
 
-      <!-- 2 · ¿Qué quieres cuidar? -->
+      <!-- 2 · ¿Qué tienes plantado? ────────────────────────────────────
+           EL BUSCADOR ES LA ENTRADA PRINCIPAL, no la parrilla. Una parrilla de
+           seis botones dice "elige uno de estos" y deja fuera al que tiene
+           alcachofas; además, al crecer el catálogo la parrilla no escala y el
+           buscador sí. Los habituales siguen debajo, como ATAJO.
+
+           ⚠️ ESCRIBIR NO CONFIRMA. Antes, cada tecla llamaba a `desdeTexto()`:
+           quien tecleaba "lechu" camino de "lechuga" se llevaba un cultivo
+           `otro:lechu` sin Kc, y el botón se ponía verde. Ahora hay que elegir
+           una sugerencia o confirmar el texto libre a propósito. -->
       <section class="alta-paso" data-pc="cultivo">
-        <p class="alta-preg" id="pc-cultivo-preg">¿Qué quieres cuidar con Kylia?</p>
-        <p class="alta-nota" style="margin-top:0">Añade solo los cultivos que quieras llevar con Kylia.</p>
+        <p class="alta-preg" id="pc-cultivo-preg">¿Qué tienes plantado?</p>
+        <input type="text" class="alta-input pc-buscador" id="pc-cultivo-txt" autocomplete="off"
+               role="combobox" aria-expanded="false" aria-autocomplete="list"
+               aria-controls="pc-sug" placeholder="Escribe un cultivo…" aria-label="Cultivo">
+        <div class="pc-sug" id="pc-sug" role="listbox" aria-label="Sugerencias"></div>
+
+        <!-- Lo que ha quedado ELEGIDO, separado de lo que está escrito. Sin
+             esto, editar el texto borraba visualmente una selección que seguía
+             viva por dentro. -->
+        <div class="pc-elegido" id="pc-elegido" hidden>
+          <span class="pc-elegido-txt" id="pc-elegido-txt"></span>
+          <button type="button" class="pc-elegido-x" id="pc-elegido-quitar"
+                  aria-label="Quitar el cultivo elegido">Cambiar</button>
+        </div>
+
+        <p class="alta-nota pc-atajo-tit" id="pc-habituales-tit">O elige uno de los de siempre:</p>
         <div class="pc-cultivos" id="pc-habituales"></div>
-        <input type="text" class="alta-input" id="pc-cultivo-txt" autocomplete="off"
-               placeholder="O escribe otro cultivo…" aria-label="Cultivo">
-        <div class="pc-sug" id="pc-sug"></div>
         <p class="alta-nota" id="pc-cultivo-nota"></p>
         <button type="button" class="alta-btn" id="pc-b-cultivo" disabled>Seguir</button>
+      </section>
+
+      <!-- 3 · ¿Qué variedad? ────────────────────────────────────────────
+           SE PREGUNTA SIEMPRE Y HAY QUE CONTESTAR: o la escribe, o dice que no
+           la sabe. Lo que no se hace es dejarla en blanco y seguir, porque
+           entonces "sin variedad" acaba significando dos cosas distintas —no se
+           la preguntamos, y no la sabe— y no hay forma de distinguirlas después.
+
+           ⚠️ GUARDARLA NO AFINA NADA. El motor tiene una curva de Kc POR
+           CULTIVO, no por variedad: una iceberg y una romana se calculan igual.
+           La variedad se conserva para su cuaderno; no se presenta como si
+           cambiara la recomendación. -->
+      <section class="alta-paso" data-pc="variedad">
+        <p class="alta-preg" id="pc-variedad-preg">¿Qué variedad es?</p>
+        <input type="text" class="alta-input" id="pc-variedad-txt" autocomplete="off"
+               placeholder="Ej: romana, cherry, del Perelló…" aria-label="Variedad">
+        <div class="pc-opciones">
+          <button type="button" class="pc-opcion" id="pc-variedad-nose">No sé la variedad</button>
+        </div>
+        <p class="alta-nota" id="pc-variedad-nota"></p>
+        <button type="button" class="alta-btn" id="pc-b-variedad" disabled>Seguir</button>
       </section>
 
       <!-- 3 · ¿Dónde están? -->
       <section class="alta-paso" data-pc="superficie">
         <p class="alta-preg" id="pc-sup-preg">¿Dónde están?</p>
+        <!-- "Registra solo lo que quieras gestionar con Kylia." El texto
+             anterior —"no necesitas registrar todo lo que tienes plantado"— se
+             leía como una disculpa por una limitación nuestra. Esto dice lo
+             mismo en positivo: es SU decisión, no nuestra carencia. -->
+        <p class="alta-nota" id="pc-sup-intro">Registra solo lo que quieras gestionar con Kylia.</p>
         <div id="pc-sup-elegir">
           <button type="button" class="pc-btn-grande" id="pc-todo">
-            <span class="pc-btn-tit">Ocupan todo el terreno</span>
+            <span class="pc-btn-tit">Todo este terreno</span>
             <span class="pc-btn-sub" id="pc-todo-sub"></span>
           </button>
           <button type="button" class="pc-btn-grande" id="pc-parte">
-            <span class="pc-btn-tit">Solo una parte</span>
-            <span class="pc-btn-sub">Lo marcas en el mapa</span>
+            <span class="pc-btn-tit">Solo una zona: la marcaré en el mapa</span>
           </button>
         </div>
         <div id="pc-sup-mapa-caja" hidden>
@@ -3262,70 +3390,284 @@
       </section>
 
       <!-- 4 · ¿Cuándo? -->
+      <!-- 5 · ¿Cuándo? ─────────────────────────────────────────────────
+           LA FECHA ES LA ENTRADA PRINCIPAL, no una parrilla de "hace 2-4
+           semanas". Una parrilla de respuestas relativas invita a contestar
+           rápido y guarda un día concreto que él no ha dicho; puestas de
+           primeras, además, la mayoría no llega a ver que podía dar la fecha
+           buena. Aquí se escribe o se elige en el calendario, y las
+           aproximaciones quedan detrás, para quien las necesite.
+
+           ⚠️ NO SE RELLENA "HOY". El campo nace VACÍO: una fecha precargada es
+           una fecha declarada en cuanto él pulsa seguir sin mirarla. -->
       <section class="alta-paso" data-pc="fecha">
         <p class="alta-preg" id="pc-fecha-preg">¿Cuándo las plantaste?</p>
+        <label class="pc-campo">
+          <span class="pc-campo-lab" id="pc-fecha-lab">Día de plantación</span>
+          <input type="date" class="alta-input" id="pc-fecha" aria-describedby="pc-fecha-nota">
+        </label>
+        <p class="alta-nota pc-atajo-tit">Si no la recuerdas exacta:</p>
         <div class="pc-opciones" id="pc-cuando">
           <button type="button" class="pc-opcion" data-hace="5">Esta semana</button>
           <button type="button" class="pc-opcion" data-hace="14">Hace unas dos semanas</button>
           <button type="button" class="pc-opcion" data-hace="30">Hace un mes</button>
-          <button type="button" class="pc-opcion" id="pc-fecha-abrir">Elegir fecha</button>
-          <button type="button" class="pc-opcion" id="pc-sin-fecha">No me acuerdo</button>
+          <button type="button" class="pc-opcion" id="pc-sin-fecha">No recuerdo la fecha. La añadiré después.</button>
         </div>
-        <input type="date" class="alta-input" id="pc-fecha" hidden style="margin-top:10px">
-        <p class="alta-nota" id="pc-fecha-nota"></p>
+        <p class="alta-nota" id="pc-fecha-nota" aria-live="polite"></p>
         <button type="button" class="alta-btn" id="pc-b-fecha" disabled>Seguir</button>
       </section>
 
-      <!-- 5 · ¿Cómo las riegas? -->
+      <!-- 6 · ¿Cómo las riegas? ─────────────────────────────────────────
+           UNA PREGUNTA CADA VEZ, DE VERDAD. Antes se iban desplegando bloques
+           uno debajo de otro y la pantalla crecía y crecía: al llegar a la
+           tercera pregunta la primera ya no se veía y el botón se había ido al
+           fondo. Aquí solo hay una `.pc-q` visible, con su Atrás, y la anterior
+           se guarda al salir de ella.
+
+           ⚠️ LOS CUATRO MARCOS QUE NO SON EL MISMO. Aquí se pregunta por la
+           separación entre GOTEROS y entre LÍNEAS DE RIEGO. NO se pregunta la
+           separación entre plantas ni entre filas de cultivo, y no se supone
+           que una planta sea un gotero ni que una fila sea una manguera: son
+           datos distintos, y el motor no usa el marco de plantación (ver §6 del
+           informe). Los textos lo dicen con esas palabras. -->
       <section class="alta-paso" data-pc="riego">
-        <p class="alta-preg" id="pc-riego-preg">¿Cómo las riegas?</p>
-        <div class="pc-opciones" id="pc-metodo">
-          <button type="button" class="pc-opcion" data-metodo="goteo">Goteo</button>
-          <button type="button" class="pc-opcion" data-metodo="aspersion">Aspersores</button>
-          <button type="button" class="pc-opcion" data-metodo="manguera">Manguera</button>
-          <button type="button" class="pc-opcion" data-metodo="regadera">Regadera</button>
-          <button type="button" class="pc-opcion" data-metodo="surco">Surcos</button>
-          <button type="button" class="pc-opcion" id="pc-riego-luego">Lo indicaré después</button>
+        <p class="alta-preg pc-ctx" id="pc-riego-ctx"></p>
+
+        <!-- ── método ─────────────────────────────────────────────────── -->
+        <div class="pc-q" data-preg="metodo">
+          <p class="alta-preg" id="pc-riego-preg">¿Cómo las riegas?</p>
+          <div class="pc-opciones" id="pc-metodo">
+            <button type="button" class="pc-opcion" data-metodo="goteo">Goteo</button>
+            <button type="button" class="pc-opcion" data-metodo="aspersion">Aspersores</button>
+            <button type="button" class="pc-opcion" data-metodo="manguera">Manguera</button>
+            <button type="button" class="pc-opcion" data-metodo="regadera">Regadera</button>
+            <button type="button" class="pc-opcion" data-metodo="surco">Surcos</button>
+            <button type="button" class="pc-opcion" id="pc-riego-luego">Lo indicaré después</button>
+          </div>
         </div>
 
-        <!-- La segunda mitad: medir la instalación, y solo si quiere ahora -->
-        <div id="pc-inst" hidden>
-          <p class="alta-preg" style="font-size:1rem">Para decirte cuánto tiempo regar, necesitamos conocer tu instalación.</p>
+        <!-- ── ¿configuramos la instalación ahora? ─────────────────────── -->
+        <div class="pc-q" data-preg="inst" hidden>
+          <p class="alta-preg">Para decirte cuánto tiempo regar, necesitamos conocer tu instalación.</p>
           <div class="pc-opciones">
             <button type="button" class="pc-opcion" id="pc-inst-ahora">Lo configuro ahora</button>
             <button type="button" class="pc-opcion" id="pc-inst-luego">Lo haré después</button>
           </div>
         </div>
 
-        <div id="pc-g1" hidden>
-          <p class="alta-preg" style="font-size:1rem">¿Cuántos litros por hora da cada gotero?</p>
+        <!-- ── GOTEO · ¿es una instalación regular? ────────────────────── -->
+        <!-- El supuesto de la fórmula, PREGUNTADO. `q / (sep × sep)` solo
+             describe una instalación donde todas las cintas son iguales. -->
+        <div class="pc-q" data-preg="g-regular" hidden>
+          <p class="alta-preg">¿Todas las cintas de goteo son iguales?</p>
+          <p class="alta-nota" style="margin-top:0">Mismo tipo de gotero y separadas más o menos igual entre ellas.</p>
+          <div class="pc-opciones" id="pc-g-regular">
+            <button type="button" class="pc-opcion" data-reg="regular">Sí, son todas iguales</button>
+            <button type="button" class="pc-opcion" data-reg="irregular">No, son distintas</button>
+          </div>
+        </div>
+
+        <!-- ── GOTEO · litros por hora de cada gotero ──────────────────── -->
+        <div class="pc-q" data-preg="g-q" hidden>
+          <p class="alta-preg">¿Sabes cuántos litros por hora da cada gotero?</p>
           <p class="alta-nota" style="margin-top:0">Suele venir impreso en la cinta, junto a cada gotero.</p>
-          <div class="pc-opciones" id="pc-gq">
-            <button type="button" class="pc-opcion" data-q="1.6">1,6 L/h</button>
-            <button type="button" class="pc-opcion" data-q="2">2 L/h</button>
-            <button type="button" class="pc-opcion" data-q="4">4 L/h</button>
+          <div class="pc-campo-unidad">
+            <input type="text" class="alta-input" id="pc-gq-txt" inputmode="decimal"
+                   autocomplete="off" placeholder="Ej: 2" aria-label="Litros por hora de cada gotero">
+            <span class="pc-unidad">L/h por gotero</span>
+          </div>
+          <div class="pc-opciones pc-rapidas" id="pc-gq">
+            <button type="button" class="pc-opcion" data-q="1.6">1,6</button>
+            <button type="button" class="pc-opcion" data-q="2">2</button>
+            <button type="button" class="pc-opcion" data-q="4">4</button>
+          </div>
+          <button type="button" class="pc-link" data-nose="caudal">No lo sé</button>
+          <button type="button" class="alta-btn" id="pc-b-gq" disabled>Seguir</button>
+        </div>
+
+        <!-- ── GOTEO · separación entre GOTEROS ────────────────────────── -->
+        <div class="pc-q" data-preg="g-sep" hidden>
+          <p class="alta-preg">¿A qué distancia están los goteros?</p>
+          <p class="alta-nota" style="margin-top:0">La distancia entre dos agujeros seguidos de la MISMA cinta.
+             No es la distancia entre plantas.</p>
+          <figure class="pc-dibujo">
+            <svg viewBox="0 0 260 74" role="img" aria-label="Una cinta de goteo con los goteros marcados y la distancia medida entre dos goteros seguidos">
+              <line x1="12" y1="30" x2="248" y2="30" stroke="currentColor" stroke-width="3"/>
+              <circle cx="50" cy="30" r="5" fill="currentColor"/><circle cx="110" cy="30" r="5" fill="currentColor"/>
+              <circle cx="170" cy="30" r="5" fill="currentColor"/><circle cx="230" cy="30" r="5" fill="currentColor"/>
+              <line x1="50" y1="48" x2="110" y2="48" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="50" y1="42" x2="50" y2="54" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="110" y1="42" x2="110" y2="54" stroke="currentColor" stroke-width="1.5"/>
+              <text x="80" y="68" text-anchor="middle" font-size="11" fill="currentColor">esta</text>
+            </svg>
+          </figure>
+          <div class="pc-campo-unidad">
+            <input type="text" class="alta-input" id="pc-gsep-txt" inputmode="decimal"
+                   autocomplete="off" placeholder="Ej: 30" aria-label="Distancia entre goteros en centímetros">
+            <span class="pc-unidad">cm</span>
+          </div>
+          <div class="pc-opciones pc-rapidas" id="pc-gsep">
+            <button type="button" class="pc-opcion" data-sep="0.2">20 cm</button>
+            <button type="button" class="pc-opcion" data-sep="0.3">30 cm</button>
+            <button type="button" class="pc-opcion" data-sep="0.5">50 cm</button>
+          </div>
+          <button type="button" class="alta-btn" id="pc-b-gsep" disabled>Seguir</button>
+        </div>
+
+        <!-- ── GOTEO · separación entre LÍNEAS DE RIEGO ────────────────── -->
+        <div class="pc-q" data-preg="g-lin" hidden>
+          <p class="alta-preg">¿A qué distancia están las líneas de goteo?</p>
+          <p class="alta-nota" style="margin-top:0">De una cinta a la siguiente. No es la distancia entre filas de plantas:
+             puede haber dos cintas en una fila, o una cinta para dos.</p>
+          <figure class="pc-dibujo">
+            <svg viewBox="0 0 260 84" role="img" aria-label="Tres cintas de goteo paralelas con la distancia medida entre dos cintas seguidas">
+              <line x1="12" y1="16" x2="248" y2="16" stroke="currentColor" stroke-width="3"/>
+              <line x1="12" y1="46" x2="248" y2="46" stroke="currentColor" stroke-width="3"/>
+              <line x1="12" y1="76" x2="248" y2="76" stroke="currentColor" stroke-width="3"/>
+              <line x1="150" y1="16" x2="150" y2="46" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="144" y1="16" x2="156" y2="16" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="144" y1="46" x2="156" y2="46" stroke="currentColor" stroke-width="1.5"/>
+              <text x="166" y="35" font-size="11" fill="currentColor">esta</text>
+            </svg>
+          </figure>
+          <div class="pc-campo-unidad">
+            <input type="text" class="alta-input" id="pc-glin-txt" inputmode="decimal"
+                   autocomplete="off" placeholder="Ej: 1" aria-label="Distancia entre líneas de goteo en metros">
+            <span class="pc-unidad">m</span>
+          </div>
+          <div class="pc-opciones pc-rapidas" id="pc-glin">
+            <button type="button" class="pc-opcion" data-lin="0.5">50 cm</button>
+            <button type="button" class="pc-opcion" data-lin="0.8">80 cm</button>
+            <button type="button" class="pc-opcion" data-lin="1">1 m</button>
+            <button type="button" class="pc-opcion" data-lin="1.5">1,5 m</button>
+          </div>
+          <button type="button" class="alta-btn" id="pc-b-glin" disabled>Seguir</button>
+        </div>
+
+        <!-- ── ASPERSIÓN · ¿fijos o se mueven? ─────────────────────────── -->
+        <!-- SOLO DOS OPCIONES, y ningún "no lo sé": si están fijos o los mueve
+             es lo único de toda la instalación que sabe con total seguridad,
+             porque los mueve él. Ofrecerle una salida aquí sería invitarle a no
+             contestar lo único que no puede fallar. -->
+        <div class="pc-q" data-preg="a-fijos" hidden>
+          <p class="alta-preg">¿Los aspersores están siempre en el mismo sitio o los vas moviendo?</p>
+          <div class="pc-opciones" id="pc-a-fijos">
+            <button type="button" class="pc-opcion" data-fijos="1">Están fijos</button>
+            <button type="button" class="pc-opcion" data-fijos="0">Los voy moviendo</button>
           </div>
         </div>
-        <div id="pc-g2" hidden>
-          <p class="alta-preg" style="font-size:1rem">¿Cada cuánto hay un gotero?</p>
-          <p class="alta-nota" style="margin-top:0">La distancia entre dos agujeros seguidos de la misma cinta.</p>
-          <div class="pc-opciones" id="pc-gsep">
-            <button type="button" class="pc-opcion" data-sep="0.2">Un palmo (20 cm)</button>
-            <button type="button" class="pc-opcion" data-sep="0.3">Medio brazo (30 cm)</button>
-            <button type="button" class="pc-opcion" data-sep="0.5">Medio metro</button>
+
+        <!-- ── ASPERSIÓN FIJA · ¿en malla regular? ─────────────────────── -->
+        <div class="pc-q" data-preg="a-regular" hidden>
+          <p class="alta-preg">¿Están repartidos en filas, a la misma distancia unos de otros?</p>
+          <div class="pc-opciones" id="pc-a-regular">
+            <button type="button" class="pc-opcion" data-reg="regular">Sí, en cuadrícula</button>
+            <button type="button" class="pc-opcion" data-reg="irregular">No, están puestos a ojo</button>
           </div>
         </div>
-        <div id="pc-g3" hidden>
-          <p class="alta-preg" style="font-size:1rem">¿Qué distancia hay entre una cinta y la siguiente?</p>
-          <div class="pc-opciones" id="pc-glin">
-            <button type="button" class="pc-opcion" data-lin="0.5">Medio metro</button>
-            <button type="button" class="pc-opcion" data-lin="0.8">Unos 80 cm</button>
-            <button type="button" class="pc-opcion" data-lin="1">Un metro</button>
-            <button type="button" class="pc-opcion" data-lin="1.5">Metro y medio</button>
+
+        <div class="pc-q" data-preg="a-q" hidden>
+          <p class="alta-preg">¿Cuántos litros por hora da cada aspersor?</p>
+          <p class="alta-nota" style="margin-top:0">Viene en la ficha o en la caja del aspersor.</p>
+          <div class="pc-campo-unidad">
+            <input type="text" class="alta-input" id="pc-aq-txt" inputmode="decimal"
+                   autocomplete="off" placeholder="Ej: 900" aria-label="Litros por hora de cada aspersor">
+            <span class="pc-unidad">L/h por aspersor</span>
           </div>
+          <button type="button" class="pc-link" data-nose="caudal">No lo sé</button>
+          <button type="button" class="alta-btn" id="pc-b-aq" disabled>Seguir</button>
         </div>
-        <div id="pc-vaso" hidden>
-          <p class="alta-preg" style="font-size:1rem">Pon un vaso recto donde riegas y déjalo 15 minutos</p>
+
+        <div class="pc-q" data-preg="a-sep" hidden>
+          <p class="alta-preg">¿A qué distancia están los aspersores entre sí?</p>
+          <p class="alta-nota" style="margin-top:0">Entre dos aspersores seguidos de la misma fila.</p>
+          <figure class="pc-dibujo">
+            <svg viewBox="0 0 260 74" role="img" aria-label="Una fila de aspersores con la distancia medida entre dos aspersores seguidos">
+              <line x1="12" y1="34" x2="248" y2="34" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4"/>
+              <path d="M60 34 v-14 M60 20 l-8 -8 M60 20 l8 -8" stroke="currentColor" stroke-width="2.5" fill="none"/>
+              <path d="M160 34 v-14 M160 20 l-8 -8 M160 20 l8 -8" stroke="currentColor" stroke-width="2.5" fill="none"/>
+              <line x1="60" y1="52" x2="160" y2="52" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="60" y1="46" x2="60" y2="58" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="160" y1="46" x2="160" y2="58" stroke="currentColor" stroke-width="1.5"/>
+              <text x="110" y="70" text-anchor="middle" font-size="11" fill="currentColor">esta</text>
+            </svg>
+          </figure>
+          <div class="pc-campo-unidad">
+            <input type="text" class="alta-input" id="pc-asep-txt" inputmode="decimal"
+                   autocomplete="off" placeholder="Ej: 12" aria-label="Distancia entre aspersores en metros">
+            <span class="pc-unidad">m</span>
+          </div>
+          <button type="button" class="alta-btn" id="pc-b-asep" disabled>Seguir</button>
+        </div>
+
+        <div class="pc-q" data-preg="a-lin" hidden>
+          <p class="alta-preg">¿A qué distancia está una fila de aspersores de la siguiente?</p>
+          <figure class="pc-dibujo">
+            <svg viewBox="0 0 260 90" role="img" aria-label="Dos filas de aspersores con la distancia medida entre una fila y la siguiente">
+              <path d="M50 26 v-12 M50 14 l-7 -7 M50 14 l7 -7" stroke="currentColor" stroke-width="2.5" fill="none"/>
+              <path d="M130 26 v-12 M130 14 l-7 -7 M130 14 l7 -7" stroke="currentColor" stroke-width="2.5" fill="none"/>
+              <path d="M210 26 v-12 M210 14 l-7 -7 M210 14 l7 -7" stroke="currentColor" stroke-width="2.5" fill="none"/>
+              <path d="M50 82 v-12 M50 70 l-7 -7 M50 70 l7 -7" stroke="currentColor" stroke-width="2.5" fill="none"/>
+              <path d="M130 82 v-12 M130 70 l-7 -7 M130 70 l7 -7" stroke="currentColor" stroke-width="2.5" fill="none"/>
+              <path d="M210 82 v-12 M210 70 l-7 -7 M210 70 l7 -7" stroke="currentColor" stroke-width="2.5" fill="none"/>
+              <line x1="240" y1="26" x2="240" y2="82" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="234" y1="26" x2="246" y2="26" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="234" y1="82" x2="246" y2="82" stroke="currentColor" stroke-width="1.5"/>
+              <text x="228" y="58" text-anchor="end" font-size="11" fill="currentColor">esta</text>
+            </svg>
+          </figure>
+          <div class="pc-campo-unidad">
+            <input type="text" class="alta-input" id="pc-alin-txt" inputmode="decimal"
+                   autocomplete="off" placeholder="Ej: 12" aria-label="Distancia entre filas de aspersores en metros">
+            <span class="pc-unidad">m</span>
+          </div>
+          <button type="button" class="alta-btn" id="pc-b-alin" disabled>Seguir</button>
+        </div>
+
+        <!-- ── GOTEO · medirlo con una botella ────────────────────────── -->
+        <!-- La medición que SÍ vale para goteo. El vaso en el suelo no: bajo un
+             gotero sobreestima ×29, y eso ya está fijado en los tests. -->
+        <div class="pc-q" data-preg="g-botella" hidden>
+          <p class="alta-preg">Pon una botella debajo de un gotero y déjala 10 minutos</p>
+          <p class="alta-nota" style="margin-top:0">Luego mira cuántos litros ha recogido. Si es menos de medio
+             litro, cuéntalo en decimales: medio litro es 0,5.</p>
+          <div class="pc-campo-unidad">
+            <input type="text" class="alta-input" id="pc-botella-txt" inputmode="decimal"
+                   autocomplete="off" placeholder="Ej: 0,33" aria-label="Litros recogidos en diez minutos">
+            <span class="pc-unidad">litros en 10 min</span>
+          </div>
+          <button type="button" class="pc-link" data-nose="medir-no">Ahora no puedo medirlo</button>
+          <button type="button" class="alta-btn" id="pc-b-botella" disabled>Seguir</button>
+        </div>
+
+        <!-- ── MEDICIÓN CON VARIOS RECIPIENTES ─────────────────────────── -->
+        <!-- Para lo que NO es una malla regular: aspersores que se mueven o
+             puestos a ojo. Un solo vaso mide su punto, no la parcela. -->
+        <div class="pc-q" data-preg="vasos" hidden>
+          <p class="alta-preg">Vamos a medirlo: pon tres recipientes repartidos por la zona que riegas</p>
+          <p class="alta-nota" style="margin-top:0">Rectos y del mismo tamaño: uno cerca de un aspersor, otro a media
+             distancia y otro en el borde. Riega 15 minutos y mira cuánto se ha acumulado en cada uno.</p>
+          <div class="pc-vasos">
+            <label class="pc-campo-unidad"><span class="pc-campo-lab">Recipiente 1</span>
+              <input type="text" class="alta-input pc-vaso-in" id="pc-vaso-1" inputmode="decimal"
+                     autocomplete="off" placeholder="Ej: 1,2" aria-label="Centímetros en el recipiente 1">
+              <span class="pc-unidad">cm</span></label>
+            <label class="pc-campo-unidad"><span class="pc-campo-lab">Recipiente 2</span>
+              <input type="text" class="alta-input pc-vaso-in" id="pc-vaso-2" inputmode="decimal"
+                     autocomplete="off" placeholder="Ej: 0,9" aria-label="Centímetros en el recipiente 2">
+              <span class="pc-unidad">cm</span></label>
+            <label class="pc-campo-unidad"><span class="pc-campo-lab">Recipiente 3</span>
+              <input type="text" class="alta-input pc-vaso-in" id="pc-vaso-3" inputmode="decimal"
+                     autocomplete="off" placeholder="Ej: 0,6" aria-label="Centímetros en el recipiente 3">
+              <span class="pc-unidad">cm</span></label>
+          </div>
+          <button type="button" class="pc-link" data-nose="medir">Ahora no puedo medirlo</button>
+          <button type="button" class="alta-btn" id="pc-b-vasos" disabled>Seguir</button>
+        </div>
+
+        <!-- ── MANGUERA · un vaso basta: moja un sitio cada vez ────────── -->
+        <div class="pc-q" data-preg="vaso" hidden>
+          <p class="alta-preg">Pon un vaso recto donde riegas y déjalo 15 minutos</p>
           <p class="alta-nota" style="margin-top:0">Luego mira cuánta agua se ha acumulado dentro.</p>
           <div class="pc-opciones" id="pc-cm">
             <button type="button" class="pc-opcion" data-cm="0.5">Medio dedo (medio cm)</button>
@@ -3333,19 +3675,75 @@
             <button type="button" class="pc-opcion" data-cm="2">Dos dedos (2 cm)</button>
             <button type="button" class="pc-opcion" data-cm="3">Más de tres</button>
           </div>
+          <button type="button" class="pc-link" data-nose="medir">No lo sé</button>
         </div>
-        <div id="pc-reg" hidden>
-          <p class="alta-preg" style="font-size:1rem">¿Cuántos litros caben en tu regadera?</p>
+
+        <div class="pc-q" data-preg="reg" hidden>
+          <p class="alta-preg">¿Cuántos litros caben en tu regadera?</p>
           <div class="pc-opciones" id="pc-regl">
             <button type="button" class="pc-opcion" data-reg="5">5 litros</button>
             <button type="button" class="pc-opcion" data-reg="10">10 litros</button>
             <button type="button" class="pc-opcion" data-reg="15">15 litros</button>
           </div>
         </div>
-        <p class="alta-nota" id="pc-riego-res"></p>
+
+        <!-- ── "NO LO SÉ" ──────────────────────────────────────────────── -->
+        <!-- No es un callejón: es una bifurcación con tres salidas de verdad.
+             ⚠️ NINGUNA DE ELLAS FINGE LEER UNA ETIQUETA. "Buscarlo en la
+             etiqueta" le dice DÓNDE mirar y le deja volver; no hay foto que
+             interpretemos, porque esa capacidad no existe. -->
+        <div class="pc-q" data-preg="nose" hidden>
+          <p class="alta-preg">No pasa nada. Podemos ayudarte a averiguarlo.</p>
+          <div class="pc-opciones">
+            <button type="button" class="pc-opcion" id="pc-nose-medir">Medirlo con ayuda</button>
+            <button type="button" class="pc-opcion" id="pc-nose-etiqueta">Buscarlo en la etiqueta o ficha</button>
+            <button type="button" class="pc-opcion" id="pc-nose-luego">Hacerlo más tarde</button>
+          </div>
+        </div>
+
+        <div class="pc-q" data-preg="etiqueta" hidden>
+          <p class="alta-preg" id="pc-etiqueta-tit">Dónde mirarlo</p>
+          <p class="alta-nota" id="pc-etiqueta-txt"></p>
+          <div class="pc-opciones">
+            <button type="button" class="pc-opcion" id="pc-etiqueta-volver">Ya lo tengo, volver</button>
+            <button type="button" class="pc-opcion" id="pc-etiqueta-luego">Hacerlo más tarde</button>
+          </div>
+        </div>
+
+        <p class="alta-nota" id="pc-riego-res" aria-live="polite"></p>
         <details id="pc-tecnico" hidden><summary>Detalles técnicos</summary>
           <p class="alta-nota" id="pc-tecnico-txt"></p></details>
-        <button type="button" class="alta-btn" id="pc-b-riego" disabled>Guardar cultivo</button>
+        <button type="button" class="alta-btn" id="pc-b-riego" disabled>Seguir</button>
+      </section>
+
+      <!-- 7 · Revisar ────────────────────────────────────────────────────
+           ANTES DE GUARDAR, LO QUE SE VA A GUARDAR. Cada línea es tocable y
+           lleva a la pantalla que la contestó; al confirmar allí se vuelve aquí.
+           No dice "todo listo": dice qué queda pendiente, porque registrar un
+           cultivo y poder decirle los minutos no son lo mismo. -->
+      <section class="alta-paso" data-pc="revisar">
+        <p class="alta-preg">Repasa antes de guardar</p>
+        <ul class="pc-revision" id="pc-revision"></ul>
+        <p class="alta-nota" id="pc-revisar-pend"></p>
+        <button type="button" class="alta-btn" id="pc-b-revisar">Guardar cultivo</button>
+      </section>
+
+      <!-- 8 · Identificarse ──────────────────────────────────────────────
+           SOLO SI HACE FALTA. Va al final: configurar sin cuenta es lo que
+           permite ver qué hace Kylia antes de dar nada. Y el borrador queda
+           escrito ANTES de pedir el correo, así que cancelar aquí, equivocarse
+           o cerrar la pantalla no cuesta ninguna de las respuestas. -->
+      <section class="alta-paso" data-pc="identificacion">
+        <p class="alta-preg">Guarda tu parcela para no perderla y poder abrirla desde otro dispositivo.</p>
+        <p class="alta-nota" id="pc-ident-borrador"></p>
+        <label class="pc-campo">
+          <span class="pc-campo-lab">Tu correo</span>
+          <input type="email" class="alta-input" id="pc-ident-email" autocomplete="email"
+                 placeholder="tu@correo.com" aria-describedby="pc-ident-estado">
+        </label>
+        <p class="alta-estado" id="pc-ident-estado" aria-live="polite"></p>
+        <button type="button" class="alta-btn" id="pc-b-ident">Guardar en mi cuenta</button>
+        <button type="button" class="pc-link" id="pc-ident-luego">Ahora no: seguir solo en este dispositivo</button>
       </section>
 
       <!-- 6 · Guardado -->
@@ -4577,7 +4975,11 @@
         return window.kyliaSync?.guardarConfigServidor?.(f, { timeoutMs: TIMEOUT_CONFIG_MS });
       }
     }
-    function subirConfig() {
+    // `onResultado` es OPCIONAL y ninguna de las llamadas que ya existían lo
+    // pasa: para ellas esto se comporta exactamente igual que antes. Existe
+    // porque la pantalla de guardado no puede decir "guardado en tu cuenta"
+    // hasta que el servidor lo confirme, y sin esto no había forma de saberlo.
+    function subirConfig(onResultado) {
       clearTimeout(subidaPendiente);
       subidaPendiente = setTimeout(() => {
         try {
@@ -4599,14 +5001,22 @@
               ultimaSincroZonas = r;
               // Por la cola, nunca suelto: dos guardados en paralelo pueden
               // llegar al servidor en el orden contrario al que se pidieron.
-              encolarConfig({
+              const subida = encolarConfig({
                 finca: cfgFinca,
                 zonas: zonasGuardadas(),        // releídas: con las marcas nuevas
                 zonaActiva: zonaActiva || null,
                 modo: window.kyliaSync?.modo || null,
               });
+              if (typeof onResultado === "function") {
+                Promise.resolve(subida)
+                  .then(res => onResultado({ ok: !!(res && res.ok !== false), res }))
+                  .catch(err => onResultado({ ok: false, error: err }));
+              }
             });
-        } catch (_) { /* el guardado local ya está hecho; esto es el espejo */ }
+        } catch (err) {
+          /* el guardado local ya está hecho; esto es el espejo */
+          if (typeof onResultado === "function") onResultado({ ok: false, error: err });
+        }
       }, 1500);
     }
 
@@ -11537,6 +11947,9 @@
       let mapa = null, mapa2 = null, mapa3 = null;
       let capaRec = null, capaSup = null, tiradores = [];
       let guardando = false;                  // anti doble pulsación
+      let estadoGuardado = null;              // local | subiendo | cuenta | fallo
+      let soloLocal = false;
+      let eligioSoloLocal = false;            // pulsó "ahora no, solo este dispositivo"
       window.__PCF = () => F;
 
       // Separador de miles a mano: `toLocaleString("es-ES")` depende de los datos
@@ -11569,25 +11982,62 @@
       };
 
       // ── navegación ────────────────────────────────────────────────────────
-      const TITULOS = { terreno: 1, cultivo: 2, superficie: 3, fecha: 4, riego: 5 };
+      // ⚠️ YA NO SE PROMETE "PASO 3 DE 5". El recorrido CAMBIA DE LARGO según lo
+      // que conteste: quien ya se identificó se salta una pantalla, y el riego
+      // tiene tres preguntas o siete según la instalación. Un denominador fijo
+      // sería mentira a la segunda respuesta, y una barra que retrocede es peor
+      // que no tener barra. Se dice por dónde va, no cuánto falta.
+      const ORDINAL = { terreno: "Terreno", cultivo: "Cultivo", variedad: "Variedad",
+                        superficie: "Zona", fecha: "Fecha", riego: "Riego",
+                        revisar: "Repaso", identificacion: "Guardar" };
       function ir(paso) {
         caja.querySelectorAll("[data-pc]").forEach(sec =>
           sec.classList.toggle("activo", sec.dataset.pc === paso));
-        caja.querySelector(".alta-caja").scrollTop = 0;
-        $("pc-avance").textContent = TITULOS[paso] ? `Paso ${TITULOS[paso]} de 5` : "";
+        // `caja` ES el contenedor que hace scroll (#pc lleva la clase .alta, que
+        // es la que tiene overflow-y). Poner scrollTop en .alta-caja, que no
+        // desborda, no movía nada: al cambiar de pantalla se seguía viendo el
+        // final de la anterior.
+        caja.scrollTop = 0;
+        $("pc-avance").textContent = ORDINAL[paso] || "";
         // "Atrás" siempre visible salvo en la primera pantalla y en la final.
         $("pc-atras").hidden = paso === "terreno" || paso === "guardado";
-        if (paso === "superficie") prepararSuperficie();
-        if (paso === "guardado")   { pintarTarjeta(); setTimeout(pintarMapaFinal, 60); }
-        if (paso === "cultivo")    prepararCultivo();
-        if (paso === "fecha")      prepararFecha();
-        if (paso === "riego")      prepararRiego();
+        if (paso === "superficie")     prepararSuperficie();
+        if (paso === "guardado")       { pintarTarjeta(); setTimeout(pintarMapaFinal, 60); }
+        if (paso === "cultivo")        prepararCultivo();
+        if (paso === "variedad")       prepararVariedad();
+        if (paso === "fecha")          prepararFecha();
+        if (paso === "riego")          prepararRiego();
+        if (paso === "revisar")        prepararRevisar();
+        if (paso === "identificacion") prepararIdentificacion();
         anotar();
       }
+
+      // ── ¿está identificado? ───────────────────────────────────────────────
+      // El mecanismo de acceso que YA EXISTE: el correo del gate. No se inventa
+      // uno nuevo. Ver la limitación declarada en el informe: esto identifica
+      // al dueño para poder guardar y recuperar, no es una sesión firmada.
+      const identificado = () => {
+        try { return !!localStorage.getItem("kylia_user_email"); } catch (_) { return false; }
+      };
+      const ctxFlujo = () => ({ identificado: identificado() });
       const pasoActual = () => F?.borrador?.paso || F?.paso || "terreno";
 
       $("pc-atras").addEventListener("click", () => {
         const antes = pasoActual();
+        // ⚠️ DENTRO DEL RIEGO, ATRÁS ES UNA PREGUNTA ATRÁS. El paso de riego son
+        // varias preguntas encadenadas; salir del paso entero desde la tercera
+        // obligaría a recorrerlas todas otra vez. Y lo contestado se conserva:
+        // las respuestas siguen en `RG` y en los campos.
+        if (antes === "riego" && pilaQ.length) {
+          const previa = pilaQ.pop();
+          cadaQ(el => { el.hidden = el.dataset.preg !== previa; });
+          RG.q_actual = previa;
+          soloUnBoton();
+          caja.scrollTop = 0;
+          return;
+        }
+        // Volver desde el repaso a corregir algo ya se hace tocando la línea;
+        // aquí Atrás hace lo de siempre: el paso anterior, sin perder nada.
         F = FLUJO.atras(F);
         const destino = F.paso === "terreno" ? "terreno" : (F.borrador?.paso || "cultivo");
         if (destino === "terreno" && antes === "cultivo") { $("pc-mapa-caja").hidden = false; }
@@ -11763,24 +12213,46 @@
         ir("cultivo");
       });
 
-      // ══ 2 · ¿QUÉ QUIERES CUIDAR CON KYLIA? ═══════════════════════════════
+      // ══ 2 · ¿QUÉ TIENES PLANTADO? ════════════════════════════════════════
+      // El buscador manda; los habituales son un atajo.
+      //
+      // ⚠️ ESCRIBIR NO ES ELEGIR. La versión anterior llamaba a
+      // `CAT.desdeTexto(q)` en CADA TECLA: quien escribía "lechu" camino de
+      // "lechuga" se llevaba un cultivo `otro:lechu` con kcId null —sin
+      // recomendación de riego— y el botón "Seguir" se encendía igual. El texto
+      // libre sigue valiendo, pero hay que confirmarlo a propósito.
+      let sugActiva = -1;             // navegación con teclado por las sugerencias
+
       function prepararCultivo() {
         const b = F?.borrador;
         $("pc-cultivo-preg").textContent = F?.cultivos?.length
-          ? "¿Qué más quieres cuidar aquí?" : "¿Qué quieres cuidar con Kylia?";
+          ? "¿Qué más tienes plantado?" : "¿Qué tienes plantado?";
         $("pc-habituales").innerHTML = HABITUALES.map(h => {
           const c = CAT.porId(h.id);
           const sel = b?.cultivoId === h.id ? " sel" : "";
           return `<button type="button" class="pc-cultivo${sel}" data-cid="${esc(h.id)}">`
                + `<span class="emoji" aria-hidden="true">${h.emoji}</span>${esc(c?.nombre || h.id)}</button>`;
         }).join("");
-        $("pc-cultivo-txt").value = b?.cultivoId && !HABITUALES.some(h => h.id === b.cultivoId)
-          ? (b.cultivo || "") : "";
-        $("pc-sug").innerHTML = "";
-        $("pc-cultivo-nota").textContent = "";
+        // El campo se deja VACÍO y la elección se enseña aparte: así editar el
+        // texto para buscar otra cosa no borra visualmente lo que ya eligió.
+        $("pc-cultivo-txt").value = "";
+        cerrarSugerencias();
+        pintarElegido();
         $("pc-b-cultivo").disabled = !b?.cultivoId;
-        if (b?.cultivoId) notaCultivo(CAT.porId(b.cultivoId));
       }
+
+      function pintarElegido() {
+        const b = F?.borrador;
+        const c = b?.cultivoId ? CAT.porId(b.cultivoId) : null;
+        const hay = !!b?.cultivoId;
+        $("pc-elegido").hidden = !hay;
+        if (hay) $("pc-elegido-txt").textContent = c?.nombre || b.cultivo || b.cultivoId;
+        $("pc-habituales").querySelectorAll(".pc-cultivo").forEach(x =>
+          x.classList.toggle("sel", hay && x.dataset.cid === b.cultivoId));
+        if (hay) notaCultivo(c || { nombre: b.cultivo || "", kcId: b.soportado ? "?" : null });
+        else { $("pc-cultivo-nota").textContent = ""; $("pc-cultivo-nota").className = "alta-nota"; }
+      }
+
       function notaCultivo(c) {
         if (!c) return;
         const n = $("pc-cultivo-nota");
@@ -11789,48 +12261,157 @@
         // lechuga y una alcachofa no gastan lo mismo, y un número inventado con
         // cara de cálculo es peor que decir "todavía no".
         n.textContent = CAT.soportado(c)
-          ? `Bien. Sabemos calcular el riego de ${c.nombre.toLowerCase()}.`
-          : `Puedes guardarlo. Todavía no ofrecemos recomendaciones de riego para este cultivo.`;
+          ? `Bien. Sabemos calcular el riego de ${String(c.nombre).toLowerCase()}.`
+          : "Todavía no calculamos recomendaciones para este cultivo. Puedes registrarlo igualmente.";
       }
+
       function fijarCultivo(c) {
         if (!c || !F?.borrador) return;
+        // `cultivoId` es el CANÓNICO y `cultivo` el nombre que se enseña. El
+        // texto escrito no sustituye al identificador: `desdeTexto` devuelve el
+        // del catálogo cuando lo reconoce ("enciam" → lechuga) y solo fabrica un
+        // `otro:` cuando de verdad no está.
         F = { ...F, borrador: { ...F.borrador, cultivoId: c.id, cultivo: c.nombre,
                                 soportado: CAT.soportado(c) } };
         $("pc-b-cultivo").disabled = false;
-        $("pc-habituales").querySelectorAll(".pc-cultivo").forEach(x =>
-          x.classList.toggle("sel", x.dataset.cid === c.id));
-        notaCultivo(c);
+        pintarElegido();
         anotar();
       }
+
+      function cerrarSugerencias() {
+        $("pc-sug").innerHTML = "";
+        $("pc-cultivo-txt").setAttribute("aria-expanded", "false");
+        sugActiva = -1;
+      }
+
+      function pintarSugerencias(q) {
+        const txt = String(q || "").trim();
+        if (!txt) { cerrarSugerencias(); return; }
+        const lista = CAT.buscar(txt, 6);
+        // El texto libre, como ÚLTIMA opción y dicho con todas las letras: se
+        // elige a propósito, no por descuido.
+        const libre = CAT.desdeTexto(txt);
+        const yaEsta = libre && lista.some(c => c.id === libre.id);
+        const filas = lista.map(c =>
+          `<button type="button" role="option" aria-selected="false" data-cid="${esc(c.id)}">`
+          + `<span>${esc(c.nombre)}</span>`
+          + (CAT.soportado(c) ? "" : `<span class="pc-sin-motor">sin recomendación de riego</span>`)
+          + `</button>`);
+        if (libre && !yaEsta) {
+          filas.push(`<button type="button" role="option" aria-selected="false" data-libre="1">`
+            + `<span>Usar &laquo;${esc(libre.nombre)}&raquo;</span>`
+            + `<span class="pc-sin-motor">sin recomendación de riego</span></button>`);
+        }
+        $("pc-sug").innerHTML = filas.join("");
+        $("pc-cultivo-txt").setAttribute("aria-expanded", filas.length ? "true" : "false");
+        sugActiva = -1;
+      }
+
+      function marcarSugerencia(i) {
+        const bs = [...$("pc-sug").querySelectorAll("button")];
+        if (!bs.length) return;
+        sugActiva = ((i % bs.length) + bs.length) % bs.length;
+        bs.forEach((b, k) => b.setAttribute("aria-selected", k === sugActiva ? "true" : "false"));
+        bs[sugActiva].scrollIntoView({ block: "nearest" });
+      }
+
+      function elegirSugerencia(btn) {
+        if (!btn) return;
+        const c = btn.dataset.libre ? CAT.desdeTexto($("pc-cultivo-txt").value) : CAT.porId(btn.dataset.cid);
+        if (!c) return;
+        $("pc-cultivo-txt").value = "";
+        cerrarSugerencias();
+        fijarCultivo(c);
+      }
+
       $("pc-habituales").addEventListener("click", (ev) => {
         const b = ev.target.closest("[data-cid]");
         if (!b) return;
         $("pc-cultivo-txt").value = "";
-        $("pc-sug").innerHTML = "";
+        cerrarSugerencias();
         fijarCultivo(CAT.porId(b.dataset.cid));
       });
-      $("pc-cultivo-txt").addEventListener("input", (ev) => {
-        const q = ev.target.value;
-        $("pc-habituales").querySelectorAll(".pc-cultivo").forEach(x => x.classList.remove("sel"));
-        if (!q.trim()) { $("pc-sug").innerHTML = ""; $("pc-b-cultivo").disabled = true; return; }
-        $("pc-sug").innerHTML = CAT.buscar(q).map(c =>
-          `<button type="button" data-cid="${esc(c.id)}">${esc(c.nombre)}`
-          + (CAT.soportado(c) ? "" : `<span class="pc-sin-motor">sin recomendación de riego</span>`)
-          + `</button>`).join("");
-        // Lo que escriba vale aunque no esté en la lista: su explotación no puede
-        // depender de que nosotros hayamos previsto su cultivo.
-        fijarCultivo(CAT.desdeTexto(q));
+      // Escribir SOLO filtra. No toca la elección.
+      $("pc-cultivo-txt").addEventListener("input", (ev) => pintarSugerencias(ev.target.value));
+      // Dedo y ratón.
+      $("pc-sug").addEventListener("click", (ev) => elegirSugerencia(ev.target.closest("button")));
+      // Teclado: flechas, Enter y Escape.
+      $("pc-cultivo-txt").addEventListener("keydown", (ev) => {
+        const bs = [...$("pc-sug").querySelectorAll("button")];
+        if (ev.key === "ArrowDown")      { ev.preventDefault(); marcarSugerencia(sugActiva + 1); }
+        else if (ev.key === "ArrowUp")   { ev.preventDefault(); marcarSugerencia(sugActiva - 1); }
+        else if (ev.key === "Escape")    { cerrarSugerencias(); }
+        else if (ev.key === "Enter") {
+          ev.preventDefault();
+          // Sin nada marcado, Enter confirma lo escrito: es lo que espera quien
+          // ha tecleado su cultivo entero y no piensa usar las flechas.
+          if (sugActiva >= 0 && bs[sugActiva]) elegirSugerencia(bs[sugActiva]);
+          else if ($("pc-cultivo-txt").value.trim()) {
+            const c = CAT.desdeTexto($("pc-cultivo-txt").value);
+            $("pc-cultivo-txt").value = ""; cerrarSugerencias(); fijarCultivo(c);
+          }
+        }
       });
-      $("pc-sug").addEventListener("click", (ev) => {
-        const b = ev.target.closest("[data-cid]");
-        if (!b) return;
-        const c = CAT.porId(b.dataset.cid);
-        if (!c) return;
-        $("pc-cultivo-txt").value = c.nombre;
-        $("pc-sug").innerHTML = "";
-        fijarCultivo(c);
+      $("pc-elegido-quitar").addEventListener("click", () => {
+        F = { ...F, borrador: { ...F.borrador, cultivoId: null, cultivo: null, soportado: null } };
+        $("pc-b-cultivo").disabled = true;
+        pintarElegido();
+        $("pc-cultivo-txt").focus();
+        anotar();
       });
-      $("pc-b-cultivo").addEventListener("click", () => { F = FLUJO.avanzar(F, GEO); ir("superficie"); });
+      $("pc-b-cultivo").addEventListener("click", () => {
+        F = FLUJO.avanzar(F, GEO, ctxFlujo());
+        ir(F.borrador?.paso || "variedad");
+      });
+
+      // ══ 3 · ¿QUÉ VARIEDAD ES? ════════════════════════════════════════════
+      // ⚠️ RESPUESTA EXPLÍCITA, SIEMPRE. O la escribe, o pulsa "No sé la
+      // variedad". Lo que NO se acepta es seguir sin contestar: entonces "sin
+      // variedad" significaría a la vez "no se lo preguntamos" y "no la sabe",
+      // y esas dos cosas se leen distinto dentro de seis meses.
+      //
+      // ⚠️ Y GUARDARLA NO AFINA NADA. El motor tiene una curva de Kc por
+      // CULTIVO; no distingue variedades. Se conserva para su cuaderno y no se
+      // presenta como si cambiara la recomendación.
+      function prepararVariedad() {
+        const b = F?.borrador;
+        $("pc-variedad-preg").textContent = `¿Qué variedad es ${nombreCult()}?`;
+        $("pc-variedad-txt").value = b?.variedadDesconocida === true ? "" : (b?.variedad || "");
+        $("pc-variedad-nose").classList.toggle("sel", b?.variedadDesconocida === true);
+        notaVariedad();
+        $("pc-b-variedad").disabled = !FLUJO.completo(b, "variedad");
+      }
+      function notaVariedad() {
+        const b = F?.borrador, n = $("pc-variedad-nota");
+        n.className = "alta-nota";
+        n.textContent = b?.variedadDesconocida === true
+          ? "Perfecto, lo guardamos como desconocida. No hace falta para calcular el riego."
+          : (b?.variedad
+             ? "La guardamos en tu cuaderno. El cálculo del riego es el mismo para todas las variedades."
+             : "");
+      }
+      $("pc-variedad-txt").addEventListener("input", (ev) => {
+        const v = ev.target.value;
+        F = { ...F, borrador: { ...F.borrador, variedad: v,
+                                variedadDesconocida: v.trim() ? false : null } };
+        $("pc-variedad-nose").classList.remove("sel");
+        notaVariedad();
+        $("pc-b-variedad").disabled = !FLUJO.completo(F.borrador, "variedad");
+        anotar();
+      });
+      $("pc-variedad-nose").addEventListener("click", () => {
+        // Se guarda como DESCONOCIDA, no como una variedad que se llame "No sé".
+        F = { ...F, borrador: { ...F.borrador, variedad: null, variedadDesconocida: true } };
+        $("pc-variedad-txt").value = "";
+        $("pc-variedad-nose").classList.add("sel");
+        notaVariedad();
+        $("pc-b-variedad").disabled = false;
+        anotar();
+      });
+      $("pc-b-variedad").addEventListener("click", () => {
+        F = FLUJO.avanzar(F, GEO, ctxFlujo());
+        ir(F.borrador?.paso || "superficie");
+      });
 
       // ══ 3 · ¿DÓNDE ESTÁN? ════════════════════════════════════════════════
       // "la lechuga", "el tomate". Preguntar "¿Dónde está lechuga?" suena a robot.
@@ -12007,24 +12588,48 @@
         // saber. Antes se enseñaba lo libre de ANTES, y con un solo cultivo eso
         // decía "ocupa 2.499 m² y te quedan 4.998", que no cuadra.
         const rep = FLUJO.reparto(F.parcela, [...F.cultivos, { area_m2: b.area_m2 }]);
-        nota.innerHTML = `Ocupa <strong>${m2(b.area_m2)} m²</strong>`
-          + (rep.sin_configurar ? ` · te quedarán ${m2(rep.sin_configurar)} m² sin configurar en Kylia.` : ".");
+        // El resumen CONCRETO, con los dos números y en su idioma. "Sin
+        // configurar" no es "sin cultivar" y se dice, porque si no el agricultor
+        // entiende que le estamos diciendo que tiene medio campo baldío.
+        nota.innerHTML = `Vas a registrar <strong>${m2(b.area_m2)} m²</strong> de `
+          + `${esc(CAT.nombreDe(b.cultivoId).toLowerCase() || "este cultivo")}.`
+          + (rep.sin_configurar
+             ? ` Los otros ${m2(rep.sin_configurar)} m² quedan sin configurar en Kylia`
+               + " (sin configurar no es sin cultivar: es lo que no llevas aquí)."
+             : "");
         $("pc-b-sup").disabled = !(Number(b.area_m2) > 0);
       }
       // Confirmación EXPLÍCITA del contorno propuesto: no se da por bueno solo
       // porque esté dibujado.
-      $("pc-b-sup").addEventListener("click", () => { F = FLUJO.avanzar(F, GEO); ir("fecha"); });
+      $("pc-b-sup").addEventListener("click", () => {
+        F = FLUJO.avanzar(F, GEO, ctxFlujo());
+        ir(F.borrador?.paso || "fecha");
+      });
 
-      // ══ 4 · ¿CUÁNDO LAS PLANTASTE? ═══════════════════════════════════════
+      // ══ 5 · ¿CUÁNDO LAS PLANTASTE? ═══════════════════════════════════════
+      // ⚠️ EL CAMPO NACE VACÍO Y NO SE RELLENA CON HOY. Una fecha precargada se
+      // convierte en una fecha declarada en cuanto pulsa seguir sin mirarla, y
+      // "hoy" es justo la que casi nunca es.
+      //
       // ⚠️ UNA RESPUESTA APROXIMADA SE GUARDA COMO APROXIMADA. "Hace unas dos
-      // semanas" no es un día concreto, y guardarlo como si él hubiera declarado
-      // el 3 de septiembre es ponerle en la boca una precisión que no tiene.
-      // `fechaPrecision` lo distingue, y "no me acuerdo" no fabrica nada.
+      // semanas" no es un día concreto. `fechaPrecision` lo distingue, y las
+      // aproximadas que YA estaban guardadas conservan su precisión: abrir esta
+      // pantalla no las asciende a exactas.
+      //
+      // ⚠️ QUÉ FECHA ES ESTA. El motor la usa como día 0 del ciclo (curva de Kc
+      // y crecimiento radicular, FAO-56 §8.3), que para un cultivo trasplantado
+      // es el TRASPLANTE y no la siembra en semillero. No se parte en dos
+      // preguntas aquí: cambiarle el significado a `fechaPlantacion` movería
+      // todo el histórico. Queda declarado en el informe.
       function prepararFecha() {
         const b = F?.borrador;
         $("pc-fecha-preg").textContent = `¿Cuándo plantaste ${nombreCult()}?`;
+        $("pc-fecha-lab").textContent = "Día de plantación";
         $("pc-cuando").querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel"));
-        $("pc-fecha").hidden = true;
+        const f = $("pc-fecha");
+        f.max = hoyISO();
+        // Solo se precarga lo que ÉL declaró; nunca un valor por defecto.
+        f.value = b?.fechaPlantacion || "";
         $("pc-fecha-nota").className = "alta-nota";
         $("pc-fecha-nota").textContent = "";
         $("pc-b-fecha").disabled = !(b?.fechaPlantacion || b?.fechaPendiente);
@@ -12057,49 +12662,108 @@
         notaFecha(iso, false, precision);
         anotar();
       }
+      // La entrada principal: escrita o del calendario. `change` cubre las dos.
+      $("pc-fecha").addEventListener("change", (ev) => {
+        $("pc-cuando").querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel"));
+        if (!ev.target.value) { $("pc-b-fecha").disabled = true; return; }
+        fijarFecha(ev.target.value, "exacta");
+      });
+      // Las aproximaciones, detrás y marcadas como lo que son.
       $("pc-cuando").addEventListener("click", (ev) => {
         const b = ev.target.closest("[data-hace]");
         if (!b) return;
         $("pc-cuando").querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel"));
         b.classList.add("sel");
-        $("pc-fecha").hidden = true;
-        fijarFecha(KyliaClima.sumarDias(hoyISO(), -Number(b.dataset.hace)), "aproximada");
+        const iso = KyliaClima.sumarDias(hoyISO(), -Number(b.dataset.hace));
+        // El campo enseña el día que sale de la aproximación, pero se guarda
+        // como APROXIMADA: lo que se ve y lo que se guarda no se contradicen.
+        $("pc-fecha").value = iso;
+        fijarFecha(iso, "aproximada");
       });
-      $("pc-fecha-abrir").addEventListener("click", () => {
-        $("pc-cuando").querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel"));
-        $("pc-fecha-abrir").classList.add("sel");
-        const f = $("pc-fecha");
-        f.hidden = false; f.max = hoyISO(); f.focus();
-      });
-      $("pc-fecha").addEventListener("change", (ev) => fijarFecha(ev.target.value, "exacta"));
       $("pc-sin-fecha").addEventListener("click", () => {
         $("pc-cuando").querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel"));
         $("pc-sin-fecha").classList.add("sel");
-        $("pc-fecha").hidden = true;
+        $("pc-fecha").value = "";
         F = { ...F, borrador: { ...F.borrador, fechaPlantacion: null, fechaPrecision: null,
                                 fechaPendiente: true } };
         $("pc-b-fecha").disabled = false;
         notaFecha(null, true);
         anotar();
       });
-      $("pc-b-fecha").addEventListener("click", () => { F = FLUJO.avanzar(F, GEO); ir("riego"); });
+      $("pc-b-fecha").addEventListener("click", () => {
+        F = FLUJO.avanzar(F, GEO, ctxFlujo());
+        ir(F.borrador?.paso || "riego");
+      });
 
-      // ══ 5 · ¿CÓMO LAS RIEGAS? ════════════════════════════════════════════
-      // El contrato de capacidad (fiable / provisional / no_ejecutable) es el
-      // desplegado y NO se toca: aquí solo se recogen respuestas y se llama a
-      // KyliaRiego.derivar.
+      // ══ 6 · ¿CÓMO LAS RIEGAS? ════════════════════════════════════════════
+      // UNA PREGUNTA CADA VEZ, con su propia vuelta atrás. El contrato de
+      // capacidad (fiable / provisional / no_ejecutable) es el desplegado y NO
+      // se toca: aquí solo se recogen respuestas y se llama a KyliaRiego.derivar.
+      //
+      // ⚠️ LO QUE SE PREGUNTA SON SEPARACIONES DE RIEGO, NO EL MARCO DE
+      // PLANTACIÓN. Entre goteros ≠ entre plantas. Entre líneas de goteo ≠ entre
+      // filas de cultivo. No se supone que haya un gotero por planta ni una
+      // manguera por fila, y el marco de plantación no se pregunta porque el
+      // motor no lo usa: añadirlo sería alargar el camino para guardar un dato
+      // que no cambia ningún cálculo.
       let RG = {};
+      let pilaQ = [];                       // por dónde ha pasado, para el Atrás
+
+      const cadaQ = (fn) => caja.querySelectorAll('#pc [data-preg]').forEach(fn);
+      // ⚠️ UN SOLO BOTÓN PRINCIPAL A LA VISTA. Cada pregunta tiene el suyo
+      // ("Seguir"), y el del paso ("Seguir" de riego) es el que cierra el paso
+      // cuando ya no queda ninguna pregunta abierta. Teniendo los dos a la vez
+      // salían DOS botones idénticos uno encima de otro y no había forma de
+      // saber cuál avanzaba. Se vio en la captura de móvil, no en el DOM.
+      const soloUnBoton = () => { $("pc-b-riego").hidden = !!RG.q_actual; };
+      function verQ(q, apilar = true) {
+        cadaQ(el => { el.hidden = el.dataset.preg !== q; });
+        if (apilar && RG.q_actual && RG.q_actual !== q) pilaQ.push(RG.q_actual);
+        RG.q_actual = q;
+        soloUnBoton();
+        caja.scrollTop = 0;
+        anotar();
+      }
+      // Cerrar todas las preguntas: el paso vuelve a tener su botón.
+      function cerrarQ() { cadaQ(el => { el.hidden = true; }); RG.q_actual = null; soloUnBoton(); }
+
       function prepararRiego() {
-        RG = {};
+        // Al (re)entrar en el paso se empieza por el método, salvo que se venga
+        // del resumen a corregirlo: entonces también, porque cambiar de método
+        // invalida todo lo demás.
+        RG = {}; pilaQ = [];
+        $("pc-riego-ctx").textContent = F?.borrador?.cultivoId
+          ? `Riego de ${nombreCult()}` : "";
         $("pc-riego-preg").textContent = `¿Cómo riegas ${nombreCult()}?`;
-        ["pc-metodo", "pc-gq", "pc-gsep", "pc-glin", "pc-cm", "pc-regl"].forEach(id =>
+        ["pc-metodo", "pc-gq", "pc-gsep", "pc-glin", "pc-cm", "pc-regl",
+         "pc-g-regular", "pc-a-fijos", "pc-a-regular"].forEach(id =>
           $(id)?.querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel")));
-        ["pc-inst", "pc-g1", "pc-g2", "pc-g3", "pc-vaso", "pc-reg"].forEach(id => { $(id).hidden = true; });
-        $("pc-riego-res").textContent = "";
-        $("pc-riego-res").className = "alta-nota";
+        ["pc-gq-txt", "pc-gsep-txt", "pc-glin-txt", "pc-aq-txt", "pc-asep-txt",
+         "pc-alin-txt", "pc-botella-txt", "pc-vaso-1", "pc-vaso-2", "pc-vaso-3"].forEach(id => {
+          if ($(id)) $(id).value = "";
+        });
+        $("pc-riego-luego").classList.remove("sel");
+        $("pc-riego-res").textContent = ""; $("pc-riego-res").className = "alta-nota";
         $("pc-tecnico").hidden = true;
         $("pc-b-riego").disabled = true;
+        RG.q_actual = null;
+        $("pc-b-riego").hidden = false;
+        verQ("metodo", false);
       }
+
+      // ── números del agricultor ────────────────────────────────────────────
+      // ⚠️ COMA DECIMAL. "0,33" es como se escribe aquí, y `Number("0,33")` es
+      // NaN. Se convierte UNA VEZ, al leer, y a partir de ahí todo son metros y
+      // litros: nunca se vuelve a convertir más abajo.
+      function numCampo(id) {
+        const t = String($(id)?.value ?? "").trim().replace(",", ".");
+        if (!t) return null;
+        const n = Number(t);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      }
+      // Los campos en centímetros viajan a metros AQUÍ y solo aquí.
+      const cmAMetros = (n) => (n == null ? null : n / 100);
+
       const grupoPC = (id, attr, campo, luego) => {
         $(id)?.addEventListener("click", (ev) => {
           const b = ev.target.closest(`[data-${attr}]`);
@@ -12110,93 +12774,244 @@
           luego && luego();
         });
       };
+      // Enlaza un campo de texto con su botón: el botón se enciende cuando hay
+      // un número válido, y no antes.
+      const campoCon = (idTxt, idBtn, extra) => {
+        $(idTxt)?.addEventListener("input", () => {
+          $(idBtn).disabled = numCampo(idTxt) == null;
+          extra && extra();
+        });
+      };
 
       grupoPC("pc-metodo", "metodo", "metodo", () => {
         const m = RG.metodo;
         // Cambiar de método invalida lo contestado para el anterior: las
-        // preguntas eran de otro sistema de riego.
-        RG = { metodo: m };
-        ["pc-g1", "pc-g2", "pc-g3", "pc-vaso", "pc-reg"].forEach(id => { $(id).hidden = true; });
-        ["pc-gq", "pc-gsep", "pc-glin", "pc-cm", "pc-regl"].forEach(id =>
-          $(id)?.querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel")));
+        // preguntas eran de otro sistema de riego. Y nunca se reutiliza una
+        // capacidad medida para otra instalación.
+        RG = { metodo: m, q_actual: RG.q_actual };
+        pilaQ = ["metodo"];
         $("pc-riego-res").textContent = ""; $("pc-tecnico").hidden = true;
         $("pc-riego-luego").classList.remove("sel");
         if (m === "surco") {
           // A surco no se le pregunta capacidad: su orden va en litros por metro.
-          $("pc-inst").hidden = true;
+          cerrarQ();
           $("pc-riego-res").textContent = "A manta te diremos el agua en litros por metro cuadrado.";
           $("pc-b-riego").disabled = false;
         } else if (m === "regadera") {
-          $("pc-inst").hidden = true; $("pc-reg").hidden = false;
-          $("pc-b-riego").disabled = true;
+          verQ("reg"); $("pc-b-riego").disabled = true;
         } else {
-          $("pc-inst").hidden = false;
-          $("pc-b-riego").disabled = true;
+          verQ("inst"); $("pc-b-riego").disabled = true;
         }
       });
 
       $("pc-riego-luego").addEventListener("click", () => {
         $("pc-metodo").querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel"));
         $("pc-riego-luego").classList.add("sel");
-        ["pc-inst", "pc-g1", "pc-g2", "pc-g3", "pc-vaso", "pc-reg"].forEach(id => { $(id).hidden = true; });
-        RG = { pendiente: true };
+        cerrarQ();
+        // ⚠️ SIN MÉTODO NI CAPACIDAD HEREDADOS. `pendiente` es la marca de que
+        // esta siembra declaró su riego —declaró que está pendiente—, y por eso
+        // no coge el de la finca ni el del cultivo de al lado.
+        RG = { pendiente: true, q_actual: null };
+        pilaQ = [];
         $("pc-riego-res").className = "alta-nota";
-        $("pc-riego-res").textContent =
-          "Sin problema. Lo guardamos y nos lo dices cuando quieras.";
+        $("pc-riego-res").textContent = "Sin problema. Lo guardamos y nos lo dices cuando quieras.";
         $("pc-tecnico").hidden = true;
         $("pc-b-riego").disabled = false;
       });
 
       $("pc-inst-ahora").addEventListener("click", () => {
-        $("pc-inst").hidden = true;
-        if (RG.metodo === "goteo") $("pc-g1").hidden = false;
-        else $("pc-vaso").hidden = false;
+        if (RG.metodo === "goteo")          verQ("g-regular");
+        else if (RG.metodo === "aspersion") verQ("a-fijos");
+        else                                verQ("vaso");       // manguera
       });
-      $("pc-inst-luego").addEventListener("click", () => {
-        $("pc-inst").hidden = true;
-        RG.capPendiente = true;
+      $("pc-inst-luego").addEventListener("click", () => dejarPendiente(
+        "De acuerdo. Podremos decirte cuánta agua necesita, pero no cuántos minutos "
+        + "regar hasta que midamos tu instalación."));
+
+      function dejarPendiente(txt) {
+        cerrarQ();
+        RG.capPendiente = true; RG.cap = null;
+        $("pc-tecnico").hidden = true;
         $("pc-riego-res").className = "alta-nota";
-        $("pc-riego-res").textContent =
-          "De acuerdo. Podremos decirte cuánta agua necesita, pero no cuántos minutos "
-          + "regar hasta que midamos tu instalación.";
+        $("pc-riego-res").textContent = txt;
         $("pc-b-riego").disabled = false;
+        anotar();
+      }
+
+      // ── GOTEO ─────────────────────────────────────────────────────────────
+      grupoPC("pc-g-regular", "reg", "disposicion", () => {
+        if (RG.disposicion === "regular") { verQ("g-q"); return; }
+        // ⚠️ NO SE APLICA LA FÓRMULA A UNA INSTALACIÓN QUE NO LA CUMPLE. Y para
+        // goteo la alternativa NO es el vaso en el suelo (sobreestima ×29): o
+        // mide con la botella, o se queda pendiente.
+        verQ("g-botella");
+        $("pc-riego-res").className = "alta-nota";
+        $("pc-riego-res").textContent = "Con cintas distintas no podemos calcularlo a partir de las "
+          + "separaciones. Lo medimos directamente.";
+      });
+      campoCon("pc-gq-txt", "pc-b-gq", () => {
+        $("pc-gq").querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel"));
+      });
+      grupoPC("pc-gq", "q", "q", () => { $("pc-gq-txt").value = RG.q; $("pc-b-gq").disabled = false; });
+      $("pc-b-gq").addEventListener("click", () => {
+        RG.q = numCampo("pc-gq-txt"); RG.botella = null; verQ("g-sep");
+      });
+      campoCon("pc-gsep-txt", "pc-b-gsep", () => {
+        $("pc-gsep").querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel"));
+      });
+      grupoPC("pc-gsep", "sep", "sep", () => {
+        // Los atajos vienen en METROS (data-sep="0.3") y el campo está en cm.
+        $("pc-gsep-txt").value = String(Math.round(Number(RG.sep) * 100));
+        $("pc-b-gsep").disabled = false;
+      });
+      $("pc-b-gsep").addEventListener("click", () => {
+        RG.sep = cmAMetros(numCampo("pc-gsep-txt")); verQ("g-lin");
+      });
+      campoCon("pc-glin-txt", "pc-b-glin", () => {
+        $("pc-glin").querySelectorAll(".pc-opcion").forEach(x => x.classList.remove("sel"));
+      });
+      grupoPC("pc-glin", "lin", "lin", () => {
+        $("pc-glin-txt").value = String(RG.lin).replace(".", ",");
+        $("pc-b-glin").disabled = false;
+      });
+      $("pc-b-glin").addEventListener("click", () => {
+        RG.lin = numCampo("pc-glin-txt"); calcularRiego();
+      });
+      campoCon("pc-botella-txt", "pc-b-botella");
+      $("pc-b-botella").addEventListener("click", () => {
+        RG.botella = numCampo("pc-botella-txt");
+        // Con la botella ya sabemos el caudal del gotero; siguen faltando las
+        // dos separaciones para repartirlo sobre el suelo.
+        RG.q = null;
+        verQ("g-sep");
       });
 
-      grupoPC("pc-gq",   "q",   "q",   () => { $("pc-g2").hidden = false; calcularRiego(); });
-      grupoPC("pc-gsep", "sep", "sep", () => { $("pc-g3").hidden = false; calcularRiego(); });
-      grupoPC("pc-glin", "lin", "lin", calcularRiego);
-      grupoPC("pc-cm",   "cm",  "cm",  calcularRiego);
+      // ── ASPERSIÓN ─────────────────────────────────────────────────────────
+      grupoPC("pc-a-fijos", "fijos", "fijos", () => {
+        if (RG.fijos === "1") { verQ("a-regular"); return; }
+        // ⚠️ A UNOS ASPERSORES QUE SE MUEVEN NO SE LE APLICA LA MALLA. Se mide.
+        RG.disposicion = "movil";
+        verQ("vasos");
+        $("pc-riego-res").className = "alta-nota";
+        $("pc-riego-res").textContent = "Como los mueves, las distancias no describen tu riego. Lo medimos.";
+      });
+      grupoPC("pc-a-regular", "reg", "disposicion", () => {
+        if (RG.disposicion === "regular") { RG.disposicion = "fija_regular"; verQ("a-q"); return; }
+        verQ("vasos");
+        $("pc-riego-res").className = "alta-nota";
+        $("pc-riego-res").textContent = "Puestos a ojo, las distancias no bastan. Lo medimos.";
+      });
+      campoCon("pc-aq-txt", "pc-b-aq");
+      $("pc-b-aq").addEventListener("click", () => { RG.aq = numCampo("pc-aq-txt"); verQ("a-sep"); });
+      campoCon("pc-asep-txt", "pc-b-asep");
+      $("pc-b-asep").addEventListener("click", () => { RG.asep = numCampo("pc-asep-txt"); verQ("a-lin"); });
+      campoCon("pc-alin-txt", "pc-b-alin");
+      $("pc-b-alin").addEventListener("click", () => { RG.alin = numCampo("pc-alin-txt"); calcularRiego(); });
+
+      // ── medición con varios recipientes ───────────────────────────────────
+      const vasosLeidos = () => ["pc-vaso-1", "pc-vaso-2", "pc-vaso-3"]
+        .map(numCampo).filter(v => v != null);
+      ["pc-vaso-1", "pc-vaso-2", "pc-vaso-3"].forEach(id =>
+        $(id)?.addEventListener("input", () => {
+          $("pc-b-vasos").disabled = vasosLeidos().length < RIEGO.MIN_RECIPIENTES;
+        }));
+      $("pc-b-vasos").addEventListener("click", () => { RG.cmVarios = vasosLeidos(); calcularRiego(); });
+
+      grupoPC("pc-cm", "cm", "cm", calcularRiego);
       grupoPC("pc-regl", "reg", "reg", () => {
+        // cerrarQ() y no solo `disabled = false`: si la pregunta sigue abierta,
+        // el botón del paso está oculto y no hay forma de avanzar.
+        cerrarQ();
         $("pc-riego-res").textContent = `Con ${RG.reg} litros te diremos cuántas regaderas echar.`;
         $("pc-b-riego").disabled = false;
       });
 
+      // ── "no lo sé" ────────────────────────────────────────────────────────
+      caja.addEventListener("click", (ev) => {
+        const b = ev.target.closest("[data-nose]");
+        if (!b || !caja.contains(b)) return;
+        RG.noseDe = b.dataset.nose;
+        if (b.dataset.nose === "medir" || b.dataset.nose === "medir-no") {
+          // "Ahora no puedo medirlo" desde una pantalla de medición: se va
+          // directo a las tres salidas, no se le vuelve a ofrecer medir.
+          verQ("nose");
+          return;
+        }
+        verQ("nose");
+      });
+      $("pc-nose-medir").addEventListener("click", () => {
+        // La ayuda SE ADAPTA al método. No hay una medición única.
+        if (RG.metodo === "goteo")          verQ("g-botella");
+        else if (RG.metodo === "aspersion") verQ("vasos");
+        else                                verQ("vaso");
+      });
+      $("pc-nose-etiqueta").addEventListener("click", () => {
+        // ⚠️ NO SE FINGE LEER NADA. No hay foto que interpretemos ni ficha que
+        // consultemos: se le dice DÓNDE mirar y se le deja volver cuando lo
+        // tenga. Prometer una lectura automática que no existe es peor que no
+        // ofrecer nada.
+        $("pc-etiqueta-txt").textContent = RG.metodo === "goteo"
+          ? "Mira la cinta de goteo de cerca: suele llevar impreso el caudal junto a cada gotero, "
+            + "como «2 L/h» o «2.2 l/h». Si no aparece, está en la caja o en el rollo que sobró."
+          : "Mira la ficha del aspersor o la caja: el caudal viene en litros por hora (L/h) o en "
+            + "metros cúbicos por hora (m³/h; 1 m³/h son 1.000 L/h), normalmente junto a la presión.";
+        verQ("etiqueta");
+      });
+      $("pc-nose-luego").addEventListener("click", () => dejarPendiente(
+        "De acuerdo. Podremos decirte cuánta agua necesita, pero no cuántos minutos "
+        + "regar hasta que sepamos esto."));
+      $("pc-etiqueta-luego").addEventListener("click", () => dejarPendiente(
+        "De acuerdo. Cuando lo encuentres, nos lo dices y ya podremos darte los minutos."));
+      $("pc-etiqueta-volver").addEventListener("click", () => {
+        verQ(RG.metodo === "goteo" ? "g-q" : "a-q");
+      });
+
+      // ── el cálculo, una sola vez y por el contrato de siempre ─────────────
       function calcularRiego() {
         RG.capPendiente = false;
-        const r = RIEGO.derivar(RG.metodo, {
-          l_h_gotero: RG.q, sep_goteros_m: RG.sep, sep_lineas_m: RG.lin, cm: RG.cm, minutos: 15,
-        });
+        const entrada = { minutos: 15 };
+        if (RG.cmVarios)                 entrada.cm_varios = RG.cmVarios;
+        else if (RG.metodo === "goteo") {
+          entrada.disposicion = "regular";
+          if (RG.botella != null) entrada.litros_botella_10min = RG.botella;
+          else                    entrada.l_h_gotero = RG.q;
+          entrada.sep_goteros_m = RG.sep; entrada.sep_lineas_m = RG.lin;
+        }
+        else if (RG.metodo === "aspersion" && RG.disposicion === "fija_regular") {
+          entrada.disposicion = "fija_regular";
+          entrada.l_h_aspersor = RG.aq; entrada.sep_aspersores_m = RG.asep;
+          entrada.sep_lineas_m = RG.alin;
+        }
+        else entrada.cm = RG.cm;
+        const r = RIEGO.derivar(RG.metodo, entrada);
         if (!r.ok) {
           RG.cap = null;
           $("pc-tecnico").hidden = true;
           $("pc-riego-res").className = r.motivo === "datos_incompletos" ? "alta-nota" : "alta-nota pc-mal";
           $("pc-riego-res").textContent = r.motivo === "datos_incompletos" ? ""
-            : "Con esas respuestas no sale un número creíble. Repásalas.";
+            : r.motivo === "pocos_recipientes"
+              ? `Hacen falta ${RIEGO.MIN_RECIPIENTES} recipientes: con menos no sabemos si ese punto `
+                + "es el que más recibe o el que menos."
+              : "Con esas respuestas no sale un número creíble. Repásalas.";
           $("pc-b-riego").disabled = true;
           return;
         }
         RG.cap = r;
+        cerrarQ();
         // En su idioma. Los mm/h son nuestros, no suyos: van en "detalles".
         $("pc-riego-res").className = "alta-nota";
         $("pc-riego-res").textContent = "Perfecto. Ya sabemos cómo aplica agua tu riego.";
         $("pc-tecnico").hidden = false;
         $("pc-tecnico-txt").textContent =
-          `Tu riego aplica ${r.valor} litros por metro cuadrado cada hora (${r.valor} mm/h).`;
+          `Tu riego aplica ${r.valor} litros por metro cuadrado cada hora (${r.valor} mm/h).`
+          + (r.datos && r.datos.uniformidad != null
+             ? ` El recipiente que menos recogió tiene el ${Math.round(r.datos.uniformidad * 100)}% `
+               + "de lo que recogió el que más."
+             : "");
         $("pc-b-riego").disabled = false;
       }
 
       $("pc-b-riego").addEventListener("click", () => {
-        // Ya guardado, o guardando: el segundo toque no hace nada.
         if (guardando || F?.paso === "guardado") return;
         const cap = RG.cap;
         const pend = RG.pendiente === true;
@@ -12205,9 +13020,6 @@
           riegoPendiente: pend,
           caudal: cap && cap.ok ? cap.valor : null,
           capacidadRegaderaL: RG.reg ? Number(RG.reg) : null,
-          // Se guarda SIEMPRE, también el "lo haré después": ese campo ES la
-          // marca de que este cultivo declaró su riego, y por eso no hereda el
-          // del vecino.
           // SIEMPRE se escribe `riego`, también con "lo indicaré después": ese
           // campo ES la marca de que esta siembra declaró su riego —aunque lo
           // declarara pendiente— y por eso no hereda el del vecino ni el de la
@@ -12221,7 +13033,92 @@
               : { capacidad_mmh: null, unidad: "mm/h", fuente: "no_lo_se", confianza: "baja",
                   datos: null, estimacion_mmh: RIEGO.POR_DEFECTO_MMH[RG.metodo] ?? null }),
         } };
-        F = FLUJO.avanzar(F, GEO);
+        F = FLUJO.avanzar(F, GEO, ctxFlujo());
+        ir(F.borrador?.paso || "revisar");
+      });
+
+      // ══ 7 · REPASAR ══════════════════════════════════════════════════════
+      // Lo que se va a guardar, tal cual, y cada línea lleva a quien la contestó.
+      function prepararRevisar() {
+        const lineas = FLUJO.resumen(F, (id) => CAT.nombreDe(id));
+        const METODOS = { goteo: "Goteo", aspersion: "Aspersores", manguera: "Manguera",
+                          regadera: "Regadera", surco: "Surcos" };
+        $("pc-revision").innerHTML = lineas.map(l => {
+          const val = l.clave === "metodo" ? (METODOS[l.valor] || l.valor) : l.valor;
+          const editable = !!l.paso;
+          return `<li><button type="button" class="pc-rev-fila" data-ir="${esc(l.paso || "")}"`
+               + `${editable ? "" : " disabled"}>`
+               + `<span class="pc-rev-lab">${esc(l.etiqueta)}</span>`
+               + `<span class="pc-rev-val${l.conocido ? "" : " desconocido"}">${esc(val)}</span>`
+               + (editable ? `<span class="pc-rev-ed">Cambiar</span>` : "")
+               + `</button></li>`;
+        }).join("");
+        // ⚠️ NO HAY "TODO LISTO". Registrado y listo para regar no son lo mismo,
+        // y decirlo aquí evita que lo descubra el día que espere unos minutos.
+        const b = F?.borrador;
+        const pend = FLUJO.pendientesDe({
+          fechaPlantacion: b?.fechaPlantacion, metodoRiego: b?.metodoRiego,
+          riego: b?.riego, soportado: b?.soportado,
+          capacidadRegaderaL: b?.capacidadRegaderaL,
+        }, RIEGO);
+        $("pc-revisar-pend").className = pend.length ? "alta-nota pc-t-pend" : "alta-nota";
+        $("pc-revisar-pend").textContent = pend.length
+          ? "Al guardar quedará pendiente: " + pend.map(x => x.texto.toLowerCase()).join("; ") + "."
+          : "Con esto podremos decirte cuándo regar y cuántos minutos.";
+        $("pc-b-revisar").textContent = "Guardar cultivo";
+      }
+      $("pc-revision").addEventListener("click", (ev) => {
+        const b = ev.target.closest("[data-ir]");
+        if (!b || !b.dataset.ir) return;
+        F = FLUJO.irAPaso(F, b.dataset.ir);
+        ir(b.dataset.ir);
+      });
+      $("pc-b-revisar").addEventListener("click", () => {
+        F = FLUJO.avanzar(F, GEO, ctxFlujo());
+        // Identificado → `avanzar` ya ha guardado el cultivo en el flujo.
+        if (F.paso === "guardado") { guardar(); return; }
+        ir("identificacion");
+      });
+
+      // ══ 8 · IDENTIFICARSE ════════════════════════════════════════════════
+      // ⚠️ EL BORRADOR SE ESCRIBE ANTES DE PEDIR NADA. Si el correo falla, lo
+      // cancela, cierra la pantalla o se queda sin red, todo lo contestado sigue
+      // ahí y se retoma exactamente en este punto. Y no se crea el cultivo dos
+      // veces: al volver se reanuda el MISMO borrador, con su id.
+      function prepararIdentificacion() {
+        anotar();
+        $("pc-ident-borrador").textContent =
+          "Lo que has contestado ya está guardado en este dispositivo. Si sales ahora, lo retomas donde estabas.";
+        $("pc-ident-estado").textContent = "";
+        $("pc-ident-estado").className = "alta-estado";
+        $("pc-b-ident").disabled = false;
+        try { $("pc-ident-email").value = localStorage.getItem("kylia_user_email") || ""; } catch (_) {}
+      }
+      $("pc-b-ident").addEventListener("click", async () => {
+        const email = String($("pc-ident-email").value || "").trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          $("pc-ident-estado").className = "alta-estado pc-mal";
+          $("pc-ident-estado").textContent = "Escribe un correo válido para poder guardarlo.";
+          return;
+        }
+        eligioSoloLocal = false;
+        $("pc-b-ident").disabled = true;
+        $("pc-ident-estado").className = "alta-estado";
+        $("pc-ident-estado").textContent = "Guardando…";
+        try { localStorage.setItem("kylia_user_email", email); } catch (_) {}
+        try { await window.kyliaSync?.registroUsuario({ email,
+                nombre: localStorage.getItem("kylia_user_nombre") || null,
+                origen: localStorage.getItem("kylia_origen") || null }); } catch (_) {}
+        F = { ...F, borrador: { ...F.borrador, identificado: true } };
+        F = FLUJO.avanzar(F, GEO, ctxFlujo());
+        guardar();
+      });
+      $("pc-ident-luego").addEventListener("click", () => {
+        // Guardar SOLO en el dispositivo es una opción legítima y se dice tal
+        // cual. Lo que no se hace es enseñar "guardado en tu cuenta".
+        eligioSoloLocal = true;
+        F = { ...F, borrador: { ...F.borrador, identificado: true } };
+        F = FLUJO.avanzar(F, GEO, ctxFlujo());
         guardar();
       });
 
@@ -12260,8 +13157,33 @@
               : `<div class="pc-t-ok">Ya podemos decirte cuándo y cuánto regar.</div>`)
           + (rep.sin_configurar
               ? `<div class="pc-t-linea pc-libre" style="margin-top:8px">`
-                + `${m2(rep.sin_configurar)} m² sin configurar en Kylia</div>`
-              : "");
+                + `${m2(rep.sin_configurar)} m² sin configurar en Kylia`
+                + `<br>Sin configurar no quiere decir sin cultivar: es lo que no llevas con Kylia.</div>`
+              : "")
+          + `<div class="pc-t-linea" id="pc-t-donde" style="margin-top:8px"></div>`;
+        pintarEstadoGuardado();
+      }
+
+      // ⚠️ DÓNDE ESTÁ GUARDADO, DICHO SIN ADORNAR. "Borrador en este
+      // dispositivo" y "guardado en tu cuenta" no son lo mismo, y lo segundo no
+      // se escribe hasta que el servidor lo confirma. Si la subida falla se
+      // dice que falló, en vez de dejar puesto un "guardado" que no es verdad.
+      function pintarEstadoGuardado() {
+        const el = $("pc-t-donde");
+        if (!el) return;
+        const TXT = {
+          local:    "Guardado en este dispositivo. No está en tu cuenta: si cambias de móvil, no viaja.",
+          subiendo: "Guardado en este dispositivo · guardándolo en tu cuenta…",
+          cuenta:   "Guardado en tu cuenta. Podrás abrirlo desde otro dispositivo.",
+          // ⚠️ NO SE PROMETE UN REINTENTO AUTOMÁTICO, porque no lo hay: la
+          // config se vuelve a subir cuando algo la vuelve a disparar, no sola
+          // en segundo plano. Decir "lo reintentaremos" sería la misma clase de
+          // promesa falsa que decir "guardado en tu cuenta" sin confirmarlo.
+          fallo:    "Guardado en este dispositivo. No hemos podido guardarlo en tu cuenta: "
+                    + "se subirá la próxima vez que guardes algo.",
+        };
+        el.className = estadoGuardado === "fallo" ? "pc-t-linea pc-mal" : "pc-t-linea pc-libre";
+        el.textContent = TXT[estadoGuardado] || "";
       }
 
       async function pintarMapaFinal() {
@@ -12316,6 +13238,15 @@
             z.siembras.push(nuevaSiembra(c.area_m2, {
               cultivo: c.cultivo, fechaPlantacion: c.fechaPlantacion,
               fechaPrecision: c.fechaPrecision,
+              // ⚠️ LA VARIEDAD SE GUARDA Y NO VIAJA AL `payloadSiembra`. Si
+              // entrara ahí cambiaría la HUELLA de todas las siembras —payload y
+              // huella salen de la misma función— y desplegar dispararía una
+              // resincronización del histórico entero por un campo que el
+              // servidor ni mira. Vive en la zona, que va a `config_app` (jsonb):
+              // sin migración, y las siembras antiguas simplemente no lo llevan,
+              // que es exactamente lo que significa "no lo sabemos".
+              variedad: c.variedad ?? null,
+              variedadDesconocida: c.variedadDesconocida === true,
               geometria: c.geometria,
               metodoRiego: c.metodoRiego, riegoPendiente: !!c.riegoPendiente,
               caudal: c.caudal ?? null, riego: c.riego || null,
@@ -12332,9 +13263,18 @@
           localStorage.setItem(ZONAS_KEY, JSON.stringify(zonas));
           FLUJO.borrarBorrador(localStorage);
           try { renderZonasTabs(); renderHoy(); } catch (_) {}
-          // La subida es aparte y puede fallar: la tarjeta no promete nada que
-          // no se haya confirmado.
-          subirConfig();
+          // ⚠️ LA TARJETA NO PROMETE LO QUE NO ESTÁ CONFIRMADO. Aquí solo se sabe
+          // que está en ESTE dispositivo; la subida es aparte, tarda y puede
+          // fallar. Se dice eso, y cuando el servidor confirma, se corrige el
+          // texto. Quien eligió "ahora no" ni siquiera intenta subirlo.
+          soloLocal = eligioSoloLocal || !identificado();
+          estadoGuardado = soloLocal ? "local" : "subiendo";
+          if (!soloLocal) {
+            subirConfig((r) => {
+              estadoGuardado = r && r.ok ? "cuenta" : "fallo";
+              try { pintarEstadoGuardado(); } catch (_) {}
+            });
+          }
         } finally { guardando = false; }
         ir("guardado");
       }

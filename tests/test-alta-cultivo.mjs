@@ -81,6 +81,7 @@ try {
 
   const r = await pag.evaluate(async () => {
     const o={}, $=id=>document.getElementById(id), sleep=ms=>new Promise(r=>setTimeout(r,ms));
+    try {
     const clic=s=>{const e=document.querySelector(s); if(!e||e.disabled) return false; e.click(); return true;};
     const paso=()=>document.querySelector("#pc .alta-paso.activo")?.dataset?.pc;
     const G = window.KyliaGeo;
@@ -98,7 +99,10 @@ try {
     o.A_habituales=document.querySelectorAll("#pc-habituales .pc-cultivo").length;
     clic("#pc-habituales [data-cid='lechuga']"); await sleep(120);
     o.A_notaCult=$("pc-cultivo-nota").textContent;
-    clic("#pc-b-cultivo"); await sleep(300);
+    clic("#pc-b-cultivo"); await sleep(200);
+    o.A_pasoVar=paso();
+    clic("#pc-variedad-nose"); await sleep(100);
+    clic("#pc-b-variedad"); await sleep(300);
     o.A_paso2=paso(); o.A_preg=$("pc-sup-preg").textContent;
     o.A_todoVisible=$("pc-todo").hidden===false;
     clic("#pc-parte"); await sleep(1300);
@@ -112,14 +116,18 @@ try {
     clic("#pc-b-fecha"); await sleep(250);
     o.A_paso4=paso();
     clic("#pc-metodo [data-metodo='goteo']"); await sleep(150);
-    o.A_inst=$("pc-inst").hidden===false;
+    o.A_inst=document.querySelector("[data-preg='inst']").hidden===false;
     clic("#pc-inst-ahora"); await sleep(150);
-    o.A_g1=$("pc-g1").hidden===false; o.A_g2=$("pc-g2").hidden===false;
-    clic("#pc-gq [data-q='2']"); await sleep(120); o.A_g2b=$("pc-g2").hidden===false;
-    clic("#pc-gsep [data-sep='0.3']"); await sleep(120);
-    clic("#pc-glin [data-lin='1']"); await sleep(150);
+    o.A_greg=document.querySelector("[data-preg='g-regular']").hidden===false;
+    clic("#pc-g-regular [data-reg='regular']"); await sleep(120);
+    o.A_g1=document.querySelector("[data-preg='g-q']").hidden===false; o.A_g2=document.querySelector("[data-preg='g-sep']").hidden===false;
+    clic("#pc-gq [data-q='2']"); await sleep(80); clic("#pc-b-gq"); await sleep(120);
+    o.A_g2b=document.querySelector("[data-preg='g-sep']").hidden===false;
+    clic("#pc-gsep [data-sep='0.3']"); await sleep(80); clic("#pc-b-gsep"); await sleep(120);
+    clic("#pc-glin [data-lin='1']"); await sleep(80); clic("#pc-b-glin"); await sleep(200);
     o.A_riegoRes=$("pc-riego-res").textContent; o.A_tecnico=$("pc-tecnico-txt").textContent;
-    clic("#pc-b-riego"); await sleep(900);
+    clic("#pc-b-riego"); await sleep(250);
+    clic("#pc-b-revisar"); await sleep(900);
     o.A_paso5=paso(); o.A_tarjeta=$("pc-tarjeta").textContent.replace(/\s+/g," ").trim();
     o.A_titulo=$("pc-ok-tit").textContent;
     clic("#pc-listo"); await sleep(200);
@@ -127,10 +135,23 @@ try {
     // ── CASO B · dos cultivos, mismo terreno, todo independiente ────────
     window.kyliaCultivoNuevo("R1"); await sleep(400);
     o.B_paso=paso(); o.B_conserva=window.__PCF()?.cultivos?.length;
+    // §4 · ESCRIBIR NO CONFIRMA. A medio teclear no puede quedar elegido nada:
+    // antes, "lechu" fijaba un `otro:lechu` sin Kc y el botón se encendía.
+    $("pc-cultivo-txt").value="tomà";
+    $("pc-cultivo-txt").dispatchEvent(new Event("input",{bubbles:true})); await sleep(180);
+    o.B_aMedias=window.__PCF()?.borrador?.cultivoId;
+    o.B_botonAMedias=$("pc-b-cultivo").disabled;
+    o.B_sugerencias=[...document.querySelectorAll("#pc-sug button")].map(x=>x.textContent.trim());
+    // Elegir de la lista sí confirma, y conserva el identificador canónico.
     $("pc-cultivo-txt").value="tomàquet";
     $("pc-cultivo-txt").dispatchEvent(new Event("input",{bubbles:true})); await sleep(180);
+    clic("#pc-sug button[data-cid='tomate']"); await sleep(120);
     o.B_sinonimo=window.__PCF()?.borrador?.cultivoId;
-    clic("#pc-b-cultivo"); await sleep(1300);
+    o.B_elegidoVisible=$("pc-elegido").hidden===false;
+    o.B_elegidoTxt=$("pc-elegido-txt").textContent;
+    clic("#pc-b-cultivo"); await sleep(200);
+    clic("#pc-variedad-nose"); await sleep(100);
+    clic("#pc-b-variedad"); await sleep(1300);
     o.B_todoOculto=$("pc-todo").hidden;                  // ya hay un cultivo → no se ofrece
     o.B_areaB=window.__PCF()?.borrador?.area_m2;
     o.B_leyenda=$("pc-leyenda").textContent.replace(/\s+/g," ").trim();
@@ -139,10 +160,20 @@ try {
     clic("#pc-b-fecha"); await sleep(250);
     clic("#pc-metodo [data-metodo='aspersion']"); await sleep(150);
     clic("#pc-inst-ahora"); await sleep(150);
-    o.B_vaso=$("pc-vaso").hidden===false;
-    clic("#pc-cm [data-cm='0.5']"); await sleep(200);
+    // §8B · la primera pregunta de aspersión es fijos/móviles, y SOLO esas dos.
+    o.B_fijosQ=document.querySelector("[data-preg='a-fijos']").hidden===false;
+    o.B_fijosOpciones=[...document.querySelectorAll("#pc-a-fijos .pc-opcion")].map(x=>x.textContent.trim());
+    clic("#pc-a-fijos [data-fijos='1']"); await sleep(120);
+    clic("#pc-a-regular [data-reg='regular']"); await sleep(120);
+    $("pc-aq-txt").value="900"; $("pc-aq-txt").dispatchEvent(new Event("input",{bubbles:true}));
+    await sleep(80); clic("#pc-b-aq"); await sleep(120);
+    $("pc-asep-txt").value="12"; $("pc-asep-txt").dispatchEvent(new Event("input",{bubbles:true}));
+    await sleep(80); clic("#pc-b-asep"); await sleep(120);
+    $("pc-alin-txt").value="12"; $("pc-alin-txt").dispatchEvent(new Event("input",{bubbles:true}));
+    await sleep(80); clic("#pc-b-alin"); await sleep(200);
     o.B_tecnico=$("pc-tecnico-txt").textContent;
-    clic("#pc-b-riego"); await sleep(900);
+    clic("#pc-b-riego"); await sleep(250);
+    clic("#pc-b-revisar"); await sleep(900);
     clic("#pc-listo"); await sleep(200);
 
     const zonas=()=>JSON.parse(localStorage.getItem("kylia_zonas")||"[]");
@@ -155,7 +186,9 @@ try {
     // ── CASO C · pendientes ────────────────────────────────────────────
     window.kyliaCultivoNuevo("R1"); await sleep(400);
     clic("#pc-habituales [data-cid='cebolla']"); await sleep(120);
-    clic("#pc-b-cultivo"); await sleep(1300);
+    clic("#pc-b-cultivo"); await sleep(200);
+    clic("#pc-variedad-nose"); await sleep(100);
+    clic("#pc-b-variedad"); await sleep(1300);
     clic("#pc-b-sup"); await sleep(250);
     clic("#pc-sin-fecha"); await sleep(150);
     o.C_notaSinFecha=$("pc-fecha-nota").textContent;
@@ -163,7 +196,8 @@ try {
     clic("#pc-metodo [data-metodo='goteo']"); await sleep(150);
     clic("#pc-inst-luego"); await sleep(150);
     o.C_notaInstLuego=$("pc-riego-res").textContent;
-    clic("#pc-b-riego"); await sleep(900);
+    clic("#pc-b-riego"); await sleep(250);
+    clic("#pc-b-revisar"); await sleep(900);
     o.C_tarjeta=$("pc-tarjeta").textContent.replace(/\s+/g," ").trim();
     const sc=zonas()[0].siembras.slice(-1)[0];
     o.C_fecha=sc.fechaPlantacion; o.C_caudal=sc.caudal; o.C_fuente=sc.riego?.fuente;
@@ -174,13 +208,19 @@ try {
     window.kyliaCultivoNuevo("R1"); await sleep(400);
     $("pc-cultivo-txt").value="quinoa";
     $("pc-cultivo-txt").dispatchEvent(new Event("input",{bubbles:true})); await sleep(180);
+    // Lo que no está en el catálogo se ofrece explícitamente como texto libre.
+    o.E_opcionLibre=!!document.querySelector("#pc-sug button[data-libre]");
+    clic("#pc-sug button[data-libre]"); await sleep(150);
     o.E_nota=$("pc-cultivo-nota").textContent;
-    clic("#pc-b-cultivo"); await sleep(1300);
+    clic("#pc-b-cultivo"); await sleep(200);
+    clic("#pc-variedad-nose"); await sleep(100);
+    clic("#pc-b-variedad"); await sleep(1300);
     clic("#pc-b-sup"); await sleep(250);
     clic("#pc-cuando [data-hace='30']"); await sleep(150);
     clic("#pc-b-fecha"); await sleep(250);
     clic("#pc-riego-luego"); await sleep(150);
-    clic("#pc-b-riego"); await sleep(900);
+    clic("#pc-b-riego"); await sleep(250);
+    clic("#pc-b-revisar"); await sleep(900);
     o.E_tarjeta=$("pc-tarjeta").textContent.replace(/\s+/g," ").trim();
     const sq=zonas()[0].siembras.slice(-1)[0];
     o.E_id=sq.cultivo; o.E_kc=window.KyliaMotor.FAO_KC[sq.cultivo]===undefined;
@@ -199,7 +239,9 @@ try {
     o.F_sup=$("pc-sel-txt").textContent;
     clic("#pc-confirmar"); await sleep(250);
     clic("#pc-habituales [data-cid='pimiento']"); await sleep(120);
-    clic("#pc-b-cultivo"); await sleep(400);
+    clic("#pc-b-cultivo"); await sleep(200);
+    clic("#pc-variedad-nose"); await sleep(100);
+    clic("#pc-b-variedad"); await sleep(400);
     o.F_todoVisible=$("pc-todo").hidden===false;
     clic("#pc-todo"); await sleep(1300);
     o.F_anillos=(window.__PCF()?.borrador?.geometria?.coordinates||[]).length;
@@ -210,7 +252,8 @@ try {
     clic("#pc-cuando [data-hace='5']"); await sleep(150);
     clic("#pc-b-fecha"); await sleep(250);
     clic("#pc-metodo [data-metodo='surco']"); await sleep(150);
-    clic("#pc-b-riego"); await sleep(900);
+    clic("#pc-b-riego"); await sleep(250);
+    clic("#pc-b-revisar"); await sleep(900);
     clic("#pc-listo"); await sleep(250);
     const zR2=zonas().find(z=>z.referencia==="R2");
     o.F_guardado_anillos=(zR2?.siembras?.[0]?.geometria?.coordinates||[]).length;
@@ -221,7 +264,9 @@ try {
     // ── CASO G · interrupciones ────────────────────────────────────────
     window.kyliaCultivoNuevo("R1"); await sleep(400);
     clic("#pc-habituales [data-cid='calabacin']"); await sleep(120);
-    clic("#pc-b-cultivo"); await sleep(1300);
+    clic("#pc-b-cultivo"); await sleep(200);
+    clic("#pc-variedad-nose"); await sleep(100);
+    clic("#pc-b-variedad"); await sleep(1300);
     clic("#pc-b-sup"); await sleep(250);
     clic("#pc-cuando [data-hace='5']"); await sleep(150);
     clic("#pc-b-fecha"); await sleep(250);
@@ -243,8 +288,12 @@ try {
     o.G_cultivoRetomado=window.__PCF()?.borrador?.cultivoId;
     clic("#pc-metodo [data-metodo='goteo']"); await sleep(150);
     clic("#pc-inst-luego"); await sleep(150);
+    clic("#pc-b-riego"); await sleep(250);
+    o.G_pasoRepaso=paso();
+    o.G_repasoLineas=[...document.querySelectorAll("#pc-revision .pc-rev-fila")].length;
+    o.G_repasoPend=$("pc-revisar-pend").textContent;
     // DOBLE PULSACIÓN en guardar
-    $("pc-b-riego").click(); $("pc-b-riego").click(); await sleep(1000);
+    $("pc-b-revisar").click(); $("pc-b-revisar").click(); await sleep(1000);
     o.G_trasDoble=zonas()[0].siembras.length;
     o.G_duplicados=o.G_trasDoble-antesDeRetomar;
     o.G_borradorBorrado=window.kyliaHayAltaPendiente()===false;
@@ -258,12 +307,15 @@ try {
     // que deja el riego para después no puede salir regando por aspersión.
     window.kyliaCultivoNuevo("R1"); await sleep(400);
     clic("#pc-habituales [data-cid='lechuga']"); await sleep(120);
-    clic("#pc-b-cultivo"); await sleep(1400);
+    clic("#pc-b-cultivo"); await sleep(200);
+    clic("#pc-variedad-nose"); await sleep(100);
+    clic("#pc-b-variedad"); await sleep(1400);
     clic("#pc-b-sup"); await sleep(250);
     clic("#pc-cuando [data-hace='14']"); await sleep(150);   // plantada hace 2 semanas
     clic("#pc-b-fecha"); await sleep(250);
     clic("#pc-riego-luego"); await sleep(150);
-    clic("#pc-b-riego"); await sleep(1000);
+    clic("#pc-b-riego"); await sleep(250);
+    clic("#pc-b-revisar"); await sleep(1000);
     o.I_tarjeta=$("pc-tarjeta").textContent.replace(/\s+/g," ").trim();
     clic("#pc-listo"); await sleep(300);
     const sI=zonas()[0].siembras.slice(-1)[0];
@@ -280,6 +332,7 @@ try {
       historialDesde:sI.registradoEl});
     o.I_confianza=bal.confianzaBalance; o.I_previos=bal.aportesPreviosDesconocidos;
     o.I_lamina=window.KyliaMotor.decisionRiego(bal,{lluviaPrevista:[]}).cantidad_l_m2;
+    } catch (e) { o.__error = e.message + " @ " + (e.stack||"").split("\n")[1]; }
     return o;
   });
 
@@ -295,7 +348,10 @@ try {
   ok(r.A_preg === "¿Dónde está la lechuga?", `pregunta por su nombre y con artículo: "${r.A_preg}"`);
   ok(r.A_todoVisible === true, "con el terreno vacío se ofrece usarlo entero");
   ok(r.A_area > 0, `el contorno propuesto trae su superficie (${r.A_area} m²)`);
-  ok(/te quedarán/.test(r.A_supNota), `y dice lo que quedará DESPUÉS: "${r.A_supNota}"`);
+  // El resumen da los DOS números —lo que registra y lo que queda fuera— con el
+  // texto concreto del encargo. Antes decía "ocupa X · te quedarán Y".
+  ok(/Vas a registrar/.test(r.A_supNota) && /quedan sin configurar en Kylia/.test(r.A_supNota),
+     `y dice lo que registra y lo que queda fuera: "${r.A_supNota}"`);
   ok(r.A_fechaPreg === "¿Cuándo plantaste la lechuga?", "la fecha, también por su nombre");
   ok(r.A_precision === "aproximada", "\"hace unas dos semanas\" se guarda como APROXIMADA");
   ok(/aproximada/.test(r.A_fechaNota), `y se le dice: "${r.A_fechaNota}"`);
@@ -313,15 +369,25 @@ try {
   console.log("\n── CASO B · dos cultivos, nada se contagia ──");
   ok(r.B_paso === "cultivo" && r.B_conserva === 1,
      "\"añadir cultivo\" mantiene el terreno y lo ya configurado, sin volver a pedir terreno");
-  ok(r.B_sinonimo === "tomate", "\"tomàquet\" resuelve al cultivo canónico");
+  ok(r.B_aMedias == null && r.B_botonAMedias === true,
+     "escribir a medias NO elige cultivo ni enciende el botón (antes \"lechu\" daba un otro: sin Kc)");
+  ok(r.B_sugerencias.length > 0 && /Tomate/.test(r.B_sugerencias.join(" ")),
+     `el buscador sugiere mientras escribe: ${JSON.stringify(r.B_sugerencias.slice(0,3))}`);
+  ok(r.B_sinonimo === "tomate", "\"tomàquet\" elegido de la lista resuelve al cultivo canónico");
+  ok(r.B_elegidoVisible === true && /Tomate/.test(r.B_elegidoTxt),
+     "y lo elegido se enseña aparte del texto escrito");
   ok(r.B_todoOculto === true, "con un cultivo dentro ya no se ofrece \"todo el terreno\"");
   ok(/Tomate/.test(r.B_leyenda) && /Lechuga/.test(r.B_leyenda),
      `la leyenda nombra los cultivos, no solo los colorea: "${r.B_leyenda}"`);
-  ok(r.B_vaso === true, "con aspersores se pregunta por el vaso");
+  ok(r.B_fijosQ === true, "con aspersores lo PRIMERO es si están fijos o se mueven");
+  ok(r.B_fijosOpciones.length === 2
+     && /fijos/i.test(r.B_fijosOpciones[0]) && /moviendo/i.test(r.B_fijosOpciones[1]),
+     `y solo esas dos opciones, sin "no lo sé": ${JSON.stringify(r.B_fijosOpciones)}`);
   const [a, b] = r.B_siembras;
   ok(a.f !== b.f, `fechas independientes (${a.f} / ${b.f})`);
   ok(a.m !== b.m && a.q !== b.q, `métodos y caudales independientes (${a.q} / ${b.q})`);
-  ok(a.fu === "derivado_goteo" && b.fu === "medido_vaso", "y su procedencia");
+  ok(a.fu === "derivado_goteo" && b.fu === "derivado_aspersion",
+     `y su procedencia (${a.fu} / ${b.fu})`);
   ok(a.g && b.g && a.id && b.id && a.tok && b.tok,
      "cada uno con su contorno, su id y su token de sincronización");
   ok(r.B_areasCoinciden === true, "las áreas guardadas coinciden con su GeoJSON");
@@ -344,7 +410,11 @@ try {
   ok(/sin configurar en Kylia/.test(r.C_tarjeta), "y se llama \"sin configurar\", no \"sin cultivar\"");
 
   console.log("\n── CASO E · cultivo libre ──");
-  ok(/Puedes guardarlo/.test(r.E_nota) && /Todavía no ofrecemos/.test(r.E_nota),
+  ok(r.E_opcionLibre === true,
+     "lo que no está en el catálogo se ofrece explícitamente, no se cuela al teclear");
+  // §4 · el texto exacto del encargo.
+  ok(/Todavía no calculamos recomendaciones para este cultivo/.test(r.E_nota)
+     && /registrarlo/.test(r.E_nota),
      `se explica sin rodeos: "${r.E_nota}"`);
   ok(r.E_id === "otro:quinoa", "conserva su identidad");
   ok(r.E_kc === true, "y el motor NO lo conoce: nada de Kc prestado");

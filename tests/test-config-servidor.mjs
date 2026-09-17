@@ -109,11 +109,24 @@ ok(/clearTimeout\(subidaPendiente\)/.test(app) && /setTimeout\(\(\) => \{/.test(
 // El tercero es guardar un cultivo nuevo dibujado en el mapa, que crea una
 // siembra — o sea, un cambio de zonas por otra puerta. Si aparece un cuarto,
 // que salte: subirConfig desde cualquier sitio es la vía rápida a saturar la red.
-const llamadas = (app.match(/subirConfig\(\);/g) || []).length;
+// ⚠️ SE CUENTAN LAS LLAMADAS, NO UN LITERAL. Antes esto buscaba
+// `subirConfig();` con el punto y coma pegado, así que una llamada con
+// argumento —`subirConfig(cb)`— no la veía y el censo salía corto sin que
+// nadie se enterara: justo el agujero que esta guarda existe para tapar.
+// Se cuentan las LLAMADAS de verdad: al principio de una sentencia, no las
+// menciones en comentarios ni la propia definición. Antes esto buscaba el
+// literal `subirConfig();` con el punto y coma pegado, así que una llamada con
+// argumento —`subirConfig(cb)`— no la veía y el censo salía corto sin que nadie
+// se enterara: justo el agujero que esta guarda existe para tapar.
+const llamadas = (app.match(/^\s*subirConfig\s*\(/gm) || []).length;
 // El quinto es el asistente de parcela → cultivos, al terminar: acaba de crear
 // una parcela con sus cultivos y si no sube, el cron mediría algo que en el
 // servidor no existe. Sigue siendo el mismo criterio de siempre —cambió la
 // finca o cambiaron las zonas— por una puerta más.
+//
+// Ese quinto pasa ahora un callback (`subirConfig(cb)`) para poder decir en
+// pantalla si la parcela llegó a la cuenta o se quedó en el dispositivo. Es la
+// MISMA llamada, no una sexta puerta.
 ok(llamadas === 5,
    `se sube al cambiar la finca, las zonas, al añadir un cultivo, al renombrar una parcela y al cerrar el asistente (${llamadas})`);
 ok(/subirConfig\(\);/.test(app.slice(app.indexOf("function guardarNombreParcela"), app.indexOf("let mapaLleno"))),

@@ -33,3 +33,4 @@ coverage/
 # Python (scripts/valida_pyfao56.py deja caché al importarse)
 __pycache__/
 *.pyc
+docs/capturas/

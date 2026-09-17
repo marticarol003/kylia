@@ -393,10 +393,15 @@ console.log("\n── 5. guarda de regresión: nadie consume el valor sin proteg
   //     fallback a null y comprobación de r antes de usarlo;
   //   · el `await guardarConfigServidor` de kyliaConfirmarHistoricas (Punto 2),
   //     que comprueba `!r || !r.persisted` antes de usarlo.
-  // Si aparece un QUINTO, hay que mirarlo a mano: una promesa consumida sin
+  //   · el `await registroUsuario` de la pantalla de identificación del alta
+  //     (onboarding), también en try/catch: su valor NO se usa para decidir
+  //     nada, y el correo ya está en localStorage antes de llamar, así que un
+  //     fallo de red no puede dejar al agricultor sin identificar ni perderle
+  //     el borrador. Revisado a mano al añadirlo, que es lo que pide esta guarda.
+  // Si aparece un SEXTO, hay que mirarlo a mano: una promesa consumida sin
   // protección es justo lo que este trabajo viene a evitar. Esta guarda ha
-  // saltado ya dos veces al añadir un consumidor, que es para lo que está.
-  ok(usos.length === 4, `call sites que consumen el valor: ${usos.length} (esperado 4)`);
+  // saltado ya tres veces al añadir un consumidor, que es para lo que está.
+  ok(usos.length === 5, `call sites que consumen el valor: ${usos.length} (esperado 5)`);
   // Vive en confirmarHistoricas; el envoltorio público es una línea.
   const conf = /async function confirmarHistoricas\(ids\)[\s\S]*?\n    \}/.exec(FUENTE)[0];
   ok(/if \(!r \|\| !r\.persisted\)/.test(conf),
@@ -413,7 +418,7 @@ console.log("\n── 5. guarda de regresión: nadie consume el valor sin proteg
   // se dejaba fuera `guardarConfigServidor?.(`, que lleva llamada opcional.
   const todos = FUENTE.match(
     new RegExp("window\\.kyliaSync\\??\\.(" + metodos + ")\\??\\.?\\(", "g")) || [];
-  ok(todos.length === 13, `call sites en total: ${todos.length} (esperado 13)`);
+  ok(todos.length === 14, `call sites en total: ${todos.length} (esperado 14)`);
   ok(recorta("function addRiego(").includes(".catch(() => marcarNoSincronizado"),
      "y el de addRiego encadena .catch: no puede quedar colgada");
 }

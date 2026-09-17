@@ -607,6 +607,29 @@ console.log("\n── 20. el payload real es JSON-safe (guarda barata) ──");
      "y no lleva funciones ni BigInt: estable() no tiene que ser universal");
 }
 
+console.log("\n── 20 bis. la VARIEDAD no entra en la huella ──");
+{
+  // ⚠️ EL INVARIANTE DEL ONBOARDING NUEVO. `payloadSiembra` y `huellaPayload`
+  // salen de la misma función a propósito, así que meter un campo en el payload
+  // mueve la huella de TODAS las siembras y desplegar dispara una
+  // resincronización del histórico entero. La variedad es un dato del cuaderno
+  // del agricultor que el servidor ni mira: vive en la zona (config_app, jsonb)
+  // y NO viaja en el payload. Esto se ejecuta, no se lee.
+  const app = monta({ zonas: zonaCon([siembra("v")]), finca: FINCA });
+  const z = app.leerZonas()[0];
+  const sinVariedad = app.payloadSiembra(z, z.siembras[0], FINCA, "d");
+  const conVariedad = app.payloadSiembra(
+    z, { ...z.siembras[0], variedad: "Romana", variedadDesconocida: false }, FINCA, "d");
+  const conDesconocida = app.payloadSiembra(
+    z, { ...z.siembras[0], variedad: null, variedadDesconocida: true }, FINCA, "d");
+  ok(!("variedad" in sinVariedad) && !("variedad" in conVariedad),
+     "la variedad NO está en el payload que se manda al servidor");
+  ok(app.huellaPayload(sinVariedad) === app.huellaPayload(conVariedad),
+     "añadirle una variedad a una siembra NO le cambia la huella");
+  ok(app.huellaPayload(sinVariedad) === app.huellaPayload(conDesconocida),
+     "y declararla desconocida, tampoco: ninguna histórica se marca como modificada");
+}
+
 console.log("\n── 21. BLOQUEANTE 1 · un UUID no es una identidad lógica ──");
 {
   // B planificada como NUEVA. Mientras espera a A, se borra y reaparece con el

@@ -83,8 +83,22 @@
   // Qué fuente da FIABILIDAD, y para qué métodos. Whitelist: una fuente nueva
   // que nadie ha revisado no entra sola.
   const FUENTES_FIABLES = {
-    derivado_goteo: ["goteo"],                    // geometría real de la cinta
-    medido_vaso:    ["aspersion", "manguera"],    // pluviómetro improvisado
+    derivado_goteo:     ["goteo"],                    // geometría real de la cinta
+    medido_vaso:        ["aspersion", "manguera"],    // pluviómetro improvisado
+    // ── AÑADIDAS, no sustituidas ──────────────────────────────────────────
+    // `derivado_aspersion` es la misma geometría que el goteo aplicada a una
+    // malla de aspersores FIJA Y REGULAR: caudal por aspersor repartido entre
+    // el rectángulo que cubre. Solo se ofrece cuando él ha dicho que están
+    // fijos y en malla; a un aspersor que se va moviendo esta fórmula no se le
+    // aplica, porque no describe su instalación.
+    derivado_aspersion: ["aspersion"],
+    // `medido_vasos` (plural) es la medición con VARIOS recipientes repartidos.
+    // Existe aparte de `medido_vaso` a propósito: un solo vaso en un punto
+    // cualquiera de una malla de aspersores mide ESE punto, no la parcela, y
+    // el solape entre aspersores hace que el centro y el borde no se parezcan.
+    // Las siembras que ya llevan `medido_vaso` NO cambian de clase: su fuente
+    // sigue en la lista y su fila sigue dando exactamente los mismos minutos.
+    medido_vasos:       ["aspersion", "manguera"],
   };
   // Fuentes cuyo número puede CRUZAR al motor sin ser fiable. Es lo que mantiene
   // vivo a quien tecleó su caudal o lo hereda de su finca: sigue recibiendo
@@ -179,6 +193,16 @@
   // La separación entre líneas se puede dar directa o dejar que salga del ancho
   // del bancal repartido entre sus mangueras, que es más fácil de contestar.
   function capacidadGoteo(d = {}) {
+    // ⚠️ EL SUPUESTO, COMPROBADO ANTES DE LA FÓRMULA. `q / (sep × sep)` describe
+    // una instalación REGULAR: todas las cintas iguales, una por línea, todos
+    // los goteros con el mismo caudal. Si él dice que la suya no es así, no se
+    // le devuelve un número: se le manda a medir o a dejarlo pendiente.
+    //
+    // Cuando `disposicion` no viene, se comporta EXACTAMENTE como antes — es lo
+    // que mantiene funcionando a las siembras y a las pantallas que ya existían.
+    if (d.disposicion != null && d.disposicion !== "regular") {
+      return fallo("disposicion_no_soportada", { disposicion: d.disposicion });
+    }
     const sepGoteros = num(d.sep_goteros_m);
     const anchoM     = num(d.ancho_m);
     const nLineas    = num(d.lineas);
@@ -219,6 +243,59 @@
                      { cm, minutos: min });
   }
 
+  // ─── ASPERSIÓN FIJA Y EN MALLA ───────────────────────────────────────────
+  // Misma aritmética que el goteo y por la misma razón: un emisor reparte su
+  // caudal sobre el rectángulo que le toca. Aquí el emisor es el aspersor.
+  //
+  // ⚠️ `disposicion` NO ES DECORATIVA: sin "fija_regular" declarado, esta
+  // fórmula no se aplica. Aplicarla a unos aspersores que se van moviendo, o a
+  // un reparto irregular, produce un número con toda la pinta de estar medido
+  // y que no describe nada. Antes de calcular se comprueba el supuesto.
+  function capacidadAspersion(d = {}) {
+    if (d.disposicion !== "fija_regular") {
+      return fallo("disposicion_no_soportada", { disposicion: d.disposicion ?? null });
+    }
+    const q       = num(d.l_h_aspersor);
+    const sepAsp  = num(d.sep_aspersores_m);
+    const sepLin  = num(d.sep_lineas_m);
+    if (q == null || sepAsp == null || sepLin == null) return fallo("datos_incompletos");
+    if (!(q > 0) || !(sepAsp > 0) || !(sepLin > 0))    return fallo("valores_no_positivos");
+    // Los datos originales, no solo el resultado: si mañana hay que rehacer la
+    // cuenta, un mm/h suelto no se puede y estos tres sí.
+    return capacidad(q / (sepAsp * sepLin), "derivado_aspersion", "alta",
+                     { l_h_aspersor: r1(q), sep_aspersores_m: sepAsp, sep_lineas_m: sepLin,
+                       disposicion: "fija_regular" });
+  }
+
+  // ─── MEDICIÓN CON VARIOS RECIPIENTES ─────────────────────────────────────
+  // Lo que de verdad vale para una instalación que no es regular, y lo único
+  // que vale para unos aspersores que se mueven.
+  //
+  // Se piden AL MENOS TRES repartidos por la zona regada. Con uno solo no se
+  // sabe si ese punto es el que más recibe o el que menos: en una malla de
+  // aspersores el solape hace que entre el centro y el borde haya el doble.
+  // Por eso el resultado es la MEDIA, y por eso con menos de tres esto falla en
+  // vez de devolver un número más pequeño con la misma cara de seguridad.
+  const MIN_RECIPIENTES = 3;
+  function capacidadVasos(d = {}) {
+    const lista = Array.isArray(d.cm_varios) ? d.cm_varios.map(num).filter(v => v != null) : [];
+    const min   = num(d.minutos) != null ? num(d.minutos) : 15;
+    if (!lista.length || min == null) return fallo("datos_incompletos");
+    if (lista.length < MIN_RECIPIENTES) {
+      return fallo("pocos_recipientes", { recipientes: lista.length, minimo: MIN_RECIPIENTES });
+    }
+    if (lista.some(v => !(v > 0)) || !(min > 0)) return fallo("valores_no_positivos");
+    const media = lista.reduce((a, b) => a + b, 0) / lista.length;
+    // La dispersión se GUARDA, no se esconde: un reparto con el triple en un
+    // punto que en otro es una instalación que riega mal, y eso se puede decir
+    // más adelante sin volver a pedirle que mida.
+    const menor = Math.min(...lista), mayor = Math.max(...lista);
+    return capacidad((media * 10) / (min / 60), "medido_vasos", "alta",
+                     { cm_varios: lista, recipientes: lista.length, minutos: min,
+                       cm_medio: Math.round(media * 100) / 100,
+                       uniformidad: mayor > 0 ? Math.round((menor / mayor) * 100) / 100 : null });
+  }
+
   // Lo tecleó él directamente en mm/h. Pantalla avanzada: no se pregunta así en
   // el onboarding. Confianza media — no sabemos cómo lo obtuvo.
   function capacidadDeclarada(mmh) {
@@ -240,6 +317,11 @@
   // un método nuevo no obligue a tocar cada call site.
   function derivar(metodo, entrada = {}) {
     if (entrada.mm_h != null)                   return capacidadDeclarada(entrada.mm_h);
+    // Varios recipientes gana a uno solo esté el método que esté: es la medida
+    // mejor, y se comprueba ANTES para que el onboarding nuevo no caiga por
+    // descuido en la rama de un vaso.
+    if (Array.isArray(entrada.cm_varios))       return capacidadVasos(entrada);
+    if (metodo === "aspersion" && entrada.disposicion) return capacidadAspersion(entrada);
     if (metodo === "goteo")                     return capacidadGoteo(entrada);
     if (metodo === "aspersion" || metodo === "manguera") return capacidadVaso(entrada);
     return fallo("metodo_sin_capacidad", { metodo });
@@ -549,6 +631,7 @@
     MMH_MIN, MMH_MAX, UNIDAD_ORDEN, POR_DEFECTO_MMH,
     REGADERA_MIN_L, REGADERA_MAX_L,
     capacidadGoteo, capacidadVaso, capacidadDeclarada, capacidadEstimada, derivar,
+    capacidadAspersion, capacidadVasos, MIN_RECIPIENTES,
     FUENTES_OPERATIVAS, FUENTES_AL_MOTOR, FUENTES_FIABLES, FUENTES_PROVISIONALES,
     capacidadOperativa, evaluarCapacidadRiego,
     capacidadVigente, caudalOperativo, caudalMotor, puedeDarMinutos, presentarRiegoSeguro,
