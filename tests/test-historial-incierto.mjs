@@ -272,5 +272,119 @@ console.log("\n── 5 · CADENA CRON → LOG → REVEAL, sin escribir fuera �
   void salida;
 }
 
+console.log("\n── 6 · LA LECTURA REAL: el SELECT tiene que traer `contexto` ──");
+{
+  // ⚠️ EL TEST ANTERIOR SE SALTABA LA CONSULTA. Mapeaba `filasLog` a mano y
+  // llamaba a construirReveal, así que nunca pasaba por el SELECT — y el SELECT
+  // pedía `fecha,tipo,cantidad_l_m2,nivel`, sin `contexto`. El cron guardaba la
+  // incertidumbre, la lectura la tiraba, el adaptador veía una fila sin
+  // metadatos, la trataba como log antiguo y el reveal la publicaba:
+  //   publicable: true · recomendada_l_m2: 32.1
+  //
+  // Aquí el doble de supabaseSelect PROYECTA solo las columnas pedidas, como
+  // hace PostgREST. Si la consulta no pide `contexto`, no llega `contexto`.
+  function proyectar(consulta, filas) {
+    const m = /select=([^&]+)/.exec(consulta || "");
+    if (!m) return filas;
+    const cols = m[1].split(",").map(c => c.trim()).filter(Boolean);
+    if (cols.includes("*")) return filas;
+    return filas.map(f => Object.fromEntries(cols.filter(c => c in f).map(c => [c, f[c]])));
+  }
+
+  // A · el cron real congela, con los inserts capturados en memoria.
+  const filasLog = [];
+  const diario = cargarHandler("api/diario-b.js", { config: CFG_NUEVA,
+    capturar: (t, f) => { if (t === "recomendaciones_log") filasLog.push(...f); } });
+  const nada = { status() { return this; }, json() { return this; }, setHeader() {}, end() {} };
+  const antes = process.env.DIARIO_B_LIVE;
+  process.env.DIARIO_B_LIVE = "1";
+  try { await diario({ method: "GET", url: "/api/diario-b", query: {}, headers: {} }, nada); }
+  finally { if (antes === undefined) delete process.env.DIARIO_B_LIVE; else process.env.DIARIO_B_LIVE = antes; }
+  ok(filasLog.length >= 1, `el cron congeló ${filasLog.length} fila(s) en memoria`);
+
+  // C+D+E · el handler REAL de vista=reveal, con la proyección de columnas y el
+  // clima caído para forzar el fallback a recomendaciones_log.
+  function revealCon(filas, { climaRoto = true } = {}) {
+    const orig = Module.prototype.require;
+    Module.prototype.require = function (id) {
+      if (id.endsWith("_supabase.js")) return {
+        isConfigured: () => true, preludio: () => true,
+        supabaseSelect: async (t, q) => {
+          if (t === "usuarios" && /config_app/.test(q)) return [{ config_app: CFG_NUEVA }];
+          if (t === "usuarios") return [U];
+          if (t === "recomendaciones_log") return proyectar(q, filas);
+          if (t === "acciones") return proyectar(q, [{ fecha_local: HOY, tipo: "riego",
+            cantidad_l_m2: 40, duracion_min: null, lamina_mm: 40, lamina_origen: "medida",
+            caudal_mmh: null, producto_nombre: null, motivo: null }]);
+          return [];
+        },
+        supabaseInsert: async () => [], supabaseUpdate: async () => ({}),
+      };
+      if (id.endsWith("_clima.js")) return {
+        // E · el clima del reveal falla → se cae al método heredado.
+        climaSerie: async () => { if (climaRoto) throw new Error("clima no disponible"); return SERIE; },
+        serieTermica: async () => { if (climaRoto) throw new Error("clima no disponible"); return SERIE; },
+        hoyISO: () => HOY, normalesMensuales: async () => null,
+        procedencia: () => ({ fuente: "archivo", dias: 20 }), diasConDato: () => 20,
+        sumarDias: (f, n) => iso(new Date(new Date(`${f}T12:00:00Z`).getTime() + n * 86400000)),
+        diasEntre: () => 0,
+      };
+      return orig.apply(this, arguments);
+    };
+    try { delete require.cache[require.resolve(join(RAIZ, "api/campo.js"))]; } catch (_) {}
+    const h = require(join(RAIZ, "api/campo.js"));
+    Module.prototype.require = orig;
+    return llamar(h, { vista: "reveal", usuario_id: UID });
+  }
+
+  const { salida } = await revealCon(filasLog);
+  const agua = salida?.informe?.dimensiones?.agua || salida?.dimensiones?.agua;
+  ok(!!agua, "el endpoint devuelve la dimensión de agua");
+  ok(agua.clase_metrica === "log_heredado",
+     `y por el fallback a recomendaciones_log (${agua.clase_metrica})`);
+  ok(agua.decisiones_inciertas >= 1,
+     `la fila nueva llega marcada como incierta (${agua.decisiones_inciertas})`);
+  ok(agua.decisiones_sin_metadato_confianza === 0,
+     "y NO se cuenta como log antiguo sin metadatos");
+  ok(agua.publicable === false, "no es publicable");
+  ok(agua.recomendada_l_m2 === null, "sin sacar la cifra comparada");
+  ok(/sin conocer los riegos anteriores/.test(agua.motivo_no_publicable || ""),
+     `con el motivo explícito: "${(agua.motivo_no_publicable || "").slice(0, 58)}…"`);
+
+  console.log("\n  ── controles ──");
+  // Un log con historial CONOCIDO sí se publica.
+  const conocido = filasLog.map(f => ({ ...f,
+    contexto: { ...f.contexto, aportes_previos_desconocidos: 0,
+                historial_sin_determinar: false, confianza: "conocido" } }));
+  const r2 = await revealCon(conocido);
+  const a2 = r2.salida?.informe?.dimensiones?.agua;
+  ok(a2.decisiones_inciertas === 0, "log con historial conocido: 0 decisiones inciertas");
+  ok(a2.decisiones_sin_metadato_confianza === 0, "y con su metadato");
+  ok(!/sin conocer los riegos anteriores/.test(a2.motivo_no_publicable || ""),
+     "no se bloquea por este motivo");
+
+  // Un log REALMENTE antiguo: sin los campos nuevos en el contexto.
+  const viejo = filasLog.map(f => ({ ...f, contexto: { confianza: "conocido" } }));
+  const r3 = await revealCon(viejo);
+  const a3 = r3.salida?.informe?.dimensiones?.agua;
+  ok(a3.decisiones_sin_metadato_confianza >= 1,
+     `log antiguo: ${a3.decisiones_sin_metadato_confianza} sin metadato, contado y no supuesto`);
+  ok(a3.historial_declarado === false, "y declarado como no constante");
+  ok(!/sin conocer los riegos anteriores/.test(a3.motivo_no_publicable || ""),
+     "sin bloquearlo: es anterior a que el metadato existiera");
+
+  // Mezcla: una conocida y una incierta.
+  const mezcla = [
+    { ...filasLog[0], fecha: iso(new Date(hoyD.getTime() - 86400000)) + "T06:00:00Z",
+      contexto: { ...filasLog[0].contexto, aportes_previos_desconocidos: 0,
+                  historial_sin_determinar: false, confianza: "conocido" } },
+    filasLog[0],
+  ];
+  const r4 = await revealCon(mezcla);
+  const a4 = r4.salida?.informe?.dimensiones?.agua;
+  ok(a4.decisiones_inciertas === 1 && a4.publicable === false,
+     `mezcla: ${a4.decisiones_inciertas} de 2 inciertas basta para no publicar`);
+}
+
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }
 console.log("\n✅ TODOS LOS TESTS VERDES");

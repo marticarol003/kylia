@@ -757,7 +757,13 @@ async function revealDeUsuario(u) {
 
   const [recs, acciones, jornadas] = await Promise.all([
     supabaseSelect("recomendaciones_log",
-      `usuario_id=eq.${u.id}${fRec}&select=fecha,tipo,cantidad_l_m2,nivel&order=fecha.asc`),
+      // ⚠️ `contexto` TAMBIÉN. El cron guarda ahí la confianza del balance y los
+      // días sin registro, el adaptador de abajo los lee, y sin pedirlos en el
+      // SELECT llegaban como `undefined`: una fila recién congelada como
+      // INCIERTA se leía como log antiguo sin metadatos y el reveal la
+      // publicaba (publicable: true, recomendada 32,1 L/m²). La incertidumbre
+      // se guardaba bien y se perdía al leerla.
+      `usuario_id=eq.${u.id}${fRec}&select=fecha,tipo,cantidad_l_m2,nivel,contexto&order=fecha.asc`),
     supabaseSelect("acciones",
       `usuario_id=eq.${u.id}${fAcc}&select=fecha_local,tipo,cantidad_l_m2,duracion_min,lamina_mm,lamina_origen,caudal_mmh,producto_nombre,motivo&order=fecha_local.asc`),
     supabaseSelect("jornadas", `usuario_id=eq.${u.id}&select=fuente_decision`),
