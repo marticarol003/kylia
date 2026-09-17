@@ -58,16 +58,23 @@
                                    (ocupados || []).map(o => o.geometria).filter(Boolean));
       if (!v.ok) return { ok: false, motivo: v.motivo, con: v.con ?? null };
     }
-    const r = reparto(parcela, ocupados);
-    const area = m2(candidato?.area_m2);
-    if (area > 0 && area > r.sin_asignar + tolerancia) {
-      return { ok: false, motivo: "no_cabe", sin_asignar: r.sin_asignar, pedido: Math.round(area) };
-    }
+    // Sin geometría no hay cultivo que validar: no se asignan metros a ciegas.
+    if (!candidato?.geometria) return { ok: false, motivo: "sin_geometria" };
+    // Y ya está: si el contorno cabe dentro de la parcela y no pisa a nadie, la
+    // superficie CUADRA por construcción. Comparar un `area_m2` declarado contra
+    // los metros libres era una segunda verdad que podía contradecir a la
+    // primera; ahora la única verdad es el dibujo.
+    void reparto; void tolerancia;
     return { ok: true, motivo: null };
   }
 
   const MOTIVOS = {
-    sin_geometria:          "Marca en el mapa qué parte ocupa este cultivo.",
+    sin_geometria:          "Marca en el mapa qué zona ocupa este cultivo.",
+    parcela_invalida:       "El contorno de la parcela no es válido.",
+    se_cruza_consigo_mismo: "Ese contorno se cruza consigo mismo. Mueve el punto por otro sitio.",
+    area_nula:              "Ese contorno no encierra superficie.",
+    pocos_vertices:         "Ese contorno no tiene forma. Vuelve a marcarlo.",
+    coordenada_no_finita:   "Ese contorno no es válido. Vuelve a marcarlo.",
     se_cruza_consigo_mismo: "Ese contorno se cruza consigo mismo. Prueba a mover el punto por otro sitio.",
     fuera_de_la_parcela:    "Se sale de tu parcela. Muévelo hacia dentro.",
     se_solapa:              "Se pisa con otro cultivo que ya has añadido.",
@@ -101,7 +108,11 @@
 
   function nuevoBorrador(parcela, ocuparTodo = false) {
     return { cultivo: null, cultivoId: null, soportado: null,
-             area_m2: ocuparTodo ? m2(parcela?.superficie_m2 ?? parcela?.area_m2) : null,
+             // ⚠️ El área NO se declara aquí: sale del polígono cuando lo haya.
+             // La superficie oficial del recinto y el área de su contorno no
+             // tienen por qué coincidir, y persistir la primera con el segundo
+             // debajo es guardar dos verdades distintas sobre el mismo cultivo.
+             area_m2: null,
              geometria: ocuparTodo ? (parcela?.geometria || null) : null,
              ocupaTodo: !!ocuparTodo,
              fechaPlantacion: null, metodoRiego: null, riego: null, caudal: null,
@@ -158,20 +169,33 @@
   // Cuánto queda libre AHORA, contando lo ya guardado y sin contar el borrador.
   const libres = (flujo) => reparto(flujo.parcela, flujo.cultivos).sin_asignar;
 
-  // "Usar toda la superficie disponible": el atajo que evita dibujar cuando el
-  // cultivo ocupa lo que queda. Con la parcela vacía es la parcela entera.
+  // ─── "Usar toda la parcela" ──────────────────────────────────────────────
+  //
+  // ⚠️ SOLO CUANDO PODEMOS CONSTRUIR EL POLÍGONO EXACTO, o sea cuando no hay
+  // ningún cultivo todavía: entonces "todo" es literalmente el contorno de la
+  // parcela y se copia tal cual.
+  //
+  // Con cultivos dentro, el trozo que queda libre es la DIFERENCIA entre la
+  // parcela y lo ya ocupado, y eso puede ser cualquier cosa: varios pedazos,
+  // con agujeros, cóncavo. No sabemos dibujarlo, y la versión anterior lo
+  // resolvía asignando los metros SIN geometría — un cultivo con 1.306 m²
+  // declarados y un rectángulo cualquiera debajo. El satélite mide el dibujo,
+  // no el número, así que eso es peor que no ofrecer el atajo.
+  const puedeUsarTodo = (flujo) => (flujo?.cultivos?.length || 0) === 0
+                                   && !!flujo?.parcela?.geometria;
+
   function usarTodoLoLibre(flujo) {
     const b = flujo.borrador;
-    if (!b) return flujo;
-    const soloEl = flujo.cultivos.length === 0;
+    if (!b || !puedeUsarTodo(flujo)) return flujo;
     return { ...flujo, borrador: { ...b, ocupaTodo: true,
-      area_m2: libres(flujo),
-      // Solo se puede heredar el contorno de la parcela si no hay nadie más:
-      // con vecinos, el trozo libre no es un polígono que sepamos dibujar solos.
-      geometria: soloEl ? (flujo.parcela?.geometria || null) : b.geometria } };
+      geometria: flujo.parcela.geometria,
+      // El área sale del polígono, siempre. Quien llama pasa el módulo de
+      // geometría; sin él se deja en null antes que inventar un número.
+      area_m2: null } };
   }
 
   return { PASOS_CULTIVO, reparto, cabe, explicar, MOTIVOS,
            nuevoFlujo, elegirParcela, responderCuantos, nuevoBorrador,
-           completo, avanzar, guardarCultivo, anadirOtro, libres, usarTodoLoLibre };
+           completo, avanzar, guardarCultivo, anadirOtro, libres,
+           usarTodoLoLibre, puedeUsarTodo };
 });

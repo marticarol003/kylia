@@ -3165,7 +3165,7 @@
         <p class="alta-preg">¿Qué parte de la parcela ocupa?</p>
         <div id="pc-mapa2" class="pc-mapa"></div>
         <p class="alta-nota" id="pc-sup-nota"></p>
-        <button type="button" class="alta-chip ancho" id="pc-todo">Usar toda la superficie disponible</button>
+        <button type="button" class="alta-chip ancho" id="pc-todo" hidden>Usar toda la parcela</button>
         <button type="button" class="alta-btn" id="pc-b-sup" disabled>Seguir</button>
       </section>
 
@@ -11338,6 +11338,14 @@
       // Sonda para los tests de navegador, como window.__A en el alta. Es una
       // función y no una copia: así siempre devuelve el flujo VIGENTE.
       window.__PCF = () => F;
+      // Pone un contorno en el borrador y repinta, igual que hace soltar un
+      // tirador. Es la sonda con la que el test de navegador comprueba que el
+      // solape y la salida de la parcela se bloquean de verdad.
+      window.__pcPonerContorno = (geom) => {
+        F = { ...F, borrador: { ...F.borrador, geometria: geom, ocupaTodo: false,
+              area_m2: geom ? GEO.areaDePolygon(geom) : null } };
+        if (geom) revisarSuperficie(); else pintarSuperficie();
+      };
       let recintos = [];            // los de SIGPAC alrededor
       let seleccionada = null;      // la que ha tocado, aún sin confirmar
       let mapa = null, mapa2 = null, mapa3 = null;
@@ -11520,8 +11528,7 @@
           // menos que el agricultor arrastrase una esquina — y si el rectángulo
           // ya le valía, no tenía por qué tocar nada. Se quedaba encallado en
           // esa pantalla. Lo cazó el test de navegador.
-          if (g) F = { ...F, borrador: { ...b, geometria: g,
-            area_m2: Math.round(GEO.areaM2(GEO.anilloExterior(g))) } };
+          if (g) F = { ...F, borrador: { ...b, geometria: g, area_m2: GEO.areaDePolygon(g) } };
         }
         const capas = [
           L.geoJSON(F.parcela.geometria, { style: { color: "#fff", weight: 2, fillOpacity: 0.05, dashArray: "5 4" } }),
@@ -11567,8 +11574,7 @@
           }
           for (const [dx, dy] of saltos) {
             const cand = dx || dy ? desplazar(base, dx, dy) : base;
-            const area = Math.round(GEO.areaM2(GEO.anilloExterior(cand)));
-            if (FLUJO.cabe(GEO, { geometria: cand, area_m2: area }, F.parcela, F.cultivos).ok) return cand;
+            if (FLUJO.cabe(GEO, { geometria: cand }, F.parcela, F.cultivos).ok) return cand;
           }
         }
         return GEO.rectanguloCentrado(F.parcela.geometria, libre * 0.4)?.geometria || null;
@@ -11595,20 +11601,26 @@
           return;
         }
         F = { ...F, borrador: { ...F.borrador, geometria: r.geometria, ocupaTodo: false,
-              area_m2: Math.round(GEO.areaM2(GEO.anilloExterior(r.geometria))) } };
+              area_m2: GEO.areaDePolygon(r.geometria) } };
         revisarSuperficie();
       }
 
       function revisarSuperficie() {
         let b = F?.borrador;
         if (!b) return;
-        // Si hay contorno, la superficie SALE DE ÉL. Tenerlos por separado
-        // dejaba guardar un cultivo cuyo área decía una cosa y cuyo dibujo decía
-        // otra — y el satélite mide el dibujo.
-        if (b.geometria) {
-          const area = Math.round(GEO.areaM2(GEO.anilloExterior(b.geometria)));
-          if (area !== b.area_m2) { b = { ...b, area_m2: area }; F = { ...F, borrador: b }; }
-        }
+        // ⚠️ LA SUPERFICIE SALE DEL POLÍGONO. SIEMPRE. Guardar un `area_m2` por
+        // su cuenta deja dos verdades sobre el mismo cultivo, y el satélite mide
+        // el DIBUJO, no el número. `areaDePolygon` devuelve null si la geometría
+        // no vale, y entonces tampoco hay superficie que enseñar.
+        const area = b.geometria ? GEO.areaDePolygon(b.geometria) : null;
+        if (area !== b.area_m2) { b = { ...b, area_m2: area }; F = { ...F, borrador: b }; }
+
+        // El atajo solo existe cuando "todo" es EXACTAMENTE el contorno de la
+        // parcela, o sea con la parcela aún vacía. Con vecinos dentro, el trozo
+        // libre es una diferencia geométrica que no sabemos dibujar — y asignar
+        // los metros sin polígono es justo lo que no puede pasar.
+        $("pc-todo").hidden = !FLUJO.puedeUsarTodo(F);
+
         const v = FLUJO.cabe(GEO, b, F.parcela, F.cultivos);
         const rep = FLUJO.reparto(F.parcela, F.cultivos);
         const nota = $("pc-sup-nota");
@@ -11620,7 +11632,7 @@
         }
         nota.className = "alta-nota";
         nota.innerHTML = `Este cultivo ocupa <strong>${m2(b.area_m2)} m²</strong>`
-          + (rep.sin_asignar ? ` · quedaban ${m2(rep.sin_asignar)} m² sin asignar.` : ".");
+          + (rep.sin_asignar ? ` · quedan ${m2(rep.sin_asignar)} m² sin configurar.` : ".");
         $("pc-b-sup").disabled = !(Number(b.area_m2) > 0);
       }
 
@@ -11792,7 +11804,10 @@
                 + `<span>${m2(c.area_m2)} m²</span></div>`;
             }).join("")
           + (rep.sin_asignar
-              ? `<div class="pc-fila"><b class="pc-libre">Sin asignar</b><span>${m2(rep.sin_asignar)} m²</span></div>`
+              // "Sin configurar" y no "sin asignar": esa superficie puede tener
+              // otros cultivos que el agricultor no quiere registrar en Kylia, y
+              // llamarla "sin asignar" da a entender que está vacía.
+              ? `<div class="pc-fila"><b class="pc-libre">Sin configurar</b><span>${m2(rep.sin_asignar)} m²</span></div>`
               : "");
         $("pc-otro").hidden = FLUJO.libres(F) < 10;
       }

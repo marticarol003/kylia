@@ -133,6 +133,50 @@ try {
     clic("#pc-b-riego"); await sleep(1000);
     o.lista2 = $("pc-lista").textContent.replace(/\s+/g, " ").trim();
 
+    // ── §10 · los bloqueos, moviendo el contorno de verdad ──────────────
+    // Se añade un TERCER cultivo y se le mueve el contorno encima del primero y
+    // luego fuera de la parcela, comprobando que el botón de seguir se apaga y
+    // la nota lo explica. Se manipula el estado del flujo con las mismas
+    // funciones que usa el arrastre (KyliaGeo), no un doble.
+    clic("#pc-otro"); await sleep(200);
+    const t3 = $("pc-cultivo-txt");
+    t3.value = "Espinaca"; t3.dispatchEvent(new Event("input", { bubbles: true })); await sleep(150);
+    clic("#pc-b-cultivo"); await sleep(1400);
+    o.tercerValido = $("pc-b-sup").disabled === false;
+    o.tercerNota = $("pc-sup-nota").textContent;
+
+    // ENCIMA del primer cultivo (que ocupa media parcela desde el borde oeste).
+    const f = window.__PCF();
+    const primero = f.cultivos[0].geometria;
+    window.__pcPonerContorno(JSON.parse(JSON.stringify(primero)));
+    await sleep(300);
+    o.solapeBloqueado = $("pc-b-sup").disabled === true;
+    o.solapeNota = $("pc-sup-nota").textContent;
+
+    // FUERA de la parcela: se desplaza el contorno medio grado al este.
+    const parc = f.parcela.geometria;
+    const anillo = window.KyliaGeo.anilloExterior(parc);
+    const fuera = { type: "Polygon", coordinates: [[...anillo.map(([lo, la]) => [lo + 0.01, la]),
+                                                    [anillo[0][0] + 0.01, anillo[0][1]]]] };
+    window.__pcPonerContorno(fuera);
+    await sleep(300);
+    o.fueraBloqueado = $("pc-b-sup").disabled === true;
+    o.fueraNota = $("pc-sup-nota").textContent;
+
+    // Y de vuelta a un sitio válido: el bloqueo no es permanente.
+    window.__pcPonerContorno(null);
+    await sleep(700);
+    o.recuperado = $("pc-b-sup").disabled === false;
+
+    // Se termina el tercero, para comprobar que tres cultivos conviven.
+    clic("#pc-b-sup"); await sleep(200);
+    clic("#pc-cuando [data-hace='5']"); await sleep(100);
+    clic("#pc-b-fecha"); await sleep(200);
+    clic("#pc-metodo [data-metodo='surco']"); await sleep(150);
+    o.surcoSinCapacidad = $("pc-nolose-caja").hidden === true;
+    clic("#pc-b-riego"); await sleep(1000);
+    o.lista3 = $("pc-lista").textContent.replace(/\s+/g, " ").trim();
+
     clic("#pc-listo"); await sleep(400);
     o.cerrado = $("pc").hidden === true;
     const zonas = JSON.parse(localStorage.getItem("kylia_zonas") || "[]");
@@ -182,7 +226,10 @@ try {
 
   console.log("\n── dos cultivos en la misma parcela ──");
   ok(r.trasRiego === "resumen", "guardar un cultivo lleva al resumen");
-  ok(/Lechuga/.test(r.lista1) && /Sin asignar/.test(r.lista1),
+  // "Sin configurar" y no "sin asignar": esa superficie puede tener otros
+  // cultivos que el agricultor no quiere registrar en Kylia, y llamarla "sin
+  // asignar" da a entender que está vacía.
+  ok(/Lechuga/.test(r.lista1) && /Sin configurar/.test(r.lista1),
      `el resumen se pinta: "${r.lista1}"`);
   ok(r.solapaEvitado === true,
      "el contorno del SEGUNDO cultivo nace en un hueco libre, no encima del primero");
@@ -192,7 +239,7 @@ try {
 
   console.log("\n── lo que queda guardado ──");
   ok(r.cerrado === true && r.zonas === 1 && r.ref === "R1", "una parcela guardada");
-  ok(r.siembras.length === 2, `con sus dos cultivos (${r.siembras.length})`);
+  ok(r.siembras.length === 3, `con sus tres cultivos (${r.siembras.length})`);
   const [a, b] = r.siembras;
   ok(a.cultivo === "lechuga" && b.cultivo.startsWith("otro:"),
      "el soportado con su id canónico, el otro marcado como tal");
@@ -204,6 +251,16 @@ try {
   ok(a.geom && b.geom, "cada uno con su contorno");
   ok(a.id && b.id && a.token && b.token,
      "y con id y token de sincronización: nacen por nuevaSiembra, como el resto de la app");
+
+  console.log("\n── §10 · se bloquea lo imposible, arrastrando de verdad ──");
+  ok(r.tercerValido === true, `un tercer cultivo nace en sitio válido: "${r.tercerNota}"`);
+  ok(r.solapeBloqueado === true, "moverlo ENCIMA de otro cultivo apaga el botón de seguir");
+  ok(/pisa con otro cultivo/.test(r.solapeNota), `y lo explica: "${r.solapeNota}"`);
+  ok(r.fueraBloqueado === true, "sacarlo de la parcela, también");
+  ok(/sale de tu parcela/i.test(r.fueraNota), `y lo explica: "${r.fueraNota}"`);
+  ok(r.recuperado === true, "y al volver a un sitio válido se puede seguir: el bloqueo no es permanente");
+  ok(r.surcoSinCapacidad === true, "a surco no se le pregunta capacidad: su orden va en L/m²");
+  ok(/Espinaca/.test(r.lista3), `y los tres salen en la lista: "${r.lista3}"`);
 
   console.log("\n── sin errores de JavaScript ──");
   ok(errores.length === 0, `0 errores de página (${errores.length ? errores.join(" · ") : "0"})`);

@@ -302,94 +302,174 @@
 
   // ─── Un cultivo dentro de su parcela, sin pisar a los vecinos ────────────
   //
-  // Hacía falta para repartir un recinto entre varios cultivos: hasta ahora solo
-  // se sabía si un PUNTO caía dentro (contieneAlPunto), y con eso no se puede
-  // impedir que un cultivo se salga de la parcela ni que se solape con otro.
+  // ⚠️ AQUÍ NO SE ENCOGE NADA. La primera versión muestreaba los polígonos
+  // tirando los puntos un 0,5% hacia su centro para que "compartir borde" no
+  // contase como "compartir área". Funcionaba para el caso de la linde y fallaba
+  // para todo lo demás: en una parcela de 100×100 m dejaba pasar un solape de
+  // 10 m² y una salida de 20 m², porque ambos caben dentro de ese 0,5%. Un
+  // margen relativo aplicado a una pregunta topológica da respuestas falsas
+  // proporcionales al tamaño del campo.
   //
-  // Todo en grados, con el mismo criterio que el resto del fichero: a estas
-  // escalas (un bancal, una hectárea) la distorsión es irrelevante para decidir
-  // dentro/fuera, y las áreas siguen calculándose con areaM2, que sí proyecta.
+  // LO QUE SE HACE AHORA. No hace falta recortar polígonos ni medir áreas de
+  // intersección: para polígonos SIMPLES, "¿el área compartida es cero o
+  // positiva?" se decide de forma EXACTA con dos predicados.
+  //
+  //   · cruce PROPIO de bordes → los bordes se atraviesan de verdad, en un punto
+  //     interior a los dos segmentos. Tocarse en un vértice o compartir un tramo
+  //     de linde NO es un cruce propio, y por eso compartir borde sigue valiendo.
+  //   · punto ESTRICTAMENTE interior de uno dentro del otro → uno contiene al
+  //     otro, aunque sus bordes no se crucen.
+  //
+  // Dos polígonos simples comparten área si y solo si se da una de las dos. Sin
+  // tolerancia relativa, sin muestreo y sin depender de lo grande que sea el
+  // campo. La única tolerancia que queda es el epsilon numérico de los propios
+  // cálculos en coma flotante.
 
-  // ¿Se cruzan los segmentos AB y CD? Incluye el caso de tocarse en un punto.
-  function segmentosCruzan(a, b, c, d) {
-    const cruz = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
-    const enCaja = (p, q, r) =>
-      Math.min(p[0], q[0]) <= r[0] && r[0] <= Math.max(p[0], q[0]) &&
-      Math.min(p[1], q[1]) <= r[1] && r[1] <= Math.max(p[1], q[1]);
-    const d1 = cruz(a, b, c), d2 = cruz(a, b, d), d3 = cruz(c, d, a), d4 = cruz(c, d, b);
-    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
-        ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
-    // Colineales: basta con que el punto caiga dentro del otro segmento.
-    if (d1 === 0 && enCaja(a, b, c)) return true;
-    if (d2 === 0 && enCaja(a, b, d)) return true;
-    if (d3 === 0 && enCaja(c, d, a)) return true;
-    if (d4 === 0 && enCaja(c, d, b)) return true;
-    return false;
+  const EPS = 1e-12;          // epsilon numérico, no una tolerancia agronómica
+  const AREA_MIN_M2 = 0.5;    // por debajo de esto no es un recinto, es un error
+
+  const cruz = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const signo = (v) => (v > EPS ? 1 : v < -EPS ? -1 : 0);
+  const enCaja = (p, q, r) =>
+    Math.min(p[0], q[0]) - EPS <= r[0] && r[0] <= Math.max(p[0], q[0]) + EPS &&
+    Math.min(p[1], q[1]) - EPS <= r[1] && r[1] <= Math.max(p[1], q[1]) + EPS;
+
+  // CRUCE PROPIO: los dos segmentos se atraviesan en un punto interior a ambos.
+  // Si alguno de los cuatro giros sale 0, hay contacto (vértice compartido o
+  // tramo colineal) y eso NO es atravesar.
+  function crucePropio(a, b, c, d) {
+    const d1 = signo(cruz(a, b, c)), d2 = signo(cruz(a, b, d));
+    const d3 = signo(cruz(c, d, a)), d4 = signo(cruz(c, d, b));
+    return d1 !== 0 && d2 !== 0 && d3 !== 0 && d4 !== 0 && d1 !== d2 && d3 !== d4;
   }
 
-  const lados = (ring) => ring.map((p, i) => [p, ring[(i + 1) % ring.length]]);
+  const enSegmento = (p, q, r) => signo(cruz(p, q, r)) === 0 && enCaja(p, q, r);
 
-  // MUESTRAS ENCOGIDAS. El problema de decidir dentro/fuera con los vértices tal
-  // cual es que en el campo los bordes COINCIDEN: un cultivo que ocupa toda la
-  // parcela comparte los cuatro lados con ella, y dos bancales vecinos comparten
-  // la linde. Con un test de cruce de segmentos, lo primero salía "fuera de la
-  // parcela" y lo segundo "se solapan" — las dos cosas, falsas.
-  //
-  // Se toman puntos del polígono tirados un pelín hacia su propio centro (0,5%).
-  // Un punto así está siempre ESTRICTAMENTE dentro del polígono del que sale, y
-  // eso convierte "compartir borde" en "no compartir área", que es lo que de
-  // verdad queremos saber. A la escala de un bancal ese 0,5% son centímetros.
-  const ENCOGE = 0.005;
-  function muestras(geom) {
-    const ring = anilloExterior(geom);
-    if (ring.length < 3) return [];
-    const cx = ring.reduce((s, p) => s + p[0], 0) / ring.length;
-    const cy = ring.reduce((s, p) => s + p[1], 0) / ring.length;
-    const haciaDentro = ([x, y]) => [x + (cx - x) * ENCOGE, y + (cy - y) * ENCOGE];
-    const pts = [[cx, cy]];
-    for (const [a, b] of lados(ring)) {
-      pts.push(haciaDentro(a));
-      // También a lo largo del lado: una "pajarita" que sale y vuelve a entrar
-      // puede tener todos los vértices dentro y el lado fuera.
-      for (const t of [0.25, 0.5, 0.75]) {
-        pts.push(haciaDentro([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]));
-      }
+  // Dónde cae un punto respecto de un anillo: dentro, en el borde, o fuera. El
+  // borde se distingue a propósito — es lo que permite que dos cultivos
+  // compartan linde sin que eso cuente como pisarse.
+  function situarPunto(anillo, p) {
+    const n = anillo.length;
+    for (let i = 0; i < n; i++) {
+      if (enSegmento(anillo[i], anillo[(i + 1) % n], p)) return "borde";
     }
-    return pts;
+    let dentro = false;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const [xi, yi] = anillo[i], [xj, yj] = anillo[j];
+      if ((yi > p[1]) !== (yj > p[1]) &&
+          p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) dentro = !dentro;
+    }
+    return dentro ? "dentro" : "fuera";
   }
 
-  // ¿Está `interior` ENTERO dentro de `exterior`? Si algún punto suyo se sale,
-  // no lo está. Ocupar la parcela entera SÍ vale: es el caso corriente.
-  function contenidoEn(interior, exterior) {
-    const pts = muestras(interior);
-    if (!pts.length) return false;
-    return pts.every(p => contieneAlPunto(exterior, p));
-  }
+  const medio = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  const ladosDe = (anillo) => anillo.map((p, i) => [p, anillo[(i + 1) % anillo.length]]);
 
-  // ¿Se pisan dos cultivos? Comparten ÁREA, no solo borde. Dos bancales pegados
-  // por la linde es lo normal en un campo y no es un solape.
-  function seSolapan(a, b) {
-    const pa = muestras(a), pb = muestras(b);
-    if (!pa.length || !pb.length) return false;
-    if (pa.some(p => contieneAlPunto(b, p))) return true;
-    if (pb.some(p => contieneAlPunto(a, p))) return true;
+  function hayCrucePropio(ra, rb) {
+    for (const [a, b] of ladosDe(ra)) {
+      for (const [c, d] of ladosDe(rb)) if (crucePropio(a, b, c, d)) return true;
+    }
     return false;
+  }
+
+  // ─── Validación canónica de un Polygon GeoJSON ───────────────────────────
+  // UNA sola puerta. Antes cada función comprobaba lo que le parecía: una
+  // pajarita pasaba como válida, un polígono de área cero también, y uno vacío
+  // reventaba con una excepción en vez de decir qué le pasaba. Aquí nada lanza:
+  // lo que no vale, sale con su motivo.
+  //
+  // ⚠️ RECIBE GeoJSON, no un anillo. El contrato está en el nombre a propósito:
+  // `esSimple` espera un ANILLO y se le estaba pasando el GeoJSON entero, así
+  // que devolvía true para cualquier cosa y las pajaritas se colaban.
+  function validarPolygonGeoJSON(geom) {
+    if (!geom || typeof geom !== "object") return { ok: false, motivo: "sin_geometria" };
+    const tipo = geom.type;
+    if (tipo !== "Polygon" && tipo !== "MultiPolygon") return { ok: false, motivo: "tipo_no_soportado" };
+    let anillo;
+    try { anillo = anilloExterior(geom); } catch (_) { return { ok: false, motivo: "sin_coordenadas" }; }
+    if (!Array.isArray(anillo) || anillo.length < 3) return { ok: false, motivo: "pocos_vertices" };
+    for (const p of anillo) {
+      if (!Array.isArray(p) || p.length < 2) return { ok: false, motivo: "sin_coordenadas" };
+      if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) return { ok: false, motivo: "coordenada_no_finita" };
+    }
+    // Vértices repetidos seguidos: no aportan lado y estropean los predicados.
+    const limpio = anillo.filter((p, i) => {
+      const q = anillo[(i + 1) % anillo.length];
+      return Math.abs(p[0] - q[0]) > EPS || Math.abs(p[1] - q[1]) > EPS;
+    });
+    if (limpio.length < 3) return { ok: false, motivo: "pocos_vertices" };
+    // ⚠️ LA SIMPLICIDAD SE MIRA ANTES QUE EL ÁREA. El área de Gauss de una
+    // pajarita simétrica se cancela y sale ~0, así que comprobando primero el
+    // área se la acusaba de "área nula" — cierto de la fórmula, y equivocado
+    // sobre lo que le pasa. El motivo que se enseña tiene que ser el de verdad.
+    if (!esSimple(limpio)) return { ok: false, motivo: "se_cruza_consigo_mismo" };
+    const area = areaM2(limpio);
+    if (!Number.isFinite(area) || area < AREA_MIN_M2) return { ok: false, motivo: "area_nula" };
+    return { ok: true, motivo: null, anillo: limpio, area_m2: Math.round(area) };
+  }
+
+  // ¿Está `interior` ENTERO dentro de `exterior`? Ocupar la parcela entera vale;
+  // sobresalir una franja, por estrecha que sea, no. Exacto, sin tolerancia.
+  function contenidoEn(interior, exterior) {
+    const vi = validarPolygonGeoJSON(interior), ve = validarPolygonGeoJSON(exterior);
+    if (!vi.ok || !ve.ok) return false;
+    const ri = vi.anillo, re = ve.anillo;
+    // Un solo vértice fuera ya lo descarta.
+    for (const p of ri) if (situarPunto(re, p) === "fuera") return false;
+    // Atravesar el borde: es lo que pasa cuando sobresale un trozo, y también
+    // cuando un cultivo cruza el hueco de una parcela en forma de L.
+    if (hayCrucePropio(ri, re)) return false;
+    // Y el punto medio de cada lado: cubre el caso de salir y volver a entrar
+    // justo por dos vértices del exterior, donde no hay cruce propio.
+    for (const [a, b] of ladosDe(ri)) if (situarPunto(re, medio(a, b)) === "fuera") return false;
+    return true;
+  }
+
+  // ¿Comparten ÁREA dos cultivos? Compartir un punto o un tramo de linde NO
+  // cuenta: el área de intersección de eso es cero, y dos bancales pegados es lo
+  // normal en un campo.
+  function seSolapan(a, b) {
+    const va = validarPolygonGeoJSON(a), vb = validarPolygonGeoJSON(b);
+    if (!va.ok || !vb.ok) return false;
+    const ra = va.anillo, rb = vb.anillo;
+    if (hayCrucePropio(ra, rb)) return true;
+    // ⚠️ UNO DENTRO DEL OTRO, INCLUIDO SER EL MISMO. Con dos polígonos idénticos
+    // no hay cruces propios (los lados son colineales) y NINGÚN vértice cae
+    // "dentro" del otro: todos caen en el borde. Sin esta línea, arrastrar un
+    // cultivo exactamente encima de otro se daba por bueno. Lo cazó el test de
+    // navegador; el unitario usaba rectángulos anidados y no lo veía.
+    if (contenidoEn(a, b) || contenidoEn(b, a)) return true;
+    // Y el caso general: un punto estrictamente interior de uno dentro del otro.
+    const algunoDentro = (r1, r2) =>
+      r1.some(p => situarPunto(r2, p) === "dentro") ||
+      ladosDe(r1).some(([x, y]) => situarPunto(r2, medio(x, y)) === "dentro");
+    return algunoDentro(ra, rb) || algunoDentro(rb, ra);
   }
 
   // La comprobación que usa el editor, con el motivo dicho para poder enseñarlo.
+  // El área SIEMPRE sale del polígono: nunca se declara por separado.
   function validarCultivo(geom, parcela, ocupados = []) {
-    if (!geom || !parcela) return { ok: false, motivo: "sin_geometria" };
-    if (!esSimple(geom)) return { ok: false, motivo: "se_cruza_consigo_mismo" };
+    const v = validarPolygonGeoJSON(geom);
+    if (!v.ok) return { ok: false, motivo: v.motivo };
+    const vp = validarPolygonGeoJSON(parcela);
+    if (!vp.ok) return { ok: false, motivo: "parcela_invalida" };
     if (!contenidoEn(geom, parcela)) return { ok: false, motivo: "fuera_de_la_parcela" };
     for (let i = 0; i < ocupados.length; i++) {
-      if (ocupados[i] && seSolapan(geom, ocupados[i])) {
-        return { ok: false, motivo: "se_solapa", con: i };
-      }
+      if (!ocupados[i]) continue;
+      if (seSolapan(geom, ocupados[i])) return { ok: false, motivo: "se_solapa", con: i };
     }
-    return { ok: true, motivo: null, area_m2: Math.round(areaM2(anilloExterior(geom))) };
+    return { ok: true, motivo: null, area_m2: v.area_m2 };
+  }
+
+  // Área (m²) de un Polygon GeoJSON, sin que quien llama tenga que acordarse de
+  // sacar el anillo. Devuelve null si la geometría no vale — nunca lanza.
+  function areaDePolygon(geom) {
+    const v = validarPolygonGeoJSON(geom);
+    return v.ok ? v.area_m2 : null;
   }
 
   return { areaM2, anilloExterior, partirPorLinea, R_TIERRA, contieneAlPunto,
            esSimple, moverVertice, insertarVertice, quitarVertice, rectanguloCentrado,
-           segmentosCruzan, contenidoEn, seSolapan, validarCultivo };
+           crucePropio, situarPunto, validarPolygonGeoJSON, areaDePolygon,
+           contenidoEn, seSolapan, validarCultivo };
 });

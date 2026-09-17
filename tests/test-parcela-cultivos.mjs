@@ -48,8 +48,13 @@ console.log("── 1 parcela + 1 cultivo ocupando TODO ──");
 {
   let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "uno");
   ok(f.borrador.ocupaTodo === true, "con un solo cultivo se propone que ocupe la parcela entera");
-  ok(f.borrador.area_m2 === 5226, `y su superficie viene puesta (${f.borrador.area_m2} m²)`);
-  ok(f.borrador.geometria === PARCELA.geometria, "sin obligarle a dibujar de cero");
+  ok(f.borrador.geometria === PARCELA.geometria, "con el contorno de la parcela, sin dibujar de cero");
+  // ⚠️ La superficie NO se declara: sale del polígono. La oficial del recinto y
+  // el área de su contorno no tienen por qué coincidir, y persistir la primera
+  // con el segundo debajo es guardar dos verdades sobre el mismo cultivo.
+  ok(f.borrador.area_m2 === null, "y sin superficie declarada: esa sale del contorno");
+  ok(G.areaDePolygon(f.borrador.geometria) > 0,
+     `el área del contorno es ${G.areaDePolygon(f.borrador.geometria)} m², y es la que vale`);
   f = anadir(f, { cultivo: "Lechuga", area: 5226, geometria: PARCELA.geometria,
                   fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
   const r = P.reparto(PARCELA, f.cultivos);
@@ -129,13 +134,20 @@ console.log("\n── \"usar toda la superficie disponible\" ──");
 {
   let f = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "varios");
   f = anadir(f, { cultivo: "Lechuga", area: 2000, geometria: cuad(0, 0, 5, 5), fecha: "2026-09-02", metodo: "goteo", caudal: 6.7 });
-  f = P.usarTodoLoLibre(P.anadirOtro(f));
-  ok(f.borrador.area_m2 === 3226, `el segundo cultivo coge los ${f.borrador.area_m2} m² que quedaban`);
-  ok(f.borrador.geometria === null,
-     "pero sin heredar el contorno de la parcela: con un vecino dentro, ese trozo no lo sabemos dibujar solos");
-  // Con la parcela vacía sí puede heredarlo.
-  let g = P.usarTodoLoLibre(P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "varios"));
-  ok(g.borrador.geometria === PARCELA.geometria, "con la parcela vacía, sí hereda el contorno entero");
+  // ⚠️ CON VECINOS DENTRO EL ATAJO NO SE OFRECE. El trozo libre es la diferencia
+  // entre la parcela y lo ocupado: puede ser varios pedazos, cóncavo o con
+  // agujeros, y no sabemos dibujarlo. La versión anterior lo resolvía asignando
+  // los metros SIN geometría — y el satélite mide el dibujo, no el número.
+  const conVecino = P.anadirOtro(f);
+  ok(P.puedeUsarTodo(conVecino) === false, "con un cultivo dentro, el atajo NO se ofrece");
+  const intento = P.usarTodoLoLibre(conVecino);
+  ok(intento.borrador.geometria === null && intento.borrador.area_m2 === null,
+     "y si alguien lo llama igual, no asigna metros a ciegas");
+  // Con la parcela vacía sí: ahí "todo" ES el contorno de la parcela, exacto.
+  let g = P.responderCuantos(P.elegirParcela(P.nuevoFlujo(), PARCELA), "varios");
+  ok(P.puedeUsarTodo(g) === true, "con la parcela vacía sí se ofrece");
+  g = P.usarTodoLoLibre(g);
+  ok(g.borrador.geometria === PARCELA.geometria, "y copia el contorno entero, tal cual");
 }
 
 console.log("\n── añadir un cultivo DESPUÉS, sobre una parcela ya hecha ──");
