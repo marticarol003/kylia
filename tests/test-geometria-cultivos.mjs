@@ -12,6 +12,7 @@
 // polígonos simples, "¿el área compartida es cero o positiva?" se decide EXACTO
 // con dos predicados —cruce propio de bordes y punto estrictamente interior—.
 // La única tolerancia que queda es el epsilon de la coma flotante.
+import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { createRequire } from "module";
@@ -182,6 +183,115 @@ console.log("\n── ÁREA ↔ GEOJSON · la superficie sale del polígono, sie
       if (G.seSolapan(releidos[i].geometria, releidos[j].geometria)) choques++;
   ok(choques === 0, "los tres conviven sin pisarse, pegados por las lindes");
   ok(releidos.every(c => G.contenidoEn(c.geometria, PARCELA)), "y los tres dentro de la parcela");
+}
+
+console.log("\n── AGUJEROS · un anillo interior no es superficie del agricultor ──");
+{
+  // Parcela de 100×100 con un hueco de 25×25 en el centro: una caseta, una
+  // balsa, un poste. 625 m² que no son suyos.
+  const hueco = [pt(.375, .375), pt(.375, .625), pt(.625, .625), pt(.625, .375), pt(.375, .375)];
+  const P = { type: "Polygon", coordinates: [PARCELA.coordinates[0], hueco] };
+  const v = G.validarPolygonGeoJSON(P);
+  ok(v.ok === true && v.agujeros.length === 1, "un Polygon con anillo interior es válido y conserva sus 2 anillos");
+  ok(v.area_m2 < 9500 && v.area_m2 > 9300,
+     `el área DESCUENTA el hueco: ${v.area_m2} m² (10.004 − 625)`);
+  ok(G.areaDePolygon(P) === v.area_m2, "y areaDePolygon dice lo mismo");
+
+  console.log("\n  ── contención: los tres casos que los vértices no ven ──");
+  ok(G.contenidoEn(rect(.05, .05, .3, .3), P) === true, "cultivo en zona útil → válido");
+  ok(G.contenidoEn(rect(.45, .45, .55, .55), P) === false, "cultivo DENTRO del hueco → inválido");
+  // A · ningún vértice dentro del hueco, pero una arista lo atraviesa.
+  ok(G.contenidoEn(rect(.2, .45, .8, .55), P) === false, "cultivo que ATRAVIESA el hueco → inválido");
+  // B · todos los vértices fuera, ninguna arista cruza, y contiene el hueco entero.
+  ok(G.contenidoEn(rect(.2, .2, .8, .8), P) === false, "cultivo que ENVUELVE el hueco → inválido");
+  ok(G.contenidoEn(rect(.1, .375, .375, .625), P) === true,
+     "cultivo PEGADO al borde del hueco → válido (no ocupa su interior)");
+  ok(G.contenidoEn(rect(.1, .1, .375, .375), P) === true, "y tocándolo por una esquina, también");
+
+  console.log("\n  ── point-in-polygon con la MISMA semántica en un solo sitio ──");
+  ok(G.situarEnPoligono(P, pt(.1, .1)) === "dentro", "punto en zona útil → dentro");
+  ok(G.situarEnPoligono(P, pt(.5, .5)) === "fuera", "punto en el hueco → FUERA de la parcela");
+  ok(G.situarEnPoligono(P, pt(.375, .5)) === "borde", "punto en el borde del hueco → borde");
+  ok(G.situarEnPoligono(P, pt(0, .5)) === "borde", "punto en el borde exterior → borde");
+  ok(G.situarEnPoligono(P, pt(3, 3)) === "fuera", "punto lejos → fuera");
+
+  console.log("\n  ── solapamiento entre cultivos ≠ contención en la parcela (§6) ──");
+  const B = rect(.45, .45, .55, .55);
+  ok(G.seSolapan(P, B) === false, "B dentro del hueco de A → NO se solapan: el hueco no es superficie de A");
+  ok(G.contenidoEn(B, P) === false, "pero B tampoco es un cultivo válido: está fuera de la superficie de parcela");
+  ok(G.seSolapan(rect(0, 0, .5, .5), rect(.3, .3, .8, .8)) === true, "y dos cultivos normales que se pisan, sí");
+
+  console.log("\n  ── \"usar toda la parcela\" conserva los anillos ──");
+  const todo = JSON.parse(JSON.stringify(P));
+  ok(todo.coordinates.length === 2, "el cultivo copia el GeoJSON COMPLETO, no solo el exterior");
+  ok(G.contenidoEn(todo, P) === true,
+     "y es válido: declara el mismo hueco, así que no ocupa su interior");
+  ok(G.areaDePolygon(todo) === G.areaDePolygon(P), "con el área ya descontada");
+  const releido = JSON.parse(JSON.stringify(todo));
+  ok(releido.coordinates.length === 2 && G.areaDePolygon(releido) === G.areaDePolygon(todo),
+     "y sobrevive a guardar y releer sin perder anillos ni superficie");
+}
+
+console.log("\n── MULTIPOLYGON · rechazo explícito, nunca a medias ──");
+{
+  const M = { type: "MultiPolygon", coordinates: [
+    [[pt(0, 0), pt(.4, 0), pt(.4, .4), pt(0, .4), pt(0, 0)]],
+    [[pt(.6, .6), pt(1, .6), pt(1, 1), pt(.6, 1), pt(.6, .6)]]] };
+  const v = G.validarPolygonGeoJSON(M);
+  ok(v.ok === false && v.motivo === "multipolygon_no_soportado",
+     "se rechaza con su motivo, no se coge el primer trozo");
+  ok(G.areaDePolygon(M) === null, "sin área: no se inventa la de un pedazo");
+  ok(G.contenidoEn(rect(.1, .1, .2, .2), M) === false, "nada se da por contenido en él");
+  ok(G.seSolapan(M, rect(.1, .1, .2, .2)) === false, "ni por solapado");
+  ok(G.validarCultivo(rect(.1, .1, .2, .2), M, []).motivo === "multipolygon_no_soportado",
+     "y validarCultivo lo nombra, para poder decírselo al agricultor");
+  ok(G.situarEnPoligono(M, pt(.1, .1)) === "fuera", "situarEnPoligono tampoco lo interpreta");
+}
+
+console.log("\n── ANILLOS ABIERTOS · se cierran en la frontera y solo ahí ──");
+{
+  const abierto = { type: "Polygon", coordinates: [[pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)]] };
+  ok(G.validarPolygonGeoJSON(abierto).motivo === "anillo_abierto",
+     "dentro del modelo, un anillo sin cerrar es INVÁLIDO");
+  const norm = G.normalizarGeometriaExterna(abierto);
+  ok(G.validarPolygonGeoJSON(norm).ok === true, "normalizado en la frontera → válido");
+  ok(G.areaDePolygon(norm) === G.areaDePolygon(PARCELA), "y mide lo mismo que el cerrado");
+
+  const conHuecoAbierto = { type: "Polygon", coordinates: [
+    [pt(0, 0), pt(1, 0), pt(1, 1), pt(0, 1)],
+    [pt(.4, .4), pt(.6, .4), pt(.6, .6), pt(.4, .6)]] };
+  ok(G.validarPolygonGeoJSON(conHuecoAbierto).motivo === "anillo_abierto",
+     "y un anillo INTERIOR sin cerrar, también");
+  const norm2 = G.normalizarGeometriaExterna(conHuecoAbierto);
+  const v2 = G.validarPolygonGeoJSON(norm2);
+  ok(v2.ok === true && v2.agujeros.length === 1, "normalizado, válido y con su agujero");
+  ok(JSON.stringify(G.normalizarGeometriaExterna(norm)) === JSON.stringify(norm),
+     "normalizar dos veces no cambia nada");
+  ok(G.normalizarGeometriaExterna(null) === null, "y con basura no lanza");
+}
+
+console.log("\n── FIXTURES DE SIGPAC REAL · anonimizados, forma conservada ──");
+{
+  // Sacados de la respuesta real de /api/sigpac el 17-sep sobre el tile que
+  // cubre el campo del piloto: 2 de sus 135 recintos tienen anillo interior.
+  // Se han trasladado al origen y se les ha quitado la referencia catastral.
+  const fixtures = JSON.parse(readFileSync(join(RAIZ, "tests", "fixtures-sigpac.json"), "utf8"));
+  ok(fixtures.length >= 2, `${fixtures.length} recintos reales con agujeros`);
+  for (const f of fixtures) {
+    const v = G.validarPolygonGeoJSON(f.geometria);
+    ok(v.ok === true, `${f.id}: válido`);
+    ok(v.agujeros.length >= 1, `${f.id}: conserva ${v.agujeros.length} anillo(s) interior(es)`);
+    const soloExterior = G.areaDePolygon({ type: "Polygon", coordinates: [f.geometria.coordinates[0]] });
+    ok(v.area_m2 < soloExterior,
+       `${f.id}: ${v.area_m2} m² con el hueco descontado, frente a ${soloExterior} del exterior pelado`);
+    // Y un cultivo metido en su hueco tiene que rechazarse.
+    const h = f.geometria.coordinates[1];
+    const cx = h.reduce((s, p) => s + p[0], 0) / h.length, cy = h.reduce((s, p) => s + p[1], 0) / h.length;
+    const dentroDelHueco = { type: "Polygon", coordinates: [[[cx, cy], [cx + 1e-6, cy], [cx + 1e-6, cy + 1e-6], [cx, cy + 1e-6], [cx, cy]]] };
+    ok(G.situarEnPoligono(f.geometria, [cx, cy]) === "fuera",
+       `${f.id}: el centro de su hueco cae FUERA de la superficie`);
+    void dentroDelHueco;
+  }
 }
 
 if (fallos) { console.error(`\n${fallos} test(s) FALLARON`); process.exit(1); }

@@ -31,11 +31,29 @@ if (!puppeteer) {
 }
 
 // SIGPAC falso: dos recintos contiguos. Se simula el TRANSPORTE, no la lógica.
+// SIGPAC falso: se simula el TRANSPORTE, no la lógica. Las geometrías miden de
+// verdad lo que declaran —un cuadrado de 72,3 m de lado son 5.226 m²—, porque
+// desde el cierre de los agujeros la superficie que se enseña sale del CONTORNO
+// y no del campo `superficie_m2`. El fixture anterior declaraba 5.226 con un
+// polígono de 111.673 m², y el test lo cazó.
+const LAT0 = 41.324, LON0 = 2.060;
+const mLat = (m) => m / 111320, mLon = (m) => m / 83600;
+const cuadrado = (x0, y0, lado) => [[
+  [LON0 + mLon(x0),        LAT0 + mLat(y0)],
+  [LON0 + mLon(x0 + lado), LAT0 + mLat(y0)],
+  [LON0 + mLon(x0 + lado), LAT0 + mLat(y0 + lado)],
+  [LON0 + mLon(x0),        LAT0 + mLat(y0 + lado)],
+  [LON0 + mLon(x0),        LAT0 + mLat(y0)],
+]];
 const RECINTOS = { recintos: [
   { referencia: "R1", superficie_m2: 5226, uso: "TA", satelite: true,
-    geometria: { type: "Polygon", coordinates: [[[2.060, 41.324], [2.064, 41.324], [2.064, 41.327], [2.060, 41.327], [2.060, 41.324]]] } },
+    geometria: { type: "Polygon", coordinates: cuadrado(0, 0, 72.3) } },
   { referencia: "R2", superficie_m2: 900, uso: "TA", satelite: false,
-    geometria: { type: "Polygon", coordinates: [[[2.065, 41.324], [2.067, 41.324], [2.067, 41.326], [2.065, 41.326], [2.065, 41.324]]] } },
+    geometria: { type: "Polygon", coordinates: cuadrado(120, 0, 30) } },
+  // Una parcela en dos trozos: Kylia todavía no sabe gestionarla y el
+  // agricultor no debe poder confirmarla.
+  { referencia: "R3", superficie_m2: 1800, uso: "TA", satelite: false,
+    geometria: { type: "MultiPolygon", coordinates: [cuadrado(0, 120, 30), cuadrado(60, 120, 30)] } },
 ], umbral_satelite_m2: 5000 };
 
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
@@ -79,9 +97,18 @@ try {
     o.recintosPintados = document.querySelectorAll("#pc-mapa path").length;
     o.notaMapa = $("pc-mapa-nota").textContent;
 
+    // R3 es un MultiPolygon: Kylia todavía no sabe gestionarlo y no debe
+    // dejarse confirmar. Antes se quedaba con su primer trozo en silencio.
+    const caminos = document.querySelectorAll("#pc-mapa path");
+    caminos[caminos.length - 1].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await sleep(300);
+    o.multiTxt = $("pc-sel-txt").textContent;
+    o.multiBloqueado = $("pc-confirmar").disabled === true;
+
     document.querySelectorAll("#pc-mapa path")[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await sleep(300);
     o.selTxt = $("pc-sel-txt").textContent;
+    o.confirmarActivo = $("pc-confirmar").disabled === false;
     clic("#pc-confirmar"); await sleep(200);
     o.trasConfirmar = paso();
 
@@ -193,10 +220,16 @@ try {
   ok(r.modulos === "object,object,object", "los tres módulos están cargados");
   ok(r.puertas === "function,function", "las dos puertas existen (parcela nueva y cultivo nuevo)");
   ok(r.abierto === true && r.paso0 === "parcela", "el asistente abre por el mapa");
-  ok(r.recintosPintados === 2,
+  ok(r.recintosPintados === 3,
      `los ${r.recintosPintados} recintos de la zona salen dibujados sin pedir ninguna acción rara`);
   ok(/Toca la que trabajas/.test(r.notaMapa), "y se le dice qué hacer con ellos");
-  ok(/5226 m²/.test(r.selTxt), `al tocar uno se resalta y enseña su superficie: "${r.selTxt}"`);
+  // La superficie que se enseña sale del CONTORNO, que es la que usan el
+  // reparto y el satélite — no el campo declarado por SIGPAC.
+  ok(/5\.?2\d\d m²/.test(r.selTxt), `al tocar uno se resalta y enseña su superficie: "${r.selTxt}"`);
+  ok(r.confirmarActivo === true, "y se puede confirmar");
+  ok(r.multiBloqueado === true,
+     "una parcela en varios trozos (MultiPolygon) NO se puede confirmar");
+  ok(/todavía no puede gestionar/.test(r.multiTxt), `y se le dice por qué: "${r.multiTxt}"`);
   ok(r.trasConfirmar === "cuantos", "confirmar lleva a \"¿cuántos cultivos?\"");
   ok(r.trasCuantos === "cultivo", "y \"más de uno\" entra directo al primer cultivo");
 

@@ -302,28 +302,26 @@
 
   // ─── Un cultivo dentro de su parcela, sin pisar a los vecinos ────────────
   //
-  // ⚠️ AQUÍ NO SE ENCOGE NADA. La primera versión muestreaba los polígonos
-  // tirando los puntos un 0,5% hacia su centro para que "compartir borde" no
-  // contase como "compartir área". Funcionaba para el caso de la linde y fallaba
-  // para todo lo demás: en una parcela de 100×100 m dejaba pasar un solape de
-  // 10 m² y una salida de 20 m², porque ambos caben dentro de ese 0,5%. Un
-  // margen relativo aplicado a una pregunta topológica da respuestas falsas
-  // proporcionales al tamaño del campo.
+  // ⚠️ AQUÍ NO SE ENCOGE NADA Y NO SE TIRA NINGÚN ANILLO.
   //
-  // LO QUE SE HACE AHORA. No hace falta recortar polígonos ni medir áreas de
-  // intersección: para polígonos SIMPLES, "¿el área compartida es cero o
-  // positiva?" se decide de forma EXACTA con dos predicados.
+  // Dos versiones anteriores fallaron por lo mismo: resolver una pregunta
+  // topológica con un atajo.
+  //   · La primera encogía los polígonos un 0,5% hacia su centro para que
+  //     compartir borde no contase como compartir área. En una parcela de
+  //     100×100 m dejaba pasar un solape de 10 m² y una salida de 20 m².
+  //   · La segunda se quedaba con `coordinates[0]`, o sea con el anillo
+  //     exterior, y tiraba los agujeros. Y los agujeros LLEGAN: medido contra
+  //     SIGPAC el 17-sep, 2 de los 135 recintos del tile que cubre el campo del
+  //     piloto tienen anillo interior, y otros dos tiles daban 1 de 19 y 2 de
+  //     91. Un cultivo colocado dentro del agujero se daba por válido.
   //
-  //   · cruce PROPIO de bordes → los bordes se atraviesan de verdad, en un punto
-  //     interior a los dos segmentos. Tocarse en un vértice o compartir un tramo
-  //     de linde NO es un cruce propio, y por eso compartir borde sigue valiendo.
-  //   · punto ESTRICTAMENTE interior de uno dentro del otro → uno contiene al
-  //     otro, aunque sus bordes no se crucen.
-  //
-  // Dos polígonos simples comparten área si y solo si se da una de las dos. Sin
-  // tolerancia relativa, sin muestreo y sin depender de lo grande que sea el
-  // campo. La única tolerancia que queda es el epsilon numérico de los propios
-  // cálculos en coma flotante.
+  // LO QUE SE HACE AHORA. El modelo interno conserva TODOS los anillos y la
+  // superficie real es exterior menos agujeros. Las decisiones siguen siendo
+  // exactas, con dos predicados y sin recortar polígonos:
+  //   · cruce PROPIO de bordes → se atraviesan en un punto interior a los dos
+  //     segmentos. Tocarse en un vértice o compartir linde NO es atravesar.
+  //   · punto ESTRICTAMENTE interior de uno dentro del otro.
+  // Dos polígonos simples comparten área si y solo si se da una de las dos.
 
   const EPS = 1e-12;          // epsilon numérico, no una tolerancia agronómica
   const AREA_MIN_M2 = 0.5;    // por debajo de esto no es un recinto, es un error
@@ -334,9 +332,6 @@
     Math.min(p[0], q[0]) - EPS <= r[0] && r[0] <= Math.max(p[0], q[0]) + EPS &&
     Math.min(p[1], q[1]) - EPS <= r[1] && r[1] <= Math.max(p[1], q[1]) + EPS;
 
-  // CRUCE PROPIO: los dos segmentos se atraviesan en un punto interior a ambos.
-  // Si alguno de los cuatro giros sale 0, hay contacto (vértice compartido o
-  // tramo colineal) y eso NO es atravesar.
   function crucePropio(a, b, c, d) {
     const d1 = signo(cruz(a, b, c)), d2 = signo(cruz(a, b, d));
     const d3 = signo(cruz(c, d, a)), d4 = signo(cruz(c, d, b));
@@ -344,11 +339,12 @@
   }
 
   const enSegmento = (p, q, r) => signo(cruz(p, q, r)) === 0 && enCaja(p, q, r);
+  const medio = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  const ladosDe = (anillo) => anillo.map((p, i) => [p, anillo[(i + 1) % anillo.length]]);
 
-  // Dónde cae un punto respecto de un anillo: dentro, en el borde, o fuera. El
-  // borde se distingue a propósito — es lo que permite que dos cultivos
-  // compartan linde sin que eso cuente como pisarse.
-  function situarPunto(anillo, p) {
+  // Dónde cae un punto respecto de UN anillo: dentro, en el borde, o fuera. El
+  // borde se distingue a propósito: es lo que permite compartir linde.
+  function situarEnAnillo(anillo, p) {
     const n = anillo.length;
     for (let i = 0; i < n; i++) {
       if (enSegmento(anillo[i], anillo[(i + 1) % n], p)) return "borde";
@@ -362,9 +358,6 @@
     return dentro ? "dentro" : "fuera";
   }
 
-  const medio = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-  const ladosDe = (anillo) => anillo.map((p, i) => [p, anillo[(i + 1) % anillo.length]]);
-
   function hayCrucePropio(ra, rb) {
     for (const [a, b] of ladosDe(ra)) {
       for (const [c, d] of ladosDe(rb)) if (crucePropio(a, b, c, d)) return true;
@@ -372,78 +365,166 @@
     return false;
   }
 
-  // ─── Validación canónica de un Polygon GeoJSON ───────────────────────────
-  // UNA sola puerta. Antes cada función comprobaba lo que le parecía: una
-  // pajarita pasaba como válida, un polígono de área cero también, y uno vacío
-  // reventaba con una excepción en vez de decir qué le pasaba. Aquí nada lanza:
-  // lo que no vale, sale con su motivo.
-  //
-  // ⚠️ RECIBE GeoJSON, no un anillo. El contrato está en el nombre a propósito:
-  // `esSimple` espera un ANILLO y se le estaba pasando el GeoJSON entero, así
-  // que devolvía true para cualquier cosa y las pajaritas se colaban.
-  function validarPolygonGeoJSON(geom) {
-    if (!geom || typeof geom !== "object") return { ok: false, motivo: "sin_geometria" };
-    const tipo = geom.type;
-    if (tipo !== "Polygon" && tipo !== "MultiPolygon") return { ok: false, motivo: "tipo_no_soportado" };
-    let anillo;
-    try { anillo = anilloExterior(geom); } catch (_) { return { ok: false, motivo: "sin_coordenadas" }; }
-    if (!Array.isArray(anillo) || anillo.length < 3) return { ok: false, motivo: "pocos_vertices" };
-    for (const p of anillo) {
-      if (!Array.isArray(p) || p.length < 2) return { ok: false, motivo: "sin_coordenadas" };
-      if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) return { ok: false, motivo: "coordenada_no_finita" };
-    }
-    // Vértices repetidos seguidos: no aportan lado y estropean los predicados.
-    const limpio = anillo.filter((p, i) => {
-      const q = anillo[(i + 1) % anillo.length];
-      return Math.abs(p[0] - q[0]) > EPS || Math.abs(p[1] - q[1]) > EPS;
-    });
-    if (limpio.length < 3) return { ok: false, motivo: "pocos_vertices" };
-    // ⚠️ LA SIMPLICIDAD SE MIRA ANTES QUE EL ÁREA. El área de Gauss de una
-    // pajarita simétrica se cancela y sale ~0, así que comprobando primero el
-    // área se la acusaba de "área nula" — cierto de la fórmula, y equivocado
-    // sobre lo que le pasa. El motivo que se enseña tiene que ser el de verdad.
-    if (!esSimple(limpio)) return { ok: false, motivo: "se_cruza_consigo_mismo" };
-    const area = areaM2(limpio);
-    if (!Number.isFinite(area) || area < AREA_MIN_M2) return { ok: false, motivo: "area_nula" };
-    return { ok: true, motivo: null, anillo: limpio, area_m2: Math.round(area) };
-  }
-
-  // ¿Está `interior` ENTERO dentro de `exterior`? Ocupar la parcela entera vale;
-  // sobresalir una franja, por estrecha que sea, no. Exacto, sin tolerancia.
-  function contenidoEn(interior, exterior) {
-    const vi = validarPolygonGeoJSON(interior), ve = validarPolygonGeoJSON(exterior);
-    if (!vi.ok || !ve.ok) return false;
-    const ri = vi.anillo, re = ve.anillo;
-    // Un solo vértice fuera ya lo descarta.
-    for (const p of ri) if (situarPunto(re, p) === "fuera") return false;
-    // Atravesar el borde: es lo que pasa cuando sobresale un trozo, y también
-    // cuando un cultivo cruza el hueco de una parcela en forma de L.
+  // ¿El anillo `ri` está entero dentro del anillo `re`? (cierre incluido: tocar
+  // el borde vale). Exacto, sin tolerancia.
+  function anilloContenido(ri, re) {
+    for (const p of ri) if (situarEnAnillo(re, p) === "fuera") return false;
     if (hayCrucePropio(ri, re)) return false;
-    // Y el punto medio de cada lado: cubre el caso de salir y volver a entrar
-    // justo por dos vértices del exterior, donde no hay cruce propio.
-    for (const [a, b] of ladosDe(ri)) if (situarPunto(re, medio(a, b)) === "fuera") return false;
+    for (const [a, b] of ladosDe(ri)) if (situarEnAnillo(re, medio(a, b)) === "fuera") return false;
     return true;
   }
 
-  // ¿Comparten ÁREA dos cultivos? Compartir un punto o un tramo de linde NO
-  // cuenta: el área de intersección de eso es cero, y dos bancales pegados es lo
-  // normal en un campo.
+  // ¿Dos ANILLOS comparten área positiva? Compartir un punto o un tramo de
+  // linde no cuenta: el área de eso es cero.
+  function anillosCompartenArea(ra, rb) {
+    if (hayCrucePropio(ra, rb)) return true;
+    // Uno dentro del otro, incluido ser el mismo: con dos anillos idénticos no
+    // hay cruces propios (los lados son colineales) y ningún vértice cae
+    // "dentro" — todos caen en el borde.
+    if (anilloContenido(ra, rb) || anilloContenido(rb, ra)) return true;
+    const algunoDentro = (r1, r2) =>
+      r1.some(p => situarEnAnillo(r2, p) === "dentro") ||
+      ladosDe(r1).some(([x, y]) => situarEnAnillo(r2, medio(x, y)) === "dentro");
+    return algunoDentro(ra, rb) || algunoDentro(rb, ra);
+  }
+
+  // ─── NORMALIZACIÓN DEL DATO EXTERNO ──────────────────────────────────────
+  // SOLO para lo que viene de fuera (SIGPAC). El GeoJSON exige que un
+  // LinearRing cierre —último punto == primero— y el de SIGPAC a veces no lo
+  // hace. Cerrarlo es reconstruir lo que el formato ya implica, no adivinar.
+  //
+  // ⚠️ SE HACE EN LA FRONTERA Y EN NINGÚN OTRO SITIO. Pasada esa puerta el
+  // contrato interno exige anillos cerrados, y `validarPolygonGeoJSON` no
+  // perdona uno abierto: arreglar geometría rota en cualquier punto del código
+  // es cómo se acaba sin saber qué forma tienen los datos.
+  function normalizarGeometriaExterna(geom) {
+    if (!geom || typeof geom !== "object" || !Array.isArray(geom.coordinates)) return geom;
+    const cierra = (anillo) => {
+      if (!Array.isArray(anillo) || anillo.length < 3) return anillo;
+      const a = anillo[0], z = anillo[anillo.length - 1];
+      if (!Array.isArray(a) || !Array.isArray(z)) return anillo;
+      return (a[0] === z[0] && a[1] === z[1]) ? anillo : [...anillo, [a[0], a[1]]];
+    };
+    if (geom.type === "Polygon") {
+      return { ...geom, coordinates: geom.coordinates.map(cierra) };
+    }
+    if (geom.type === "MultiPolygon") {
+      // Se cierran sus anillos por coherencia, pero el tipo NO se toca: el
+      // MVP no soporta MultiPolygon y la validación lo rechazará con su motivo.
+      return { ...geom, coordinates: geom.coordinates.map(p => (Array.isArray(p) ? p.map(cierra) : p)) };
+    }
+    return geom;
+  }
+
+  // ─── Validación canónica de un Polygon GeoJSON ───────────────────────────
+  // UNA sola puerta, y devuelve TODOS los anillos. Antes una pajarita pasaba
+  // como válida, un polígono de área cero también, uno vacío reventaba, un
+  // MultiPolygon se reducía en silencio a su primer trozo y los agujeros se
+  // tiraban. Aquí nada lanza y nada se interpreta a medias.
+  //
+  // ⚠️ RECIBE GeoJSON, no un anillo. El contrato está en el nombre.
+  function validarPolygonGeoJSON(geom) {
+    if (!geom || typeof geom !== "object") return { ok: false, motivo: "sin_geometria" };
+    // MULTIPOLYGON: rechazo EXPLÍCITO. Quedarse con el primer trozo era dar por
+    // buena una parcela de la que solo veíamos un cacho — y decirle al
+    // agricultor una superficie que no es la suya.
+    if (geom.type === "MultiPolygon") return { ok: false, motivo: "multipolygon_no_soportado" };
+    if (geom.type !== "Polygon") return { ok: false, motivo: "tipo_no_soportado" };
+    const crudos = geom.coordinates;
+    if (!Array.isArray(crudos) || !crudos.length) return { ok: false, motivo: "sin_coordenadas" };
+
+    const limpios = [];
+    for (const anillo of crudos) {
+      if (!Array.isArray(anillo) || anillo.length < 4) return { ok: false, motivo: "pocos_vertices" };
+      for (const p of anillo) {
+        if (!Array.isArray(p) || p.length < 2) return { ok: false, motivo: "sin_coordenadas" };
+        if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) return { ok: false, motivo: "coordenada_no_finita" };
+      }
+      // Contrato interno: los anillos vienen CERRADOS. Lo de fuera se cierra en
+      // normalizarGeometriaExterna, no aquí.
+      const a = anillo[0], z = anillo[anillo.length - 1];
+      if (a[0] !== z[0] || a[1] !== z[1]) return { ok: false, motivo: "anillo_abierto" };
+      const abierto = anillo.slice(0, -1).filter((p, i, arr) => {
+        const q = arr[(i + 1) % arr.length];
+        return Math.abs(p[0] - q[0]) > EPS || Math.abs(p[1] - q[1]) > EPS;
+      });
+      if (abierto.length < 3) return { ok: false, motivo: "pocos_vertices" };
+      if (!esSimple(abierto)) return { ok: false, motivo: "se_cruza_consigo_mismo" };
+      limpios.push(abierto);
+    }
+
+    const [exterior, ...agujeros] = limpios;
+    const areaExt = areaM2(exterior);
+    if (!Number.isFinite(areaExt) || areaExt < AREA_MIN_M2) return { ok: false, motivo: "area_nula" };
+    let areaHuecos = 0;
+    for (const h of agujeros) {
+      // Un "agujero" que no está dentro del exterior no es un agujero.
+      if (!anilloContenido(h, exterior)) return { ok: false, motivo: "agujero_fuera_del_exterior" };
+      areaHuecos += areaM2(h);
+    }
+    // ÁREA REAL: exterior menos agujeros. La caseta, la balsa o el camino que
+    // forman el hueco no son superficie del agricultor.
+    const area = areaExt - areaHuecos;
+    if (!Number.isFinite(area) || area < AREA_MIN_M2) return { ok: false, motivo: "area_nula" };
+    return { ok: true, motivo: null, anillo: exterior, agujeros, area_m2: Math.round(area) };
+  }
+
+  // ─── Semántica de "dentro", con agujeros. UN solo sitio. ─────────────────
+  //   dentro del exterior y fuera de todos los agujeros → dentro
+  //   dentro de un agujero                              → FUERA
+  //   sobre cualquier frontera (exterior o agujero)     → borde
+  function situarEnPoligono(geom, punto) {
+    const v = validarPolygonGeoJSON(geom);
+    if (!v.ok || !Array.isArray(punto)) return "fuera";
+    const p = [Number(punto[0]), Number(punto[1])];
+    if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) return "fuera";
+    const fuera = situarEnAnillo(v.anillo, p);
+    if (fuera !== "dentro") return fuera;                 // fuera, o en el borde exterior
+    for (const h of v.agujeros) {
+      const s = situarEnAnillo(h, p);
+      if (s === "borde") return "borde";                  // el borde del hueco es frontera
+      if (s === "dentro") return "fuera";                 // el hueco NO es superficie
+    }
+    return "dentro";
+  }
+
+  // ¿Está `interior` entero dentro de la SUPERFICIE de `exterior`? Dentro de su
+  // anillo exterior y sin ocupar área de ningún agujero.
+  function contenidoEn(interior, exterior) {
+    const vi = validarPolygonGeoJSON(interior), ve = validarPolygonGeoJSON(exterior);
+    if (!vi.ok || !ve.ok) return false;
+    if (!anilloContenido(vi.anillo, ve.anillo)) return false;
+    // ⚠️ NO BASTA CON MIRAR LOS VÉRTICES. Fallan dos casos reales: un cultivo
+    // que ATRAVIESA el hueco (ningún vértice dentro, pero una arista lo cruza) y
+    // uno que lo ENVUELVE entero (todos los vértices fuera y ninguna arista
+    // cruza). `anillosCompartenArea` cubre los dos, porque decide sobre área.
+    for (const h of ve.agujeros) {
+      if (!anillosCompartenArea(vi.anillo, h)) continue;
+      // Su CONTORNO pisa el hueco, pero puede que su SUPERFICIE no: si el
+      // cultivo declara ese mismo hueco como suyo, ahí tampoco hay cultivo.
+      // Es justo el caso de "usar toda la parcela" sobre una parcela con una
+      // caseta dentro: el cultivo hereda el contorno entero, agujeros incluidos,
+      // y sin esto se rechazaba a sí mismo.
+      const tambienExcluido = vi.agujeros.some(hi => anilloContenido(h, hi));
+      if (!tambienExcluido) return false;
+    }
+    return true;
+  }
+
+  // ¿Dos cultivos comparten SUPERFICIE REAL? Un agujero no es superficie: lo que
+  // cae dentro del hueco de A no se solapa con A.
+  //
+  // OJO: esto es solapamiento ENTRE CULTIVOS, no contención en la parcela. Un
+  // cultivo metido en el hueco de la parcela no se solapa con nadie y aun así no
+  // es válido — de eso se encarga `contenidoEn`. Son dos preguntas distintas.
   function seSolapan(a, b) {
     const va = validarPolygonGeoJSON(a), vb = validarPolygonGeoJSON(b);
     if (!va.ok || !vb.ok) return false;
-    const ra = va.anillo, rb = vb.anillo;
-    if (hayCrucePropio(ra, rb)) return true;
-    // ⚠️ UNO DENTRO DEL OTRO, INCLUIDO SER EL MISMO. Con dos polígonos idénticos
-    // no hay cruces propios (los lados son colineales) y NINGÚN vértice cae
-    // "dentro" del otro: todos caen en el borde. Sin esta línea, arrastrar un
-    // cultivo exactamente encima de otro se daba por bueno. Lo cazó el test de
-    // navegador; el unitario usaba rectángulos anidados y no lo veía.
-    if (contenidoEn(a, b) || contenidoEn(b, a)) return true;
-    // Y el caso general: un punto estrictamente interior de uno dentro del otro.
-    const algunoDentro = (r1, r2) =>
-      r1.some(p => situarPunto(r2, p) === "dentro") ||
-      ladosDe(r1).some(([x, y]) => situarPunto(r2, medio(x, y)) === "dentro");
-    return algunoDentro(ra, rb) || algunoDentro(rb, ra);
+    if (!anillosCompartenArea(va.anillo, vb.anillo)) return false;
+    // Los contornos se pisan; falta ver si todo lo pisado cae en un hueco.
+    for (const h of va.agujeros) if (anilloContenido(vb.anillo, h)) return false;
+    for (const h of vb.agujeros) if (anilloContenido(va.anillo, h)) return false;
+    return true;
   }
 
   // La comprobación que usa el editor, con el motivo dicho para poder enseñarlo.
@@ -452,7 +533,8 @@
     const v = validarPolygonGeoJSON(geom);
     if (!v.ok) return { ok: false, motivo: v.motivo };
     const vp = validarPolygonGeoJSON(parcela);
-    if (!vp.ok) return { ok: false, motivo: "parcela_invalida" };
+    if (!vp.ok) return { ok: false, motivo: vp.motivo === "multipolygon_no_soportado"
+                                          ? "multipolygon_no_soportado" : "parcela_invalida" };
     if (!contenidoEn(geom, parcela)) return { ok: false, motivo: "fuera_de_la_parcela" };
     for (let i = 0; i < ocupados.length; i++) {
       if (!ocupados[i]) continue;
@@ -461,8 +543,8 @@
     return { ok: true, motivo: null, area_m2: v.area_m2 };
   }
 
-  // Área (m²) de un Polygon GeoJSON, sin que quien llama tenga que acordarse de
-  // sacar el anillo. Devuelve null si la geometría no vale — nunca lanza.
+  // Área (m²) REAL de un Polygon GeoJSON: exterior menos agujeros. Devuelve null
+  // si la geometría no vale — nunca lanza.
   function areaDePolygon(geom) {
     const v = validarPolygonGeoJSON(geom);
     return v.ok ? v.area_m2 : null;
@@ -470,6 +552,7 @@
 
   return { areaM2, anilloExterior, partirPorLinea, R_TIERRA, contieneAlPunto,
            esSimple, moverVertice, insertarVertice, quitarVertice, rectanguloCentrado,
-           crucePropio, situarPunto, validarPolygonGeoJSON, areaDePolygon,
+           crucePropio, situarEnAnillo, situarEnPoligono, anillosCompartenArea,
+           normalizarGeometriaExterna, validarPolygonGeoJSON, areaDePolygon,
            contenidoEn, seSolapan, validarCultivo };
 });

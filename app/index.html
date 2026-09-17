@@ -11413,8 +11413,31 @@
         seleccionada = recintos.find(r => r.referencia === ref) || null;
         if (!seleccionada) return;
         $("pc-sel").hidden = false;
+        // ⚠️ SI NO SABEMOS GESTIONAR SU FORMA, NO SE DEJA CONFIRMAR. Un
+        // MultiPolygon (parcela en varios trozos) se reducía en silencio a su
+        // primer pedazo: le habríamos enseñado una superficie que no es la suya
+        // y aceptado cultivos en un sitio y no en otro. Mejor decirlo.
+        const v = GEO.validarPolygonGeoJSON(seleccionada.geometria);
+        if (!v.ok) {
+          $("pc-sel-txt").innerHTML = v.motivo === "multipolygon_no_soportado"
+            ? "Esta parcela tiene una geometría que Kylia todavía no puede gestionar: "
+              + "está dividida en varios trozos separados. Prueba con otra, o escríbenos."
+            : "Esta parcela tiene una geometría que Kylia todavía no puede gestionar.";
+          $("pc-confirmar").disabled = true;
+          seleccionada = null;
+          if (capaRec) capaRec.setStyle((f) => (f.properties.ref === ref)
+            ? { color: "#B23B2E", weight: 3, fillOpacity: 0.25, fillColor: "#B23B2E", dashArray: "3 3" }
+            : { color: "#ffffff", weight: 1.4, fillOpacity: 0.08, fillColor: "#ffffff", dashArray: "4 3" });
+          return;
+        }
+        $("pc-confirmar").disabled = false;
+        // La superficie que se enseña es la REAL del contorno —exterior menos
+        // agujeros—, no la oficial: es la que van a usar los cálculos.
         $("pc-sel-txt").innerHTML =
-          `Parcela de <strong>${m2(seleccionada.superficie_m2)} m²</strong>.`;
+          `Parcela de <strong>${m2(v.area_m2)} m²</strong>.`
+          + (v.agujeros.length
+              ? ` <span class="pc-libre">(descontando ${v.agujeros.length === 1 ? "un hueco" : v.agujeros.length + " huecos"} que no son cultivables)</span>`
+              : "");
         if (capaRec) capaRec.setStyle((f) => (f.properties.ref === ref)
           ? { color: "#013A27", weight: 3, fillOpacity: 0.35, fillColor: "#013A27" }
           : { color: "#ffffff", weight: 1.4, fillOpacity: 0.08, fillColor: "#ffffff", dashArray: "4 3" });
@@ -11428,7 +11451,14 @@
         const previa = zonasGuardadas().find(z => z.referencia === seleccionada.referencia);
         F = FLUJO.elegirParcela(FLUJO.nuevoFlujo(), {
           referencia: seleccionada.referencia, nombre: previa?.nombre || null,
-          superficie_m2: seleccionada.superficie_m2, geometria: seleccionada.geometria,
+          // La superficie sale del CONTORNO (exterior menos agujeros), que es lo
+          // que usan el reparto y el satélite. La oficial de SIGPAC se guarda
+          // aparte: sirve para el cuaderno, no para calcular.
+          superficie_m2: GEO.areaDePolygon(seleccionada.geometria) ?? seleccionada.superficie_m2,
+          superficie_oficial_m2: seleccionada.superficie_m2,
+          // La geometría ENTERA, con sus anillos interiores. Quedarse con el
+          // exterior era regalarle al agricultor la caseta y la balsa.
+          geometria: seleccionada.geometria,
           uso: seleccionada.uso, satelite: seleccionada.satelite,
         });
         if (previa?.siembras?.length) {
@@ -11561,22 +11591,44 @@
         const libre = Math.max(20, FLUJO.libres(F));
         const anillo = GEO.anilloExterior(F.parcela.geometria);
         const lons = anillo.map(p => p[0]), lats = anillo.map(p => p[1]);
-        const ancho = Math.max(...lons) - Math.min(...lons);
-        const alto  = Math.max(...lats) - Math.min(...lats);
-        for (const fraccion of [0.5, 0.3, 0.15]) {
+        const x0 = Math.min(...lons), x1 = Math.max(...lons);
+        const y0 = Math.min(...lats), y1 = Math.max(...lats);
+        const ancho = x1 - x0, alto = y1 - y0;
+        // Se barre la parcela de verdad: tamaños decrecientes y una rejilla de
+        // posiciones. Con el primer cultivo en el centro solo queda un marco
+        // estrecho alrededor, y probando cuatro desplazamientos desde el medio
+        // no se encontraba nada — el agricultor se quedaba encallado sin que
+        // nadie le dijera que solo tenía que arrastrarlo.
+        for (const fraccion of [0.5, 0.35, 0.2, 0.1, 0.05, 0.02, 0.008]) {
           const base = GEO.rectanguloCentrado(F.parcela.geometria, libre * fraccion)?.geometria;
           if (!base) continue;
-          const saltos = [[0, 0]];
-          for (const d of [0.22, 0.34]) {
-            saltos.push([ancho * d, 0], [-ancho * d, 0], [0, alto * d], [0, -alto * d],
-                        [ancho * d, alto * d], [-ancho * d, alto * d],
-                        [ancho * d, -alto * d], [-ancho * d, -alto * d]);
-          }
-          for (const [dx, dy] of saltos) {
-            const cand = dx || dy ? desplazar(base, dx, dy) : base;
+          const bb = GEO.anilloExterior(base);
+          const bx0 = Math.min(...bb.map(p => p[0])), bx1 = Math.max(...bb.map(p => p[0]));
+          const by0 = Math.min(...bb.map(p => p[1])), by1 = Math.max(...bb.map(p => p[1]));
+          const margen = 0.02;
+          // Las CUATRO ESQUINAS primero. Cuando el primer cultivo ocupa el
+          // centro, lo único libre es un marco estrecho alrededor, y ahí es
+          // donde hay que mirar — probando desplazamientos desde el medio no se
+          // encontraba nada y el agricultor se quedaba encallado sin que nadie
+          // le dijera que solo tenía que arrastrarlo.
+          const esquinas = [
+            [x0 + ancho * margen - bx0, y0 + alto * margen - by0],
+            [x1 - ancho * margen - bx1, y0 + alto * margen - by0],
+            [x0 + ancho * margen - bx0, y1 - alto * margen - by1],
+            [x1 - ancho * margen - bx1, y1 - alto * margen - by1],
+            // Y los cuatro lados, centrados.
+            [x0 + ancho * margen - bx0, (y0 + y1) / 2 - (by0 + by1) / 2],
+            [x1 - ancho * margen - bx1, (y0 + y1) / 2 - (by0 + by1) / 2],
+            [(x0 + x1) / 2 - (bx0 + bx1) / 2, y0 + alto * margen - by0],
+            [(x0 + x1) / 2 - (bx0 + bx1) / 2, y1 - alto * margen - by1],
+            [0, 0],
+          ];
+          for (const [dx, dy] of esquinas) {
+            const cand = (dx || dy) ? desplazar(base, dx, dy) : base;
             if (FLUJO.cabe(GEO, { geometria: cand }, F.parcela, F.cultivos).ok) return cand;
           }
         }
+        // No cabe nada razonable: se deja el del centro y la nota lo explica.
         return GEO.rectanguloCentrado(F.parcela.geometria, libre * 0.4)?.geometria || null;
       }
 
@@ -11849,7 +11901,9 @@
         let z = zonas.find(x => x.referencia === F.parcela.referencia);
         if (!z) {
           z = { referencia: F.parcela.referencia, nombre: F.parcela.nombre || null,
-                superficie_m2: F.parcela.superficie_m2, uso: F.parcela.uso,
+                superficie_m2: F.parcela.superficie_m2,
+                superficie_oficial_m2: F.parcela.superficie_oficial_m2 ?? null,
+                uso: F.parcela.uso,
                 satelite: F.parcela.satelite, geometria: F.parcela.geometria, siembras: [] };
           zonas.push(z);
         }

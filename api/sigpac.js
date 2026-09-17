@@ -78,6 +78,17 @@ function containsPoint(geom, mx, my) {
   return false;
 }
 
+// ⚠️ LA FRONTERA DEL DATO EXTERNO. SIGPAC es de terceros y su GeoJSON a veces
+// trae LinearRings sin cerrar —último punto distinto del primero—, que el
+// formato no admite. Se cierran AQUÍ y en ningún otro sitio: pasada esta puerta
+// el contrato interno exige anillos cerrados y `validarPolygonGeoJSON` no
+// perdona uno abierto. Arreglar geometría rota en cualquier punto del código es
+// cómo se acaba sin saber qué forma tienen los datos.
+//
+// El TIPO no se toca: un MultiPolygon sigue saliendo como MultiPolygon para que
+// el cliente lo rechace explícitamente, en vez de quedarse con su primer trozo.
+const { normalizarGeometriaExterna } = require("../assets/js/geo-parcela.js");
+
 function convertCoords(coords) {
   if (typeof coords[0] === "number") return mercatorToWgs84(coords[0], coords[1]);
   return coords.map(convertCoords);
@@ -136,7 +147,8 @@ module.exports = async (req, res) => {
               // conocer el criterio (vive en _satelite.js y en ningún sitio más).
               satelite: aplicaSatelite(sup),
               motivo_sin_satelite: motivoSinSatelite(sup),
-              geometria: { type: f.geometry.type, coordinates: convertCoords(f.geometry.coordinates) },
+              geometria: normalizarGeometriaExterna(
+                { type: f.geometry.type, coordinates: convertCoords(f.geometry.coordinates) }),
             };
           })
           .sort((a, b) => b.superficie_m2 - a.superficie_m2)
@@ -183,7 +195,8 @@ module.exports = async (req, res) => {
     const sup = Number.isFinite(p.dn_surface) ? Math.round(p.dn_surface) : null;
 
     return conVecinos({
-      parcela: { type: feature.geometry.type, coordinates: convertCoords(feature.geometry.coordinates) },
+      parcela: normalizarGeometriaExterna(
+        { type: feature.geometry.type, coordinates: convertCoords(feature.geometry.coordinates) }),
       superficie_m2: sup,
       uso: p.uso_sigpac || null,
       referencia: refSigpac(p),
