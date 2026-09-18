@@ -17,6 +17,7 @@ import { readFileSync, existsSync } from "fs";
 import { createServer } from "http";
 import { fileURLToPath } from "url";
 import { dirname, join, extname } from "path";
+import { sinRed } from "./_sin-red.mjs";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
 let fallos = 0;
@@ -167,6 +168,7 @@ async function nuevaPagina(sembrar) {
   const ctx = await nav.createBrowserContext();
   contextos.push(ctx);
   const pag = await ctx.newPage();
+  await sinRed(pag);
   await pag.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   pag.on("pageerror", e => errores.push(e.message));
   await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });
@@ -330,6 +332,7 @@ console.log("\n── C bis · enlace inválido o caducado ──");
   canjeVale = false;
   const ctx = await nav.createBrowserContext(); contextos.push(ctx);
   const pag = await ctx.newPage();
+  await sinRed(pag);
   pag.on("dialog", async d => { await d.dismiss(); });
   pag.on("pageerror", e => errores.push(e.message));
   await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });
@@ -366,6 +369,7 @@ console.log("\n── D · canje correcto: propietario, base y sin duplicar ─�
   pedidas = []; subidas = [];
   const ctx = await nav.createBrowserContext(); contextos.push(ctx);
   const pag = await ctx.newPage();
+  await sinRed(pag);
   pag.on("dialog", async d => { await d.dismiss(); });
   pag.on("pageerror", e => errores.push(e.message));
   await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });
@@ -416,6 +420,7 @@ console.log("\n── E · el enlace se abre en otro navegador ──");
   // Navegador 1: tiene el borrador a medias. Nunca canjea.
   const uno = await nav.createBrowserContext();
   const p1 = await uno.newPage();
+  await sinRed(p1);
   await p1.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   await p1.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });
   await p1.waitForFunction("typeof window.kyliaParcelaNueva === 'function'", { timeout: 20000 });
@@ -429,6 +434,7 @@ console.log("\n── E · el enlace se abre en otro navegador ──");
   // Navegador 2 (contexto aparte: otro localStorage). Abre el enlace.
   const dos = await nav.createBrowserContext();
   const p2 = await dos.newPage();
+  await sinRed(p2);
   p2.on("dialog", async d => { await d.dismiss(); });
   try { await p2.goto(`http://127.0.0.1:${port}/app?acceso=TOKEN-BUENO`, { waitUntil: "domcontentloaded" }); }
   catch (_) {}
@@ -470,6 +476,7 @@ async function dispositivoConCultivoYCanje(zonasDeLaCuenta) {
   zonasRemotas = zonasDeLaCuenta;
   const ctx = await nav.createBrowserContext(); contextos.push(ctx);
   const pag = await ctx.newPage();
+  await sinRed(pag);
   pag.on("dialog", async d => { await d.dismiss(); });
   pag.on("pageerror", e => errores.push(e.message));
   await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });
@@ -565,6 +572,24 @@ console.log("\n── la cuenta está VACÍA: no se pregunta y NO se borra ─�
   ok(e.base?.owner_id === AJENO, "se adopta la cuenta, con su base");
   await pag.close();
   zonasRemotas = [];
+}
+
+console.log("\n── MISMO cultivo con datos distintos: se pregunta, no se pisa ──");
+{
+  // El caso exacto de la auditoría, por el camino real de canje y adopción:
+  // aquí 900 m², en la cuenta 100 m², y el MISMO uuid.
+  const mismaConOtraArea = { referencia: "R1", superficie_m2: 5000, geometria: GEOM,
+    siembras: [{ id: "mia-1", cultivo: "lechuga", area_m2: 100, geometria: GEOM,
+                 sync: { nueva: false, vista: "h", confirmada: "h", token: "t-mia-1" } }] };
+  const pag = await dispositivoConCultivoYCanje([mismaConOtraArea]);
+  const e = await leerEstado(pag);
+  const areas = await pag.evaluate(() => JSON.parse(localStorage.getItem("kylia_zonas") || "[]")
+    .flatMap(z => (z.siembras || []).map(s => s.area_m2)));
+  ok(areas.join() === "1500", `el área editada aquí NO se pisa (${areas.join()})`);
+  ok(e.base === null, "y la base NO avanza: sin base no se escribe nada");
+  ok(e.pantalla === true, "sale la pantalla para decidir, aunque el uuid coincida");
+  ok(!!e.pendiente, "con la foto de la cuenta guardada aparte");
+  await pag.close();
 }
 
 console.log("\n── cuenta NUEVA y vacía: los cultivos locales se conservan ──");

@@ -63,6 +63,9 @@ function montar(ls) {
     ${linea(/const esOwner   = [^\n]+/)}
     ${linea(/const siembrasDe = \(zonas\) => \{[\s\S]*?\n      \};/)}
     ${trozo("function zonasLocales(")}
+    ${linea(/const DECLARADO = \[[\s\S]*?\];/)}
+    ${trozo("function estableLocal(")}
+    ${linea(/const huellaDeclarada = \(s\) =>[\s\S]*?;\n/)}
     ${trozo("function conflictoDeAdopcion(")}
     ${linea(/const leerPendiente = \(\) => \{[\s\S]*?\n      \};/)}
     ${linea(/const borrarPendiente = [^\n]+/)}
@@ -108,6 +111,62 @@ console.log("── el caso obligatorio: A tiene cultivos, la cuenta también �
   const p = app.pendiente();
   ok(!!p && p.owner_id === OWNER, "la foto de la cuenta se guarda aparte, sin aplicarla");
   ok(p.choque.aqui === 1 && p.choque.alla === 1, `y se sabe qué hay a cada lado (${p.choque.aqui}/${p.choque.alla})`);
+}
+
+console.log("\n── BLOQUEANTE 1 · mismo UUID, datos distintos ──");
+{
+  // El caso exacto de la auditoría: la MISMA siembra, editada aquí a 900 y con
+  // 100 en el servidor. Compartir UUID no la hace el mismo trabajo.
+  const local  = zona("R1", { ...siembra("s-1", "lechuga"), area_m2: 900 });
+  const remota9 = zona("R1", { ...siembra("s-1", "lechuga"), area_m2: 100 });
+  const ls = almacen({ kylia_zonas: JSON.stringify([local]) });
+  const app = montar(ls);
+
+  const ch = app.conflicto(remota([remota9]));
+  ok(ch !== null, "se detecta que hay algo que decidir, aunque el UUID coincida");
+  ok(ch && ch.divergentes === 1, `y se sabe que es el MISMO cultivo con otros datos (${ch?.divergentes})`);
+
+  const r = app.adoptar(tupla([remota9], 8));
+  ok(r === "pendiente", `no se adopta: queda pendiente (${r})`);
+  ok(app.zonas()[0].siembras[0].area_m2 === 900,
+     `el área editada aquí NO se pisa (${app.zonas()[0].siembras[0].area_m2})`);
+  ok(app.base() === null, "y la base NO avanza a 8: sin base no se escribe nada");
+  ok(app.pendiente() !== null, "la foto del servidor queda guardada para decidir");
+}
+
+console.log("\n── …y cuando de verdad es lo mismo, no se molesta al agricultor ──");
+{
+  const igual = zona("R1", siembra("s-1", "lechuga"));
+  const ls = almacen({ kylia_zonas: JSON.stringify([igual]) });
+  const app = montar(ls);
+  ok(app.conflicto(remota([igual])) === null, "idéntico en los dos lados: nada que decidir");
+  ok(app.adoptar(tupla([igual], 8)) === true, "se adopta");
+  ok(app.base()?.base_version === 8, "y la base avanza, que es lo correcto aquí");
+}
+
+console.log("\n── qué cuenta como 'distinto' ──");
+{
+  const base_ = siembra("s-1", "lechuga");
+  const ls = almacen({ kylia_zonas: JSON.stringify([zona("R1", base_)]) });
+  const app = montar(ls);
+  const cambia = (patch, etiqueta) => {
+    const r = app.conflicto(remota([zona("R1", { ...base_, ...patch })]));
+    ok(r !== null, `cambiar ${etiqueta} es una divergencia`);
+  };
+  cambia({ area_m2: 100 }, "la superficie");
+  cambia({ fechaPlantacion: "2026-08-01" }, "la fecha");
+  cambia({ variedad: "Otra" }, "la variedad");
+  cambia({ metodoRiego: "aspersion" }, "el método de riego");
+  cambia({ caudal: 99 }, "el caudal");
+  cambia({ geometria: { type: "Polygon", coordinates: [[[9, 9], [9, 8], [8, 8], [9, 9]]] } }, "el contorno");
+  // Lo que NO cuenta: lo que no contestó él.
+  const noCambia = (patch, etiqueta) => {
+    const r = app.conflicto(remota([zona("R1", { ...base_, ...patch })]));
+    ok(r === null, `${etiqueta} NO es una divergencia: no es una respuesta suya`);
+  };
+  noCambia({ sync: { nueva: true, vista: null, confirmada: null, token: "otro" } },
+           "el estado de sincronización");
+  noCambia({ registradoEl: "2026-01-01" }, "desde cuándo hay registro en cada sitio");
 }
 
 console.log("\n── la cuenta está VACÍA: no hay nada que decidir ──");

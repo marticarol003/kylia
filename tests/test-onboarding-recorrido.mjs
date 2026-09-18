@@ -19,6 +19,7 @@ import { readFileSync, existsSync, mkdirSync } from "fs";
 import { createServer } from "http";
 import { fileURLToPath } from "url";
 import { dirname, join, extname } from "path";
+import { sinRed } from "./_sin-red.mjs";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
 let fallos = 0;
@@ -65,6 +66,7 @@ const errores = [];
 
 async function abrirApp({ ancho, alto, movil, conCorreo }) {
   const pag = await nav.newPage();
+  await sinRed(pag);
   await pag.setViewport({ width: ancho, height: alto, isMobile: !!movil, hasTouch: !!movil });
   pag.on("pageerror", e => errores.push(`${ancho}px · ${e.message}`));
   await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });

@@ -19,6 +19,7 @@ import { readFileSync, existsSync } from "fs";
 import { createServer } from "http";
 import { fileURLToPath } from "url";
 import { dirname, join, extname } from "path";
+import { sinRed } from "./_sin-red.mjs";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..");
 let fallos = 0;
@@ -63,6 +64,7 @@ const port = srv.address().port;
 
 const nav = await puppeteer.launch({ headless: "new", args: ["--no-sandbox"] });
 const pag = await nav.newPage();
+  await sinRed(pag);
 // Tamaño de móvil real: es donde se usa esto, de pie y al sol.
 await pag.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
 const errores = [];

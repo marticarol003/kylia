@@ -117,9 +117,18 @@ async function pedir(body, ip) {
 
   const respuesta = { estado: 200, cuerpo: { ok: true, enviado: true } };
 
-  const haceUnaHora = new Date(Date.now() - 3600_000).toISOString();
-  const recientes = await supabaseSelect("accesos",
-    `email=eq.${encodeURIComponent(email)}&creado=gte.${haceUnaHora}&select=id`);
+  // Una sola consulta sirve para las dos cosas: contar los del último rato
+  // (tope por hora) y saber si ya hay una reserva para este correo.
+  const previos = await supabaseSelect("accesos",
+    `email=eq.${encodeURIComponent(email)}&select=id,creado,propietario_id&order=creado.desc&limit=10`);
+  const haceUnaHora = Date.now() - 3600_000;
+  // ⚠️ UN `creado` QUE NO SE PUEDE LEER CUENTA COMO RECIENTE. Al revés —
+  // descartarlo— el tope por hora desaparecería en silencio justo cuando algo
+  // va mal, que es cuando más falta hace. Se falla hacia el lado cerrado.
+  const recientes = (previos || []).filter(x => {
+    const t = new Date(x.creado).getTime();
+    return !Number.isFinite(t) || t >= haceUnaHora;
+  });
   if ((recientes || []).length >= MAX_POR_HORA) {
     console.warn("[acceso] tope por hora alcanzado:", email);
     return respuesta;   // callado a propósito: por fuera es indistinguible
@@ -154,9 +163,25 @@ async function pedir(body, ip) {
   // acceso, así que dos canjeos del MISMO enlace no pueden crear dos
   // propietarios distintos ni aunque lleguen a la vez. Un UUID reservado no es
   // una cuenta: mientras no exista la fila en `usuarios`, no hay nada.
+  // ⚠️ LA RESERVA SE REUTILIZA, Y ESTO ERA UN BLOQUEANTE. Con un UUID nuevo por
+  // enlace, pedir DOS enlaces para el mismo correo antes de canjear ninguno
+  // reservaba dos propietarios distintos; canjeando los dos nacían dos cuentas
+  // con el mismo correo, y a partir de ahí ese correo quedaba en conflicto y
+  // dejaba de recibir enlaces. La persona se rompía su propia cuenta pidiendo
+  // el enlace dos veces, que es lo más normal del mundo.
+  //
+  // Ahora todos los enlaces pendientes de un mismo correo apuntan al MISMO
+  // propietario reservado: se canjeen los que se canjeen, y en el orden que sea,
+  // sale UNA cuenta. En el canje, quien llega segundo se encuentra la fila ya
+  // creada y no crea otra.
   const alta = !!quien.vacio;
-  const destino = alta ? crypto.randomUUID() : quien.propietario_id;
-  if (alta) console.log("[acceso] correo sin cuenta: se reserva un alta");
+  const reservaPrevia = alta ? (previos || [])[0]?.propietario_id || null : null;
+  const destino = alta ? (reservaPrevia || crypto.randomUUID()) : quien.propietario_id;
+  if (alta) {
+    console.log(reservaPrevia
+      ? "[acceso] correo sin cuenta: se reutiliza la reserva anterior"
+      : "[acceso] correo sin cuenta: se reserva un alta");
+  }
 
   const { token, hash } = nuevoToken();
   await supabaseInsert("accesos", {
@@ -230,6 +255,18 @@ async function canjear(body) {
     // lee un error y vuelve a pulsar tarda mucho más que esto.
     const desde = Date.now() - new Date(a.usado_en).getTime();
     if (!(desde >= RECUPERAR_TRAS_MS)) return noVale;
+    // ⚠️ EL REMATE TAMBIÉN TIENE QUE SER DE UN SOLO USO, Y ESTO FALTABA. Sin
+    // exclusión, dos reintentos simultáneos pasaban los dos y el enlace dejaba
+    // de ser de un solo uso: dos sesiones del mismo token.
+    //
+    // La exclusión la da la BASE, no este proceso: se vuelve a quemar con un
+    // compare-and-set sobre la marca que acabamos de leer. Solo una de las dos
+    // peticiones encuentra ese valor; la otra actualiza cero filas y sale.
+    // Mismo mecanismo que el quemado original, sin columnas nuevas.
+    const rematando = await supabaseUpdate("accesos",
+      `id=eq.${a.id}&usado_en=eq.${encodeURIComponent(a.usado_en)}`,
+      { usado_en: new Date().toISOString() });
+    if (!Array.isArray(rematando) || rematando.length === 0) return noVale;
     console.warn("[acceso] canje a medias: se remata el MISMO propietario reservado");
   } else {
     // El filtro lleva usado_en=is.null para que dos canjeos simultáneos no
@@ -266,12 +303,17 @@ async function canjear(body) {
       });
       console.log("[acceso] alta: propietario creado en el canje");
     } catch (err) {
-      // 23505 = ya existía. Otro canjeo ganó la carrera, o un reintento: no es
-      // un error y no se crea nada más.
-      if (!/23505|duplicate key/i.test(err.message || "")) {
-        console.error("[acceso] no se pudo crear el propietario:", err.message);
-        return { estado: 500, cuerpo: { ok: false, error: "no se pudo completar el alta" } };
+      // ⚠️ 23505 = OTRO LA CREÓ, Y ENTONCES ESTE CANJE NO VALE. Antes se seguía
+      // como si nada y se emitía sesión igualmente: dos peticiones del mismo
+      // enlace acababan con cookie las dos. Aquí solo se lleva sesión quien
+      // CREA la cuenta; el que llega tarde —la petición original que terminó
+      // fuera de plazo, o un reintento— se encuentra la fila hecha y sale.
+      if (/23505|duplicate key/i.test(err.message || "")) {
+        console.warn("[acceso] la cuenta ya la creó otro canje: este no identifica");
+        return noVale;
       }
+      console.error("[acceso] no se pudo crear el propietario:", err.message);
+      return { estado: 500, cuerpo: { ok: false, error: "no se pudo completar el alta" } };
     }
   }
 

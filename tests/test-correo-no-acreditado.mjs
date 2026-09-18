@@ -56,7 +56,12 @@ sb.supabaseSelect = async (tabla, q) => {
 };
 let fallarAltaUsuario = false;     // para simular la caída justo tras quemar
 sb.supabaseInsert = async (tabla, fila) => {
-  if (tabla === "accesos") { ACCESOS.push({ ...fila, id: "acc-" + ACCESOS.length }); return [ACCESOS.at(-1)]; }
+  // `creado` lo pone la base por defecto (db/acceso-por-email-2026-08-07.sql).
+  // Sin él aquí, el tope por hora no vería nada y estaríamos probando el arnés.
+  if (tabla === "accesos") {
+    ACCESOS.push({ creado: new Date().toISOString(), ...fila, id: "acc-" + ACCESOS.length });
+    return [ACCESOS.at(-1)];
+  }
   if (tabla !== "usuarios") return [fila];
   if (fallarAltaUsuario) throw new Error("la base no responde");
   const i = USUARIOS.findIndex(f => f.id === fila.id);
@@ -379,6 +384,113 @@ console.log("\n── G quater · si la cuenta SÍ se creó, el enlace está gas
     ok(otra.estado === 400, "y el enlace ya no vale: no hay replay por la puerta del remate");
     ok(!otra.cookies, "sin cookie");
     ok(USUARIOS.length === 1, "y sigue habiendo una sola cuenta");
+  });
+}
+
+console.log("\n── BLOQUEANTE 2 · dos enlaces del mismo correo, UNA cuenta ──");
+{
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    // Se piden DOS enlaces antes de canjear ninguno. Es lo más normal: no llega
+    // el primero, o llega a spam, y se vuelve a pedir.
+    await ACCESO.pedir({ email: "dos@ejemplo.es" }, "1.2.3.4");
+    const token1 = tokenDelUltimoCorreo();
+    await ACCESO.pedir({ email: "dos@ejemplo.es" }, "1.2.3.4");
+    const token2 = tokenDelUltimoCorreo();
+    ok(ACCESOS.length === 2 && token1 !== token2, "hay dos enlaces distintos");
+    ok(ACCESOS[0].propietario_id === ACCESOS[1].propietario_id,
+       "pero los dos apuntan al MISMO propietario reservado");
+
+    const a = await ACCESO.canjear({ token: token1 });
+    ok(a.estado === 200, "el primero canjea");
+    ok(USUARIOS.length === 1, `y nace una cuenta (${USUARIOS.length})`);
+    const b = await ACCESO.canjear({ token: token2 });
+    ok(USUARIOS.length === 1, `el segundo NO crea otra: sigue habiendo una (${USUARIOS.length})`);
+    // Y SÍ le deja entrar, que es lo correcto: es un enlace válido, sin usar y
+    // sin caducar, que llegó a SU buzón. Pedir el enlace dos veces y abrir el
+    // segundo es lo que hace cualquiera cuando el primero tarda.
+    ok(b.estado === 200 && b.cuerpo.propietario_id === USUARIOS[0].id,
+       "y le deja entrar en la MISMA cuenta: es su enlace, sin usar y sin caducar");
+
+    // Y lo que de verdad importa: ese correo NO queda en conflicto.
+    const q = await propietarioPorEmail("dos@ejemplo.es");
+    ok(!q.conflicto && q.propietario_id === USUARIOS[0].id,
+       "el correo sigue resolviendo a un único dueño");
+    ACCESOS = []; CORREOS = [];
+    const otro = await ACCESO.pedir({ email: "dos@ejemplo.es" }, "1.2.3.4");
+    ok(otro.estado === 200 && CORREOS.length === 1,
+       "así que puede seguir pidiendo enlaces: no se ha roto su cuenta");
+  });
+}
+
+console.log("\n── …y tres enlaces canjeados en orden inverso, igual ──");
+{
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    const tokens = [];
+    for (let i = 0; i < 3; i++) {
+      await ACCESO.pedir({ email: "tres@ejemplo.es" }, "1.2.3.4");
+      tokens.push(tokenDelUltimoCorreo());
+    }
+    ok(new Set(ACCESOS.map(a => a.propietario_id)).size === 1,
+       "los tres reservan el mismo propietario");
+    const res = [];
+    for (const t of tokens.reverse()) res.push(await ACCESO.canjear({ token: t }));
+    ok(USUARIOS.length === 1, `una sola cuenta (${USUARIOS.length})`);
+    ok(res.every(r => r.estado === 200), "los tres enlaces valen: son suyos y ninguno estaba usado");
+    ok(new Set(res.map(r => r.cuerpo.propietario_id)).size === 1,
+       "y los tres llevan al MISMO propietario");
+    // Cada uno se gasta al usarse.
+    const repetido = await ACCESO.canjear({ token: tokens[0] });
+    ok(repetido.estado === 400, "y cada enlace sigue siendo de un solo uso");
+  });
+}
+
+console.log("\n── BLOQUEANTE 3 · el remate también es de un solo uso ──");
+{
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    await ACCESO.pedir({ email: "remate2@ejemplo.es" }, "1.2.3.4");
+    const token = tokenDelUltimoCorreo();
+    fallarAltaUsuario = true;
+    await ACCESO.canjear({ token });             // se cae con el enlace ya quemado
+    fallarAltaUsuario = false;
+    ACCESOS[0].usado_en = new Date(Date.now() - 30_000).toISOString();
+
+    // DOS reintentos a la vez. Antes pasaban los dos y daban cookie los dos.
+    const [a, b] = await Promise.all([ACCESO.canjear({ token }), ACCESO.canjear({ token })]);
+    const conSesion = [a, b].filter(r => r.estado === 200 && r.cookies?.length);
+    ok(conSesion.length === 1,
+       `solo UNO de los dos reintentos identifica (${conSesion.length})`);
+    ok(USUARIOS.length === 1, "y sigue habiendo una sola cuenta");
+    const otro = [a, b].find(r => !(r.estado === 200 && r.cookies?.length));
+    ok(otro.estado === 400 && !otro.cookies, "el otro sale sin sesión y con el motivo genérico");
+  });
+}
+
+console.log("\n── …y la petición original que termina TARDE tampoco duplica ──");
+{
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    await ACCESO.pedir({ email: "tarde2@ejemplo.es" }, "1.2.3.4");
+    const token = tokenDelUltimoCorreo();
+    const reservado = ACCESOS[0].propietario_id;
+
+    // La original se queda colgada creando la cuenta; mientras, alguien remata.
+    fallarAltaUsuario = true;
+    await ACCESO.canjear({ token });
+    fallarAltaUsuario = false;
+    ACCESOS[0].usado_en = new Date(Date.now() - 30_000).toISOString();
+    const remate = await ACCESO.canjear({ token });
+    ok(remate.estado === 200 && USUARIOS.length === 1, "el remate completa la cuenta");
+
+    // Y ahora llega la original, tardísimo: la fila ya está.
+    ACCESOS[0].usado_en = new Date(Date.now() - 30_000).toISOString();
+    const original = await ACCESO.canjear({ token });
+    ok(original.estado === 400 && !original.cookies,
+       "la original llega tarde, se encuentra la cuenta hecha y NO identifica");
+    ok(USUARIOS.length === 1 && USUARIOS[0].id === reservado,
+       "una sola cuenta, la reservada");
   });
 }
 

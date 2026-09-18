@@ -378,22 +378,58 @@
               return Array.isArray(z) ? z : []; } catch (_) { return []; }
       }
 
+      // ⚠️ DOS SIEMBRAS CON EL MISMO UUID NO SON EL MISMO TRABAJO. Este era el
+      // agujero: se comparaban solo los ids, así que una siembra editada aquí
+      // —área 900— y la misma siembra en el servidor —área 100— se daban por
+      // idénticas, no había conflicto, se adoptaba y la edición local se perdía
+      // sin copia y sin preguntar. El UUID dice QUÉ cultivo es, no CÓMO está.
+      //
+      // Se compara el CONTENIDO DECLARADO: lo que el agricultor contestó. Fuera
+      // quedan `sync` —que por definición difiere entre dispositivos— y
+      // `registradoEl`, que es cuándo empezó el registro en cada sitio y no una
+      // respuesta suya.
+      const DECLARADO = ["cultivo", "variedad", "variedadDesconocida", "area_m2",
+                         "geometria", "fechaPlantacion", "fechaPrecision",
+                         "metodoRiego", "riegoPendiente", "caudal", "riego",
+                         "capacidadRegadera"];
+      // Serialización estable y RECURSIVA: la geometría es un objeto anidado y
+      // dos polígonos distintos tienen que dar huellas distintas.
+      //
+      // Sí, `estable()` ya existe para la huella de sincronización — pero vive
+      // en otro bloque <script> y desde aquí no se alcanza. Antes que exponer
+      // media app en `window` para compartir seis líneas, se escriben las seis
+      // líneas; y son las dos comparaciones de cosas distintas: aquella compara
+      // lo que se MANDA al servidor, esta lo que el agricultor CONTESTÓ.
+      function estableLocal(v) {
+        if (v === null || v === undefined) return "null";
+        if (typeof v !== "object") { const t = JSON.stringify(v); return t === undefined ? "null" : t; }
+        if (Array.isArray(v)) return "[" + v.map(estableLocal).join(",") + "]";
+        return "{" + Object.keys(v).sort()
+          .map(k => JSON.stringify(k) + ":" + estableLocal(v[k])).join(",") + "}";
+      }
+      const huellaDeclarada = (s) =>
+        estableLocal(Object.fromEntries(DECLARADO.map(k => [k, s?.[k] ?? null])));
+
       // Devuelve null si no hay nada que decidir, o el reparto si lo hay.
       // "Inequívoco" es que una de las dos partes NO tenga cultivos: entonces
       // no hay elección posible y se conserva lo que hay. Con cultivos a los dos
-      // lados, decide él — aunque los ids coincidan, porque el contenido puede
-      // haber divergido y no vamos a fusionar siembra a siembra por nuestra
-      // cuenta.
+      // lados, decide él.
       function conflictoDeAdopcion(configRemota) {
         const aqui  = siembrasDe(zonasLocales());
         const alla  = siembrasDe(configRemota?.zonas);
         if (!aqui.length || !alla.length) return null;
-        const idsAlla = new Set(alla.map(s => s.id).filter(Boolean));
-        const soloAqui = aqui.filter(s => !s.id || !idsAlla.has(s.id));
-        // Si TODO lo local ya está en la cuenta, adoptar no pierde nada: es el
-        // mismo trabajo, visto desde el otro lado.
+        // Por id Y por contenido: "esto ya está en la cuenta" solo si está
+        // IGUAL. Si el mismo cultivo tiene otra área, otra fecha u otro riego,
+        // es una divergencia y la decide él.
+        const alla_ = new Map(alla.filter(s => s.id).map(s => [s.id, huellaDeclarada(s)]));
+        const soloAqui = aqui.filter(s => !s.id || alla_.get(s.id) !== huellaDeclarada(s));
+        // Si TODO lo local ya está en la cuenta, y está igual, adoptar no pierde
+        // nada: es el mismo trabajo visto desde el otro lado.
         if (!soloAqui.length) return null;
-        return { aqui: aqui.length, alla: alla.length, soloAqui: soloAqui.length };
+        return { aqui: aqui.length, alla: alla.length, soloAqui: soloAqui.length,
+                 // Cuántos son el MISMO cultivo con datos distintos: eso es lo
+                 // que de verdad se estaba perdiendo en silencio.
+                 divergentes: soloAqui.filter(s => s.id && alla_.has(s.id)).length };
       }
 
       // ── Resolver la decisión, y SIEMPRE sin destruir ───────────────

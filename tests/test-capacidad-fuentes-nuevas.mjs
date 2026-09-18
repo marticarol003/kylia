@@ -216,13 +216,26 @@ console.log("\n── cliente y servidor, la misma clasificación ──");
     fechas.push(hoyISO(Date.now() - (n - 1 - i) * 86400000));
     et0.push(4.8); pp.push(0); tx.push(28); tn.push(16);
   }
-  http.getJSON = async (url) => {
-    if (/soilgrids/i.test(url)) return { properties: { layers: [] } };
+  // ⚠️ SE SIMULA `fetchConTimeout`, QUE ES LO QUE USA EL CÓDIGO. Esto simulaba
+  // `getJSON`, que no lo llama nadie: el clima y el suelo salían por
+  // `fetchConTimeout` y este test pedía de verdad a Open-Meteo y a SoilGrids.
+  // De ahí su inestabilidad —verde o rojo según la red, sin tocar una línea— y
+  // por eso salió rojo una vez en la suite. Lo localizó la auditoría.
+  //
+  // Devuelve la forma de una respuesta de fetch, que es lo que esperan los
+  // llamantes: `ok`, `json()` y `text()`.
+  const respuesta = (cuerpo) => ({ ok: true, status: 200,
+    json: async () => cuerpo, text: async () => JSON.stringify(cuerpo) });
+  let pedidasFuera = [];
+  http.fetchConTimeout = async (url) => {
+    pedidasFuera.push(String(url));
+    if (/soilgrids/i.test(url)) return respuesta({ properties: { layers: [] } });
     if (/open-meteo|archive-api/i.test(url)) {
-      return { daily: { time: fechas, et0_fao_evapotranspiration: et0, precipitation_sum: pp,
-                        temperature_2m_max: tx, temperature_2m_min: tn } };
+      return respuesta({ daily: { time: fechas, et0_fao_evapotranspiration: et0,
+                                  precipitation_sum: pp, temperature_2m_max: tx,
+                                  temperature_2m_min: tn } });
     }
-    return {};
+    return respuesta({});
   };
 
   for (const c of casos) {
@@ -260,6 +273,12 @@ console.log("\n── cliente y servidor, la misma clasificación ──");
     const minutos = cuerpo?.capacidad_riego?.puede_ejecutar === true;
     ok(minutos === (enCliente === "fiable"),
        `  …y los minutos fiables se habilitan solo si la clase es fiable (${minutos})`);
+    // Que el transporte esté DE VERDAD controlado: si alguna petición se
+    // escapara a la red, este test volvería a ser inestable sin avisar.
+    const sueltas = pedidasFuera.filter(u => !/soilgrids|open-meteo|archive-api/i.test(u));
+    ok(sueltas.length === 0,
+       `  …y ninguna petición se escapa a la red sin simular (${sueltas.join(", ") || "ninguna"})`);
+    ok(pedidasFuera.length > 0, "  …con el transporte simulado de verdad en uso");
   }
 }
 
