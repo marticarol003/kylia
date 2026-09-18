@@ -89,6 +89,7 @@ const RECINTOS = { recintos: [{ referencia: "R1", superficie_m2: 5000, uso: "TA"
 const AJENO = "11111111-2222-3333-4444-555555555555";
 let pedidas = [];           // {recurso, accion, email, ...}
 let canjeVale = true;       // C: enlace inválido/caducado
+let zonasRemotas = [];      // qué tiene la CUENTA (para el choque de adopción)
 let envioFalla = false;     // C: el envío del enlace falla
 let subidas = [];           // config-app que llegan al servidor
 
@@ -114,8 +115,9 @@ const srv = createServer((q, r) => {
       if (b.recurso === "acceso" && b.accion === "canjear") {
         if (!canjeVale) return r.end(JSON.stringify({ ok: false, error: "enlace no válido o caducado" }));
         return r.end(JSON.stringify({ ok: true, propietario_id: AJENO, email: "dueño@ejemplo.es",
-          nombre: "Dueño", config: { finca: { lat: 41.3255, lon: 2.062, suelo: "franco" }, zonas: [], zonaActiva: null },
-          zonas: [] }));
+          nombre: "Dueño", config: { finca: { lat: 41.3255, lon: 2.062, suelo: "franco" },
+                                     zonas: zonasRemotas, zonaActiva: null },
+          zonas: zonasRemotas }));
       }
       if (b.recurso === "config-app") { subidas.push(b); return r.end(JSON.stringify({ ok: true, persisted: true, config_version: 1 })); }
       return r.end(JSON.stringify({ ok: true }));
@@ -132,7 +134,8 @@ const srv = createServer((q, r) => {
     // La tupla que exige `adoptarDelPropietario`: owner + config + versión, de
     // la MISMA fila.
     return r.end(JSON.stringify({ ok: true, propietario: { id: AJENO,
-      config: { finca: { lat: 41.3255, lon: 2.062, suelo: "franco" }, zonas: [], zonaActiva: null },
+      config: { finca: { lat: 41.3255, lon: 2.062, suelo: "franco" },
+                zonas: zonasRemotas, zonaActiva: null },
       config_version: 3 } }));
   }
   if (u.startsWith("/api/")) { r.writeHead(404); return r.end("{}"); }
@@ -443,6 +446,101 @@ console.log("\n── E · el enlace se abre en otro navegador ──");
      "no se le asocia el propietario del otro navegador: no comparten almacenamiento");
   ok(d2 && d2.userId === AJENO, "y el navegador que abrió el enlace sí adopta al propietario");
   ok(d2 && d2.borrador === false, "sin heredar el borrador del primero: son orígenes distintos");
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// BLOQUEANTE · canjear no puede costarle un cultivo
+// ══════════════════════════════════════════════════════════════════════
+const GEOM = { type: "Polygon", coordinates: [[[2.060, 41.324], [2.060, 41.325],
+                                               [2.061, 41.325], [2.061, 41.324], [2.060, 41.324]]] };
+const zonaCon = (ref, id, cultivo) => ({ referencia: ref, superficie_m2: 5000, geometria: GEOM,
+  siembras: [{ id, cultivo, area_m2: 1500, geometria: GEOM,
+               sync: { nueva: false, vista: "h", confirmada: "h", token: "t-" + id } }] });
+
+async function dispositivoConCultivoYCanje(zonasDeLaCuenta) {
+  zonasRemotas = zonasDeLaCuenta;
+  const ctx = await nav.createBrowserContext(); contextos.push(ctx);
+  const pag = await ctx.newPage();
+  pag.on("dialog", async d => { await d.dismiss(); });
+  pag.on("pageerror", e => errores.push(e.message));
+  await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });
+  await esperar(1500);
+  // Un cultivo guardado en local, sin identificarse.
+  for (let i = 0; i < 8; i++) { try { await pag.evaluate((z) => {
+    localStorage.setItem("kylia_zonas", JSON.stringify([z]));
+  }, zonaCon("R1", "mia-1", "lechuga")); break; } catch (_) { await esperar(400); } }
+  // Y ahora abre el enlace que le llegó al correo.
+  try { await pag.goto(`http://127.0.0.1:${port}/app?acceso=TOKEN-BUENO`, { waitUntil: "domcontentloaded" }); }
+  catch (_) {}
+  await esperar(4000);
+  return pag;
+}
+const leerEstado = async (pag) => { for (let i = 0; i < 10; i++) { try {
+  return await pag.evaluate(() => ({
+    siembras: JSON.parse(localStorage.getItem("kylia_zonas") || "[]")
+      .flatMap(z => (z.siembras || []).map(s => s.id)),
+    base: JSON.parse(localStorage.getItem("kylia_config_base") || "null"),
+    pendiente: JSON.parse(localStorage.getItem("kylia_adopcion_pendiente") || "null"),
+    previas: JSON.parse(localStorage.getItem("kylia_zonas_previas") || "null"),
+    pantalla: document.getElementById("adopcion")?.hidden === false,
+    titulo: document.getElementById("adopcion-tit")?.textContent || "",
+    opciones: [...document.querySelectorAll("#adopcion .pc-btn-tit")].map(x => x.textContent.trim()),
+  })); } catch (_) { await esperar(500); } } return null; };
+
+console.log("\n── la cuenta TAMBIÉN tiene cultivos: se pregunta, no se borra ──");
+{
+  const pag = await dispositivoConCultivoYCanje([zonaCon("R9", "suya-1", "tomate")]);
+  const e = await leerEstado(pag);
+  ok(e.siembras.join() === "mia-1", `el cultivo de este dispositivo sigue ahí (${e.siembras.join()})`);
+  ok(e.base === null, "sin base adoptada: cero POST mientras no decida");
+  ok(!!e.pendiente, "la foto de la cuenta queda guardada aparte");
+  ok(e.pantalla === true, "y sale la pantalla para decidir");
+  ok(/cultivos en esta cuenta y en este dispositivo/i.test(e.titulo), `con el texto claro: "${e.titulo}"`);
+  ok(e.opciones.length === 2, `y las dos salidas: ${JSON.stringify(e.opciones)}`);
+
+  // RELOAD sin decidir: todo sigue igual.
+  await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });
+  await esperar(2500);
+  const tras = await leerEstado(pag);
+  ok(tras.siembras.join() === "mia-1" && !!tras.pendiente && tras.base === null,
+     "tras recargar sin decidir, nada ha cambiado");
+  ok(tras.pantalla === true, "y se vuelve a preguntar");
+
+  // Elegir la CUENTA: se aplica y lo de aquí queda a salvo.
+  await pag.evaluate(() => document.getElementById("adopcion-cuenta").click());
+  await esperar(2500);
+  const fin = await leerEstado(pag);
+  ok(fin.siembras.join() === "suya-1", `ahora se ven los de la cuenta (${fin.siembras.join()})`);
+  ok(fin.previas?.zonas?.[0]?.siembras?.[0]?.id === "mia-1",
+     "y los de este dispositivo quedan guardados aparte, no borrados");
+  ok(fin.base?.owner_id === AJENO, "con la base de la cuenta");
+  ok(fin.pendiente === null, "y sin nada pendiente");
+  await pag.close();
+}
+
+console.log("\n── quedarse con los de este dispositivo ──");
+{
+  const pag = await dispositivoConCultivoYCanje([zonaCon("R9", "suya-1", "tomate")]);
+  await esperar(500);
+  await pag.evaluate(() => document.getElementById("adopcion-dispositivo").click());
+  await esperar(2500);
+  const e = await leerEstado(pag);
+  ok(e.siembras.join() === "mia-1", "los cultivos de aquí siguen intactos");
+  ok(e.base?.owner_id === AJENO && e.base?.base_version === 3,
+     "y el dispositivo coge la base de la cuenta: al guardar subirán ahí");
+  ok(e.pendiente === null, "sin nada pendiente");
+  await pag.close();
+}
+
+console.log("\n── la cuenta está VACÍA: no se pregunta y NO se borra ──");
+{
+  const pag = await dispositivoConCultivoYCanje([]);
+  const e = await leerEstado(pag);
+  ok(e.siembras.join() === "mia-1", `el cultivo local sobrevive a una cuenta vacía (${e.siembras.join()})`);
+  ok(e.pantalla === false, "y no se le pregunta nada: no hay nada que elegir");
+  ok(e.base?.owner_id === AJENO, "se adopta la cuenta, con su base");
+  await pag.close();
+  zonasRemotas = [];
 }
 
 await nav.close();

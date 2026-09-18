@@ -349,6 +349,96 @@
         } catch (_) { return false; }
       }
 
+      // ─── QUÉ HAY AQUÍ Y QUÉ HAY ALLÍ ───────────────────────────────
+      // Adoptar una cuenta SOBRESCRIBE `kylia_zonas`. Si este dispositivo tiene
+      // cultivos que la cuenta no tiene, adoptar los borra; y si conserváramos
+      // los locales pero adoptáramos la base del CAS, la siguiente subida
+      // mandaría la foto local ENTERA y borraría los de la cuenta. Las dos
+      // direcciones pierden trabajo del agricultor.
+      //
+      // Así que cuando hay cultivos a los dos lados no se decide por él: no se
+      // escribe NADA —ni foto ni base, o sea cero POST— y se guarda la foto
+      // remota aparte para que elija. Perder una siembra es mucho peor que una
+      // pantalla de más.
+      const PENDIENTE_KEY = "kylia_adopcion_pendiente";
+      const ZONAS_PREVIAS_KEY = "kylia_zonas_previas";
+
+      const siembrasDe = (zonas) => {
+        const out = [];
+        for (const z of (Array.isArray(zonas) ? zonas : [])) {
+          for (const sb of (z?.siembras || [])) if (sb && sb.cultivo) out.push(sb);
+        }
+        return out;
+      };
+      function zonasLocales() {
+        try { const z = JSON.parse(localStorage.getItem("kylia_zonas") || "null");
+              return Array.isArray(z) ? z : []; } catch (_) { return []; }
+      }
+
+      // Devuelve null si no hay nada que decidir, o el reparto si lo hay.
+      // "Inequívoco" es que una de las dos partes NO tenga cultivos: entonces
+      // no hay elección posible y se conserva lo que hay. Con cultivos a los dos
+      // lados, decide él — aunque los ids coincidan, porque el contenido puede
+      // haber divergido y no vamos a fusionar siembra a siembra por nuestra
+      // cuenta.
+      function conflictoDeAdopcion(configRemota) {
+        const aqui  = siembrasDe(zonasLocales());
+        const alla  = siembrasDe(configRemota?.zonas);
+        if (!aqui.length || !alla.length) return null;
+        const idsAlla = new Set(alla.map(s => s.id).filter(Boolean));
+        const soloAqui = aqui.filter(s => !s.id || !idsAlla.has(s.id));
+        // Si TODO lo local ya está en la cuenta, adoptar no pierde nada: es el
+        // mismo trabajo, visto desde el otro lado.
+        if (!soloAqui.length) return null;
+        return { aqui: aqui.length, alla: alla.length, soloAqui: soloAqui.length };
+      }
+
+      // ── Resolver la decisión, y SIEMPRE sin destruir ───────────────
+      // Las dos salidas conservan lo que había: quedarse con la cuenta guarda
+      // antes una copia de los cultivos de este dispositivo, y quedarse con el
+      // dispositivo no borra la cuenta —la foto remota sigue en el servidor
+      // hasta que él guarde encima, que es lo que ha pedido—.
+      function resolverAdopcion(eleccion) {
+        const p = leerPendiente();
+        if (!p) return false;
+        if (eleccion === "cuenta") {
+          // La copia de seguridad va ANTES de escribir nada. Si esto falla, no
+          // se adopta: no se pisa lo local sin haberlo puesto a salvo.
+          try {
+            localStorage.setItem(ZONAS_PREVIAS_KEY, JSON.stringify({
+              guardado: new Date().toISOString(),
+              zonas: zonasLocales(),
+            }));
+          } catch (_) { return false; }
+          const r = adoptarConfigPropietario(
+            { owner_id: p.owner_id, config: p.config, config_version: p.config_version },
+            { forzar: true });
+          if (r === true) borrarPendiente();
+          return r === true;
+        }
+        if (eleccion === "dispositivo") {
+          // ⚠️ BASE SIN FOTO, Y ESTA VEZ A PROPÓSITO. El comentario de
+          // `adoptarConfigPropietario` avisa de que una base sin foto autoriza a
+          // escribir una foto que no se adoptó: eso es exactamente lo que él ha
+          // elegido —subir LA SUYA sobre la versión que hay en el servidor—, y
+          // el CAS sigue protegiendo de escribir sobre una versión que ya no es
+          // la vigente. Lo local no se toca.
+          localStorage.setItem("kylia_user_id", p.owner_id);
+          if (!guardarBase(p.owner_id, p.config_version)) return false;
+          borrarPendiente();
+          return true;
+        }
+        return false;
+      }
+      window.kyliaResolverAdopcion = resolverAdopcion;
+
+      const leerPendiente = () => {
+        try { const p = JSON.parse(localStorage.getItem(PENDIENTE_KEY) || "null");
+              return p && p.owner_id && p.config ? p : null; } catch (_) { return null; }
+      };
+      const borrarPendiente = () => { try { localStorage.removeItem(PENDIENTE_KEY); } catch (_) {} };
+      window.kyliaAdopcionPendiente = leerPendiente;
+
       // ⚠️ ESCRITOR INTERNO. NO se llama desde ningún sitio salvo desde
       // adoptarConfigPropietario(). Escribir la foto por un lado y la base por
       // otro es la clase de bug que hemos estado parcheando call site a call
@@ -380,17 +470,42 @@
       // Es la única función que toca a la vez la foto y kylia_config_base. Si la
       // tupla no está completa y no es coherente, no se adopta NADA: ni foto, ni
       // base. Quedarse sin base significa 0 POST, que es el lado seguro.
-      function adoptarConfigPropietario(tupla) {
+      function adoptarConfigPropietario(tupla, opciones = {}) {
         if (!tupla || typeof tupla !== "object" || Array.isArray(tupla)) return false;
         const { owner_id, config, config_version } = tupla;
         if (!esOwner(owner_id))       return false;
         if (!esVersion(config_version)) return false;
         if (!config || typeof config !== "object" || Array.isArray(config)) return false;
+        // ⚠️ LA PUERTA. Con cultivos en los dos sitios no se escribe nada: la
+        // foto remota se guarda aparte y se devuelve "pendiente". Sin base no
+        // hay POST posible (`guardarConfigServidor` → base_desconocida), así que
+        // mientras él no decida, ni se pisa lo local ni se pisa lo de la cuenta.
+        // ⚠️ UNA CUENTA VACÍA NO PUEDE BORRAR CULTIVOS. Sin esto, adoptar una
+        // cuenta recién creada escribía `zonas: []` encima de los cultivos de
+        // este dispositivo y los perdía —y aquí no hay nada que preguntar,
+        // porque la cuenta no tiene nada que perder—. Es la única fusión que se
+        // hace sola, y es inequívoca: se conserva lo único que existe.
+        let aEscribir = config;
+        if (!opciones.forzar
+            && !siembrasDe(config.zonas).length && siembrasDe(zonasLocales()).length) {
+          aEscribir = { ...config, zonas: zonasLocales() };
+        }
+        if (!opciones.forzar) {
+          const choque = conflictoDeAdopcion(config);
+          if (choque) {
+            try {
+              localStorage.setItem(PENDIENTE_KEY, JSON.stringify({
+                owner_id, config, config_version, choque, en: new Date().toISOString(),
+              }));
+            } catch (_) { /* si no cabe, tampoco se adopta: lo local se queda */ }
+            return "pendiente";
+          }
+        }
         // Primero la foto, después la base. Si la base fallara —localStorage
         // lleno, navegación privada—, el estado que queda es "foto sin base", que
         // bloquea las escrituras. Al revés dejaría una base autorizando una foto
         // que no llegó a escribirse.
-        if (!escribirConfigLocal(config, owner_id)) return false;
+        if (!escribirConfigLocal(aEscribir, owner_id)) return false;
         return guardarBase(owner_id, config_version);
       }
       // Extrae la tupla de una respuesta de vista=config. Solo del bloque
@@ -412,7 +527,15 @@
           });
           const d = await res.json();
           if (!d.ok) {
-            alert("Ese enlace ya no vale. Pide otro desde la app.");
+            // ⚠️ "NO CONFIGURADO" NO ES "CADUCADO", y decirle que pida otro
+            // enlace sería mandarle a repetir algo que va a volver a fallar. El
+            // enlace sigue INTACTO: el servidor no lo quema cuando falta
+            // configuración. Aquí no se adopta nada, no se escribe nada y lo que
+            // tuviera en el dispositivo se queda como estaba.
+            alert(d.error === "acceso_no_configurado"
+              ? "Todavía no podemos abrir sesiones. Tu enlace sigue valiendo y tus cultivos "
+                + "siguen en este dispositivo; inténtalo más tarde."
+              : "Ese enlace ya no vale. Pide otro desde la app.");
             location.replace("/app");   // el token no se queda en la barra ni aunque falle
             return;
           }
@@ -509,7 +632,8 @@
         // Y se vuelve a comprobar al escribir: "estaba vacío cuando empecé" no
         // autoriza a pisar lo que haya cuando termino.
         const adoptado = await adoptarDelPropietario(userId, () => !tieneConfigLocal());
-        if (adoptado && anotado) location.reload();
+        // "pendiente" NO es adoptado: no ha cambiado nada que recargar muestre.
+        if (adoptado === true && anotado) location.reload();
       }
 
       // ─── Guardado de config con compare-and-set ────────────────────
@@ -3824,6 +3948,32 @@
   </div>
 
 
+  <!-- ══════════════════════════════════════════════════════════════════
+       CULTIVOS EN LOS DOS SITIOS
+       ══════════════════════════════════════════════════════════════════
+       Sale cuando se canjea un acceso y resulta que hay cultivos en la cuenta Y
+       en este dispositivo. Mientras esté abierta no se ha escrito NADA: ni se ha
+       pisado lo local ni se ha tocado lo de la cuenta, y sin base adoptada no
+       sale ni un POST. Las dos salidas conservan lo que había. -->
+  <div id="adopcion" class="gate-overlay" role="dialog" aria-modal="true"
+       aria-labelledby="adopcion-tit" hidden>
+    <div class="gate-card">
+      <h2 id="adopcion-tit">Hemos encontrado cultivos en esta cuenta y en este dispositivo</h2>
+      <p id="adopcion-desc">No queremos borrarte nada, así que decides tú.</p>
+      <div class="pc-opciones" style="flex-direction:column">
+        <button type="button" class="pc-btn-grande" id="adopcion-cuenta">
+          <span class="pc-btn-tit">Usar los cultivos de mi cuenta</span>
+          <span class="pc-btn-sub" id="adopcion-sub-cuenta"></span>
+        </button>
+        <button type="button" class="pc-btn-grande" id="adopcion-dispositivo">
+          <span class="pc-btn-tit">Quedarme con los de este dispositivo</span>
+          <span class="pc-btn-sub" id="adopcion-sub-dispositivo"></span>
+        </button>
+      </div>
+      <p class="gate-legal" id="adopcion-nota"></p>
+    </div>
+  </div>
+
   <div id="gate" class="gate-overlay" role="dialog" aria-modal="true" aria-labelledby="gate-title" aria-describedby="gate-desc" hidden>
     <div class="gate-card">
       <div class="gate-logo" aria-hidden="true"><svg class="brand-logo" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="flex:0 0 auto"><path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(45)"/><path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(225)"/><circle cx="12" cy="12" r="2.4"/></svg> Kylia</div>
@@ -3907,10 +4057,50 @@
         localStorage.setItem("kylia_user_email", email);
         localStorage.setItem("kylia_user_consent", new Date().toISOString());
         if (nombre) localStorage.setItem("kylia_user_nombre", nombre);
-        // Alta inicial del piloto en Supabase (silencioso, idempotente)
-        try { window.kyliaSync?.registroUsuario({ email, nombre, origen: localStorage.getItem("kylia_origen") }); } catch (_) {}
+        // ⚠️ AQUÍ YA NO SE ESCRIBE EN `usuarios`. Esto hacía
+        // `registroUsuario({email, nombre, origen})` con el correo recién
+        // tecleado: si era el de otra persona, su cuenta pasaba a tener dos
+        // filas con el mismo correo y dueños distintos, `propietarioPorEmail`
+        // devolvía conflicto y esa persona dejaba de recibir enlaces de acceso,
+        // en silencio.
+        //
+        // Y no hacía falta para nada: el correo ya se ha guardado en este
+        // dispositivo (arriba) y viaja a su fila cuando él guarda su
+        // configuración, que es cuando la fila tiene sentido. La lista de
+        // interesados la lleva /api/waitlist, que es donde va este alta.
         gate.hidden = true;
       });
+
+      // ── La pantalla de "cultivos en los dos sitios" ──────────────────
+      // Solo pinta y llama a `kyliaResolverAdopcion`. La decisión de qué se
+      // conserva vive arriba, con el resto de la adopción.
+      (function () {
+        const caja = document.getElementById("adopcion");
+        if (!caja || !window.kyliaAdopcionPendiente) return;
+        const p = window.kyliaAdopcionPendiente();
+        if (!p) return;
+        const n = p.choque || {};
+        const plural = (x, s1, s2) => `${x} ${x === 1 ? s1 : s2}`;
+        document.getElementById("adopcion-sub-cuenta").textContent =
+          `Se verán ${plural(n.alla || 0, "cultivo", "cultivos")} de la cuenta. `
+          + `Guardamos una copia de ${plural(n.aqui || 0, "el de este móvil", "los de este móvil")} por si acaso.`;
+        document.getElementById("adopcion-sub-dispositivo").textContent =
+          `Se quedan ${plural(n.aqui || 0, "cultivo", "cultivos")} de aquí, y al guardar pasarán a tu cuenta.`;
+        document.getElementById("adopcion-nota").textContent =
+          "Hasta que elijas no tocamos ninguno de los dos.";
+        caja.hidden = false;
+        const cerrar = (eleccion) => {
+          if (!window.kyliaResolverAdopcion(eleccion)) {
+            document.getElementById("adopcion-nota").textContent =
+              "No hemos podido guardarlo ahora mismo. No se ha borrado nada; inténtalo otra vez.";
+            return;
+          }
+          caja.hidden = true;
+          location.reload();
+        };
+        document.getElementById("adopcion-cuenta").addEventListener("click", () => cerrar("cuenta"));
+        document.getElementById("adopcion-dispositivo").addEventListener("click", () => cerrar("dispositivo"));
+      })();
 
       // Enter en cualquier campo del gate
       ["gate-nombre", "gate-email"].forEach(function (id) {
@@ -9493,20 +9683,27 @@
           boton.disabled = true;
           aviso.textContent = "Enviando…";
           try {
-            // Guardar el correo en la ficha. Va solo, sin más campos: el
-            // handler ya no toca lo que no le mandas, así que esto no puede
-            // llevarse por delante la parcela.
+            // ⚠️ NI AQUÍ. Para PEDIR un enlace no hay que escribir el correo en
+            // ninguna fila: el servidor busca a quién pertenece ya. Escribirlo
+            // antes era, además, al revés de lo que hace falta — fabricaba una
+            // cuenta con ese correo para luego poder mandarle un enlace a ella
+            // misma, y de paso rompía la del dueño legítimo.
+            // Se recuerda en el dispositivo y nada más.
             if (localStorage.getItem("kylia_user_email") !== email) {
               localStorage.setItem("kylia_user_email", email);
-              await window.kyliaSync?.registroUsuario({ email });
             }
-            await fetch("/api/log", {
+            const rp = await fetch("/api/log", {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ recurso: "acceso", accion: "pedir", email }),
             });
+            // 503 = el acceso por enlace no está configurado en el servidor. No
+            // se promete un correo que no va a llegar.
+            var r503 = rp.status === 503;
             // El servidor responde lo mismo exista o no el correo, para no
             // decirle a nadie quién es cliente. Aquí se dice igual de neutro.
-            aviso.textContent = "Si ese correo tiene un campo en Kylia, el enlace ya va de camino. Caduca en 15 minutos.";
+            aviso.textContent = r503
+              ? "Todavía no podemos mandar enlaces. No se ha perdido nada: tus cultivos siguen aquí."
+              : "Si ese correo tiene un campo en Kylia, el enlace ya va de camino. Caduca en 15 minutos.";
           } catch (_) {
             aviso.textContent = "No se ha podido enviar ahora mismo. Inténtalo en un momento.";
           } finally {
@@ -13216,13 +13413,14 @@
         $("pc-b-ident").disabled = true;
         $("pc-ident-estado").className = "alta-estado";
         $("pc-ident-estado").textContent = "Enviando el enlace…";
-        let mandado = false;
+        let mandado = false, noConfigurado = false;
         try {
           const r = await fetch("/api/log", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ recurso: "acceso", accion: "pedir", email }),
           });
           mandado = r.ok;
+          noConfigurado = r.status === 503;
         } catch (_) { mandado = false; }
         // El servidor responde lo MISMO exista o no el correo, para no decirle a
         // nadie quién es cliente. Aquí se repite igual de neutro: no se afirma
@@ -13230,7 +13428,10 @@
         $("pc-ident-estado").className = mandado ? "alta-estado" : "alta-estado pc-mal";
         $("pc-ident-estado").textContent = mandado
           ? "Si ese correo tiene un campo en Kylia, el enlace ya va de camino. Caduca en 15 minutos."
-          : "No hemos podido enviarlo ahora mismo. Tu cultivo se guarda igualmente en este dispositivo.";
+          : noConfigurado
+            ? "Todavía no podemos mandar enlaces para entrar. Tu cultivo se guarda en este dispositivo "
+              + "y no se pierde nada."
+            : "No hemos podido enviarlo ahora mismo. Tu cultivo se guarda igualmente en este dispositivo.";
         // Se guarda EN LOCAL pase lo que pase. Lo que NO se hace es decir que ha
         // quedado en una cuenta: eso solo es verdad tras abrir el enlace.
         eligioSoloLocal = true;

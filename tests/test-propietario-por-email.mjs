@@ -232,6 +232,12 @@ function supa({ usuarios = [], jornadas = [], accesos = [] }) {
 // al stub de fetch. Sin ella declina a propósito —y eso también está bien—, pero
 // entonces no se podría comprobar que el flujo termina.
 process.env.RESEND_API_KEY = "test-key";
+// ⚠️ TAMBIÉN EL SECRETO DE SESIÓN. `pedir()` y `canjear()` se niegan con 503
+// cuando falta configuración —a propósito: sin ella no se puede entregar el
+// enlace ni emitir la sesión, y fingir que sí es lo que dejaba al agricultor
+// esperando un correo que no existía—. Este test prueba la RESOLUCIÓN del
+// propietario, así que se le da el entorno que tendría en producción.
+process.env.SESION_SECRET = process.env.SESION_SECRET || "secreto-de-prueba-largo-suficiente";
 process.env.RESEND_FROM = "kylia@ejemplo.es";
 const correos = [];
 const httpStub = { fetchConTimeout: async (url, init) => {

@@ -307,10 +307,20 @@ console.log("\n── 12. la BASE local persiste, y es lo que detecta el conflic
 // variables a mano — que es justo lo que ocultaría que la garantía vivía en
 // memoria.
 const APP = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+// ⚠️ SE CIERRA LA LISTA DE PARÁMETROS ANTES DE BUSCAR EL CUERPO. La versión
+// ingenua saltaba al primer `{` tras el `(`, y con `function f(a, opciones = {})`
+// se quedaba con ESE `{}` como cuerpo entero: la función salía truncada y el
+// arnés reventaba con un error de sintaxis a diez líneas de distancia.
 function trozo(marca) {
   const i = APP.indexOf(marca);
   if (i < 0) throw new Error("no encuentro: " + marca);
-  let k = APP.indexOf("{", APP.indexOf("(", i)), prof = 0;
+  let k = APP.indexOf("(", i), prof = 0;
+  for (; k < APP.length; k++) {
+    if (APP[k] === "(") prof++;
+    else if (APP[k] === ")" && --prof === 0) { k++; break; }
+  }
+  while (k < APP.length && APP[k] !== "{") k++;
+  prof = 0;
   for (let j = k; j < APP.length; j++) {
     if (APP[j] === "{") prof++;
     else if (APP[j] === "}" && --prof === 0) return APP.slice(i, j + 1);
@@ -338,6 +348,13 @@ function cargarApp({ almacen, servidor, responde, uid = "zone-1" }) {
     const kyliaSync = {};
     ${trozo("function leerBase()")}
     ${trozo("function guardarBase(")}
+    ${/const PENDIENTE_KEY = "[^"]+";/.exec(APP)[0]}
+    ${/const ZONAS_PREVIAS_KEY = "[^"]+";/.exec(APP)[0]}
+    ${/const siembrasDe = \(zonas\) => \{[\s\S]*?\n      \};/.exec(APP)[0]}
+    ${trozo("function zonasLocales(")}
+    ${trozo("function conflictoDeAdopcion(")}
+    ${/const leerPendiente = \(\) => \{[\s\S]*?\n      \};/.exec(APP)[0]}
+    ${/const borrarPendiente = [^\n]+/.exec(APP)[0]}
     ${trozo("function escribirConfigLocal(")}
     ${trozo("function adoptarConfigPropietario(")}
     ${trozo("function tuplaDe(")}
@@ -618,13 +635,30 @@ console.log("\n── 19. la adopción está CENTRALIZADA, no repartida ──")
   // El escritor de la foto solo lo llama la función canónica.
   const llamadas = (A.match(/escribirConfigLocal\(/g) || []).length;
   ok(llamadas === 2, `escribirConfigLocal: su definición y UN solo llamante (${llamadas})`);
-  const adop = /function adoptarConfigPropietario\(tupla\)[\s\S]*?\n      \}/.exec(A)[0];
-  ok(/escribirConfigLocal\(config, owner_id\)/.test(adop) && /guardarBase\(owner_id, config_version\)/.test(adop),
+  // La firma lleva ahora `opciones = {}` y la foto que se escribe puede ser la
+  // local —cuando la cuenta está vacía y el dispositivo no—, así que la variable
+  // se llama `aEscribir`. Lo que se comprueba sigue siendo lo mismo: que foto y
+  // base se escriben en la MISMA función y juntas.
+  const adop = /function adoptarConfigPropietario\(tupla[\s\S]*?\n      \}/.exec(A)[0];
+  ok(/escribirConfigLocal\(aEscribir, owner_id\)/.test(adop) && /guardarBase\(owner_id, config_version\)/.test(adop),
      "y ese llamante es adoptarConfigPropietario, que escribe foto y base JUNTAS");
   // guardarBase, igual: solo la adopción y el éxito del CAS.
+  //
+  // El QUINTO es `resolverAdopcion("dispositivo")`: el agricultor ha visto que
+  // hay cultivos en la cuenta y en el móvil y ha elegido quedarse con los de
+  // aquí. Entonces se coge la base de la versión que hay en el servidor SIN
+  // escribir la foto remota —lo local se queda— para que su siguiente guardado
+  // suba lo suyo. Es base sin foto a propósito y revisado: el CAS sigue
+  // protegiendo de escribir sobre una versión que ya no sea la vigente. Si
+  // aparece un SEXTO, hay que mirarlo a mano.
   const bases = (A.match(/guardarBase\(/g) || []).length;
-  ok(bases === 4,
-     `guardarBase: definición + adopción + arranque en 0 + éxito del CAS (${bases})`);
+  ok(bases === 5,
+     `guardarBase: definición + adopción + arranque en 0 + éxito del CAS + la decisión (${bases})`);
+  const resol = /function resolverAdopcion\([\s\S]*?\n      \}/.exec(A)[0];
+  ok(/guardarBase\(p\.owner_id, p\.config_version\)/.test(resol),
+     "y el quinto es esa decisión, con la versión que vino del servidor");
+  ok(!/escribirConfigLocal/.test(resol.split('if (eleccion === "dispositivo")')[1] || ""),
+     "que NO escribe la foto remota: quedarse con lo de aquí es quedarse con lo de aquí");
   ok(!/adoptarBaseConfig/.test(A), "no queda ningún adoptador de base suelto");
   ok(!/restaurarConfig\(/.test(A), "ni el antiguo restaurarConfig con dos fuentes");
   const rsv = /async function restaurarSiVacio\(\)[\s\S]*?\n      \}/.exec(A)[0];
@@ -662,6 +696,13 @@ function appConGetRetenido({ almacen, respuestaServidor, uid = "owner" }) {
     const kyliaSync = {};
     ${trozo("function leerBase()")}
     ${trozo("function guardarBase(")}
+    ${/const PENDIENTE_KEY = "[^"]+";/.exec(APP)[0]}
+    ${/const ZONAS_PREVIAS_KEY = "[^"]+";/.exec(APP)[0]}
+    ${/const siembrasDe = \(zonas\) => \{[\s\S]*?\n      \};/.exec(APP)[0]}
+    ${trozo("function zonasLocales(")}
+    ${trozo("function conflictoDeAdopcion(")}
+    ${/const leerPendiente = \(\) => \{[\s\S]*?\n      \};/.exec(APP)[0]}
+    ${/const borrarPendiente = [^\n]+/.exec(APP)[0]}
     ${trozo("function escribirConfigLocal(")}
     ${trozo("function adoptarConfigPropietario(")}
     ${trozo("function tuplaDe(")}

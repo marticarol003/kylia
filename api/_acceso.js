@@ -54,6 +54,17 @@ function correoHTML(enlace) {
 </div>`;
 }
 
+// Qué falta para que el acceso por enlace funcione DE VERDAD. Las dos son
+// necesarias: una entrega el enlace y la otra convierte el canje en una sesión.
+// Con cualquiera de las dos sin poner, el circuito no se cierra y más vale
+// decirlo que simularlo.
+function faltaConfiguracion() {
+  const falta = [];
+  if (!(process.env.RESEND_API_KEY || "").trim()) falta.push("RESEND_API_KEY");
+  if (!SESION.hayConfig()) falta.push("SESION_SECRET");
+  return falta;
+}
+
 async function enviarCorreo(email, enlace) {
   const key = (process.env.RESEND_API_KEY || "").trim();
   // Sin Resend configurado no se puede entregar. Se dice aquí (en el log del
@@ -83,6 +94,21 @@ async function enviarCorreo(email, enlace) {
 async function pedir(body, ip) {
   const email = (body.email || "").toString().trim().toLowerCase().slice(0, 200);
   if (!ES_EMAIL.test(email)) return { estado: 400, cuerpo: { error: "email inválido" } };
+
+  // ⚠️ SIN INFRAESTRUCTURA, ERROR EXPLÍCITO — NO UN FALSO ÉXITO. Antes, sin
+  // RESEND_API_KEY esto devolvía {ok:true, enviado:true} y la app decía "el
+  // enlace ya va de camino": una promesa que no se podía cumplir, y el
+  // agricultor esperando un correo que no existía. Y sin SESION_SECRET el canje
+  // no puede emitir sesión, así que mandar el enlace tampoco serviría de nada.
+  //
+  // Decir "esto no está configurado" no filtra NADA sobre quién es cliente: es
+  // información del servidor, no del usuario. El silencio neutral se conserva
+  // exactamente donde importa —existir o no existir—, unas líneas más abajo.
+  const falta = faltaConfiguracion();
+  if (falta.length) {
+    console.error("[acceso] sin configurar, no se puede dar acceso:", falta.join(", "));
+    return { estado: 503, cuerpo: { ok: false, error: "acceso_no_configurado", falta } };
+  }
 
   const respuesta = { estado: 200, cuerpo: { ok: true, enviado: true } };
 
@@ -128,6 +154,17 @@ async function pedir(body, ip) {
 async function canjear(body) {
   const token = (body.token || "").toString().trim();
   if (!token || token.length > 200) return { estado: 400, cuerpo: { error: "token inválido" } };
+
+  // ⚠️ ANTES DE QUEMAR NADA. Sin SESION_SECRET no se puede emitir la sesión
+  // firmada, y canjear igualmente dejaría al dispositivo ADOPTANDO una cuenta
+  // sin poder demostrar después que es suya: justo el agujero que este camino
+  // existe para cerrar. Se para aquí, con el enlace INTACTO —sigue valiendo
+  // cuando la configuración esté puesta— y sin tocar una sola fila.
+  const falta = faltaConfiguracion();
+  if (falta.length) {
+    console.error("[acceso] sin configurar, no se canjea:", falta.join(", "));
+    return { estado: 503, cuerpo: { ok: false, error: "acceso_no_configurado", falta } };
+  }
 
   const filas = await supabaseSelect("accesos",
     `token_hash=eq.${huellaDe(token)}&select=id,email,propietario_id,expira,usado_en&limit=1`);

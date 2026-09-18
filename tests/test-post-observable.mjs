@@ -393,17 +393,21 @@ console.log("\n── 5. guarda de regresión: nadie consume el valor sin proteg
   //     fallback a null y comprobación de r antes de usarlo;
   //   · el `await guardarConfigServidor` de kyliaConfirmarHistoricas (Punto 2),
   //     que comprueba `!r || !r.persisted` antes de usarlo.
-  // ⚠️ VOLVIERON A SER CUATRO, y no por deshacer nada: la pantalla de
-  // identificación del alta llegó a tener un quinto —`registroUsuario({email})`
-  // antes de pedir el enlace— y se QUITÓ a propósito. Escribir en una fila el
-  // correo que alguien teclea deja dos filas con el mismo correo y dueños
-  // distintos; entonces `propietarioPorEmail` devuelve conflicto y el dueño de
-  // verdad deja de recibir enlaces de acceso, en silencio. Para pedir un enlace
-  // no hace falta escribir ese correo en ninguna parte.
-  // Si aparece un QUINTO, hay que mirarlo a mano: una promesa consumida sin
+  // ⚠️ AHORA SON TRES, y bajaron a propósito. Tres sitios escribían en una fila
+  // el correo que alguien TECLEABA —el gate del piloto, el panel de "mándame el
+  // enlace" y la pantalla de identificación del alta— y los tres se quitaron.
+  // El daño estaba medido: si el correo es de otra persona, su cuenta pasa a
+  // tener dos filas con el mismo correo y dueños distintos, `propietarioPorEmail`
+  // devuelve conflicto y esa persona deja de recibir enlaces de acceso, en
+  // silencio. Para pedir un enlace no hace falta escribir el correo en ninguna
+  // parte; la guarda que lo cierra de verdad está en el servidor
+  // (api/log.js, handleRegistroUsuario) y se prueba en
+  // tests/test-correo-no-acreditado.mjs.
+  //
+  // Si aparece un CUARTO, hay que mirarlo a mano: una promesa consumida sin
   // protección es justo lo que este trabajo viene a evitar. Esta guarda ha
-  // saltado ya tres veces al añadir un consumidor, que es para lo que está.
-  ok(usos.length === 4, `call sites que consumen el valor: ${usos.length} (esperado 4)`);
+  // saltado ya cuatro veces al cambiar la lista, que es para lo que está.
+  ok(usos.length === 3, `call sites que consumen el valor: ${usos.length} (esperado 3)`);
   // Vive en confirmarHistoricas; el envoltorio público es una línea.
   const conf = /async function confirmarHistoricas\(ids\)[\s\S]*?\n    \}/.exec(FUENTE)[0];
   ok(/if \(!r \|\| !r\.persisted\)/.test(conf),
@@ -420,7 +424,7 @@ console.log("\n── 5. guarda de regresión: nadie consume el valor sin proteg
   // se dejaba fuera `guardarConfigServidor?.(`, que lleva llamada opcional.
   const todos = FUENTE.match(
     new RegExp("window\\.kyliaSync\\??\\.(" + metodos + ")\\??\\.?\\(", "g")) || [];
-  ok(todos.length === 13, `call sites en total: ${todos.length} (esperado 13)`);
+  ok(todos.length === 11, `call sites en total: ${todos.length} (esperado 11)`);
   ok(recorta("function addRiego(").includes(".catch(() => marcarNoSincronizado"),
      "y el de addRiego encadena .catch: no puede quedar colgada");
 }

@@ -15,6 +15,7 @@ const {
 } = require("./_supabase.js");
 
 const ACCESO = require("./_acceso.js");
+const { propietarioPorEmail } = require("./_propietario.js");
 const { puedeVer } = require("./_sesion.js");
 
 const HANDLERS = {
@@ -149,6 +150,39 @@ async function handleRegistroUsuario(req, res, body) {
     if (!permiso.permitido) {
       console.warn("[registro-usuario] sesión ajena:", JSON.stringify({ pedido: id, sesion: permiso.sesion }));
       return res.status(403).json({ ok: false, error: "esa parcela no es tuya" });
+    }
+
+    // ─── UN CORREO TECLEADO NO PUEDE ROMPERLE EL ACCESO A NADIE ───────────
+    //
+    // EL DAÑO, MEDIDO. Escribir en esta fila el correo que alguien teclea deja
+    // dos filas con el mismo correo y propietarios DISTINTOS. Entonces
+    // `propietarioPorEmail` devuelve `conflicto` —correctamente: no elige a
+    // dedo— y `_acceso.pedir()` deja de mandar el enlace. El dueño de verdad se
+    // queda sin poder entrar en su cuenta, en silencio y sin enterarse de por
+    // qué. Basta con que alguien escriba su correo en otro móvil.
+    //
+    // La guarda: antes de escribir el correo se mira a quién resuelve YA. Si
+    // resuelve a otro propietario, el correo NO se escribe —el resto de la fila
+    // sí— y queda en el log. Así:
+    //   · varias filas del mismo propietario con el mismo correo → siguen
+    //     resolviendo a ese propietario, que es lo que hacían;
+    //   · un correo nuevo, que no resuelve a nadie, se escribe: es como nace una
+    //     cuenta, y no puede pisar nada porque no hay nada;
+    //   · un correo que ya es de otro → cero escritura de ese campo.
+    //
+    // No toca ninguna fila existente, así que es compatible con todo el mundo.
+    // Y NO sustituye a la acreditación por enlace: impide el daño colateral,
+    // que es lo que estaba abierto.
+    if (fila.email) {
+      const quien = await propietarioPorEmail(fila.email);
+      const miDueño = fila.propietario_id || id;
+      const ajeno = (quien.conflicto && !quien.conflicto.includes(miDueño))
+                 || (quien.propietario_id && quien.propietario_id !== miDueño);
+      if (ajeno) {
+        console.warn("[registro-usuario] correo de otro propietario, NO se escribe:",
+          JSON.stringify({ fila: id, dueño_del_correo: quien.propietario_id || quien.conflicto }));
+        delete fila.email;
+      }
     }
 
     const filas = await supabaseInsert("usuarios", fila, { upsert: true });
