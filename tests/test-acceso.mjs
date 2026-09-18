@@ -49,8 +49,16 @@ ok(/enviado: true/.test(pedir) && !/no_existe|sin_parcelas|not_found/.test(pedir
 // en el LOG del servidor y nunca en la respuesta.
 ok(/console\.(log|warn|error)\("\[acceso\] (correo sin cuenta|email con varios propietarios|tope por hora)/.test(src),
    "el motivo real queda en el log del servidor, que es donde tiene que estar");
-ok(/crypto\.randomUUID\(\)/.test(pedir),
-   "y a un correo sin cuenta se le reserva un id: la fila se crea al canjear, no aquí");
+// La reserva ya NO se inventa en el proceso: `crypto.randomUUID()` es único en
+// el universo pero no es una identidad COMPARTIDA, y dos peticiones simultáneas
+// reservaban dos propietarios distintos para el mismo correo. Ahora la unicidad
+// la da la clave primaria de `reservas_alta` (db/reserva-alta-2026-09-18.sql).
+ok(/reservarPropietario\(email\)/.test(pedir),
+   "a un correo sin cuenta se le reserva un propietario, y la reserva la arbitra la base");
+ok(!/crypto\.randomUUID\(\)/.test(pedir),
+   "pedir() ya no se inventa la identidad por su cuenta");
+ok(/reservas_alta/.test(src) && /42P01/.test(src),
+   "y sin esa tabla no se dan altas: error explícito, no una carrera abierta");
 ok(!/supabaseInsert\("usuarios"/.test(pedir) && !/supabaseUpdate\("usuarios"/.test(pedir),
    "pedir un enlace NO toca la tabla de usuarios");
 

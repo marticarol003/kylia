@@ -29,12 +29,30 @@ let fallos = 0;
 const ok = (c, m) => { if (c) console.log("  ✓", m); else { console.log("  ✗", m); fallos++; } };
 
 // ── La "base de datos" y el correo, simulados. La lógica, real ──────────
-let USUARIOS = [], ACCESOS = [], CORREOS = [];
+let USUARIOS = [], ACCESOS = [], CORREOS = [], RESERVAS = [];
+let SIN_TABLA_RESERVAS = false;   // el estado ANTES de ejecutar la migración
+
+// ⚠️ BARRERA, para forzar el intercalado. Sin esto la carrera depende de que el
+// planificador tenga a bien alternar, y un test que gana por casualidad no
+// prueba nada. Aquí NADIE pasa de la lectura hasta que han llegado los N.
+function barrera(n) {
+  let llegados = 0, soltar;
+  const puerta = new Promise(r => { soltar = r; });
+  return async () => { if (++llegados >= n) soltar(); await puerta; };
+}
+let puertaLectura = null;   // si está puesta, toda lectura espera en la barrera
 const sb = require(join(RAIZ, "api", "_supabase.js"));
 sb.isConfigured = () => true;
 sb.parseBody = (req) => req.body || {};          // log.js lo llama SIN await
 sb.preludio = () => true;
 sb.supabaseSelect = async (tabla, q) => {
+  if (puertaLectura) await puertaLectura();
+  if (tabla === "reservas_alta") {
+    if (SIN_TABLA_RESERVAS) throw new Error('relation "reservas_alta" does not exist (42P01)');
+    const e = /email=eq\.([^&]+)/.exec(q || "");
+    const c = e ? decodeURIComponent(e[1]) : null;
+    return RESERVAS.filter(r => !c || r.email === c);
+  }
   if (tabla === "accesos") {
     const h = /token_hash=eq\.([^&]+)/.exec(q || "");
     if (h) return ACCESOS.filter(a => a.token_hash === h[1]);
@@ -56,6 +74,18 @@ sb.supabaseSelect = async (tabla, q) => {
 };
 let fallarAltaUsuario = false;     // para simular la caída justo tras quemar
 sb.supabaseInsert = async (tabla, fila) => {
+  // ⚠️ LA CLAVE PRIMARIA, MODELADA COMO LA DE VERDAD. No se regala unicidad:
+  // se rechaza el duplicado con el MISMO error que devuelve PostgREST, que es
+  // el mecanismo del que depende la corrección. Si el código no lo usara bien,
+  // este mock no lo taparía.
+  if (tabla === "reservas_alta") {
+    if (SIN_TABLA_RESERVAS) throw new Error('relation "reservas_alta" does not exist (42P01)');
+    if (RESERVAS.some(r => r.email === fila.email)) {
+      throw new Error('Supabase insert reservas_alta 409: duplicate key value violates unique constraint "reservas_alta_pkey" (23505)');
+    }
+    RESERVAS.push({ creado: new Date().toISOString(), ...fila });
+    return [RESERVAS.at(-1)];
+  }
   // `creado` lo pone la base por defecto (db/acceso-por-email-2026-08-07.sql).
   // Sin él aquí, el tope por hora no vería nada y estaríamos probando el arnés.
   if (tabla === "accesos") {
@@ -127,6 +157,9 @@ const ZONA    = "aaaaaaaa-3333-3333-3333-333333333333";
 const INTRUSO = "bbbbbbbb-2222-2222-2222-222222222222";
 const CORREO  = "agricultor@ejemplo.es";
 const copia = (x) => JSON.parse(JSON.stringify(x));
+// El tope declarado en _acceso.js. Se usa para DECIR que no es atómico, no para
+// fingir que lo es.
+const MAX_ESPERADO_SI_FUERA_ATOMICO = 5;
 
 console.log("── 1 · correo NUEVO, que no existe en ninguna fila, sin canje ──");
 {
@@ -494,6 +527,185 @@ console.log("\n── …y la petición original que termina TARDE tampoco dupli
   });
 }
 
+console.log("\n══ CONCURRENCIA · la reserva del propietario ══");
+
+const limpio = () => { USUARIOS = []; ACCESOS = []; CORREOS = []; RESERVAS = []; };
+const tokenDe = (i) => /\/app\?acceso=([A-Za-z0-9_-]+)/.exec(CORREOS[i]?.html || "")?.[1] || null;
+const canjearTodos = async () => {
+  const res = [];
+  for (let i = 0; i < CORREOS.length; i++) {
+    const t = tokenDe(i);
+    if (t) res.push(await ACCESO.canjear({ token: t }));
+  }
+  return res;
+};
+
+console.log("\n── A · dos solicitudes simultáneas, correo nuevo ──");
+{
+  limpio();
+  await conInfra(async () => {
+    // ⚠️ LAS DOS LEEN ANTES DE QUE NINGUNA ESCRIBA. Es el intercalado exacto que
+    // rompía: ambas ven que no hay reserva y ambas se inventan un uuid.
+    puertaLectura = barrera(2);
+    await Promise.all([
+      ACCESO.pedir({ email: "a@ejemplo.es" }, "1.2.3.4"),
+      ACCESO.pedir({ email: "a@ejemplo.es" }, "1.2.3.4"),
+    ]);
+    puertaLectura = null;
+    ok(ACCESOS.length === 2, `se crean los dos accesos (${ACCESOS.length})`);
+    const reservas = [...new Set(ACCESOS.map(a => a.propietario_id))];
+    ok(reservas.length === 1, `pero apuntan al MISMO propietario (${reservas.length} reserva)`);
+    ok(RESERVAS.length === 1, `y solo hay una reserva en la base (${RESERVAS.length})`);
+
+    const res = await canjearTodos();
+    ok(USUARIOS.length === 1, `al canjear los dos, UNA sola cuenta (${USUARIOS.length})`);
+    const q = await propietarioPorEmail("a@ejemplo.es");
+    ok(!q.conflicto && q.propietario_id === USUARIOS[0].id,
+       "el correo resuelve a un único dueño: cero conflicto");
+    ok(res.filter(r => r.estado === 200).length >= 1, "y puede entrar");
+  });
+}
+
+console.log("\n── B · veinte solicitudes concurrentes ──");
+{
+  limpio();
+  await conInfra(async () => {
+    puertaLectura = barrera(20);
+    const rs = await Promise.all(Array.from({ length: 20 },
+      () => ACCESO.pedir({ email: "b@ejemplo.es" }, "1.2.3.4")));
+    puertaLectura = null;
+    ok(RESERVAS.length === 1, `una sola identidad de propietario (${RESERVAS.length})`);
+    ok(new Set(ACCESOS.map(a => a.propietario_id)).size <= 1,
+       "y todos los accesos creados apuntan a ella");
+    const res = await canjearTodos();
+    ok(USUARIOS.length === 1, `una sola cuenta (${USUARIOS.length})`);
+    ok(!(await propietarioPorEmail("b@ejemplo.es")).conflicto, "sin conflicto de correo");
+    // ⚠️ EL TOPE POR HORA NO ES ATÓMICO, y no se va a afirmar que lo sea: son
+    // SELECT + contar + INSERT, y con 20 peticiones que leen a la vez todas ven
+    // cero. Se dice lo que se observa.
+    ok(ACCESOS.length > MAX_ESPERADO_SI_FUERA_ATOMICO,
+       `el tope por hora NO es atómico: con 20 simultáneas pasan ${ACCESOS.length}, no ${MAX_ESPERADO_SI_FUERA_ATOMICO}`);
+    ok(rs.every(r => r.estado === 200), "por fuera todas responden igual: no enumera");
+  });
+}
+
+console.log("\n── C · dos enlaces distintos, canje SIMULTÁNEO ──");
+{
+  limpio();
+  await conInfra(async () => {
+    await ACCESO.pedir({ email: "c@ejemplo.es" }, "1.2.3.4");
+    await ACCESO.pedir({ email: "c@ejemplo.es" }, "1.2.3.4");
+    ok(new Set(ACCESOS.map(a => a.propietario_id)).size === 1, "los dos enlaces, misma reserva");
+    const [x, y] = await Promise.all([
+      ACCESO.canjear({ token: tokenDe(0) }),
+      ACCESO.canjear({ token: tokenDe(1) }),
+    ]);
+    ok(USUARIOS.length === 1, `una sola cuenta (${USUARIOS.length})`);
+    const estados = [x, y].map(r => r.estado).sort();
+    ok(estados.filter(e => e === 200).length >= 1, `alguno entra (estados: ${estados.join(", ")})`);
+    // Lo que NO puede pasar: que la carrera le deje sin acceso para siempre.
+    const q = await propietarioPorEmail("c@ejemplo.es");
+    ok(!q.conflicto, "y el correo NO queda en conflicto");
+    CORREOS.length = 0;
+    const otro = await ACCESO.pedir({ email: "c@ejemplo.es" }, "1.2.3.4");
+    ok(otro.estado === 200 && CORREOS.length === 1,
+       "puede pedir otro enlace: la carrera no le inutiliza el acceso");
+    const ultimo = await ACCESO.canjear({ token: tokenDe(0) });
+    ok(ultimo.estado === 200 && ultimo.cuerpo.propietario_id === USUARIOS[0].id,
+       "y entra en su cuenta de siempre");
+  });
+}
+
+console.log("\n── D · solicitud con timeout y escritura TARDÍA ──");
+{
+  limpio();
+  await conInfra(async () => {
+    // La primera se queda colgada justo antes de insertar su acceso; mientras,
+    // llega la segunda y termina. Después la primera despierta y escribe.
+    let soltar; const colgada = new Promise(r => { soltar = r; });
+    const insertOriginal = sb.supabaseInsert;
+    let primera = true;
+    sb.supabaseInsert = async (tabla, fila) => {
+      if (tabla === "accesos" && primera) { primera = false; await colgada; }
+      return insertOriginal(tabla, fila);
+    };
+    const tarde = ACCESO.pedir({ email: "d@ejemplo.es" }, "1.2.3.4");
+    await new Promise(r => setTimeout(r, 30));
+    const pronto = await ACCESO.pedir({ email: "d@ejemplo.es" }, "1.2.3.4");
+    ok(pronto.estado === 200, "la segunda termina");
+    soltar();
+    await tarde;
+    sb.supabaseInsert = insertOriginal;
+    ok(RESERVAS.length === 1, `una sola reserva pese a la escritura tardía (${RESERVAS.length})`);
+    ok(new Set(ACCESOS.map(a => a.propietario_id)).size === 1, "y los dos accesos comparten propietario");
+    await canjearTodos();
+    ok(USUARIOS.length === 1, `una sola cuenta (${USUARIOS.length})`);
+  });
+}
+
+console.log("\n── G · cuenta YA existente: ninguna reserva la desvía ──");
+{
+  limpio();
+  const YA = "eeeeeeee-1111-1111-1111-111111111111";
+  USUARIOS = [{ id: YA, propietario_id: YA, email: "g@ejemplo.es" }];
+  // Y una reserva vieja, de cuando ese correo no tenía cuenta.
+  RESERVAS = [{ email: "g@ejemplo.es", propietario_id: "ffffffff-2222-2222-2222-222222222222" }];
+  await conInfra(async () => {
+    puertaLectura = barrera(3);
+    await Promise.all([
+      ACCESO.pedir({ email: "g@ejemplo.es" }, "1.2.3.4"),
+      ACCESO.pedir({ email: "g@ejemplo.es" }, "1.2.3.4"),
+      ACCESO.pedir({ email: "g@ejemplo.es" }, "1.2.3.4"),
+    ]);
+    puertaLectura = null;
+    ok(ACCESOS.every(a => a.propietario_id === YA),
+       "todos los enlaces apuntan al propietario que YA existe");
+    const res = await canjearTodos();
+    ok(USUARIOS.length === 1, `no nace ninguna cuenta alternativa (${USUARIOS.length})`);
+    ok(res.every(r => r.estado !== 200 || r.cuerpo.propietario_id === YA),
+       "y quien entra, entra en la suya");
+  });
+}
+
+console.log("\n── H · dos propietarios históricos con el mismo correo ──");
+{
+  limpio();
+  USUARIOS = [{ id: "h-1", propietario_id: "h-1", email: "h@ejemplo.es" },
+              { id: "h-2", propietario_id: "h-2", email: "h@ejemplo.es" }];
+  const antes = copia(USUARIOS);
+  await conInfra(async () => {
+    puertaLectura = barrera(2);
+    const rs = await Promise.all([
+      ACCESO.pedir({ email: "h@ejemplo.es" }, "1.2.3.4"),
+      ACCESO.pedir({ email: "h@ejemplo.es" }, "1.2.3.4"),
+    ]);
+    puertaLectura = null;
+    ok(rs.every(r => r.estado === 200), "por fuera, la respuesta de siempre");
+    ok(ACCESOS.length === 0 && CORREOS.length === 0, "cero accesos y cero enlaces");
+    ok(RESERVAS.length === 0, "y CERO reservas: no se inventa un dueño para desatascarlo");
+    ok(JSON.stringify(USUARIOS) === JSON.stringify(antes), "cero modificación de datos");
+  });
+}
+
+console.log("\n── sin la tabla de reservas: error explícito, no carrera abierta ──");
+{
+  limpio();
+  SIN_TABLA_RESERVAS = true;
+  await conInfra(async () => {
+    const r = await ACCESO.pedir({ email: "sintabla@ejemplo.es" }, "1.2.3.4");
+    ok(r.estado === 503 && r.cuerpo.falta?.includes("reservas_alta"),
+       `sin la migración no se dan altas nuevas: ${JSON.stringify(r.cuerpo)}`);
+    ok(ACCESOS.length === 0 && CORREOS.length === 0, "cero accesos, cero enlaces");
+    ok(USUARIOS.length === 0, "y cero cuentas");
+    // Pero una cuenta que YA existe sigue pudiendo entrar: ese camino no reserva.
+    USUARIOS = [{ id: "z-1", propietario_id: "z-1", email: "z@ejemplo.es" }];
+    const bueno = await ACCESO.pedir({ email: "z@ejemplo.es" }, "1.2.3.4");
+    ok(bueno.estado === 200 && CORREOS.length === 1,
+       "y quien ya tiene cuenta no se ve afectado por la migración pendiente");
+  });
+  SIN_TABLA_RESERVAS = false;
+}
+
 console.log("\n── F · tope por hora y no enumeración ──");
 {
   await conInfra(async () => {
@@ -552,6 +764,34 @@ console.log("\n── H · la interfaz tampoco delata el conflicto ──");
   ok(/update usuarios set email = null/i.test(doc) && /propietario_id, id\) <> /.test(doc),
      "y da la escritura mínima: quitar el correo del lado que no es suyo");
   ok(/No\*\* se borra la cuenta/i.test(doc), "sin borrar la cuenta sobrante");
+}
+
+console.log("\n── la migración y el código dicen lo mismo ──");
+{
+  // ⚠️ SI ESTO SE SEPARA, LA GARANTÍA DESAPARECE SIN RUIDO. La unicidad la da la
+  // clave primaria de `reservas_alta`; si la migración dejara de declararla, o
+  // el código escribiera en otra tabla u otra columna, la carrera volvería a
+  // estar abierta y los tests —que modelan la PK— seguirían en verde.
+  const mig = readFileSync(join(RAIZ, "db", "reserva-alta-2026-09-18.sql"), "utf8");
+  ok(/create table if not exists\s+reservas_alta/i.test(mig), "la migración es idempotente");
+  ok(/email\s+text\s+primary key/i.test(mig),
+     "y la clave primaria es el CORREO: ahí vive la exclusión");
+  ok(/propietario_id\s+uuid\s+not null/i.test(mig), "con el propietario reservado, obligatorio");
+  ok(!/unique\s*\(\s*email\s*\)/i.test(mig) || !/on\s+usuarios/i.test(mig),
+     "y NO se impone unique(email) sobre usuarios: las zonas legacy comparten correo");
+
+  const src = readFileSync(join(RAIZ, "api", "_acceso.js"), "utf8");
+  ok(/supabaseInsert\("reservas_alta",\s*\{ email, propietario_id/.test(src),
+     "el código inserta en esa tabla, con esas dos columnas");
+  ok(/supabaseSelect\("reservas_alta"/.test(src), "y lee de ella al perder la carrera");
+  ok(/23505|duplicate key/.test(src.slice(src.indexOf("async function reservarPropietario"),
+                                          src.indexOf("async function pedir"))),
+     "el camino bueno de la carrera es el 23505, no una comprobación previa");
+  ok(/42P01/.test(src), "y si la tabla no está, se dice en vez de seguir sin garantía");
+  // Y que no quede un randomUUID suelto decidiendo la identidad.
+  const pedirSrc = src.slice(src.indexOf("async function pedir"), src.indexOf("async function canjear"));
+  ok(!/crypto\.randomUUID\(\)/.test(pedirSrc),
+     "pedir() ya no se inventa la identidad por su cuenta");
 }
 
 console.log("\n── ningún cliente manda ya correos tecleados ──");

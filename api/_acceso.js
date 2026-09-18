@@ -96,6 +96,53 @@ async function enviarCorreo(email, enlace) {
 // ─── pedir: manda el enlace ────────────────────────────────────────
 // Devuelve SIEMPRE {ok:true, enviado:true}. Que el email exista, que tenga
 // parcelas, que Resend funcione — nada de eso se filtra a la respuesta.
+// ─── LA RESERVA, Y POR QUÉ LA DA LA BASE ────────────────────────────────────
+//
+// `crypto.randomUUID()` es único en el universo, pero NO es una identidad
+// compartida: dos peticiones simultáneas para el mismo correo nuevo generan dos
+// uuid distintos, crean dos accesos y, al canjear los dos enlaces, nacen DOS
+// cuentas con el mismo correo. A partir de ahí `propietarioPorEmail()` devuelve
+// conflicto y esa persona deja de recibir enlaces. Reproducido con intercalado
+// forzado en tests/test-correo-no-acreditado.mjs.
+//
+// Un SELECT-comprobar-INSERT no lo arregla: entre el select y el insert cabe la
+// otra petición, y entre instancias serverless no hay estado compartido donde
+// poner un candado. La única exclusión que vale entre procesos es la de la base.
+//
+// Aquí es la CLAVE PRIMARIA de `reservas_alta` sobre el correo normalizado: las
+// dos intentan insertar, una gana, la otra recibe 23505 y lee la ganadora. Las
+// dos salen con el mismo propietario reservado. Sin esperas, sin memoria, sin
+// elegir a posteriori.
+//
+// Devuelve { propietario_id } | { sinTabla: true } | { error }
+async function reservarPropietario(email) {
+  const candidato = crypto.randomUUID();
+  try {
+    const filas = await supabaseInsert("reservas_alta", { email, propietario_id: candidato });
+    const puesta = Array.isArray(filas) ? filas[0] : null;
+    // PostgREST devuelve la fila escrita. Si por lo que sea no vuelve, se lee.
+    if (puesta?.propietario_id) return { propietario_id: puesta.propietario_id };
+  } catch (err) {
+    const msg = err?.message || "";
+    // 42P01 = la tabla no existe todavía. Es el estado ANTES de ejecutar
+    // db/reserva-alta-2026-09-18.sql, y no se puede seguir como si nada: sin
+    // esta tabla la carrera sigue abierta. Se dice y no se manda enlace.
+    if (/42P01|does not exist|relation .* does not exist/i.test(msg)) return { sinTabla: true };
+    // 23505 = ganó la otra petición. Es el camino BUENO de la carrera.
+    if (!/23505|duplicate key/i.test(msg)) {
+      console.error("[acceso] no se pudo reservar propietario:", msg.slice(0, 200));
+      return { error: msg };
+    }
+  }
+  // Perdimos la carrera (o el insert no devolvió fila): la reserva ganadora es
+  // la que vale, y es la misma para todos.
+  const filas = await supabaseSelect("reservas_alta",
+    `email=eq.${encodeURIComponent(email)}&select=propietario_id&limit=1`);
+  const ganadora = filas?.[0]?.propietario_id;
+  if (!ganadora) return { error: "reserva_ilegible" };
+  return { propietario_id: ganadora };
+}
+
 async function pedir(body, ip) {
   const email = (body.email || "").toString().trim().toLowerCase().slice(0, 200);
   if (!ES_EMAIL.test(email)) return { estado: 400, cuerpo: { error: "email inválido" } };
@@ -175,12 +222,24 @@ async function pedir(body, ip) {
   // sale UNA cuenta. En el canje, quien llega segundo se encuentra la fila ya
   // creada y no crea otra.
   const alta = !!quien.vacio;
-  const reservaPrevia = alta ? (previos || [])[0]?.propietario_id || null : null;
-  const destino = alta ? (reservaPrevia || crypto.randomUUID()) : quien.propietario_id;
+  let destino = quien.propietario_id;
   if (alta) {
-    console.log(reservaPrevia
-      ? "[acceso] correo sin cuenta: se reutiliza la reserva anterior"
-      : "[acceso] correo sin cuenta: se reserva un alta");
+    const reserva = await reservarPropietario(email);
+    if (reserva.sinTabla) {
+      // Sin la tabla no hay garantía de que dos peticiones simultáneas reserven
+      // el mismo propietario, y el precio de equivocarse es dejar a alguien
+      // fuera de su cuenta para siempre. Antes que arriesgarlo, se para. Las
+      // cuentas que YA existen no se ven afectadas: ese camino no pasa por aquí.
+      console.error("[acceso] falta la tabla reservas_alta: no se dan altas nuevas. "
+        + "Ejecutar db/reserva-alta-2026-09-18.sql.");
+      return { estado: 503, cuerpo: { ok: false, error: "acceso_no_configurado",
+                                      falta: ["reservas_alta"] } };
+    }
+    if (!reserva.propietario_id) {
+      return { estado: 503, cuerpo: { ok: false, error: "acceso_no_disponible" } };
+    }
+    destino = reserva.propietario_id;
+    console.log("[acceso] correo sin cuenta: reserva", reserva.propietario_id.slice(0, 8));
   }
 
   const { token, hash } = nuevoToken();
