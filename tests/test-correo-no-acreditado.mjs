@@ -171,74 +171,135 @@ console.log("\n── 3 · el correo de OTRO propietario, sin canje ──");
   });
 }
 
-console.log("\n── 4 · canje válido: SOLO entonces se asocia el correo ──");
+console.log("\n── A · correo NUEVO: el enlace llega, y la cuenta nace en el canje ──");
 {
-  // La fila del propietario NO tiene correo. Una zona suya sí lo tenía por
-  // historia, y una fila de OTRA persona también: ninguna de las dos se toca.
-  USUARIOS = [{ id: DUEÑO, propietario_id: DUEÑO, email: null, nombre: "Agricultor", config_app: null },
-              { id: ZONA,  propietario_id: DUEÑO, email: "viejo-de-zona@ejemplo.es" },
-              { id: INTRUSO, propietario_id: INTRUSO, email: "otra-persona@ejemplo.es" }];
-  ACCESOS = [{ id: "acc-0", email: CORREO, propietario_id: DUEÑO, token_hash: null,
-               expira: new Date(Date.now() + 9e5).toISOString(), usado_en: null }];
-  const antesZona = copia(USUARIOS.find(f => f.id === ZONA));
-  const antesOtra = copia(USUARIOS.find(f => f.id === INTRUSO));
-
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
   await conInfra(async () => {
-    // Se pide un enlace de verdad para tener el token en claro, que es lo único
-    // que el sistema entrega: en la base solo vive su huella.
-    ACCESOS = []; CORREOS = [];
-    USUARIOS.find(f => f.id === DUEÑO).email = CORREO;   // para que `pedir` lo resuelva
-    await ACCESO.pedir({ email: CORREO }, "1.2.3.4");
-    const token = tokenDelUltimoCorreo();
-    ok(!!token, "el enlace llega con su token de un solo uso");
+    const r = await ACCESO.pedir({ email: "nuevo@ejemplo.es" }, "1.2.3.4");
+    ok(r.estado === 200 && r.cuerpo.enviado === true, "se manda enlace a un correo que no es de nadie");
+    ok(USUARIOS.length === 0, "y ANTES del canje no existe ni una fila de usuarios");
+    ok(ACCESOS.length === 1, "hay un acceso pendiente");
+    const a = ACCESOS[0];
+    ok(!!a.token_hash && a.token_hash.length === 64, "con la HUELLA del token, nunca el token");
+    ok(!CORREOS[0].html.includes(a.token_hash), "y la huella no viaja en el correo");
+    ok(a.email === "nuevo@ejemplo.es", "el correo, normalizado");
+    ok(!!a.expira && new Date(a.expira) > new Date(), "con caducidad");
+    ok(a.usado_en == null, "y sin consumir");
 
-    // Y ahora la situación que importa: la fila del propietario SIN correo.
-    USUARIOS.find(f => f.id === DUEÑO).email = null;
-    const r = await ACCESO.canjear({ token });
-    ok(r.estado === 200 && r.cuerpo.ok === true, "el canje vale");
-    ok(r.cuerpo.propietario_id === DUEÑO, "e identifica al propietario correcto");
-    ok(USUARIOS.find(f => f.id === DUEÑO).email === CORREO,
-       "AHORA sí: el correo queda asociado a su cuenta");
-    ok(Array.isArray(r.cookies) && r.cookies.length === 1, "se emite la cookie de sesión");
-    ok(/HttpOnly/.test(r.cookies[0]) && /Secure/.test(r.cookies[0]) && /kylia_sesion=/.test(r.cookies[0]),
-       "firmada, HttpOnly y Secure");
-    ok(JSON.stringify(USUARIOS.find(f => f.id === ZONA)) === JSON.stringify(antesZona),
-       "la fila de su ZONA no se toca");
-    ok(JSON.stringify(USUARIOS.find(f => f.id === INTRUSO)) === JSON.stringify(antesOtra),
-       "y la de otra persona, tampoco");
-    // Un solo uso.
-    const otra = await ACCESO.canjear({ token });
-    ok(otra.estado === 400, "y el enlace ya no vale una segunda vez");
+    const token = tokenDelUltimoCorreo();
+    const c = await ACCESO.canjear({ token });
+    ok(c.estado === 200 && c.cuerpo.ok === true, "el canje vale");
+    ok(USUARIOS.length === 1, `y AHORA nace exactamente un propietario (${USUARIOS.length})`);
+    const dueño = USUARIOS[0];
+    ok(dueño.id === c.cuerpo.propietario_id && dueño.propietario_id === dueño.id,
+       "que es dueño de sí mismo");
+    ok(dueño.email === "nuevo@ejemplo.es", "con el correo asociado SOLO a esa fila");
+    ok(Array.isArray(c.cookies) && /kylia_sesion=/.test(c.cookies[0] || "")
+       && /HttpOnly/.test(c.cookies[0]) && /Secure/.test(c.cookies[0]),
+       "y una cookie firmada, HttpOnly y Secure");
+    ok(ACCESOS[0].usado_en != null, "el acceso queda consumido");
   });
 }
 
-console.log("\n── 5 · sin SESION_SECRET o sin RESEND_API_KEY ──");
+console.log("\n── B · correo de un ÚNICO propietario ──");
 {
-  USUARIOS = [{ id: DUEÑO, propietario_id: DUEÑO, email: CORREO }];
-  const antes = copia(USUARIOS);
-  const g = { r: process.env.RESEND_API_KEY, s: process.env.SESION_SECRET };
-  delete process.env.RESEND_API_KEY; delete process.env.SESION_SECRET;
+  USUARIOS = [{ id: DUEÑO, propietario_id: DUEÑO, email: null, nombre: "Agricultor" },
+              { id: ZONA,  propietario_id: DUEÑO, email: CORREO }];
+  const antesZona = copia(USUARIOS[1]);
+  const cuantos = USUARIOS.length;
   ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    await ACCESO.pedir({ email: CORREO }, "1.2.3.4");
+    ok(ACCESOS[0].propietario_id === DUEÑO, "el acceso apunta a su propietario, no a uno nuevo");
+    const c = await ACCESO.canjear({ token: tokenDelUltimoCorreo() });
+    ok(c.cuerpo.propietario_id === DUEÑO, "el canje devuelve el MISMO propietario");
+    ok(USUARIOS.length === cuantos, `cero propietarios nuevos (${USUARIOS.length})`);
+    ok(USUARIOS.find(f => f.id === DUEÑO).email === CORREO,
+       "el correo se asocia a la fila propietaria, que no lo tenía");
+    ok(JSON.stringify(USUARIOS.find(f => f.id === ZONA)) === JSON.stringify(antesZona),
+       "y la fila de su ZONA no se toca");
+  });
+}
 
-  const r1 = await ACCESO.pedir({ email: CORREO }, "1.2.3.4");
-  ok(r1.estado === 503 && r1.cuerpo.error === "acceso_no_configurado",
-     `pedir responde 503 explícito, no un falso "ya va de camino" (${r1.estado})`);
-  ok(r1.cuerpo.falta.includes("RESEND_API_KEY") && r1.cuerpo.falta.includes("SESION_SECRET"),
-     `diciendo qué falta: ${JSON.stringify(r1.cuerpo.falta)}`);
-  ok(ACCESOS.length === 0 && CORREOS.length === 0, "cero accesos creados, cero correos");
+console.log("\n── C · correo ambiguo entre propietarios ──");
+{
+  USUARIOS = [{ id: "x-1", propietario_id: "x-1", email: "ambiguo@ejemplo.es" },
+              { id: "y-1", propietario_id: "y-1", email: "ambiguo@ejemplo.es" }];
+  const antes = copia(USUARIOS);
+  ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    const r = await ACCESO.pedir({ email: "ambiguo@ejemplo.es" }, "1.2.3.4");
+    ok(r.estado === 200 && r.cuerpo.enviado === true,
+       "por fuera la respuesta es la de siempre: no se confirma ni se desmiente");
+    ok(ACCESOS.length === 0, "pero NO se crea acceso: no se elige un propietario a dedo");
+    ok(CORREOS.length === 0, "ni se manda enlace");
+    ok(USUARIOS.length === 2 && JSON.stringify(USUARIOS) === JSON.stringify(antes),
+       "cero propietarios nuevos y cero asociación");
+    const q = await propietarioPorEmail("ambiguo@ejemplo.es");
+    ok(Array.isArray(q.conflicto), "el conflicto sigue siendo explícito, para poder verlo");
+  });
+}
 
-  const r2 = await ACCESO.canjear({ token: "un-token-cualquiera" });
-  ok(r2.estado === 503 && r2.cuerpo.error === "acceso_no_configurado", "canjear tampoco: 503");
-  ok(!r2.cuerpo.propietario_id && !r2.cuerpo.config, "cero adopción: ni propietario ni configuración");
-  ok(!r2.cookies, "y ninguna cookie");
-  ok(JSON.stringify(USUARIOS) === JSON.stringify(antes), "cero asociación: ninguna fila cambia");
+console.log("\n── D · el mismo enlace, dos veces y a la vez ──");
+{
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    await ACCESO.pedir({ email: "carrera@ejemplo.es" }, "1.2.3.4");
+    const token = tokenDelUltimoCorreo();
+    const [a, b] = await Promise.all([ACCESO.canjear({ token }), ACCESO.canjear({ token })]);
+    const buenos = [a, b].filter(r => r.estado === 200 && r.cuerpo.ok);
+    ok(buenos.length === 1, `solo UNO de los dos canjeos vale (${buenos.length})`);
+    ok(USUARIOS.length === 1, `y nace como mucho un propietario (${USUARIOS.length})`);
+    const malo = [a, b].find(r => !(r.estado === 200 && r.cuerpo.ok));
+    ok(malo.estado === 400 && !malo.cuerpo.propietario_id,
+       "el otro no adopta nada, con un mensaje genérico");
+    ok(!malo.cookies, "ni recibe cookie");
+    const tercera = await ACCESO.canjear({ token });
+    ok(tercera.estado === 400 && USUARIOS.length === 1,
+       "reintentar el enlace ya usado no crea nada");
+  });
+}
 
-  process.env.RESEND_API_KEY = "re_de_mentira";
-  const r3 = await ACCESO.pedir({ email: CORREO }, "1.2.3.4");
-  ok(r3.estado === 503 && r3.cuerpo.falta.join() === "SESION_SECRET",
-     "con Resend pero sin SESION_SECRET, tampoco: el canje no podría emitir sesión");
-  if (g.r === undefined) delete process.env.RESEND_API_KEY; else process.env.RESEND_API_KEY = g.r;
-  if (g.s === undefined) delete process.env.SESION_SECRET; else process.env.SESION_SECRET = g.s;
+console.log("\n── D bis · enlace caducado o manipulado ──");
+{
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    await ACCESO.pedir({ email: "caduca@ejemplo.es" }, "1.2.3.4");
+    const token = tokenDelUltimoCorreo();
+    ACCESOS[0].expira = new Date(Date.now() - 1000).toISOString();
+    const r = await ACCESO.canjear({ token });
+    ok(r.estado === 400 && USUARIOS.length === 0, "un enlace caducado no crea propietario");
+    const m = await ACCESO.canjear({ token: token.slice(0, -3) + "zzz" });
+    ok(m.estado === 400 && USUARIOS.length === 0, "y uno manipulado, tampoco");
+    ok(JSON.stringify(r.cuerpo) === JSON.stringify(m.cuerpo),
+       `con el MISMO motivo genérico: no se dice cuál de las tres cosas pasó (${JSON.stringify(m.cuerpo)})`);
+  });
+}
+
+console.log("\n── F · tope por hora y no enumeración ──");
+{
+  await conInfra(async () => {
+    USUARIOS = [{ id: DUEÑO, propietario_id: DUEÑO, email: CORREO }];
+    ACCESOS = []; CORREOS = [];
+    const existe = await ACCESO.pedir({ email: CORREO }, "1.2.3.4");
+    USUARIOS = []; ACCESOS = []; CORREOS = [];
+    const noExiste = await ACCESO.pedir({ email: "no-existe@ejemplo.es" }, "1.2.3.4");
+    USUARIOS = [{ id: "x-1", propietario_id: "x-1", email: "amb@ejemplo.es" },
+                { id: "y-1", propietario_id: "y-1", email: "amb@ejemplo.es" }];
+    ACCESOS = []; CORREOS = [];
+    const ambiguo = await ACCESO.pedir({ email: "amb@ejemplo.es" }, "1.2.3.4");
+    const cuerpos = [existe, noExiste, ambiguo].map(r => JSON.stringify({ e: r.estado, c: r.cuerpo }));
+    ok(new Set(cuerpos).size === 1,
+       `la respuesta es IDÉNTICA exista, no exista o sea ambiguo: ${cuerpos[0]}`);
+
+    USUARIOS = [{ id: DUEÑO, propietario_id: DUEÑO, email: CORREO }];
+    ACCESOS = []; CORREOS = [];
+    let ultima = null;
+    for (let i = 0; i < 8; i++) ultima = await ACCESO.pedir({ email: CORREO }, "1.2.3.4");
+    ok(CORREOS.length < 8, `el tope por hora corta los envíos (${CORREOS.length} de 8)`);
+    ok(JSON.stringify({ e: ultima.estado, c: ultima.cuerpo }) === cuerpos[0],
+       "y la respuesta del que se corta es la misma: tampoco enumera por ahí");
+  });
 }
 
 console.log("\n── un conflicto que YA existiera se sigue viendo ──");

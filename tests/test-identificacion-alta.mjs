@@ -90,6 +90,7 @@ const AJENO = "11111111-2222-3333-4444-555555555555";
 let pedidas = [];           // {recurso, accion, email, ...}
 let canjeVale = true;       // C: enlace inválido/caducado
 let zonasRemotas = [];      // qué tiene la CUENTA (para el choque de adopción)
+let cuentaNueva = false;    // recién creada en el canje: sin configuración ninguna
 let envioFalla = false;     // C: el envío del enlace falla
 let subidas = [];           // config-app que llegan al servidor
 
@@ -114,6 +115,10 @@ const srv = createServer((q, r) => {
       r.writeHead(200, { "Content-Type": "application/json" });
       if (b.recurso === "acceso" && b.accion === "canjear") {
         if (!canjeVale) return r.end(JSON.stringify({ ok: false, error: "enlace no válido o caducado" }));
+        if (cuentaNueva) {
+          return r.end(JSON.stringify({ ok: true, propietario_id: AJENO, email: "nuevo@ejemplo.es",
+            nombre: null, config: null, zonas: [] }));
+        }
         return r.end(JSON.stringify({ ok: true, propietario_id: AJENO, email: "dueño@ejemplo.es",
           nombre: "Dueño", config: { finca: { lat: 41.3255, lon: 2.062, suelo: "franco" },
                                      zonas: zonasRemotas, zonaActiva: null },
@@ -133,6 +138,10 @@ const srv = createServer((q, r) => {
     r.writeHead(200, { "Content-Type": "application/json" });
     // La tupla que exige `adoptarDelPropietario`: owner + config + versión, de
     // la MISMA fila.
+    // Una cuenta recién creada en el canje no tiene NADA: ni config ni versión.
+    if (cuentaNueva) {
+      return r.end(JSON.stringify({ ok: true, propietario: { id: AJENO, config: null, config_version: 0 } }));
+    }
     return r.end(JSON.stringify({ ok: true, propietario: { id: AJENO,
       config: { finca: { lat: 41.3255, lon: 2.062, suelo: "franco" },
                 zonas: zonasRemotas, zonaActiva: null },
@@ -556,6 +565,56 @@ console.log("\n── la cuenta está VACÍA: no se pregunta y NO se borra ─�
   ok(e.base?.owner_id === AJENO, "se adopta la cuenta, con su base");
   await pag.close();
   zonasRemotas = [];
+}
+
+console.log("\n── cuenta NUEVA y vacía: los cultivos locales se conservan ──");
+{
+  cuentaNueva = true;
+  const pag = await dispositivoConCultivoYCanje([]);
+  const e = await leerEstado(pag);
+  ok(e.siembras.join() === "mia-1", `el cultivo dado de alta aquí sigue entero (${e.siembras.join()})`);
+  ok(e.pantalla === false, "no se pregunta nada: la cuenta está vacía, no hay elección");
+  // ⚠️ NO se ancla base sola: sin ella no se sube nada, y así el agricultor
+  // decide cuándo su trabajo pasa a la cuenta.
+  ok(e.base === null, "y NO se ancla base por su cuenta");
+  const c = await pag.evaluate(() => window.kyliaCopiasGuardadas());
+  ok(c.puedeGuardarEnCuenta === true && c.siembrasLocales === 1,
+     "la app sabe que hay cultivos aquí y todavía fuera de la cuenta");
+  const aviso = await pag.evaluate(() => document.getElementById("copias-aviso")?.textContent || "");
+  ok(/guardarlos en mi cuenta/i.test(aviso), `con un aviso visible que lo dice: "${aviso}"`);
+
+  // La acción explícita: ancla la base leyendo la versión vigente del servidor.
+  const r = await pag.evaluate(() => window.kyliaGuardarEstosEnMiCuenta());
+  ok(r.ok === true, "la acción explícita ancla la cuenta");
+  const tras = await leerEstado(pag);
+  ok(tras.base?.owner_id === AJENO && tras.base?.base_version === 0,
+     `con la versión que hay en el servidor, para que el CAS decida (v${tras.base?.base_version})`);
+  ok(tras.siembras.join() === "mia-1", "y los cultivos siguen intactos");
+  await pag.close();
+  cuentaNueva = false;
+}
+
+console.log("\n── si la subida falla, NO se dice que está en la cuenta ──");
+{
+  cuentaNueva = true;
+  const pag = await dispositivoConCultivoYCanje([]);
+  // El servidor deja de responder a vista=config: no se puede anclar nada.
+  const r = await pag.evaluate(async () => {
+    const original = window.fetch;
+    window.fetch = async (u, o) => (String(u).includes("vista=config")
+      ? { ok: false, status: 500, json: async () => ({}) } : original(u, o));
+    const res = await window.kyliaGuardarEstosEnMiCuenta();
+    window.fetch = original;
+    return { res, base: JSON.parse(localStorage.getItem("kylia_config_base") || "null"),
+             siembras: JSON.parse(localStorage.getItem("kylia_zonas") || "[]")
+               .flatMap(z => (z.siembras || []).map(s => s.id)) };
+  });
+  ok(r.res.ok === false && r.res.error === "servidor_no_disponible",
+     `se dice que no se ha podido, con motivo (${r.res.error})`);
+  ok(r.base === null, "no se ancla nada");
+  ok(r.siembras.join() === "mia-1", "y el trabajo local sigue entero");
+  await pag.close();
+  cuentaNueva = false;
 }
 
 await nav.close();

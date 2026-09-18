@@ -131,17 +131,33 @@ async function pedir(body, ip) {
       JSON.stringify({ email, dueños: quien.conflicto }));
     return respuesta;   // por fuera, indistinguible: no se confirma ni se desmiente
   }
-  if (quien.vacio) {
-    console.log("[acceso] email sin parcelas:", email);
-    return respuesta;   // ídem
-  }
-  const dueño = { id: quien.propietario_id, propietario_id: quien.propietario_id };
+  // ─── ALTA: un correo que todavía no es de nadie TAMBIÉN recibe enlace ────
+  //
+  // Antes esto se paraba aquí, y eso dejaba a los usuarios nuevos sin camino:
+  // `registro-usuario` ya no escribe correos (no acreditan nada) y `pedir()`
+  // resuelve el propietario POR el correo de la fila. Sin bootstrap, quien no
+  // tuviera correo asociado no podía recibir enlace, luego no podía acreditarlo,
+  // luego no podía asociarlo. Circular.
+  //
+  // Se rompe así: el enlace se manda igual, y el propietario se crea EN EL
+  // CANJE, cuando esa persona ha demostrado que controla el buzón. Aquí no se
+  // toca `usuarios`: ni una fila, ni una zona, ni un correo.
+  //
+  // ⚠️ EL UUID SE RESERVA AHORA, y no es un capricho: `accesos.propietario_id`
+  // es NOT NULL (db/acceso-por-email-2026-08-07.sql) y no se tocan migraciones.
+  // Reservarlo tiene además una propiedad que hacía falta: el id vive en el
+  // acceso, así que dos canjeos del MISMO enlace no pueden crear dos
+  // propietarios distintos ni aunque lleguen a la vez. Un UUID reservado no es
+  // una cuenta: mientras no exista la fila en `usuarios`, no hay nada.
+  const alta = !!quien.vacio;
+  const destino = alta ? crypto.randomUUID() : quien.propietario_id;
+  if (alta) console.log("[acceso] correo sin cuenta: se reserva un alta");
 
   const { token, hash } = nuevoToken();
   await supabaseInsert("accesos", {
     email,
     token_hash: hash,
-    propietario_id: dueño.propietario_id || dueño.id,
+    propietario_id: destino,
     expira: new Date(Date.now() + VIDA_MIN * 60_000).toISOString(),
     ip: ip || null,
   });
@@ -184,6 +200,38 @@ async function canjear(body) {
     `id=eq.${a.id}&usado_en=is.null`, { usado_en: new Date().toISOString() });
   if (!Array.isArray(quemado) || quemado.length === 0) return noVale;
 
+  // ─── ALTA: el propietario nace AQUÍ, y como mucho una vez ────────────────
+  //
+  // El enlace ya está quemado arriba con un UPDATE condicionado a
+  // `usado_en=is.null`: esa condición la resuelve la base, no este proceso, así
+  // que de dos canjeos simultáneos solo UNO llega hasta aquí. El otro ya ha
+  // salido por `noVale`.
+  //
+  // Y aunque llegaran los dos, el id viene del acceso —reservado al pedir el
+  // enlace—, así que sería el MISMO: el insert sin upsert daría 23505 y se
+  // trataría como "ya está". En ningún camino salen dos propietarios.
+  //
+  // La fila nace con el correo ya puesto porque en este punto está acreditado:
+  // llegó a ese buzón y esta persona abrió el enlace. Es el único sitio del
+  // sistema donde eso es verdad.
+  const existentes = await supabaseSelect("usuarios",
+    `id=eq.${a.propietario_id}&select=id,email,propietario_id`);
+  if (!existentes?.length) {
+    try {
+      await supabaseInsert("usuarios", {
+        id: a.propietario_id, propietario_id: a.propietario_id, email: a.email,
+      });
+      console.log("[acceso] alta: propietario creado en el canje");
+    } catch (err) {
+      // 23505 = ya existía. Otro canjeo ganó la carrera, o un reintento: no es
+      // un error y no se crea nada más.
+      if (!/23505|duplicate key/i.test(err.message || "")) {
+        console.error("[acceso] no se pudo crear el propietario:", err.message);
+        return { estado: 500, cuerpo: { ok: false, error: "no se pudo completar el alta" } };
+      }
+    }
+  }
+
   // La config viaja EN EL CANJEO, no en una segunda llamada: si el móvil nuevo
   // adopta al propietario pero no puede restaurar la configuración, el enlace no
   // ha servido de nada — el agricultor abre la app y la ve en blanco.
@@ -210,10 +258,16 @@ async function canjear(body) {
   //
   // Es idempotente: si ya lo tenía, queda igual. Y si falla, el canje sigue
   // siendo válido —la sesión ya se ha ganado—; se anota y se sigue.
-  try {
-    await supabaseUpdate("usuarios", `id=eq.${a.propietario_id}`, { email: a.email });
-  } catch (err) {
-    console.error("[acceso] no se pudo asociar el correo acreditado:", err.message);
+  // Solo SI FALTA: una fila que ya lleva su correo no se toca, ni para
+  // confirmarlo. Y solo la fila PROPIETARIA — las de sus zonas nunca, que es
+  // lo que llenaba `propietarioPorEmail` de filas repetidas.
+  const yaTenia = (fila?.email || "").trim().toLowerCase() === a.email;
+  if (!yaTenia) {
+    try {
+      await supabaseUpdate("usuarios", `id=eq.${a.propietario_id}`, { email: a.email });
+    } catch (err) {
+      console.error("[acceso] no se pudo asociar el correo acreditado:", err.message);
+    }
   }
 
   console.log("[acceso] canjeado", JSON.stringify({

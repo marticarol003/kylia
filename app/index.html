@@ -457,6 +457,42 @@
       }
       window.kyliaSubirEstosAMiCuenta = subirEstosAMiCuenta;
 
+      // ── CUENTA NUEVA Y VACÍA, con cultivos ya dados de alta aquí ──────
+      // Tras canjear un alta, la cuenta no tiene nada y este dispositivo sí. No
+      // se adopta base sola —eso dejaría subir sin que él lo pida— así que los
+      // cultivos se quedan aquí, sin tocar, hasta esta acción.
+      //
+      // Coge la base LEYENDO la versión vigente del servidor y NO escribe la
+      // foto remota: lo local se conserva y se sube encima por el CAS de
+      // siempre, que sigue rechazando si el servidor se ha movido.
+      async function guardarEstosEnMiCuenta() {
+        const dueño = localStorage.getItem("kylia_user_id");
+        if (!dueño || !verificadoDe(dueño)) return { ok: false, error: "sin_acceso_acreditado" };
+        let tupla = null;
+        try {
+          const res = await fetch(`/api/campo?vista=config&usuario_id=${encodeURIComponent(dueño)}`,
+                                  { cache: "no-store" });
+          if (!res.ok) return { ok: false, error: "servidor_no_disponible" };
+          const d = await res.json();
+          const p = d && d.ok && d.propietario;
+          if (!p || !esOwner(p.id) || !esVersion(p.config_version) || p.id !== dueño) {
+            return { ok: false, error: "version_desconocida" };
+          }
+          tupla = p;
+        } catch (_) { return { ok: false, error: "servidor_no_disponible" }; }
+        if (!guardarBase(tupla.id, tupla.config_version)) return { ok: false, error: "no_se_pudo_anclar" };
+        return { ok: true };
+      }
+      window.kyliaGuardarEstosEnMiCuenta = guardarEstosEnMiCuenta;
+
+      // La marca de acceso acreditado, para un propietario concreto.
+      const verificadoDe = (dueño) => {
+        try {
+          const v = JSON.parse(localStorage.getItem("kylia_acceso_verificado") || "null");
+          return !!v && String(v.propietario_id) === String(dueño);
+        } catch (_) { return false; }
+      };
+
       // ── Recuperar una copia ───────────────────────────────────────────
       // ⚠️ NUNCA SE BORRA NADA. Restaurar es un INTERCAMBIO: lo que estaba
       // puesto pasa a ser la copia. Así se puede ir y volver tantas veces como
@@ -483,12 +519,20 @@
         try { const v = JSON.parse(localStorage.getItem(CUENTA_REMOTA_KEY) || "null");
               return v && v.owner_id && v.config ? v : null; } catch (_) { return null; }
       };
-      window.kyliaCopiasGuardadas = () => ({
-        previas: leerZonasPrevias(), cuenta: leerCuentaRemota(),
-        siembrasPrevias: siembrasDe(leerZonasPrevias()?.zonas).length,
-        siembrasCuenta: siembrasDe(leerCuentaRemota()?.config?.zonas).length,
-        baseAdoptada: !!leerBase(),
-      });
+      window.kyliaCopiasGuardadas = () => {
+        const dueño = localStorage.getItem("kylia_user_id");
+        const locales = siembrasDe(zonasLocales()).length;
+        return {
+          previas: leerZonasPrevias(), cuenta: leerCuentaRemota(),
+          siembrasPrevias: siembrasDe(leerZonasPrevias()?.zonas).length,
+          siembrasCuenta: siembrasDe(leerCuentaRemota()?.config?.zonas).length,
+          siembrasLocales: locales,
+          baseAdoptada: !!leerBase(),
+          // Cuenta acreditada, cultivos aquí y nada anclado todavía: hace falta
+          // que él diga "guárdalos en mi cuenta". Es el caso del alta nueva.
+          puedeGuardarEnCuenta: !!dueño && verificadoDe(dueño) && locales > 0 && !leerBase(),
+        };
+      };
 
       const leerPendiente = () => {
         try { const p = JSON.parse(localStorage.getItem(PENDIENTE_KEY) || "null");
@@ -4159,7 +4203,7 @@
         if (!caja || !window.kyliaCopiasGuardadas) return;
         const pinta = () => {
           const c = window.kyliaCopiasGuardadas();
-          if (!c.previas && !c.cuenta) { caja.hidden = true; return false; }
+          if (!c.previas && !c.cuenta && !c.puedeGuardarEnCuenta) { caja.hidden = true; return false; }
           const partes = [], acciones = [];
           if (c.previas) {
             partes.push(`${c.siembrasPrevias} de este dispositivo`);
@@ -4177,8 +4221,16 @@
                 + `Hasta que lo toques, no se sube nada.</span></button>`);
             }
           }
-          document.getElementById("copias-desc").textContent =
-            `Tenemos guardados ${partes.join(" y ")}. No se borran solos.`;
+          if (c.puedeGuardarEnCuenta) {
+            partes.push(`${c.siembrasLocales} en este dispositivo, todavía fuera de tu cuenta`);
+            acciones.push(`<button type="button" class="pc-btn-grande" data-copia="guardar-cuenta">`
+              + `<span class="pc-btn-tit">Guardar estos cultivos en mi cuenta</span>`
+              + `<span class="pc-btn-sub">Hasta que lo toques siguen solo aquí. `
+              + `Si algo falla, te lo decimos y no se pierden.</span></button>`);
+          }
+          document.getElementById("copias-desc").textContent = partes.length
+            ? `Tenemos ${partes.join(" y ")}. No se borran solos.`
+            : "";
           document.getElementById("copias-acciones").innerHTML = acciones.join("");
           document.getElementById("copias-nota").textContent = c.baseAdoptada
             ? "" : "Mientras no elijas, no se escribe nada en tu cuenta.";
@@ -4191,15 +4243,43 @@
         aviso.textContent = "Tienes cultivos guardados aparte · verlos";
         aviso.addEventListener("click", () => { if (pinta()) caja.hidden = false; });
         const c0 = window.kyliaCopiasGuardadas();
-        if (c0.previas || c0.cuenta) document.body.appendChild(aviso);
+        if (c0.previas || c0.cuenta || c0.puedeGuardarEnCuenta) {
+          aviso.textContent = c0.puedeGuardarEnCuenta && !c0.previas && !c0.cuenta
+            ? "Tus cultivos están solo en este dispositivo · guardarlos en mi cuenta"
+            : "Tienes cultivos guardados aparte · verlos";
+          document.body.appendChild(aviso);
+        }
         document.getElementById("copias-cerrar").addEventListener("click", () => { caja.hidden = true; });
-        document.getElementById("copias-acciones").addEventListener("click", (ev) => {
+        document.getElementById("copias-acciones").addEventListener("click", async (ev) => {
           const b = ev.target.closest("[data-copia]");
           if (!b) return;
+          const nota = document.getElementById("copias-nota");
+          if (b.dataset.copia === "guardar-cuenta") {
+            b.disabled = true;
+            nota.textContent = "Guardando en tu cuenta…";
+            const r = await window.kyliaGuardarEstosEnMiCuenta();
+            b.disabled = false;
+            if (!r.ok) {
+              // ⚠️ NO SE AFIRMA QUE ESTÉ EN LA CUENTA. Si esto falla, lo que hay
+              // es lo que había: los cultivos aquí, intactos, y nada subido.
+              nota.textContent = "No hemos podido guardarlos en tu cuenta ahora mismo. "
+                + "Siguen aquí, enteros; inténtalo más tarde.";
+              return;
+            }
+            // Anclada la base, la subida va por el camino de siempre y cuenta
+            // cómo ha ido: la tarjeta no promete nada sin confirmar.
+            try { window.kyliaSubirConfig?.((res) => {
+              nota.textContent = res && res.ok
+                ? "Guardados en tu cuenta."
+                : "Anclada tu cuenta, pero la subida no ha terminado. Tus cultivos siguen aquí.";
+            }); } catch (_) {}
+            nota.textContent = "Guardando en tu cuenta…";
+            return;
+          }
           const okAccion = b.dataset.copia === "previas"
             ? window.kyliaRestaurarZonasPrevias()
             : window.kyliaSubirEstosAMiCuenta();
-          document.getElementById("copias-nota").textContent = okAccion
+          nota.textContent = okAccion
             ? "Hecho." : "No se ha podido. No se ha borrado nada; inténtalo otra vez.";
           if (okAccion) location.reload();
         });
@@ -5370,6 +5450,9 @@
     // pasa: para ellas esto se comporta exactamente igual que antes. Existe
     // porque la pantalla de guardado no puede decir "guardado en tu cuenta"
     // hasta que el servidor lo confirme, y sin esto no había forma de saberlo.
+    // Expuesta para que la pantalla de copias pueda pedir la subida y ENTERARSE
+    // de cómo va. Es la misma función y el mismo embudo: no hay un segundo
+    // camino para subir configuración.
     function subirConfig(onResultado) {
       clearTimeout(subidaPendiente);
       subidaPendiente = setTimeout(() => {
@@ -5410,6 +5493,7 @@
         }
       }, 1500);
     }
+    window.kyliaSubirConfig = subirConfig;
 
     // ─── Modelos de riesgo de plaga: RETIRADOS (13-ago-2026) ─────────────────
     // Eran cinco heurísticas sobre el clima diario (pulgón, mildiu, oruga de la

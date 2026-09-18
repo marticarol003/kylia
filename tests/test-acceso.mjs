@@ -43,8 +43,16 @@ ok(respuestas.length >= 3,
    `email sin parcelas, con parcelas y pasado de tope devuelven lo MISMO (${respuestas.length} salidas idénticas)`);
 ok(/enviado: true/.test(pedir) && !/no_existe|sin_parcelas|not_found/.test(pedir),
    "la respuesta no dice nunca si el email existía");
-ok(/console\.(log|warn)\("\[acceso\] email sin parcelas/.test(src),
+// Un correo que no es de nadie ya NO se queda sin enlace: se le manda igual y
+// el propietario nace en el canje (bootstrap por acceso pendiente). Lo que se
+// comprueba sigue siendo lo mismo: que la diferencia entre unos y otros quede
+// en el LOG del servidor y nunca en la respuesta.
+ok(/console\.(log|warn|error)\("\[acceso\] (correo sin cuenta|email con varios propietarios|tope por hora)/.test(src),
    "el motivo real queda en el log del servidor, que es donde tiene que estar");
+ok(/crypto\.randomUUID\(\)/.test(pedir),
+   "y a un correo sin cuenta se le reserva un id: la fila se crea al canjear, no aquí");
+ok(!/supabaseInsert\("usuarios"/.test(pedir) && !/supabaseUpdate\("usuarios"/.test(pedir),
+   "pedir un enlace NO toca la tabla de usuarios");
 
 console.log("── un enlace usado no vuelve a servir ──");
 const canjear = src.slice(src.indexOf("async function canjear"));

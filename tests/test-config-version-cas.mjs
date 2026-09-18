@@ -650,9 +650,18 @@ console.log("\n── 19. la adopción está CENTRALIZADA, no repartida ──")
   // la base es una acción aparte y explícita, y esta es. El CAS sigue
   // protegiendo de escribir sobre una versión que ya no sea la vigente. Si
   // aparece un SEXTO, hay que mirarlo a mano.
+  // Y el SEXTO es `guardarEstosEnMiCuenta()`: una cuenta recién creada en el
+  // canje está vacía y este dispositivo tiene los cultivos. Tampoco se ancla
+  // sola —sin base no se sube nada—; hace falta que él lo pida. Ancla leyendo
+  // la versión VIGENTE del servidor, así que el CAS sigue decidiendo.
   const bases = (A.match(/guardarBase\(/g) || []).length;
-  ok(bases === 5,
-     `guardarBase: definición + adopción + arranque en 0 + éxito del CAS + subir a propósito (${bases})`);
+  ok(bases === 6,
+     `guardarBase: definición + adopción + arranque en 0 + éxito del CAS + las dos a propósito (${bases})`);
+  const guardarEnCuenta = /async function guardarEstosEnMiCuenta\([\s\S]*?\n      \}/.exec(A)[0];
+  ok(/guardarBase\(tupla\.id, tupla\.config_version\)/.test(guardarEnCuenta),
+     "el sexto ancla con la versión leída del servidor, no con una inventada");
+  ok(!/escribirConfigLocal/.test(guardarEnCuenta),
+     "y no escribe la foto remota: los cultivos de este dispositivo se quedan");
   const subir = /function subirEstosAMiCuenta\([\s\S]*?\n      \}/.exec(A)[0];
   ok(/guardarBase\(c\.owner_id, c\.config_version\)/.test(subir),
      "y el quinto es esa acción, con la versión que vino del servidor");
