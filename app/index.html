@@ -321,7 +321,26 @@
       //   · Se SUBE cuando el agricultor cambia algo, nunca al arrancar.
       // Restaurar recarga la página en vez de parchear el estado en caliente:
       // media app ya ha leído localStorage de forma síncrona a estas alturas.
+      // ⚠️ TENER PARCELAS ES TENER CONFIGURACIÓN. Esto solo miraba `kylia_config`
+      // —la FINCA— y daba false cuando los cultivos estaban en `kylia_zonas`,
+      // que es exactamente donde los deja el alta de parcela → cultivos: la
+      // finca se queda con sitio y suelo, y los cultivos viven en las zonas.
+      //
+      // La consecuencia estaba medida y era un bucle infinito de recargas:
+      // restaurarSiVacio() veía "sin config", adoptaba del servidor y hacía
+      // location.reload(); al recargar volvía a ver "sin config" —porque la
+      // finca adoptada tampoco trae `cultivos`—, adoptaba otra vez y recargaba
+      // otra vez. La app quedaba inservible en el segundo dispositivo, que es
+      // justo para lo que sirve el enlace de acceso.
+      //
+      // Contar las zonas además hace la adopción MÁS conservadora, que es la
+      // dirección segura: adoptar pisa `kylia_zonas`, así que no adoptar cuando
+      // hay trabajo local es lo que hay que hacer.
       function tieneConfigLocal() {
+        try {
+          const z = JSON.parse(localStorage.getItem("kylia_zonas") || "null");
+          if (Array.isArray(z) && z.some(x => (x?.siembras || []).length)) return true;
+        } catch (_) { /* zonas ilegibles: se decide con la finca */ }
         try {
           const c = JSON.parse(localStorage.getItem("kylia_config") || "null");
           if (!c) return false;
@@ -403,6 +422,22 @@
           // poder guardar config nunca. Ahora se lee la tupla canónica y se
           // adopta por el único camino.
           localStorage.setItem("kylia_user_id", d.propietario_id);
+          // ⚠️ LA ÚNICA MARCA DE ACCESO ACREDITADO DEL CLIENTE, y se escribe
+          // AQUÍ y en ningún otro sitio: este es el único punto del sistema en
+          // el que alguien demuestra ser quien dice —abrió un enlace de un solo
+          // uso que llegó a su correo—.
+          //
+          // NO ES UNA AUTORIZACIÓN. El servidor no la mira ni puede: su
+          // autoridad es la cookie firmada de _sesion.js, que es HttpOnly y este
+          // código no puede leer ni escribir. Esto solo sirve para que la
+          // interfaz sepa si puede decir "guardado en tu cuenta" y si tiene
+          // sentido volver a pedir el correo. Lleva el propietario dentro para
+          // que no valga para otro.
+          try {
+            localStorage.setItem("kylia_acceso_verificado", JSON.stringify({
+              propietario_id: d.propietario_id, en: new Date().toISOString(),
+            }));
+          } catch (_) {}
           // Abrir el enlace que llegó a SU correo es identificarse, y con más
           // fuerza que escribirlo en un formulario. Sin esto el gate salta justo
           // después de canjear y le pide el email a quien acaba de demostrarlo.
@@ -447,9 +482,34 @@
         // Sin base, `guardarConfigServidor` devuelve base_desconocida y no manda
         // nada. Conservador a propósito.
         if (tieneConfigLocal()) return;
+        // ⚠️ UNA SOLA RESTAURACIÓN POR PESTAÑA. La recarga era incondicional: si
+        // la configuración adoptada NO satisface `tieneConfigLocal()` —y una
+        // cuenta recién creada, con la finca puesta y ninguna parcela todavía,
+        // no la satisface—, al recargar se vuelve a entrar aquí, se vuelve a
+        // adoptar y se vuelve a recargar. Bucle infinito, con la app inservible
+        // y una ronda de peticiones por vuelta. Medido en navegador.
+        //
+        // La marca va en sessionStorage: dura lo que la pestaña, así que no
+        // impide restaurar mañana ni en otro dispositivo, solo impide repetirlo
+        // dentro de la misma carga. Si sessionStorage no está disponible se opta
+        // por NO recargar, que es el lado seguro: la app arranca igual, solo que
+        // sin el refresco.
+        // ⚠️ SE GUARDA LA MARCA ANTES, PERO LO QUE SE CORTA ES LA RECARGA, NO LA
+        // RESTAURACIÓN. Un primer intento que cortara la restauración entera
+        // dejaría sin su configuración a quien no tenga sessionStorage
+        // disponible —ventana privada, almacenamiento bloqueado—, y restaurar es
+        // justo lo que hace falta ahí. Restaurar siempre; recargar solo si se
+        // pudo dejar constancia de que ya se hizo, que es lo que impide el bucle.
+        const YA = "kylia_restaurado";
+        let yaFue = false;
+        try { yaFue = sessionStorage.getItem(YA) === "1"; } catch (_) { yaFue = false; }
+        if (yaFue) return;
+        let anotado = false;
+        try { sessionStorage.setItem(YA, "1"); anotado = true; } catch (_) { anotado = false; }
         // Y se vuelve a comprobar al escribir: "estaba vacío cuando empecé" no
         // autoriza a pisar lo que haya cuando termino.
-        if (await adoptarDelPropietario(userId, () => !tieneConfigLocal())) location.reload();
+        const adoptado = await adoptarDelPropietario(userId, () => !tieneConfigLocal());
+        if (adoptado && anotado) location.reload();
       }
 
       // ─── Guardado de config con compare-and-set ────────────────────
@@ -3741,8 +3801,12 @@
           <input type="email" class="alta-input" id="pc-ident-email" autocomplete="email"
                  placeholder="tu@correo.com" aria-describedby="pc-ident-estado">
         </label>
+        <!-- ⚠️ EL BOTÓN NO DICE "GUARDAR EN MI CUENTA", porque escribir un correo
+             no mete nada en ninguna cuenta. Manda el enlace de un solo uso, que
+             es el único mecanismo que acredita quién es. -->
+        <button type="button" class="alta-btn" id="pc-b-ident">Enviarme el enlace para entrar</button>
         <p class="alta-estado" id="pc-ident-estado" aria-live="polite"></p>
-        <button type="button" class="alta-btn" id="pc-b-ident">Guardar en mi cuenta</button>
+        <p class="alta-nota" id="pc-ident-aviso"></p>
         <button type="button" class="pc-link" id="pc-ident-luego">Ahora no: seguir solo en este dispositivo</button>
       </section>
 
@@ -12012,14 +12076,25 @@
         anotar();
       }
 
-      // ── ¿está identificado? ───────────────────────────────────────────────
-      // El mecanismo de acceso que YA EXISTE: el correo del gate. No se inventa
-      // uno nuevo. Ver la limitación declarada en el informe: esto identifica
-      // al dueño para poder guardar y recuperar, no es una sesión firmada.
-      const identificado = () => {
-        try { return !!localStorage.getItem("kylia_user_email"); } catch (_) { return false; }
+      // ── ¿tiene acceso ACREDITADO? ─────────────────────────────────────────
+      // ⚠️ UN CORREO ESCRITO NO ACREDITA NADA. La versión anterior de esto
+      // devolvía `!!localStorage.kylia_user_email`, o sea: quien teclea un
+      // correo —el suyo, el de su vecino, uno inventado— quedaba "identificado"
+      // y la app le decía "guardado en tu cuenta". Eso era falso.
+      //
+      // Lo único que acredita es haber CANJEADO un enlace de un solo uso que
+      // llegó a ese correo (api/_acceso.js). Esa marca se escribe en un único
+      // punto del código y lleva dentro el propietario al que corresponde: si el
+      // dispositivo cambia de dueño, deja de valer.
+      const verificado = () => {
+        try {
+          const v = JSON.parse(localStorage.getItem("kylia_acceso_verificado") || "null");
+          if (!v || typeof v !== "object" || !v.propietario_id) return false;
+          // Tiene que ser el propietario que está usando la app AHORA.
+          return String(v.propietario_id) === String(localStorage.getItem("kylia_user_id") || "");
+        } catch (_) { return false; }
       };
-      const ctxFlujo = () => ({ identificado: identificado() });
+      const ctxFlujo = () => ({ verificado: verificado() });
       const pasoActual = () => F?.borrador?.paso || F?.paso || "terreno";
 
       $("pc-atras").addEventListener("click", () => {
@@ -12998,15 +13073,32 @@
         }
         RG.cap = r;
         cerrarQ();
-        // En su idioma. Los mm/h son nuestros, no suyos: van en "detalles".
+        // ⚠️ LA PANTALLA DICE LO MISMO QUE EL CONTRATO. Se pregunta a
+        // `evaluarCapacidadRiego` —la misma puerta que decide si se pueden dar
+        // minutos— en vez de dar por bueno cualquier resultado: un caudal de
+        // ficha de aspersor y un reparto muy desigual salen PROVISIONALES, y
+        // enseñar "perfecto" sobre ellos sería prometer unos minutos que después
+        // no se van a declarar fiables.
+        const ev = RIEGO.evaluarCapacidadRiego(
+          { capacidad_mmh: r.valor, fuente: r.fuente, confianza: r.confianza }, RG.metodo);
+        const desigual = r.datos && r.datos.reparto_desigual === true;
         $("pc-riego-res").className = "alta-nota";
-        $("pc-riego-res").textContent = "Perfecto. Ya sabemos cómo aplica agua tu riego.";
+        $("pc-riego-res").textContent = ev.clase === "fiable"
+          ? "Perfecto. Ya sabemos cómo aplica agua tu riego."
+          : desigual
+            ? "Tu riego reparte muy desigual: donde menos cae hay menos de la mitad que donde más. "
+              + "Te diremos los minutos, pero como aproximados."
+            : "Con esto te orientamos. Para darte los minutos con seguridad haría falta medir "
+              + "cuánta agua cae de verdad.";
         $("pc-tecnico").hidden = false;
         $("pc-tecnico-txt").textContent =
           `Tu riego aplica ${r.valor} litros por metro cuadrado cada hora (${r.valor} mm/h).`
           + (r.datos && r.datos.uniformidad != null
              ? ` El recipiente que menos recogió tiene el ${Math.round(r.datos.uniformidad * 100)}% `
                + "de lo que recogió el que más."
+             : "")
+          + (r.datos && r.datos.nominal
+             ? " Sale de la ficha del aspersor, no de medir: el caudal real depende de la presión."
              : "");
         $("pc-b-riego").disabled = false;
       }
@@ -13086,30 +13178,63 @@
       // ahí y se retoma exactamente en este punto. Y no se crea el cultivo dos
       // veces: al volver se reanuda el MISMO borrador, con su id.
       function prepararIdentificacion() {
+        // El borrador ya está escrito ANTES de pedir nada: lo que pase aquí no
+        // puede costarle una sola respuesta.
         anotar();
         $("pc-ident-borrador").textContent =
           "Lo que has contestado ya está guardado en este dispositivo. Si sales ahora, lo retomas donde estabas.";
         $("pc-ident-estado").textContent = "";
         $("pc-ident-estado").className = "alta-estado";
+        // ⚠️ SE AVISA DE LO QUE PASA AL ENTRAR DESDE EL ENLACE, porque lo
+        // comprobamos y no es inocuo: adoptar la cuenta REEMPLAZA los cultivos
+        // de este dispositivo por los de esa cuenta. Decirlo antes es lo mínimo;
+        // qué hacer con el trabajo local al adoptar es una decisión de producto
+        // que no se toma aquí (ver el informe).
+        $("pc-ident-aviso").textContent =
+          "Al entrar desde el enlace, este dispositivo pasa a mostrar los cultivos de esa cuenta.";
         $("pc-b-ident").disabled = false;
+        // El correo se propone, no se da por bueno: sigue haciendo falta abrir
+        // el enlace.
         try { $("pc-ident-email").value = localStorage.getItem("kylia_user_email") || ""; } catch (_) {}
       }
+
+      // ── pedir el enlace ───────────────────────────────────────────────────
+      // ⚠️ AQUÍ NO SE LLAMA A `registroUsuario`. El gate antiguo escribía el
+      // correo tecleado en la fila de ESTE dispositivo antes de mandar nada, y
+      // eso tiene una consecuencia medida: si el correo es de otra persona, su
+      // cuenta pasa a tener dos filas con dueños distintos, `propietarioPorEmail`
+      // devuelve conflicto y `pedir()` deja de mandarle enlaces —al dueño de
+      // verdad— en silencio. Para pedir un enlace no hace ninguna falta escribir
+      // ese correo en ninguna fila.
       $("pc-b-ident").addEventListener("click", async () => {
         const email = String($("pc-ident-email").value || "").trim();
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           $("pc-ident-estado").className = "alta-estado pc-mal";
-          $("pc-ident-estado").textContent = "Escribe un correo válido para poder guardarlo.";
+          $("pc-ident-estado").textContent = "Escribe un correo válido para poder mandarte el enlace.";
           return;
         }
-        eligioSoloLocal = false;
         $("pc-b-ident").disabled = true;
         $("pc-ident-estado").className = "alta-estado";
-        $("pc-ident-estado").textContent = "Guardando…";
-        try { localStorage.setItem("kylia_user_email", email); } catch (_) {}
-        try { await window.kyliaSync?.registroUsuario({ email,
-                nombre: localStorage.getItem("kylia_user_nombre") || null,
-                origen: localStorage.getItem("kylia_origen") || null }); } catch (_) {}
-        F = { ...F, borrador: { ...F.borrador, identificado: true } };
+        $("pc-ident-estado").textContent = "Enviando el enlace…";
+        let mandado = false;
+        try {
+          const r = await fetch("/api/log", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ recurso: "acceso", accion: "pedir", email }),
+          });
+          mandado = r.ok;
+        } catch (_) { mandado = false; }
+        // El servidor responde lo MISMO exista o no el correo, para no decirle a
+        // nadie quién es cliente. Aquí se repite igual de neutro: no se afirma
+        // que esa cuenta exista ni que el correo sea suyo.
+        $("pc-ident-estado").className = mandado ? "alta-estado" : "alta-estado pc-mal";
+        $("pc-ident-estado").textContent = mandado
+          ? "Si ese correo tiene un campo en Kylia, el enlace ya va de camino. Caduca en 15 minutos."
+          : "No hemos podido enviarlo ahora mismo. Tu cultivo se guarda igualmente en este dispositivo.";
+        // Se guarda EN LOCAL pase lo que pase. Lo que NO se hace es decir que ha
+        // quedado en una cuenta: eso solo es verdad tras abrir el enlace.
+        eligioSoloLocal = true;
+        F = { ...F, borrador: { ...F.borrador, identificacionResuelta: true } };
         F = FLUJO.avanzar(F, GEO, ctxFlujo());
         guardar();
       });
@@ -13117,7 +13242,7 @@
         // Guardar SOLO en el dispositivo es una opción legítima y se dice tal
         // cual. Lo que no se hace es enseñar "guardado en tu cuenta".
         eligioSoloLocal = true;
-        F = { ...F, borrador: { ...F.borrador, identificado: true } };
+        F = { ...F, borrador: { ...F.borrador, identificacionResuelta: true } };
         F = FLUJO.avanzar(F, GEO, ctxFlujo());
         guardar();
       });
@@ -13172,7 +13297,8 @@
         const el = $("pc-t-donde");
         if (!el) return;
         const TXT = {
-          local:    "Guardado en este dispositivo. No está en tu cuenta: si cambias de móvil, no viaja.",
+          local:    "Guardado en este dispositivo. No está en ninguna cuenta todavía: "
+                    + "para eso hay que entrar desde el enlace del correo.",
           subiendo: "Guardado en este dispositivo · guardándolo en tu cuenta…",
           cuenta:   "Guardado en tu cuenta. Podrás abrirlo desde otro dispositivo.",
           // ⚠️ NO SE PROMETE UN REINTENTO AUTOMÁTICO, porque no lo hay: la
@@ -13267,7 +13393,12 @@
           // que está en ESTE dispositivo; la subida es aparte, tarda y puede
           // fallar. Se dice eso, y cuando el servidor confirma, se corrige el
           // texto. Quien eligió "ahora no" ni siquiera intenta subirlo.
-          soloLocal = eligioSoloLocal || !identificado();
+          // ⚠️ SOLO SE INTENTA SUBIR SI HAY ACCESO ACREDITADO. Sin canjear un
+          // enlace, `kylia_user_id` es un UUID que se inventó este navegador: no
+          // hay ninguna cuenta a la que subir, y la subida acabaría creando una
+          // fila huérfana con la que el agricultor no puede entrar desde otro
+          // móvil. Se guarda en local y se dice exactamente eso.
+          soloLocal = eligioSoloLocal || !verificado();
           estadoGuardado = soloLocal ? "local" : "subiendo";
           if (!soloLocal) {
             subirConfig((r) => {

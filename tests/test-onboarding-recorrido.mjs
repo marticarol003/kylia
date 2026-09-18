@@ -70,7 +70,15 @@ async function abrirApp({ ancho, alto, movil, conCorreo }) {
   await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });
   await pag.evaluate((con) => {
     localStorage.clear();
-    if (con) localStorage.setItem("kylia_user_email", "prueba@kylia.app");
+    if (con) {
+      // `conCorreo` significa, de verdad, ACCESO ACREDITADO: un dispositivo que
+      // canjeó su enlace. Un correo suelto no acredita nada y por eso no basta.
+      const PROP = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+      localStorage.setItem("kylia_user_id", PROP);
+      localStorage.setItem("kylia_acceso_verificado",
+        JSON.stringify({ propietario_id: PROP, en: new Date().toISOString() }));
+      localStorage.setItem("kylia_user_email", "prueba@kylia.app");
+    }
     localStorage.setItem("kylia_config", JSON.stringify({ lat: 41.3255, lon: 2.062, suelo: "franco",
       cultivos: [], metodoRiego: "aspersion", caudal: 11.2 }));
   }, !!conCorreo);
@@ -86,6 +94,14 @@ const pag = await abrirApp({ ancho: 390, alto: 844, movil: true, conCorreo: fals
 const R = await pag.evaluate(async () => {
   const o = {}, $ = id => document.getElementById(id), sleep = ms => new Promise(r => setTimeout(r, ms));
   const clic = s => { const e = document.querySelector(s); if (!e || e.disabled) return false; e.click(); return true; };
+  const hasta = async (cond, ms = 12000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) { if (cond()) return true; await sleep(60); }
+    return false;
+  };
+  const recintosListos = () => hasta(() => document.querySelectorAll("#pc-mapa path").length > 0);
+  const contornoListo  = () => hasta(() => !!window.__PCF()?.borrador?.geometria);
+
   const paso = () => document.querySelector("#pc .alta-paso.activo")?.dataset?.pc;
   const preg = () => [...document.querySelectorAll("#pc [data-preg]")].find(x => !x.hidden)?.dataset?.preg || null;
   const escribir = (id, v) => { $(id).value = v; $(id).dispatchEvent(new Event("input", { bubbles: true })); };
@@ -143,7 +159,7 @@ const R = await pag.evaluate(async () => {
   o.supIntro = $("pc-sup-intro").textContent;
   o.opcionTodo = $("pc-todo").querySelector(".pc-btn-tit")?.textContent?.trim();
   o.opcionParte = $("pc-parte").querySelector(".pc-btn-tit")?.textContent?.trim();
-  clic("#pc-parte"); await sleep(1400);
+  clic("#pc-parte"); await contornoListo();
   o.supNota = $("pc-sup-nota").textContent;
   o.supArea = Math.round(window.__PCF()?.borrador?.area_m2 || 0);
   clic("#pc-b-sup"); await sleep(300);
@@ -356,6 +372,14 @@ const pag2 = await abrirApp({ ancho: 390, alto: 844, movil: true, conCorreo: tru
 const V = await pag2.evaluate(async () => {
   const o = {}, $ = id => document.getElementById(id), sleep = ms => new Promise(r => setTimeout(r, ms));
   const clic = s => { const e = document.querySelector(s); if (!e || e.disabled) return false; e.click(); return true; };
+  const hasta = async (cond, ms = 12000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) { if (cond()) return true; await sleep(60); }
+    return false;
+  };
+  const recintosListos = () => hasta(() => document.querySelectorAll("#pc-mapa path").length > 0);
+  const contornoListo  = () => hasta(() => !!window.__PCF()?.borrador?.geometria);
+
   const preg = () => [...document.querySelectorAll("#pc [data-preg]")].find(x => !x.hidden)?.dataset?.preg || null;
   const escribir = (id, v) => { $(id).value = v; $(id).dispatchEvent(new Event("input", { bubbles: true })); };
   const zonas = () => JSON.parse(localStorage.getItem("kylia_zonas") || "[]");
@@ -569,10 +593,18 @@ const pagX = await abrirApp({ ancho: 390, alto: 844, movil: true, conCorreo: tru
 const X = await pagX.evaluate(async () => {
   const o = {}, $ = id => document.getElementById(id), sleep = ms => new Promise(r => setTimeout(r, ms));
   const clic = s => { const e = document.querySelector(s); if (!e || e.disabled) return false; e.click(); return true; };
+  const hasta = async (cond, ms = 12000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) { if (cond()) return true; await sleep(60); }
+    return false;
+  };
+  const recintosListos = () => hasta(() => document.querySelectorAll("#pc-mapa path").length > 0);
+  const contornoListo  = () => hasta(() => !!window.__PCF()?.borrador?.geometria);
+
   const VENENO = '<img src=x onerror="window.__COLADO=1">';
   try {
   window.__COLADO = 0;
-  window.kyliaParcelaNueva({ lat: 41.3255, lon: 2.062 }); await sleep(1700);
+  window.kyliaParcelaNueva({ lat: 41.3255, lon: 2.062 }); await recintosListos();
   document.querySelectorAll("#pc-mapa path")[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
   await sleep(250); clic("#pc-confirmar"); await sleep(300);
   // cultivo escrito por él, con HTML dentro
@@ -587,7 +619,8 @@ const X = await pagX.evaluate(async () => {
   $("pc-variedad-txt").value = VENENO;
   $("pc-variedad-txt").dispatchEvent(new Event("input", { bubbles: true })); await sleep(150);
   clic("#pc-b-variedad"); await sleep(500);
-  if (!$("pc-sup-elegir").hidden) { clic("#pc-parte"); await sleep(1600); }
+  if (!$("pc-sup-elegir").hidden) clic("#pc-parte");
+  await contornoListo();
   o.notaSupImgs = document.querySelectorAll("#pc-sup-nota img").length;
   clic("#pc-b-sup"); await sleep(300);
   clic("#pc-sin-fecha"); await sleep(150); clic("#pc-b-fecha"); await sleep(300);
@@ -621,6 +654,14 @@ const pag3 = await abrirApp({ ancho: 390, alto: 844, movil: true, conCorreo: tru
 const N = await pag3.evaluate(async () => {
   const o = {}, $ = id => document.getElementById(id), sleep = ms => new Promise(r => setTimeout(r, ms));
   const clic = s => { const e = document.querySelector(s); if (!e || e.disabled) return false; e.click(); return true; };
+  const hasta = async (cond, ms = 12000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) { if (cond()) return true; await sleep(60); }
+    return false;
+  };
+  const recintosListos = () => hasta(() => document.querySelectorAll("#pc-mapa path").length > 0);
+  const contornoListo  = () => hasta(() => !!window.__PCF()?.borrador?.geometria);
+
   const zonas = () => JSON.parse(localStorage.getItem("kylia_zonas") || "[]");
   try {
   // Se controla el TRANSPORTE, no la lógica: la subida real falla, y todo lo
@@ -628,14 +669,15 @@ const N = await pag3.evaluate(async () => {
   const original = window.kyliaSync.guardarConfigServidor;
   window.kyliaSync.guardarConfigServidor = async () => ({ ok: false, error: "red" });
 
-  window.kyliaParcelaNueva({ lat: 41.3255, lon: 2.062 }); await sleep(1700);
+  window.kyliaParcelaNueva({ lat: 41.3255, lon: 2.062 }); await recintosListos();
   document.querySelectorAll("#pc-mapa path")[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
   await sleep(250); clic("#pc-confirmar"); await sleep(300);
   clic("#pc-habituales [data-cid='lechuga']"); await sleep(120);
   clic("#pc-b-cultivo"); await sleep(200);
   clic("#pc-variedad-nose"); await sleep(120);
   clic("#pc-b-variedad"); await sleep(400);
-  if (!$("pc-sup-elegir").hidden) { clic("#pc-parte"); await sleep(1600); }
+  if (!$("pc-sup-elegir").hidden) clic("#pc-parte");
+  await contornoListo();
   clic("#pc-b-sup"); await sleep(300);
   $("pc-fecha").value = "2026-09-10"; $("pc-fecha").dispatchEvent(new Event("change", { bubbles: true }));
   await sleep(150); clic("#pc-b-fecha"); await sleep(300);
@@ -682,7 +724,15 @@ async function medir(etiqueta, { ancho, alto, movil }) {
   const m = await pg.evaluate(async () => {
     const $ = id => document.getElementById(id), sleep = ms => new Promise(r => setTimeout(r, ms));
     const clic = s => { const e = document.querySelector(s); if (!e || e.disabled) return false; e.click(); return true; };
-    window.kyliaParcelaNueva({ lat: 41.3255, lon: 2.062 }); await sleep(1700);
+  const hasta = async (cond, ms = 12000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) { if (cond()) return true; await sleep(60); }
+    return false;
+  };
+  const recintosListos = () => hasta(() => document.querySelectorAll("#pc-mapa path").length > 0);
+  const contornoListo  = () => hasta(() => !!window.__PCF()?.borrador?.geometria);
+
+    window.kyliaParcelaNueva({ lat: 41.3255, lon: 2.062 }); await recintosListos();
     document.querySelectorAll("#pc-mapa path")[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await sleep(250); clic("#pc-confirmar"); await sleep(300);
     const d = {};
@@ -707,7 +757,8 @@ async function medir(etiqueta, { ancho, alto, movil }) {
     clic("#pc-b-cultivo"); await sleep(200);
     clic("#pc-variedad-nose"); await sleep(120);
     clic("#pc-b-variedad"); await sleep(400);
-    if (!$("pc-sup-elegir").hidden) { clic("#pc-parte"); await sleep(1600); }
+    if (!$("pc-sup-elegir").hidden) clic("#pc-parte");
+  await contornoListo();
     const mp = $("pc-mapa2").getBoundingClientRect();
     d.mapaAlto = Math.round(mp.height);
     d.mapaAncho = Math.round(mp.width);
@@ -721,6 +772,14 @@ async function medir(etiqueta, { ancho, alto, movil }) {
   await pg.evaluate(async () => {
     const $ = id => document.getElementById(id), sleep = ms => new Promise(r => setTimeout(r, ms));
     const clic = s => { const e = document.querySelector(s); if (!e || e.disabled) return false; e.click(); return true; };
+  const hasta = async (cond, ms = 12000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) { if (cond()) return true; await sleep(60); }
+    return false;
+  };
+  const recintosListos = () => hasta(() => document.querySelectorAll("#pc-mapa path").length > 0);
+  const contornoListo  = () => hasta(() => !!window.__PCF()?.borrador?.geometria);
+
     clic("#pc-b-sup"); await sleep(300);
     $("pc-fecha").value = "2026-09-12"; $("pc-fecha").dispatchEvent(new Event("change", { bubbles: true }));
     await sleep(150); clic("#pc-b-fecha"); await sleep(300);

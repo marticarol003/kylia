@@ -63,7 +63,8 @@ function anadir(flujo, o = {}) {
   f = P.avanzar(f, G);                                  // riego → revisar
   // Identificado: `avanzar` cierra el cultivo sin pasar por la pantalla del
   // correo. Es el mismo camino que sigue quien ya tiene su correo guardado.
-  return P.avanzar(f, G, { identificado: true });       // revisar → guardado
+  // `verificado` = canjeó un enlace de acceso. Un correo escrito no lo es.
+  return P.avanzar(f, G, { verificado: true });         // revisar → guardado
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -111,12 +112,21 @@ console.log("\n── §5 · la variedad se contesta, no se omite ──");
   ok(atras.borrador.variedad === "Romana", "y volver atrás la conserva");
 }
 
-console.log("\n── §1 · identificarse: solo quien no lo está ──");
+console.log("\n── §1 · identificarse: solo quien no ha acreditado acceso ──");
 {
-  ok(P.siguientePaso("revisar", { identificado: false }) === "identificacion",
-     "sin identificar, después del repaso se pide el correo");
-  ok(P.siguientePaso("revisar", { identificado: true }) === "hecho",
-     "y quien ya tiene sesión NO vuelve a identificarse");
+  ok(P.siguientePaso("revisar", { verificado: false }) === "identificacion",
+     "sin acceso acreditado, después del repaso se ofrece el enlace");
+  ok(P.siguientePaso("revisar", { verificado: true }) === "hecho",
+     "y quien ya canjeó un enlace NO vuelve a pasar por ahí");
+  // ⚠️ LA REGRESIÓN QUE ESTO FIJA: la bandera se llamaba `identificado` y la
+  // ponía a true cualquiera que escribiera un correo. Ahora ese nombre no
+  // existe, así que un contexto viejo no puede saltarse la pantalla por error.
+  ok(P.siguientePaso("revisar", { identificado: true }) === "identificacion",
+     "y un contexto con la bandera VIEJA no salta nada: escribir un correo no acredita");
+  ok(P.completo({ identificacionResuelta: true }, "identificacion") === true,
+     "la pantalla se da por resuelta cuando se ha contestado…");
+  ok(P.completo({ identificado: true }, "identificacion") === false,
+     "…y `identificado: true` ya no vale para nada: era un nombre que afirmaba de más");
   ok(P.PASOS.indexOf("identificacion") > P.PASOS.indexOf("revisar"),
      "el correo se pide DESPUÉS de enseñar lo que se va a guardar, no antes");
 }

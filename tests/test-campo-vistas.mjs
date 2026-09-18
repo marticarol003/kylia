@@ -27,8 +27,16 @@ let fallos = 0;
 const ok = (c, m) => { if (c) console.log("  ✓", m); else { console.log("  ✗", m); fallos++; } };
 
 // ── El campo de pruebas: una parcela cosechada, como los tres pilotos ──
-const HOY = new Date().toISOString().slice(0, 10);
-const dia = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+// ⚠️ "HOY" ES EL DÍA CIVIL EN EUROPE/MADRID, NO EL DÍA UTC. Producción lo
+// decide con `hoyISO()` de assets/js/clima-reglas.js, a propósito y desde el
+// arreglo de la franja de medianoche. Este test lo calculaba por su cuenta con
+// `new Date().toISOString()`, que es UTC: entre las 00:00 y las 02:00 locales
+// son días DISTINTOS, y el test se ponía rojo solo en esa franja —sin que
+// cambiara una línea de producción—. Se usa la función real en vez de
+// reimplementarla: si mañana cambia la regla, el test la sigue.
+const { hoyISO } = require(join(RAIZ, "assets", "js", "clima-reglas.js"));
+const HOY = hoyISO();
+const dia = n => hoyISO(Date.now() - n * 86400000);
 const PLANT = dia(80), COSECHA = dia(10);
 const USUARIO = {
   id: "11111111-2222-3333-4444-555555555555",

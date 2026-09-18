@@ -88,7 +88,13 @@ r = await correr({ ...BASE, nivel: "baja", regar: false,
 ok(r.código === 500, "clima 6 días atrasado → 500, NO silencio");
 ok(/2026-09-05/.test(r.cuerpo.error), "y dice hasta qué día llega el clima");
 
-const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+// ⚠️ "AYER" RESPECTO AL DÍA CIVIL DE MADRID, que es con el que compara el
+// endpoint (`hoyISO()` de clima-reglas.js). Calculado en UTC, entre las 00:00 y
+// las 02:00 locales este "ayer" era ANTEAYER para el servidor: dos días de
+// retraso en vez de uno, 500 en vez de 200, y el test rojo solo en esa franja
+// sin que cambiara una línea de producción.
+const { hoyISO } = require(join(RAIZ, "assets", "js", "clima-reglas.js"));
+const ayer = hoyISO(Date.now() - 86400000);
 r = await correr({ ...BASE, nivel: "baja", regar: false,
                    clima_fecha: ayer, clima_al_dia: false, dias_sin_clima: 1 });
 ok(r.código === 200 && r.cuerpo.omitido,

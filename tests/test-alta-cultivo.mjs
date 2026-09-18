@@ -71,6 +71,13 @@ pag.on("pageerror", e => errores.push(e.message));
 try {
   await pag.goto(`http://127.0.0.1:${port}/app`, { waitUntil: "domcontentloaded" });
   await pag.evaluate(() => {
+    // ⚠️ UN DISPOSITIVO QUE CANJEÓ UN ENLACE, no uno que escribió un correo.
+    // La marca la deja el canje de `?acceso=` y lleva dentro el propietario: es
+    // lo único que permite saltarse la pantalla de identificación y decir
+    // "guardado en tu cuenta". Escribir el correo no vale, y así debe ser.
+    const PROP = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    localStorage.setItem("kylia_user_id", PROP);
+    localStorage.setItem("kylia_acceso_verificado", JSON.stringify({ propietario_id: PROP, en: new Date().toISOString() }));
     localStorage.setItem("kylia_user_email", "prueba@kylia.app");
     // ⚠️ LA FINCA TIENE RIEGO PROPIO a propósito: aspersión y 11,2 mm/h. Si una
     // alta nueva que dice "lo indicaré después" lo hereda, se nota aquí.

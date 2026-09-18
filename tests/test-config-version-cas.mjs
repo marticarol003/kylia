@@ -361,10 +361,18 @@ function cargarApp({ almacen, servidor, responde, uid = "zone-1" }) {
              configLocal: () => { try { return JSON.parse(localStorage.getItem("kylia_config")); } catch (_) { return null; } },
              dueno: () => localStorage.getItem("kylia_user_id") };
   `;
-  const f = new Function("uid", "localStorage", "responde", "enviados", "fetch", "console", "location", cuerpo);
+  const f = new Function("uid", "localStorage", "sessionStorage", "responde", "enviados",
+                        "fetch", "console", "location", cuerpo);
   const recargas = [];
   const fetchFalso = async (url) => ({ ok: true, json: async () => servidor(url) });
-  return { ...f(uid, almacen, responde, enviados, fetchFalso, { warn: () => {} },
+  // ⚠️ `sessionStorage` TAMBIÉN, y NUEVO EN CADA INSTANCIA: el navegador lo
+  // tiene, y `restaurarSiVacio` lo usa para no encadenar recargas. Una instancia
+  // nueva del arnés es una PESTAÑA nueva, así que empieza vacío —si se
+  // compartiera, la segunda carga no restauraría y estaríamos probando el arnés—.
+  const sesion = (() => { const m = new Map(); return {
+    getItem: k => (m.has(k) ? m.get(k) : null),
+    setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; })();
+  return { ...f(uid, almacen, sesion, responde, enviados, fetchFalso, { warn: () => {} },
                 { reload: () => recargas.push(1), replace: () => {} }), enviados, recargas };
 }
 const OK_CAS = (v) => async () => ({ ok: true, persisted: true, status: 200, datos: { ok: true, config_version: v } });
@@ -665,9 +673,15 @@ function appConGetRetenido({ almacen, respuestaServidor, uid = "owner" }) {
              configLocal: () => { try { return JSON.parse(localStorage.getItem("kylia_config")); } catch (_) { return null; } } };
   `;
   const recargas = [];
-  const f = new Function("uid", "localStorage", "enviados", "fetch", "console", "location", cuerpo);
+  const f = new Function("uid", "localStorage", "sessionStorage", "enviados", "fetch",
+                        "console", "location", cuerpo);
   const fetchRetenido = async () => { await enVuelo; return { ok: true, json: async () => respuestaServidor }; };
-  return { ...f(uid, almacen, enviados, fetchRetenido, { warn: () => {} },
+  // Mismo motivo que arriba: el navegador tiene sessionStorage y la restauración
+  // lo usa para no encadenar recargas. Uno nuevo por instancia = una pestaña.
+  const sesion = (() => { const m = new Map(); return {
+    getItem: k => (m.has(k) ? m.get(k) : null),
+    setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; })();
+  return { ...f(uid, almacen, sesion, enviados, fetchRetenido, { warn: () => {} },
                 { reload: () => recargas.push(1), replace: () => {} }),
            soltar, recargas };
 }

@@ -260,11 +260,22 @@
     const sepLin  = num(d.sep_lineas_m);
     if (q == null || sepAsp == null || sepLin == null) return fallo("datos_incompletos");
     if (!(q > 0) || !(sepAsp > 0) || !(sepLin > 0))    return fallo("valores_no_positivos");
-    // Los datos originales, no solo el resultado: si mañana hay que rehacer la
-    // cuenta, un mm/h suelto no se puede y estos tres sí.
-    return capacidad(q / (sepAsp * sepLin), "derivado_aspersion", "alta",
+    // ⚠️ CONFIANZA MEDIA, NO ALTA, Y NO ES UN DETALLE: con "media" esto sale
+    // PROVISIONAL y no habilita minutos fiables (ver evaluarCapacidadRiego).
+    //
+    // Por qué no es "alta", que sí lo es en el goteo con el caudal impreso en la
+    // cinta: no es el mismo tipo de dato. El gotero de una cinta es casi siempre
+    // autocompensante y moja exactamente la retícula de separaciones que hemos
+    // preguntado. Un aspersor, no: su caudal nominal es a UNA presión —la de la
+    // ficha— y en la parcela hay otra, y su reparto SOLAPA, así que el agua que
+    // cae no es uniforme sobre el rectángulo. Tres números de catálogo describen
+    // la instalación, no lo que llega al suelo.
+    //
+    // Lo que sí da minutos fiables en aspersión es MEDIR lo que cae:
+    // `medido_vasos`, más abajo. Esto orienta, y se dice que orienta.
+    return capacidad(q / (sepAsp * sepLin), "derivado_aspersion", "media",
                      { l_h_aspersor: r1(q), sep_aspersores_m: sepAsp, sep_lineas_m: sepLin,
-                       disposicion: "fija_regular" });
+                       disposicion: "fija_regular", nominal: true });
   }
 
   // ─── MEDICIÓN CON VARIOS RECIPIENTES ─────────────────────────────────────
@@ -290,10 +301,24 @@
     // punto que en otro es una instalación que riega mal, y eso se puede decir
     // más adelante sin volver a pedirle que mida.
     const menor = Math.min(...lista), mayor = Math.max(...lista);
-    return capacidad((media * 10) / (min / 60), "medido_vasos", "alta",
+    const uniformidad = mayor > 0 ? menor / mayor : 0;
+    // ⚠️ UNA MEDIA SOLO SIGNIFICA ALGO SI LOS PUNTOS SE PARECEN. Si el
+    // recipiente que menos recoge tiene menos de la MITAD que el que más, no hay
+    // una tasa que describa esa parcela: hay una zona que se pasa y otra que se
+    // queda seca, y unos minutos calculados sobre la media riegan mal las dos.
+    // Entonces se conserva el número —orienta, y el reparto desigual es
+    // información útil— pero con confianza media, o sea sin habilitar minutos
+    // fiables. No es un umbral puesto para que pase una prueba: es el punto en
+    // el que la media deja de representar a la muestra, y queda dicho que es
+    // grosero —min/max no es el coeficiente de uniformidad de Christiansen, que
+    // necesitaría una malla de recipientes y no tres—.
+    const consistente = uniformidad >= 0.5;
+    return capacidad((media * 10) / (min / 60), "medido_vasos",
+                     consistente ? "alta" : "media",
                      { cm_varios: lista, recipientes: lista.length, minutos: min,
                        cm_medio: Math.round(media * 100) / 100,
-                       uniformidad: mayor > 0 ? Math.round((menor / mayor) * 100) / 100 : null });
+                       uniformidad: Math.round(uniformidad * 100) / 100,
+                       reparto_desigual: !consistente });
   }
 
   // Lo tecleó él directamente en mm/h. Pantalla avanzada: no se pregunta así en

@@ -140,11 +140,15 @@
                       fecha: "riego", riego: "revisar", revisar: "identificacion",
                       identificacion: "hecho" };
 
-  // Quien ya se identificó no vuelve a identificarse. Es la única pantalla que
-  // se salta, y se salta MIRANDO EL ESTADO REAL, no una bandera de interfaz.
+  // ⚠️ `verificado` SIGNIFICA "ABRIÓ EL ENLACE QUE LE LLEGÓ AL CORREO", no
+  // "escribió un correo". Escribir un correo no acredita nada: cualquiera puede
+  // teclear el de otro. La única pantalla que se salta es esta, y solo para
+  // quien ya canjeó un acceso; el servidor, además, no se fía de esta bandera
+  // para nada —su autoridad es la cookie firmada, que este código no puede ni
+  // leer—. Aquí solo decide qué pantalla se enseña.
   function siguientePaso(paso, ctx = {}) {
     const n = SIGUIENTE[paso];
-    if (n === "identificacion" && ctx.identificado === true) return "hecho";
+    if (n === "identificacion" && ctx.verificado === true) return "hecho";
     return n;
   }
 
@@ -166,8 +170,11 @@
     if (paso === "riego")      return !!borrador.metodoRiego || borrador.riegoPendiente === true;
     // Revisar es LEER lo contestado: no añade ningún dato que pueda faltar.
     if (paso === "revisar")    return true;
-    // Identificarse sí: sin ello no hay dónde guardar.
-    if (paso === "identificacion") return borrador.identificado === true;
+    // ⚠️ NO SE LLAMA `identificado`. Esta bandera dice que la pantalla se ha
+    // RESUELTO —pidió el enlace, o eligió seguir solo en este dispositivo—, que
+    // es una cosa de navegación. Llamarla "identificado" era exactamente el
+    // error: un nombre que afirma una identidad que nadie ha acreditado.
+    if (paso === "identificacion") return borrador.identificacionResuelta === true;
     return false;
   }
 
