@@ -15,7 +15,6 @@ const {
 } = require("./_supabase.js");
 
 const ACCESO = require("./_acceso.js");
-const { propietarioPorEmail } = require("./_propietario.js");
 const { puedeVer } = require("./_sesion.js");
 
 const HANDLERS = {
@@ -96,7 +95,6 @@ async function handleRegistroUsuario(req, res, body) {
   const fila = {
     id,
     propietario_id: ES_UUID.test(propietario) ? propietario : id,
-    email:        siViene("email",    clean(body.email, 200)?.toLowerCase() || null),
     nombre:       siViene("nombre",   clean(body.nombre, 120)               || null),
     telefono:     siViene("telefono", clean(body.telefono, 40)              || null),
     lat:          siViene("lat",      numOrNull(body.lat)),
@@ -117,13 +115,44 @@ async function handleRegistroUsuario(req, res, body) {
     caudal:               siViene("caudal",              numOrNull(body.caudal)),
     area_m2:              siViene("area_m2",             numOrNull(body.area_m2)),
     capacidad_regadera:   siViene("capacidad_regadera",  numOrNull(body.capacidad_regadera)),
-    origen:               siViene("origen",              clean(body.origen, 120) || null),
+
     piloto_sombra:        siViene("piloto_sombra",       Boolean(body.piloto_sombra)),
     preferencias:         siViene("preferencias", body.preferencias && typeof body.preferencias === "object" ? body.preferencias : {}),
     ua:           clean(req.headers["user-agent"], 400)         || null,
   };
 
-  console.log("[registro-usuario]", JSON.stringify({ id, nombre: fila.nombre, email: fila.email, cultivos: fila.cultivos, origen: fila.origen }));
+  // ─── EL CORREO NO SE ESCRIBE AQUÍ. NUNCA. ────────────────────────────────
+  //
+  // Un correo que llega en el cuerpo de una petición es un correo TECLEADO: no
+  // acredita nada. Da igual que no exista todavía en ninguna fila, que coincida
+  // con el de esta misma fila, que `propietarioPorEmail` no encuentre dueño o
+  // encuentre un conflicto, y da igual lo que el cliente diga de sí mismo. Un
+  // dato no acreditado no se convierte en acreditado por ninguno de esos
+  // caminos.
+  //
+  // EL DAÑO QUE ESTO CIERRA, MEDIDO: escribir aquí el correo de otra persona
+  // dejaba su cuenta con dos filas de mismo correo y dueños distintos;
+  // `propietarioPorEmail` devolvía conflicto —correctamente, no elige a dedo— y
+  // `_acceso.pedir()` dejaba de mandarle el enlace. Se quedaba fuera de su
+  // cuenta, en silencio.
+  //
+  // EL ÚNICO SITIO que puede asociar un correo a una cuenta es
+  // `api/_acceso.js`, después de canjear un enlace de un solo uso y con la
+  // sesión firmada emitible. Ahí y en ningún otro lado.
+  //
+  // `origen` va por el mismo camino: es atribución que viaja con el correo y
+  // tampoco la acredita nadie.
+  //
+  // ⚠️ LOS CORREOS QUE YA ESTÁN NO SE TOCAN. Esto deja de ESCRIBIR; no borra ni
+  // limpia nada. Una fila con su correo de siempre sigue exactamente igual y
+  // sigue resolviendo a su propietario.
+  const correoTecleado = "email" in body || "origen" in body;
+  if (correoTecleado) {
+    console.warn("[registro-usuario] correo/origen sin acreditar: se ignoran",
+      JSON.stringify({ fila: id }));
+  }
+
+  console.log("[registro-usuario]", JSON.stringify({ id, nombre: fila.nombre, cultivos: fila.cultivos }));
 
   if (!isConfigured()) {
     return res.status(200).json({ ok: true, persisted: false, reason: "supabase_not_configured" });
@@ -137,7 +166,11 @@ async function handleRegistroUsuario(req, res, body) {
     // true y su email NO coincide con el entrante, es una colisión de id → no la
     // tocamos y devolvemos 409 en vez de destruir el piloto.
     const previa = (await supabaseSelect("usuarios", `id=eq.${id}&select=id,email,piloto_sombra,propietario_id`))[0];
-    if (previa && previa.piloto_sombra && previa.email !== fila.email) {
+    // `fila.email` ya no existe nunca: la colisión con un piloto se decide con
+    // lo que el cliente DICE que es su correo, solo para no pisarlo. Compararlo
+    // no lo acredita ni lo escribe.
+    const correoDicho = clean(body.email, 200)?.toLowerCase() || null;
+    if (previa && previa.piloto_sombra && previa.email !== correoDicho) {
       console.warn("[registro-usuario] colisión con piloto silencioso, no se sobrescribe:", id);
       return res.status(409).json({ ok: false, reason: "pilot_collision", protegido: true });
     }
@@ -150,39 +183,6 @@ async function handleRegistroUsuario(req, res, body) {
     if (!permiso.permitido) {
       console.warn("[registro-usuario] sesión ajena:", JSON.stringify({ pedido: id, sesion: permiso.sesion }));
       return res.status(403).json({ ok: false, error: "esa parcela no es tuya" });
-    }
-
-    // ─── UN CORREO TECLEADO NO PUEDE ROMPERLE EL ACCESO A NADIE ───────────
-    //
-    // EL DAÑO, MEDIDO. Escribir en esta fila el correo que alguien teclea deja
-    // dos filas con el mismo correo y propietarios DISTINTOS. Entonces
-    // `propietarioPorEmail` devuelve `conflicto` —correctamente: no elige a
-    // dedo— y `_acceso.pedir()` deja de mandar el enlace. El dueño de verdad se
-    // queda sin poder entrar en su cuenta, en silencio y sin enterarse de por
-    // qué. Basta con que alguien escriba su correo en otro móvil.
-    //
-    // La guarda: antes de escribir el correo se mira a quién resuelve YA. Si
-    // resuelve a otro propietario, el correo NO se escribe —el resto de la fila
-    // sí— y queda en el log. Así:
-    //   · varias filas del mismo propietario con el mismo correo → siguen
-    //     resolviendo a ese propietario, que es lo que hacían;
-    //   · un correo nuevo, que no resuelve a nadie, se escribe: es como nace una
-    //     cuenta, y no puede pisar nada porque no hay nada;
-    //   · un correo que ya es de otro → cero escritura de ese campo.
-    //
-    // No toca ninguna fila existente, así que es compatible con todo el mundo.
-    // Y NO sustituye a la acreditación por enlace: impide el daño colateral,
-    // que es lo que estaba abierto.
-    if (fila.email) {
-      const quien = await propietarioPorEmail(fila.email);
-      const miDueño = fila.propietario_id || id;
-      const ajeno = (quien.conflicto && !quien.conflicto.includes(miDueño))
-                 || (quien.propietario_id && quien.propietario_id !== miDueño);
-      if (ajeno) {
-        console.warn("[registro-usuario] correo de otro propietario, NO se escribe:",
-          JSON.stringify({ fila: id, dueño_del_correo: quien.propietario_id || quien.conflicto }));
-        delete fila.email;
-      }
     }
 
     const filas = await supabaseInsert("usuarios", fila, { upsert: true });

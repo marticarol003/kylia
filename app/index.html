@@ -362,6 +362,9 @@
       // pantalla de más.
       const PENDIENTE_KEY = "kylia_adopcion_pendiente";
       const ZONAS_PREVIAS_KEY = "kylia_zonas_previas";
+      // La foto de la cuenta, conservada cuando él elige quedarse con los suyos.
+      // Ninguna de las dos copias se borra nunca sola.
+      const CUENTA_REMOTA_KEY = "kylia_cuenta_remota";
 
       const siembrasDe = (zonas) => {
         const out = [];
@@ -417,20 +420,75 @@
           return r === true;
         }
         if (eleccion === "dispositivo") {
-          // ⚠️ BASE SIN FOTO, Y ESTA VEZ A PROPÓSITO. El comentario de
-          // `adoptarConfigPropietario` avisa de que una base sin foto autoriza a
-          // escribir una foto que no se adoptó: eso es exactamente lo que él ha
-          // elegido —subir LA SUYA sobre la versión que hay en el servidor—, y
-          // el CAS sigue protegiendo de escribir sobre una versión que ya no es
-          // la vigente. Lo local no se toca.
+          // ⚠️ AQUÍ NO SE ADOPTA BASE, Y ES LO IMPORTANTE. Adoptarla dejaría que
+          // el siguiente guardado subiera la foto local ENTERA y reemplazara los
+          // cultivos de la cuenta —que siguen ahí, intactos, en el servidor—.
+          // Eso es una segunda destrucción, en la otra dirección, y no puede
+          // pasar por el simple hecho de haber elegido "quedarme con los míos".
+          //
+          // Sin base, `guardarConfigServidor` devuelve `base_desconocida` y no
+          // manda NADA. Para reemplazar lo de la cuenta hace falta una acción
+          // aparte y explícita: `subirEstosAMiCuenta()`.
+          //
+          // La foto de la cuenta se conserva para poder verla y recuperarla.
+          try {
+            localStorage.setItem(CUENTA_REMOTA_KEY, JSON.stringify({
+              guardado: new Date().toISOString(),
+              owner_id: p.owner_id, config: p.config, config_version: p.config_version,
+            }));
+          } catch (_) { return false; }
           localStorage.setItem("kylia_user_id", p.owner_id);
-          if (!guardarBase(p.owner_id, p.config_version)) return false;
           borrarPendiente();
           return true;
         }
         return false;
       }
       window.kyliaResolverAdopcion = resolverAdopcion;
+
+      // ── LA ACCIÓN EXPLÍCITA que sí reemplaza lo de la cuenta ──────────
+      // Solo desde aquí se adopta la base, y por tanto solo desde aquí puede un
+      // CAS posterior escribir la foto local encima de la de la cuenta. La copia
+      // de la cuenta NO se borra: sigue disponible para recuperarla.
+      function subirEstosAMiCuenta() {
+        const c = leerCuentaRemota();
+        if (!c) return false;
+        localStorage.setItem("kylia_user_id", c.owner_id);
+        return guardarBase(c.owner_id, c.config_version);
+      }
+      window.kyliaSubirEstosAMiCuenta = subirEstosAMiCuenta;
+
+      // ── Recuperar una copia ───────────────────────────────────────────
+      // ⚠️ NUNCA SE BORRA NADA. Restaurar es un INTERCAMBIO: lo que estaba
+      // puesto pasa a ser la copia. Así se puede ir y volver tantas veces como
+      // haga falta sin que desaparezca ninguno de los dos juegos de cultivos.
+      function restaurarZonasPrevias() {
+        const previas = leerZonasPrevias();
+        if (!previas || !Array.isArray(previas.zonas)) return false;
+        const actuales = zonasLocales();
+        try {
+          localStorage.setItem(ZONAS_PREVIAS_KEY, JSON.stringify({
+            guardado: new Date().toISOString(), zonas: actuales,
+          }));
+        } catch (_) { return false; }
+        localStorage.setItem("kylia_zonas", JSON.stringify(previas.zonas));
+        return true;
+      }
+      window.kyliaRestaurarZonasPrevias = restaurarZonasPrevias;
+
+      const leerZonasPrevias = () => {
+        try { const v = JSON.parse(localStorage.getItem(ZONAS_PREVIAS_KEY) || "null");
+              return v && Array.isArray(v.zonas) ? v : null; } catch (_) { return null; }
+      };
+      const leerCuentaRemota = () => {
+        try { const v = JSON.parse(localStorage.getItem(CUENTA_REMOTA_KEY) || "null");
+              return v && v.owner_id && v.config ? v : null; } catch (_) { return null; }
+      };
+      window.kyliaCopiasGuardadas = () => ({
+        previas: leerZonasPrevias(), cuenta: leerCuentaRemota(),
+        siembrasPrevias: siembrasDe(leerZonasPrevias()?.zonas).length,
+        siembrasCuenta: siembrasDe(leerCuentaRemota()?.config?.zonas).length,
+        baseAdoptada: !!leerBase(),
+      });
 
       const leerPendiente = () => {
         try { const p = JSON.parse(localStorage.getItem(PENDIENTE_KEY) || "null");
@@ -3023,6 +3081,15 @@
     .pc-ctx:empty { display: none; }
 
     /* ── Resumen editable ───────────────────────────────────────────────── */
+    /* El aviso de que hay copias guardadas. Discreto pero siempre alcanzable:
+       una copia que no se puede abrir es una copia que se pierde despacio. */
+    .copias-aviso { position: fixed; left: 50%; transform: translateX(-50%);
+                    bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 9990;
+                    border: 1.5px solid var(--linea, #E6E6E1); background: #fff;
+                    color: var(--verde, #013A27); border-radius: 999px;
+                    padding: 12px 18px; min-height: 48px; font-size: .88rem;
+                    cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.08); max-width: 92vw; }
+
     .pc-revision { list-style: none; padding: 0; margin: 10px 0 0; }
     .pc-revision li { border-bottom: 1px solid var(--linea, #E6E6E1); }
     .pc-revision li:last-child { border-bottom: 0; }
@@ -3974,6 +4041,19 @@
     </div>
   </div>
 
+  <!-- Las copias guardadas. Ninguna se borra sola, y desde aquí se vuelve
+       atrás sin perder ninguno de los dos juegos de cultivos. -->
+  <div id="copias" class="gate-overlay" role="dialog" aria-modal="true"
+       aria-labelledby="copias-tit" hidden>
+    <div class="gate-card">
+      <h2 id="copias-tit">Cultivos guardados aparte</h2>
+      <p id="copias-desc"></p>
+      <div class="pc-opciones" style="flex-direction:column" id="copias-acciones"></div>
+      <p class="gate-legal" id="copias-nota"></p>
+      <button type="button" class="pc-link" id="copias-cerrar">Cerrar</button>
+    </div>
+  </div>
+
   <div id="gate" class="gate-overlay" role="dialog" aria-modal="true" aria-labelledby="gate-title" aria-describedby="gate-desc" hidden>
     <div class="gate-card">
       <div class="gate-logo" aria-hidden="true"><svg class="brand-logo" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="flex:0 0 auto"><path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(45)"/><path d="M0 0C1.5 -1.7 1.5 -3.7 0 -5.4C-1.5 -3.7 -1.5 -1.7 0 0Z" transform="translate(12 12) rotate(225)"/><circle cx="12" cy="12" r="2.4"/></svg> Kylia</div>
@@ -4071,6 +4151,60 @@
         gate.hidden = true;
       });
 
+      // ── Las copias guardadas, SIEMPRE alcanzables ────────────────────
+      // Guardar una copia y no dar forma de verla es perderla despacio. Esto
+      // aparece mientras exista alguna, y no la borra nunca.
+      (function () {
+        const caja = document.getElementById("copias");
+        if (!caja || !window.kyliaCopiasGuardadas) return;
+        const pinta = () => {
+          const c = window.kyliaCopiasGuardadas();
+          if (!c.previas && !c.cuenta) { caja.hidden = true; return false; }
+          const partes = [], acciones = [];
+          if (c.previas) {
+            partes.push(`${c.siembrasPrevias} de este dispositivo`);
+            acciones.push(`<button type="button" class="pc-btn-grande" data-copia="previas">`
+              + `<span class="pc-btn-tit">Volver a los de este dispositivo</span>`
+              + `<span class="pc-btn-sub">Los que se ven ahora quedan guardados en su lugar. `
+              + `No se borra ninguno de los dos.</span></button>`);
+          }
+          if (c.cuenta) {
+            partes.push(`${c.siembrasCuenta} de tu cuenta`);
+            if (!c.baseAdoptada) {
+              acciones.push(`<button type="button" class="pc-btn-grande" data-copia="subir">`
+                + `<span class="pc-btn-tit">Subir estos a mi cuenta</span>`
+                + `<span class="pc-btn-sub">Reemplazarán los ${c.siembrasCuenta} que hay en la cuenta. `
+                + `Hasta que lo toques, no se sube nada.</span></button>`);
+            }
+          }
+          document.getElementById("copias-desc").textContent =
+            `Tenemos guardados ${partes.join(" y ")}. No se borran solos.`;
+          document.getElementById("copias-acciones").innerHTML = acciones.join("");
+          document.getElementById("copias-nota").textContent = c.baseAdoptada
+            ? "" : "Mientras no elijas, no se escribe nada en tu cuenta.";
+          return true;
+        };
+        const aviso = document.createElement("button");
+        aviso.type = "button";
+        aviso.id = "copias-aviso";
+        aviso.className = "copias-aviso";
+        aviso.textContent = "Tienes cultivos guardados aparte · verlos";
+        aviso.addEventListener("click", () => { if (pinta()) caja.hidden = false; });
+        const c0 = window.kyliaCopiasGuardadas();
+        if (c0.previas || c0.cuenta) document.body.appendChild(aviso);
+        document.getElementById("copias-cerrar").addEventListener("click", () => { caja.hidden = true; });
+        document.getElementById("copias-acciones").addEventListener("click", (ev) => {
+          const b = ev.target.closest("[data-copia]");
+          if (!b) return;
+          const okAccion = b.dataset.copia === "previas"
+            ? window.kyliaRestaurarZonasPrevias()
+            : window.kyliaSubirEstosAMiCuenta();
+          document.getElementById("copias-nota").textContent = okAccion
+            ? "Hecho." : "No se ha podido. No se ha borrado nada; inténtalo otra vez.";
+          if (okAccion) location.reload();
+        });
+      })();
+
       // ── La pantalla de "cultivos en los dos sitios" ──────────────────
       // Solo pinta y llama a `kyliaResolverAdopcion`. La decisión de qué se
       // conserva vive arriba, con el resto de la adopción.
@@ -4083,9 +4217,12 @@
         const plural = (x, s1, s2) => `${x} ${x === 1 ? s1 : s2}`;
         document.getElementById("adopcion-sub-cuenta").textContent =
           `Se verán ${plural(n.alla || 0, "cultivo", "cultivos")} de la cuenta. `
-          + `Guardamos una copia de ${plural(n.aqui || 0, "el de este móvil", "los de este móvil")} por si acaso.`;
+          + `${plural(n.aqui || 0, "El cultivo", "Los cultivos")} de este dispositivo `
+          + `${n.aqui === 1 ? "queda guardado" : "quedan guardados"} en este dispositivo y `
+          + `${n.aqui === 1 ? "puedes volver a él" : "puedes volver a ellos"} cuando quieras.`;
         document.getElementById("adopcion-sub-dispositivo").textContent =
-          `Se quedan ${plural(n.aqui || 0, "cultivo", "cultivos")} de aquí, y al guardar pasarán a tu cuenta.`;
+          `Se quedan ${plural(n.aqui || 0, "cultivo", "cultivos")} de aquí. `
+          + `Los de la cuenta NO se borran: siguen ahí hasta que decidas reemplazarlos a propósito.`;
         document.getElementById("adopcion-nota").textContent =
           "Hasta que elijas no tocamos ninguno de los dos.";
         caja.hidden = false;
@@ -10424,7 +10561,7 @@
               metodo_riego:        A.metodo || null,
               caudal:              A.caudal ?? null,
               fecha_plantacion:    A.plantado || null,
-              origen:              localStorage.getItem("kylia_origen"),
+              // Sin `origen`: viaja con el correo y tampoco lo acredita nadie.
             });
           } catch (_) { /* el campo ya está guardado en el móvil */ }
         }
@@ -11024,7 +11161,11 @@
         // Sincronizar perfil del piloto con Supabase (silencioso)
         try {
           window.kyliaSync?.registroUsuario({
-            email:                localStorage.getItem("kylia_user_email") || null,
+            // ⚠️ SIN `email`. Un correo de localStorage es un correo TECLEADO:
+            // lo escribió alguien en este dispositivo y nadie lo ha acreditado.
+            // El servidor lo ignora de todas formas; no mandarlo evita fingir
+            // que esto asocia una cuenta. Lo asocia el canje del enlace, y solo
+            // él.
             nombre:               nuevoCfg.nombre,
             ciudad:               nuevoCfg.ciudad,
             lat:                  nuevoCfg.lat,
@@ -11039,7 +11180,7 @@
             tarifa_agua:          nuevoCfg.tarifaAgua ?? null,
             area_m2:              nuevoCfg.areaParcela ?? null,
             capacidad_regadera:   nuevoCfg.capacidadRegadera ?? null,
-            origen:               localStorage.getItem("kylia_origen"),
+            // Sin `origen`, por lo mismo que sin `email`.
           });
           // sincronizarZonas() ya NO se llama aquí: cuelga de subirConfig(), por
           // donde pasa este guardado y los otros tres. Llamarla también aquí

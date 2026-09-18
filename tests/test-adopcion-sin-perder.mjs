@@ -58,6 +58,7 @@ function montar(ls) {
     ${linea(/const BASE_KEY\s+= "[^"]+";/)}
     ${linea(/const PENDIENTE_KEY = "[^"]+";/)}
     ${linea(/const ZONAS_PREVIAS_KEY = "[^"]+";/)}
+    ${linea(/const CUENTA_REMOTA_KEY = "[^"]+";/)}
     ${linea(/const esVersion = [^\n]+/)}
     ${linea(/const esOwner   = [^\n]+/)}
     ${linea(/const siembrasDe = \(zonas\) => \{[\s\S]*?\n      \};/)}
@@ -70,10 +71,16 @@ function montar(ls) {
     ${trozo("function escribirConfigLocal(")}
     ${trozo("function adoptarConfigPropietario(")}
     ${trozo("function resolverAdopcion(")}
+    ${trozo("function subirEstosAMiCuenta(")}
+    ${trozo("function restaurarZonasPrevias(")}
+    ${linea(/const leerZonasPrevias = \(\) => \{[\s\S]*?\n      \};/)}
+    ${linea(/const leerCuentaRemota = \(\) => \{[\s\S]*?\n      \};/)}
     ${trozo("function tieneConfigLocal(")}
     return { adoptar: adoptarConfigPropietario, resolver: resolverAdopcion,
              conflicto: conflictoDeAdopcion, pendiente: leerPendiente,
              base: leerBase, tieneConfigLocal,
+             subir: subirEstosAMiCuenta, restaurar: restaurarZonasPrevias,
+             cuentaRemota: leerCuentaRemota,
              zonas: () => JSON.parse(localStorage.getItem("kylia_zonas") || "[]"),
              previas: () => JSON.parse(localStorage.getItem(ZONAS_PREVIAS_KEY) || "null"),
              dueno: () => localStorage.getItem("kylia_user_id") };
@@ -147,7 +154,7 @@ console.log("\n── elegir LA CUENTA: se aplica, y lo local queda a salvo ─�
   ok(app.pendiente() === null, "y la decisión ya no está pendiente");
 }
 
-console.log("\n── elegir ESTE DISPOSITIVO: lo local se queda y no se pisa la cuenta ──");
+console.log("\n── elegir ESTE DISPOSITIVO: no se pisa la cuenta, y NO se sube solo ──");
 {
   const ls = almacen({ kylia_zonas: JSON.stringify([zona("R1", siembra("local-1", "lechuga"))]) });
   const app = montar(ls);
@@ -155,12 +162,42 @@ console.log("\n── elegir ESTE DISPOSITIVO: lo local se queda y no se pisa la
   ok(app.resolver("dispositivo") === true, "la decisión se aplica");
   ok(app.zonas()[0].siembras[0].id === "local-1", "los cultivos de aquí siguen intactos");
   ok(app.dueno() === OWNER, "el dispositivo pasa a ser de esa cuenta");
-  ok(app.base()?.base_version === 7,
-     "y coge la base de la versión que hay en el servidor: el CAS sigue protegiendo");
+  // ⚠️ LO QUE IMPIDE LA DESTRUCCIÓN EN LA OTRA DIRECCIÓN. Con base adoptada, el
+  // siguiente guardado subiría la foto local entera y reemplazaría los cultivos
+  // de la cuenta. Sin base, `guardarConfigServidor` no manda nada.
+  ok(app.base() === null,
+     "y NO coge base: sin ella no se puede reemplazar lo de la cuenta");
   ok(app.pendiente() === null, "sin nada pendiente");
-  // Y NO se ha escrito la foto remota encima de lo local.
   ok(app.zonas().length === 1 && app.zonas()[0].referencia === "R1",
      "no se ha mezclado la zona de la cuenta con la de aquí");
+  // La foto de la cuenta se conserva.
+  const c = app.cuentaRemota();
+  ok(!!c && c.owner_id === OWNER && c.config_version === 7,
+     "y la foto de la cuenta queda guardada, no descartada");
+
+  // Reemplazarla exige una ACCIÓN EXPLÍCITA.
+  ok(app.subir() === true, "subir los de aquí a la cuenta es una acción aparte");
+  ok(app.base()?.base_version === 7,
+     "solo entonces se coge la base, y el CAS sigue protegiendo de una versión vieja");
+  ok(app.cuentaRemota() !== null, "y la copia de la cuenta NO se borra al subir");
+}
+
+console.log("\n── las copias no se borran nunca, y se puede volver ──");
+{
+  const ls = almacen({ kylia_zonas: JSON.stringify([zona("R1", siembra("local-1", "lechuga"))]) });
+  const app = montar(ls);
+  app.adoptar(tupla([zona("R9", siembra("remota-1", "tomate"))]));
+  app.resolver("cuenta");
+  ok(app.zonas()[0].siembras[0].id === "remota-1", "se ven los de la cuenta");
+  ok(app.previas()?.zonas?.[0]?.siembras?.[0]?.id === "local-1", "y los de aquí están guardados");
+
+  // Volver atrás: es un INTERCAMBIO, no un borrado.
+  ok(app.restaurar() === true, "se puede volver a los de este dispositivo");
+  ok(app.zonas()[0].siembras[0].id === "local-1", "y vuelven a verse");
+  ok(app.previas()?.zonas?.[0]?.siembras?.[0]?.id === "remota-1",
+     "con los de la cuenta guardados en su lugar: no desaparece ninguno de los dos");
+  ok(app.restaurar() === true && app.zonas()[0].siembras[0].id === "remota-1",
+     "y se puede ir y volver las veces que haga falta");
 }
 
 console.log("\n── RELOAD con la decisión sin tomar ──");

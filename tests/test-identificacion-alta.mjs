@@ -526,9 +526,24 @@ console.log("\n── quedarse con los de este dispositivo ──");
   await esperar(2500);
   const e = await leerEstado(pag);
   ok(e.siembras.join() === "mia-1", "los cultivos de aquí siguen intactos");
-  ok(e.base?.owner_id === AJENO && e.base?.base_version === 3,
-     "y el dispositivo coge la base de la cuenta: al guardar subirán ahí");
+  // ⚠️ NO se coge base: con ella, el siguiente guardado reemplazaría los
+  // cultivos de la cuenta. Reemplazarlos exige una acción explícita.
+  ok(e.base === null, "y NO se coge base: no se pisa la cuenta por elegir quedarse aquí");
   ok(e.pendiente === null, "sin nada pendiente");
+  const copias = await pag.evaluate(() => window.kyliaCopiasGuardadas());
+  ok(copias.cuenta !== null && copias.siembrasCuenta === 1,
+     "la foto de la cuenta queda guardada y se puede recuperar");
+  const avisoVisible = await pag.evaluate(() => !!document.getElementById("copias-aviso"));
+  ok(avisoVisible === true, "y hay un aviso visible para llegar a ella");
+  // La acción explícita que sí la reemplaza.
+  const trasSubir = await pag.evaluate(() => {
+    const r = window.kyliaSubirEstosAMiCuenta();
+    return { r, base: JSON.parse(localStorage.getItem("kylia_config_base") || "null"),
+             copia: JSON.parse(localStorage.getItem("kylia_cuenta_remota") || "null") };
+  });
+  ok(trasSubir.r === true && trasSubir.base?.base_version === 3,
+     "solo esa acción coge la base y permite subir los de aquí");
+  ok(trasSubir.copia !== null, "y la copia de la cuenta sigue guardada");
   await pag.close();
 }
 

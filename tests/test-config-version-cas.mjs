@@ -644,21 +644,25 @@ console.log("\n── 19. la adopción está CENTRALIZADA, no repartida ──")
      "y ese llamante es adoptarConfigPropietario, que escribe foto y base JUNTAS");
   // guardarBase, igual: solo la adopción y el éxito del CAS.
   //
-  // El QUINTO es `resolverAdopcion("dispositivo")`: el agricultor ha visto que
-  // hay cultivos en la cuenta y en el móvil y ha elegido quedarse con los de
-  // aquí. Entonces se coge la base de la versión que hay en el servidor SIN
-  // escribir la foto remota —lo local se queda— para que su siguiente guardado
-  // suba lo suyo. Es base sin foto a propósito y revisado: el CAS sigue
+  // El QUINTO es `subirEstosAMiCuenta()`, y está ahí a propósito: cuando el
+  // agricultor ha elegido quedarse con los cultivos de su móvil, la decisión NO
+  // coge base —sin ella no se puede reemplazar lo que hay en la cuenta—. Coger
+  // la base es una acción aparte y explícita, y esta es. El CAS sigue
   // protegiendo de escribir sobre una versión que ya no sea la vigente. Si
   // aparece un SEXTO, hay que mirarlo a mano.
   const bases = (A.match(/guardarBase\(/g) || []).length;
   ok(bases === 5,
-     `guardarBase: definición + adopción + arranque en 0 + éxito del CAS + la decisión (${bases})`);
+     `guardarBase: definición + adopción + arranque en 0 + éxito del CAS + subir a propósito (${bases})`);
+  const subir = /function subirEstosAMiCuenta\([\s\S]*?\n      \}/.exec(A)[0];
+  ok(/guardarBase\(c\.owner_id, c\.config_version\)/.test(subir),
+     "y el quinto es esa acción, con la versión que vino del servidor");
+  // La decisión de quedarse con lo de aquí NO puede coger base por su cuenta.
   const resol = /function resolverAdopcion\([\s\S]*?\n      \}/.exec(A)[0];
-  ok(/guardarBase\(p\.owner_id, p\.config_version\)/.test(resol),
-     "y el quinto es esa decisión, con la versión que vino del servidor");
-  ok(!/escribirConfigLocal/.test(resol.split('if (eleccion === "dispositivo")')[1] || ""),
-     "que NO escribe la foto remota: quedarse con lo de aquí es quedarse con lo de aquí");
+  const ramaDispositivo = resol.split('if (eleccion === "dispositivo")')[1] || "";
+  ok(!/guardarBase\(/.test(ramaDispositivo),
+     "quedarse con los de este dispositivo NO adopta base: no puede reemplazar la cuenta sola");
+  ok(!/escribirConfigLocal/.test(ramaDispositivo),
+     "ni escribe la foto remota: quedarse con lo de aquí es quedarse con lo de aquí");
   ok(!/adoptarBaseConfig/.test(A), "no queda ningún adoptador de base suelto");
   ok(!/restaurarConfig\(/.test(A), "ni el antiguo restaurarConfig con dos fuentes");
   const rsv = /async function restaurarSiVacio\(\)[\s\S]*?\n      \}/.exec(A)[0];

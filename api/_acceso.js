@@ -199,6 +199,23 @@ async function canjear(body) {
   const fila   = dueño?.[0] || null;
   const config = fila?.config_app || configDesdeFila(fila);
 
+  // ─── EL ÚNICO SITIO QUE ASOCIA UN CORREO A UNA CUENTA ────────────────────
+  // Aquí, y solo aquí, el correo está ACREDITADO: llegó a ese buzón, y quien
+  // abrió el enlace de un solo uso demostró tenerlo. `registro-usuario` ya no
+  // escribe `email` desde ningún camino, así que esta es la asociación.
+  //
+  // Se escribe SOLO en la fila del propietario. Las filas de sus zonas no se
+  // tocan: heredaban el correo por historia y eso es justo lo que llenaba
+  // `propietarioPorEmail` de filas repetidas.
+  //
+  // Es idempotente: si ya lo tenía, queda igual. Y si falla, el canje sigue
+  // siendo válido —la sesión ya se ha ganado—; se anota y se sigue.
+  try {
+    await supabaseUpdate("usuarios", `id=eq.${a.propietario_id}`, { email: a.email });
+  } catch (err) {
+    console.error("[acceso] no se pudo asociar el correo acreditado:", err.message);
+  }
+
   console.log("[acceso] canjeado", JSON.stringify({
     email: a.email, zonas: (zonas || []).length,
     config: fila?.config_app ? "espejo" : (config ? "sintetizada" : "ninguna"),
