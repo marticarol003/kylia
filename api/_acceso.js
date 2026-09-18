@@ -28,6 +28,11 @@ const { configDesdeFila, COLUMNAS_FINCA } = require("./_config-app.js");
 const SESION = require("./_sesion.js");
 
 const { fetchConTimeout } = require("./_http.js");
+// Cuánto se espera antes de dar por MUERTO un canje a medias. Por debajo de
+// esto, un enlace consumido sin cuenta se trata como un intento EN VUELO —puede
+// ser una petición duplicada— y no se remata. Por encima, el intento anterior ya
+// falló y su enlace se puede terminar de canjear.
+const RECUPERAR_TRAS_MS = 10_000;
 const VIDA_MIN     = 15;   // minutos que vive un enlace
 const MAX_POR_HORA = 5;    // peticiones por email y hora
 const BASE_URL     = process.env.APP_BASE_URL || "https://kylia.app";
@@ -190,15 +195,53 @@ async function canjear(body) {
   // "caducado" le da información gratis a quien pruebe tokens.
   const noVale = { estado: 400, cuerpo: { ok: false, error: "enlace no válido o caducado" } };
   if (!a) return noVale;
-  if (a.usado_en) return noVale;
+  // La caducidad manda siempre, también sobre los reintentos de abajo: la
+  // ventana de validez del enlace es la misma para canjearlo y para rematarlo.
   if (new Date(a.expira).getTime() < Date.now()) return noVale;
 
-  // Se quema ANTES de devolver nada: si algo falla después, el enlace ya no
-  // sirve. Y el filtro lleva usado_en=is.null para que dos canjeos simultáneos
-  // no puedan ganar los dos — la condición la resuelve la base, no este proceso.
-  const quemado = await supabaseUpdate("accesos",
-    `id=eq.${a.id}&usado_en=is.null`, { usado_en: new Date().toISOString() });
-  if (!Array.isArray(quemado) || quemado.length === 0) return noVale;
+  const cuentaReservada = async () => (await supabaseSelect("usuarios",
+    `id=eq.${a.propietario_id}&select=id,email,propietario_id`))?.[0] || null;
+
+  // ─── QUEMAR EL ENLACE, PERO SIN DEJAR A NADIE TIRADO ─────────────────────
+  //
+  // EL AGUJERO QUE CIERRA. El enlace se quema ANTES de crear la cuenta —tiene
+  // que ser así: si se quemara después, un fallo a mitad dejaría un enlace vivo
+  // y reutilizable—. Pero entonces, si el INSERT del propietario falla, la
+  // persona se queda con el enlace consumido y SIN cuenta, y `usado_en` cerraba
+  // la puerta para siempre: enlace muerto, cuenta inexistente, sin salida.
+  //
+  // La regla ahora mira el ESTADO REAL, no solo la marca:
+  //   · consumido y la cuenta EXISTE → el canje ya terminó. No vale: un enlace
+  //     usado no vuelve a identificar a nadie (eso sería un replay).
+  //   · consumido y la cuenta NO existe → el canje se quedó a medias. Se deja
+  //     rematar, con el MISMO propietario reservado y el MISMO correo del
+  //     acceso: no puede nacer otra cuenta ni asociarse otro correo.
+  //
+  // Y sigue acotado a los minutos de validez del enlace, así que esto no alarga
+  // la vida de un token consumido más allá de lo que ya valía.
+  if (a.usado_en) {
+    if (await cuentaReservada()) return noVale;
+    // ⚠️ SOLO CUANDO EL INTENTO ANTERIOR YA NO PUEDE ESTAR EN VUELO. Sin esta
+    // espera no se distingue un REINTENTO —alguien que vio el error y volvió a
+    // tocar el enlace— de un DUPLICADO simultáneo: dos peticiones a la vez
+    // quemarían una, verían la cuenta sin crear y completarían las dos, y un
+    // canjeo duplicado acabaría identificando dos veces. Con la espera, el
+    // duplicado simultáneo no vale y el reintento de verdad sí: una persona que
+    // lee un error y vuelve a pulsar tarda mucho más que esto.
+    const desde = Date.now() - new Date(a.usado_en).getTime();
+    if (!(desde >= RECUPERAR_TRAS_MS)) return noVale;
+    console.warn("[acceso] canje a medias: se remata el MISMO propietario reservado");
+  } else {
+    // El filtro lleva usado_en=is.null para que dos canjeos simultáneos no
+    // puedan ganar los dos: la condición la resuelve la base, no este proceso.
+    const quemado = await supabaseUpdate("accesos",
+      `id=eq.${a.id}&usado_en=is.null`, { usado_en: new Date().toISOString() });
+    // Lo ganó otro, que está completando ahora mismo. Este no se mete: si el
+    // otro termina, la cuenta queda hecha; y si se cae, el enlace se podrá
+    // rematar pasada la ventana de arriba. Dos canjeos a la vez siguen dando
+    // una sola sesión.
+    if (!Array.isArray(quemado) || quemado.length === 0) return noVale;
+  }
 
   // ─── ALTA: el propietario nace AQUÍ, y como mucho una vez ────────────────
   //

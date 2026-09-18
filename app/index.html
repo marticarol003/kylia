@@ -9922,9 +9922,13 @@
             var r503 = rp.status === 503;
             // El servidor responde lo mismo exista o no el correo, para no
             // decirle a nadie quién es cliente. Aquí se dice igual de neutro.
+            // ⚠️ MISMO TEXTO PASE LO QUE PASE POR DENTRO: exista el correo, no
+            // exista, o esté en conflicto entre dos propietarios. Decir "hay un
+            // problema con tu cuenta" sería revelar que ese correo está en el
+            // sistema. La salida del conflicto es soporte, y se ofrece siempre.
             aviso.textContent = r503
               ? "Todavía no podemos mandar enlaces. No se ha perdido nada: tus cultivos siguen aquí."
-              : "Si ese correo tiene un campo en Kylia, el enlace ya va de camino. Caduca en 15 minutos.";
+              : "Si ese correo tiene un campo en Kylia, el enlace ya va de camino. Caduca en 15 minutos. Si no lo recibes, contacta con soporte.";
           } catch (_) {
             aviso.textContent = "No se ha podido enviar ahora mismo. Inténtalo en un momento.";
           } finally {
@@ -13651,8 +13655,9 @@
         // nadie quién es cliente. Aquí se repite igual de neutro: no se afirma
         // que esa cuenta exista ni que el correo sea suyo.
         $("pc-ident-estado").className = mandado ? "alta-estado" : "alta-estado pc-mal";
+        // Mismo texto neutro que el otro camino, y por lo mismo.
         $("pc-ident-estado").textContent = mandado
-          ? "Si ese correo tiene un campo en Kylia, el enlace ya va de camino. Caduca en 15 minutos."
+          ? "Si ese correo tiene un campo en Kylia, el enlace ya va de camino. Caduca en 15 minutos. Si no lo recibes, contacta con soporte."
           : noConfigurado
             ? "Todavía no podemos mandar enlaces para entrar. Tu cultivo se guarda en este dispositivo "
               + "y no se pierde nada."

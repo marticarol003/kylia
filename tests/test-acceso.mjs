@@ -56,11 +56,25 @@ ok(!/supabaseInsert\("usuarios"/.test(pedir) && !/supabaseUpdate\("usuarios"/.te
 
 console.log("── un enlace usado no vuelve a servir ──");
 const canjear = src.slice(src.indexOf("async function canjear"));
-ok(/usado_en/.test(canjear) && /if \(a\.usado_en\) return noVale/.test(canjear), "se comprueba que no esté usado");
+// ⚠️ YA NO ES UN `if (a.usado_en) return noVale` a secas, y el cambio importa:
+// quemar el enlace antes de crear la cuenta significa que un fallo a mitad
+// dejaba a la persona con el enlace consumido y SIN cuenta, para siempre. Ahora
+// se mira el estado REAL: consumido y cuenta creada → no vale (cero replay);
+// consumido y cuenta sin crear → se deja rematar el MISMO propietario, pasada
+// la ventana de vuelo y dentro de la caducidad. Las dos ramas están probadas
+// ejecutando en tests/test-correo-no-acreditado.mjs (bloques G).
+ok(/a\.usado_en/.test(canjear) && /cuentaReservada\(\)\) return noVale/.test(canjear),
+   "un enlace usado con su cuenta ya creada no vuelve a servir");
+ok(/RECUPERAR_TRAS_MS/.test(canjear),
+   "y el remate de un canje a medias espera a que el intento anterior no pueda estar en vuelo");
 ok(/new Date\(a\.expira\)\.getTime\(\) < Date\.now\(\)/.test(canjear), "y que no esté caducado");
 ok(/usado_en=is\.null/.test(canjear),
    "el quemado va condicionado EN LA BASE: dos canjeos a la vez no pueden ganar los dos");
-ok(canjear.indexOf("usado_en=is.null") < canjear.indexOf("supabaseSelect(\"usuarios\""),
+// El quemado va antes de devolverle NADA al dispositivo. Se ancla en la lectura
+// de zonas —la que arma la respuesta—, no en cualquier `select` de usuarios:
+// ahora hay uno antes, el que comprueba si la cuenta reservada existe, y ese es
+// parte de decidir si se puede canjear.
+ok(canjear.indexOf("usado_en=is.null") < canjear.indexOf("propietario_id=eq."),
    "se quema ANTES de devolver las zonas: si algo peta después, el enlace ya no vale");
 ok((canjear.match(/return noVale/g) || []).length >= 4,
    "no existe / ya usado / caducado / carrera perdida dan el MISMO error (no se ayuda a quien pruebe tokens)");

@@ -54,9 +54,11 @@ sb.supabaseSelect = async (tabla, q) => {
   if (id) return USUARIOS.filter(f => f.id === id[1]);
   return USUARIOS;
 };
+let fallarAltaUsuario = false;     // para simular la caída justo tras quemar
 sb.supabaseInsert = async (tabla, fila) => {
   if (tabla === "accesos") { ACCESOS.push({ ...fila, id: "acc-" + ACCESOS.length }); return [ACCESOS.at(-1)]; }
   if (tabla !== "usuarios") return [fila];
+  if (fallarAltaUsuario) throw new Error("la base no responde");
   const i = USUARIOS.findIndex(f => f.id === fila.id);
   if (i >= 0) USUARIOS[i] = { ...USUARIOS[i], ...fila };
   else USUARIOS.push({ ...fila });
@@ -276,6 +278,110 @@ console.log("\n── D bis · enlace caducado o manipulado ──");
   });
 }
 
+console.log("\n── G · el canje se cae DESPUÉS de quemar el enlace ──");
+{
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    await ACCESO.pedir({ email: "remate@ejemplo.es" }, "1.2.3.4");
+    const token = tokenDelUltimoCorreo();
+    const reservado = ACCESOS[0].propietario_id;
+
+    // La base se cae justo cuando toca crear el propietario.
+    fallarAltaUsuario = true;
+    const roto = await ACCESO.canjear({ token });
+    fallarAltaUsuario = false;
+    ok(roto.estado === 500, `el canje falla y lo dice (${roto.estado})`);
+    ok(USUARIOS.length === 0, "no hay cuenta");
+    ok(ACCESOS[0].usado_en != null, "y el enlace YA está consumido: este es el caso feo");
+
+    // Un duplicado EN VUELO no remata: podría ser la misma petición dos veces.
+    const enVuelo = await ACCESO.canjear({ token });
+    ok(enVuelo.estado === 400 && USUARIOS.length === 0,
+       "un reintento inmediato no remata: podría ser un duplicado simultáneo");
+
+    // ⚠️ Y AQUÍ ESTABA EL AGUJERO: con `usado_en` puesto y sin cuenta, el enlace
+    // quedaba muerto para siempre. Pasada la ventana de vuelo —una persona que
+    // lee el error y vuelve a pulsar tarda mucho más—, se puede rematar.
+    ACCESOS[0].usado_en = new Date(Date.now() - 30_000).toISOString();
+    const bueno = await ACCESO.canjear({ token });
+    ok(bueno.estado === 200 && bueno.cuerpo.ok === true, "el mismo enlace remata el canje");
+    ok(USUARIOS.length === 1, `y nace UNA cuenta, no dos (${USUARIOS.length})`);
+    ok(USUARIOS[0].id === reservado,
+       "que es EXACTAMENTE el propietario reservado al pedir el enlace, no otro");
+    ok(USUARIOS[0].email === "remate@ejemplo.es", "con el correo del acceso, no otro");
+    ok(Array.isArray(bueno.cookies) && /kylia_sesion=/.test(bueno.cookies[0] || ""),
+       "y se emite su sesión");
+
+    // Rematado una vez, ya no vale más: un enlace usado no vuelve a identificar.
+    const tercera = await ACCESO.canjear({ token });
+    ok(tercera.estado === 400 && USUARIOS.length === 1,
+       "y a partir de ahí el enlace está gastado: cero replay");
+  });
+}
+
+console.log("\n── G bis · el remate, también concurrente ──");
+{
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    await ACCESO.pedir({ email: "carrera2@ejemplo.es" }, "1.2.3.4");
+    const token = tokenDelUltimoCorreo();
+    fallarAltaUsuario = true;
+    await ACCESO.canjear({ token });          // se cae y deja el enlace quemado
+    fallarAltaUsuario = false;
+    ACCESOS[0].usado_en = new Date(Date.now() - 30_000).toISOString();   // ya no está en vuelo
+
+    // Dos reintentos a la vez sobre un canje a medias.
+    const [a, b] = await Promise.all([ACCESO.canjear({ token }), ACCESO.canjear({ token })]);
+    ok(USUARIOS.length === 1, `como máximo UNA cuenta (${USUARIOS.length})`);
+    const ids = new Set(USUARIOS.map(u => u.id));
+    ok(ids.size === 1, "y un solo propietario, el reservado");
+    const correos = new Set(USUARIOS.map(u => u.email));
+    ok(correos.size === 1 && USUARIOS[0].email === "carrera2@ejemplo.es",
+       "con un solo correo asociado, el del acceso");
+    ok([a, b].some(r => r.estado === 200 && r.cuerpo.ok), "al menos uno completa");
+    ok([a, b].every(r => r.estado === 200 ? r.cuerpo.propietario_id === USUARIOS[0].id : true),
+       "y si completan los dos, es la MISMA cuenta");
+  });
+}
+
+console.log("\n── G ter · el remate NO resucita un enlace caducado ──");
+{
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    await ACCESO.pedir({ email: "tarde@ejemplo.es" }, "1.2.3.4");
+    const token = tokenDelUltimoCorreo();
+    fallarAltaUsuario = true;
+    await ACCESO.canjear({ token });
+    fallarAltaUsuario = false;
+    ACCESOS[0].usado_en = new Date(Date.now() - 30_000).toISOString();
+    // Pasa la ventana de validez.
+    ACCESOS[0].expira = new Date(Date.now() - 1000).toISOString();
+    const r = await ACCESO.canjear({ token });
+    ok(r.estado === 400 && USUARIOS.length === 0,
+       "fuera de la ventana no se remata nada: la caducidad manda");
+    // Y la salida es pedir otro enlace, que sigue funcionando.
+    ACCESOS = []; CORREOS = [];
+    const otro = await ACCESO.pedir({ email: "tarde@ejemplo.es" }, "1.2.3.4");
+    ok(otro.estado === 200 && ACCESOS.length === 1,
+       "se puede pedir otro enlace: el usuario no queda sin salida");
+  });
+}
+
+console.log("\n── G quater · si la cuenta SÍ se creó, el enlace está gastado ──");
+{
+  USUARIOS = []; ACCESOS = []; CORREOS = [];
+  await conInfra(async () => {
+    await ACCESO.pedir({ email: "completo@ejemplo.es" }, "1.2.3.4");
+    const token = tokenDelUltimoCorreo();
+    const primera = await ACCESO.canjear({ token });
+    ok(primera.estado === 200 && USUARIOS.length === 1, "el canje completa a la primera");
+    const otra = await ACCESO.canjear({ token });
+    ok(otra.estado === 400, "y el enlace ya no vale: no hay replay por la puerta del remate");
+    ok(!otra.cookies, "sin cookie");
+    ok(USUARIOS.length === 1, "y sigue habiendo una sola cuenta");
+  });
+}
+
 console.log("\n── F · tope por hora y no enumeración ──");
 {
   await conInfra(async () => {
@@ -310,6 +416,30 @@ console.log("\n── un conflicto que YA existiera se sigue viendo ──");
   ok(Array.isArray(q.conflicto) && q.conflicto.length === 2,
      `mismo correo en propietarios distintos → conflicto explícito (${JSON.stringify(q.conflicto)})`);
   ok(q.propietario_id === undefined, "y no se elige uno a dedo");
+}
+
+console.log("\n── H · la interfaz tampoco delata el conflicto ──");
+{
+  const APP = readFileSync(join(RAIZ, "app", "index.html"), "utf8");
+  const NEUTRO = "Si no lo recibes, contacta con soporte";
+  // Los DOS sitios que piden enlace dicen lo mismo, y ofrecen la salida.
+  const dice = (APP.match(/Si no lo recibes, contacta con soporte/g) || []).length;
+  ok(dice === 2, `los dos caminos de "mándame el enlace" ofrecen soporte (${dice})`);
+  // Y en ningún sitio se nombra el conflicto delante del usuario.
+  const visible = APP.replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+  ok(!/varios propietarios|conflicto de correo|correo duplicado|duplicad[oa] .*cuenta/i.test(visible),
+     "y ningún texto de pantalla menciona que el correo esté en conflicto");
+  // El servidor sí lo deja en su log, que es donde tiene que estar.
+  const src = readFileSync(join(RAIZ, "api", "_acceso.js"), "utf8");
+  ok(/console\.error\("\[acceso\] email con varios propietarios/.test(src),
+     "el motivo real queda en el log del servidor");
+  // Y existe el procedimiento escrito para resolverlo.
+  const doc = readFileSync(join(RAIZ, "docs", "tecnico", "correo-ambiguo-soporte.md"), "utf8");
+  ok(/no se sobrescribe ninguna cuenta/i.test(doc),
+     "la nota de soporte parte de no sobrescribir cuentas");
+  ok(/update usuarios set email = null/i.test(doc) && /propietario_id, id\) <> /.test(doc),
+     "y da la escritura mínima: quitar el correo del lado que no es suyo");
+  ok(/No\*\* se borra la cuenta/i.test(doc), "sin borrar la cuenta sobrante");
 }
 
 console.log("\n── ningún cliente manda ya correos tecleados ──");
