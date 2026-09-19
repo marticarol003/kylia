@@ -766,41 +766,19 @@ console.log("\n── H · la interfaz tampoco delata el conflicto ──");
   ok(/No\*\* se borra la cuenta/i.test(doc), "sin borrar la cuenta sobrante");
 }
 
-console.log("\n── la migración y el código dicen lo mismo ──");
+console.log("\n── el código usa la tabla de reservas como debe ──");
 {
-  // ⚠️ SI ESTO SE SEPARA, LA GARANTÍA DESAPARECE SIN RUIDO. La unicidad la da la
-  // clave primaria de `reservas_alta`; si la migración dejara de declararla, o
-  // el código escribiera en otra tabla u otra columna, la carrera volvería a
-  // estar abierta y los tests —que modelan la PK— seguirían en verde.
-  const mig = readFileSync(join(RAIZ, "db", "reserva-alta-2026-09-18.sql"), "utf8");
-  ok(/create table if not exists\s+reservas_alta/i.test(mig), "la migración es idempotente");
-  ok(/email\s+text\s+primary key/i.test(mig),
-     "y la clave primaria es el CORREO: ahí vive la exclusión");
-  ok(/propietario_id\s+uuid\s+not null/i.test(mig), "con el propietario reservado, obligatorio");
-  ok(!/unique\s*\(\s*email\s*\)/i.test(mig) || !/on\s+usuarios/i.test(mig),
-     "y NO se impone unique(email) sobre usuarios: las zonas legacy comparten correo");
-  // ⚠️ LO ÚNICO QUE HAY EN ESA TABLA SON CORREOS. Una tabla nueva en `public` la
-  // enruta PostgREST, así que sin revocar permisos la lista queda alcanzable con
-  // la clave anon. La primera versión de esta migración se ejecutó sin estas dos
-  // líneas y hubo que cerrarlo después, con la tabla ya creada.
-  ok(/revoke all on reservas_alta from public, anon, authenticated/i.test(mig),
-     "se revocan los permisos de anon y authenticated");
-  ok(/alter table reservas_alta enable row level security/i.test(mig),
-     "y se activa RLS: el backend va con service_role, que la ignora");
-  ok(/notify pgrst, 'reload schema'/i.test(mig),
-     "y se recarga la caché de esquema, o el primer INSERT daría 42P01");
-  ok(/column_name.*information_schema\.columns/is.test(mig),
-     "la migración lleva su comprobación de forma: `if not exists` no valida columnas");
-
+  // ⚠️ LO QUE MIRA EL SQL VIVE EN tests/test-reserva-alta-migracion.mjs. Tenerlo
+  // en dos sitios con dos regex distintas es cómo se acaba con un test verde
+  // sobre una migración que ya no dice eso. Aquí solo queda el lado del código.
   const src = readFileSync(join(RAIZ, "api", "_acceso.js"), "utf8");
   ok(/supabaseInsert\("reservas_alta",\s*\{ email, propietario_id/.test(src),
-     "el código inserta en esa tabla, con esas dos columnas");
+     "inserta en public.reservas_alta con esas dos columnas");
   ok(/supabaseSelect\("reservas_alta"/.test(src), "y lee de ella al perder la carrera");
   ok(/23505|duplicate key/.test(src.slice(src.indexOf("async function reservarPropietario"),
                                           src.indexOf("async function pedir"))),
      "el camino bueno de la carrera es el 23505, no una comprobación previa");
   ok(/42P01/.test(src), "y si la tabla no está, se dice en vez de seguir sin garantía");
-  // Y que no quede un randomUUID suelto decidiendo la identidad.
   const pedirSrc = src.slice(src.indexOf("async function pedir"), src.indexOf("async function canjear"));
   ok(!/crypto\.randomUUID\(\)/.test(pedirSrc),
      "pedir() ya no se inventa la identidad por su cuenta");

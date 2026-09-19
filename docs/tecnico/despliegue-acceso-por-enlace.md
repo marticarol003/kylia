@@ -36,13 +36,101 @@ y desde aquí no hay acceso a Vercel ni a Resend.
 
 ## La migración
 
-`db/reserva-alta-2026-09-18.sql`, ejecutada en dos tiempos: primero el
-`create table` —la primera versión del fichero no llevaba permisos— y después
-`revoke` + `enable row level security`, con la tabla todavía vacía y el código
-sin desplegar. Comprobado por consulta que `anon` y `authenticated` ya no
-aparecen en `information_schema.role_table_grants`.
+`db/reserva-alta-2026-09-18.sql`. Se ejecutó en producción el 19-sep en su
+**primera** versión —que solo creaba la tabla— y después su bloque de permisos,
+con la tabla vacía y el código sin desplegar.
 
-Las cuatro comprobaciones de solo lectura están al final del propio `.sql`.
+Esa primera versión tenía cuatro carencias que la auditoría marcó como
+bloqueantes: `create table if not exists` no valida la forma, no se cualificaba
+el esquema, `service_role` no recibía privilegios explícitos y la normalización
+del correo solo la garantizaba `api/_acceso.js`.
+
+La versión actual **está pensada para volver a ejecutarse sobre ese estado**.
+Va dentro de una transacción y se comporta así:
+
+| estado de la base | qué hace |
+|---|---|
+| la tabla no existe | la crea entera, con PK y check |
+| existe y es correcta | no toca nada; reaplica RLS y grants |
+| existe, correcta, sin el check | comprueba que **todas** las filas ya cumplen y solo entonces lo añade |
+| alguna fila sin normalizar | **aborta** con el recuento. No reescribe ningún correo |
+| estructura incompatible | **aborta** diciendo qué falla, y revierte la transacción entera |
+
+No hay `DROP`, ni `DELETE`, ni `UPDATE`, ni `INSERT` de reparación, ni
+renombrados. Una segunda ejecución sobre una base correcta es un no-op
+funcional. Todo va cualificado con `public.`: no depende del `search_path`.
+
+### Comprobaciones de solo lectura
+
+Ninguna de estas consultas escribe. **No se han ejecutado desde aquí.**
+
+**1 · La tabla, y que RLS esté activa**
+
+```sql
+select n.nspname, c.relname, c.relrowsecurity, c.relforcerowsecurity
+  from pg_catalog.pg_class c
+  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relname = 'reservas_alta';
+-- relrowsecurity = true
+```
+
+**2 · Las columnas**
+
+```sql
+select column_name, data_type, is_nullable, column_default
+  from information_schema.columns
+ where table_schema = 'public' and table_name = 'reservas_alta'
+ order by ordinal_position;
+-- email          text                     NO   (null)
+-- propietario_id uuid                     NO   (null)
+-- creado         timestamp with time zone NO   now()
+```
+
+**3 · Los constraints: PK solo sobre email, y el check con su definición**
+
+```sql
+select c.conname, c.contype, c.convalidated,
+       pg_catalog.pg_get_constraintdef(c.oid) as definicion
+  from pg_catalog.pg_constraint c
+ where c.conrelid = 'public.reservas_alta'::regclass
+ order by c.conname;
+-- la PK tiene que ser PRIMARY KEY (email), sin más columnas
+-- reservas_alta_email_normalizado_ck → CHECK ((email = lower(btrim(email))))
+-- convalidated = true en las dos
+```
+
+**4 · Los privilegios**
+
+```sql
+select grantee, privilege_type
+  from information_schema.role_table_grants
+ where table_schema = 'public' and table_name = 'reservas_alta'
+ order by grantee, privilege_type;
+-- NI 'PUBLIC', NI anon, NI authenticated
+-- service_role: SELECT e INSERT
+```
+
+Y la comprobación efectiva, que es la que de verdad importa porque tiene en
+cuenta lo heredado de `PUBLIC`:
+
+```sql
+select
+  has_table_privilege('anon',          'public.reservas_alta', 'select') as anon_select,
+  has_table_privilege('anon',          'public.reservas_alta', 'insert') as anon_insert,
+  has_table_privilege('authenticated', 'public.reservas_alta', 'select') as auth_select,
+  has_table_privilege('authenticated', 'public.reservas_alta', 'insert') as auth_insert,
+  has_table_privilege('service_role',  'public.reservas_alta', 'select') as srv_select,
+  has_table_privilege('service_role',  'public.reservas_alta', 'insert') as srv_insert,
+  has_table_privilege('service_role',  'public.reservas_alta', 'update') as srv_update,
+  has_table_privilege('service_role',  'public.reservas_alta', 'delete') as srv_delete;
+-- los cuatro primeros false · srv_select y srv_insert true
+-- srv_update y srv_delete: el código no los usa; si salen true vienen de un
+-- default privilege histórico, no de esta migración
+```
+
+⚠️ `has_table_privilege` incluye lo heredado de `PUBLIC`. Por eso vale más que
+mirar solo `role_table_grants`: si `anon` saliera `true` ahí, hay un grant
+heredado que la revocación no alcanzó.
 
 ## Orden de despliegue
 
