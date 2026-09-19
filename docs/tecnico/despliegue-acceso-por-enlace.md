@@ -24,7 +24,7 @@ propietario de una cuenta nueva nace en ese canje, no antes.
 | Dominio verificado en Resend | Sin él, Resend solo entrega al buzón de la cuenta: los enlaces llegarían solo a Martí | `kylia.app` verificado |
 | `ACCESO_FROM` | ⚠️ **Sin esta variable, `_acceso.js` usa `onboarding@resend.dev` aunque el dominio esté verificado.** Ver `api/_acceso.js:83` | puesta |
 | `APP_BASE_URL` | La base del enlace. Por defecto `https://kylia.app`, que es lo correcto | sin poner, por defecto |
-| Tabla `reservas_alta` | La exclusión entre instancias | **ejecutada el 19-sep** |
+| Tabla `reservas_alta` | La exclusión entre instancias | **Migración `reservas_alta` v2 ejecutada y verificada en producción** (19-sep-2026) |
 
 Sin `SESION_SECRET` o sin `RESEND_API_KEY`, `pedir()` y `canjear()` responden
 503 `acceso_no_configurado` diciendo qué falta, con cero adopción y cero
@@ -36,17 +36,36 @@ y desde aquí no hay acceso a Vercel ni a Resend.
 
 ## La migración
 
-`db/reserva-alta-2026-09-18.sql`. Se ejecutó en producción el 19-sep en su
-**primera** versión —que solo creaba la tabla— y después su bloque de permisos,
-con la tabla vacía y el código sin desplegar.
+**Migración `reservas_alta` v2 ejecutada y verificada en producción**
+(19-sep-2026). `db/reserva-alta-2026-09-18.sql`. Cerrada: no queda trabajo
+pendiente sobre esta tabla.
 
-Esa primera versión tenía cuatro carencias que la auditoría marcó como
-bloqueantes: `create table if not exists` no valida la forma, no se cualificaba
-el esquema, `service_role` no recibía privilegios explícitos y la normalización
-del correo solo la garantizaba `api/_acceso.js`.
+Postflight comprobado en producción, con las consultas de solo lectura de más
+abajo:
 
-La versión actual **está pensada para volver a ejecutarse sobre ese estado**.
-Va dentro de una transacción y se comporta así:
+| | |
+|---|---|
+| PRIMARY KEY | solo `email` ✅ |
+| CHECK de normalización | correcto ✅ |
+| `convalidated` | `true` ✅ |
+| policies | 0 ✅ |
+| filas antes = filas después | ✅ |
+| `service_role` SELECT / INSERT | `true` / `true` ✅ |
+| `service_role` UPDATE / DELETE | `false` / `false` ✅ |
+| RLS | enabled ✅ |
+
+### Cómo se llegó aquí
+
+Se ejecutó primero una **v1** que solo creaba la tabla, y después su bloque de
+permisos, con la tabla vacía y el código sin desplegar. Esa v1 tenía carencias
+que la auditoría marcó como bloqueantes: `create table if not exists` no valida
+la forma, no se cualificaba el esquema, `service_role` no recibía privilegios
+explícitos, la normalización del correo solo la garantizaba `api/_acceso.js`, el
+check podía quedar `NOT VALID` y el default se aceptaba por contener `now()`.
+
+La **v2** —la que está en el fichero y la que se ha ejecutado— corrige todo eso
+y está escrita para poder correrse encima de un estado anterior. Va dentro de
+una transacción y se comporta así:
 
 | estado de la base | qué hace |
 |---|---|
@@ -71,7 +90,9 @@ funcional. Todo va cualificado con `public.`: no depende del `search_path`.
 
 ### Comprobaciones de solo lectura
 
-Ninguna de estas consultas escribe. **No se han ejecutado desde aquí.**
+Ninguna de estas consultas escribe. **Ejecutadas por Martí en Supabase el
+19-sep-2026 como postflight de la v2, con el resultado del cuadro de arriba.**
+Nunca se han ejecutado desde el repositorio: aquí no hay acceso a la base.
 
 **1 · La tabla, y que RLS esté activa**
 
@@ -159,13 +180,19 @@ heredado que la revocación no alcanzó.
 
 ## Orden de despliegue
 
-1. La migración. **Hecha.**
-2. Las variables de entorno. **Hechas** (sin verificar por código).
-3. Desplegar la rama.
-4. Smoke test con un buzón real.
+1. ✅ **Migración `reservas_alta` v2 ejecutada y verificada en producción**
+   (19-sep-2026). Postflight correcto. **Cerrado.**
+2. ✅ Variables de entorno puestas por Martí: `SESION_SECRET`,
+   `RESEND_API_KEY`, `ACCESO_FROM`, y `kylia.app` verificado en Resend.
+   ⚠️ **Ningún test las comprueba** y desde el repositorio no hay acceso ni a
+   Vercel ni a Resend: constan porque él lo dice.
+3. ⏳ Desplegar la rama.
+4. ⏳ Smoke test con un buzón real.
 
-Desplegar antes de migrar no rompe a nadie: las altas nuevas darían un error
-explícito y las cuentas existentes seguirían entrando.
+Los dos primeros pasos están hechos, así que desplegar ya no depende de la base
+ni de la configuración. Si por lo que fuera se desplegara contra una base sin la
+tabla, las altas nuevas darían un error explícito y las cuentas existentes
+seguirían entrando.
 
 ## Smoke test
 
