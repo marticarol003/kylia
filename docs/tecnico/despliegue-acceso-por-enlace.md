@@ -51,10 +51,19 @@ Va dentro de una transacción y se comporta así:
 | estado de la base | qué hace |
 |---|---|
 | la tabla no existe | la crea entera, con PK y check |
-| existe y es correcta | no toca nada; reaplica RLS y grants |
+| existe y es correcta | no toca nada; reaplica RLS, grants y el default |
 | existe, correcta, sin el check | comprueba que **todas** las filas ya cumplen y solo entonces lo añade |
+| el check existe pero dice otra cosa | lo **sustituye** por el del contrato. No toca ningún otro constraint |
+| el check es correcto pero `NOT VALID` | lo **valida**, después de comprobar las filas |
+| `service_role` arrastra `UPDATE`/`DELETE` | se le **revoca todo** y se le conceden solo `SELECT` e `INSERT` |
+| el default de `creado` es otro | lo deja en `now()`. No se adivina: se fija |
+| una columna extra `NOT NULL` sin default | **aborta**: ese esquema impediría el `INSERT` que hace Kylia |
 | alguna fila sin normalizar | **aborta** con el recuento. No reescribe ningún correo |
 | estructura incompatible | **aborta** diciendo qué falla, y revierte la transacción entera |
+
+El estado final es el mismo salga de donde salga: los privilegios se revocan
+antes de concederlos y el default se fija en vez de comprobarse, así que la
+migración no depende de cómo estuviera la base.
 
 No hay `DROP`, ni `DELETE`, ni `UPDATE`, ni `INSERT` de reparación, ni
 renombrados. Una segunda ejecución sobre una base correcta es un no-op
@@ -97,6 +106,21 @@ select c.conname, c.contype, c.convalidated,
 -- la PK tiene que ser PRIMARY KEY (email), sin más columnas
 -- reservas_alta_email_normalizado_ck → CHECK ((email = lower(btrim(email))))
 -- convalidated = true en las dos
+--
+-- ⚠️ Un CHECK con la expresión buena pero convalidated = false NO cumple el
+-- contrato: existe, se lee igual y no garantiza nada sobre lo que ya había.
+```
+
+**3 bis · El default de `creado`, y que no haya columnas que rompan el INSERT**
+
+```sql
+select column_name, is_nullable, column_default, is_generated, is_identity
+  from information_schema.columns
+ where table_schema = 'public' and table_name = 'reservas_alta'
+ order by ordinal_position;
+-- creado → column_default = now()
+-- ninguna columna ajena a las tres puede ser NOT NULL, sin default, no
+-- generada y no de identidad: el código solo inserta (email, propietario_id)
 ```
 
 **4 · Los privilegios**
@@ -124,8 +148,9 @@ select
   has_table_privilege('service_role',  'public.reservas_alta', 'update') as srv_update,
   has_table_privilege('service_role',  'public.reservas_alta', 'delete') as srv_delete;
 -- los cuatro primeros false · srv_select y srv_insert true
--- srv_update y srv_delete: el código no los usa; si salen true vienen de un
--- default privilege histórico, no de esta migración
+-- srv_update y srv_delete: FALSE. La migración revoca todo a service_role
+-- antes de concederle los dos que usa, así que un privilegio heredado de
+-- Supabase ya no sobrevive.
 ```
 
 ⚠️ `has_table_privilege` incluye lo heredado de `PUBLIC`. Por eso vale más que

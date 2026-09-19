@@ -81,6 +81,123 @@ ok(/constraint\s+reservas_alta_email_normalizado_ck/i.test(SQL),
 ok(/check\s*\(\s*email\s*=\s*lower\(btrim\(email\)\)\s*\)/i.test(SQL),
    "y con la expresión email = lower(btrim(email))");
 
+
+console.log("\n── B, C · el check se compara ENTERO, no por trozos ──");
+{
+  // ⚠️ ESTO NO BUSCA PALABRAS: saca del SQL la lista de definiciones admitidas
+  // y comprueba la PERTENENCIA, que es la misma decisión que tomará Postgres.
+  // Un `like '%lower(btrim(email))%'` aceptaría `… OR true`, que no protege de
+  // nada, y una prueba que solo mirase el texto no lo vería.
+  const lista = /v_admitidas\s+text\[\]\s*:=\s*array\[([\s\S]*?)\]/i.exec(SQL);
+  ok(!!lista, "la migración lleva una lista explícita de definiciones admitidas");
+  const admitidas = lista
+    ? [...lista[1].matchAll(/'((?:[^']|'')*)'/g)].map(m => m[1].replace(/''/g, "'"))
+    : [];
+  ok(admitidas.length >= 1, `con ${admitidas.length} forma(s)`);
+
+  // Así normaliza la migración lo que devuelve pg_get_constraintdef.
+  const norm = (def) => def.toLowerCase().replace(/\s+/g, "").replace(/notvalid$/, "");
+  const acepta = (def) => admitidas.includes(norm(def));
+
+  // B · el bueno, en las dos formas en que Postgres puede renderizarlo.
+  ok(acepta("CHECK ((email = lower(btrim(email))))"), "B · el check del contrato se acepta");
+  ok(acepta("CHECK (email = lower(btrim(email)))"), "   …y su forma sin paréntesis de más");
+  // C · el que contiene los mismos trozos y no sirve de nada.
+  ok(!acepta("CHECK (((email = lower(btrim(email))) OR true))"),
+     "C · `… OR true` NO se acepta, aunque contenga los mismos fragmentos");
+  ok(!acepta("CHECK ((email = lower(email)))"), "   …ni uno que se olvide del btrim");
+  ok(!acepta("CHECK ((email <> lower(btrim(email))))"), "   …ni uno que diga lo contrario");
+  ok(!acepta("CHECK ((propietario_id is not null))"), "   …ni uno de otra columna");
+  // D · un NOT VALID se lee igual, y por eso la validez NO se saca del texto.
+  ok(acepta("CHECK ((email = lower(btrim(email)))) NOT VALID"),
+     "D · un NOT VALID con la expresión buena se reconoce como la misma expresión…");
+  ok(/c\.convalidated/.test(SQL) && /not v_valido/.test(SQL),
+     "   …y su validez se decide con convalidated, no con el texto");
+  ok(/validate constraint\s+reservas_alta_email_normalizado_ck/i.test(SQL),
+     "   …y se VALIDA si hacía falta");
+  // Y si no es del contrato, se sustituye en vez de abortar.
+  ok(/drop constraint\s+reservas_alta_email_normalizado_ck/i.test(SQL),
+     "un check con nuestro nombre y otra expresión se sustituye");
+  const soloNuestro = (SQL.match(/drop constraint\s+(\w+)/gi) || [])
+    .every(x => /reservas_alta_email_normalizado_ck/i.test(x));
+  ok(soloNuestro, "y NO se borra ningún constraint ajeno");
+  ok(!/like\s+'%/.test(SQL), "en todo el fichero no se decide nada por subcadenas");
+}
+
+console.log("\n── las filas históricas, antes de tocar el constraint ──");
+{
+  const iFilas = SQL.search(/is distinct from lower\(btrim\(email\)\)/i);
+  const iAdd   = SQL.search(/add constraint\s+reservas_alta_email_normalizado_ck/i);
+  const iVal   = SQL.search(/validate constraint\s+reservas_alta_email_normalizado_ck/i);
+  ok(iFilas > -1, "se cuentan las filas que no cumplen");
+  ok(iFilas < iAdd, "antes de AÑADIR el check");
+  ok(iFilas < iVal, "y antes de VALIDARLO");
+}
+
+console.log("\n── G · columnas de más que romperían el INSERT ──");
+{
+  const bloque = SQL.slice(SQL.search(/into v_extra/i) - 400, SQL.search(/v_extra is not null/i) + 200);
+  ok(/column_name not in \('email', 'propietario_id', 'creado'\)/i.test(bloque),
+     "mira solo las columnas ajenas a las tres del contrato");
+  ok(/is_nullable\s*=\s*'NO'/i.test(bloque), "y de esas, las NOT NULL…");
+  ok(/column_default is null/i.test(bloque), "…sin default…");
+  ok(/is_generated[^)]*'NEVER'/i.test(bloque), "…que no sean generadas…");
+  ok(/is_identity[^)]*'NO'/i.test(bloque), "…ni de identidad");
+  ok(/raise exception[\s\S]{0,240}INSERT de Kylia/i.test(SQL),
+     "G · esa combinación aborta, diciendo por qué rompería el INSERT");
+  // E y F: lo que NO se rechaza.
+  ok(/is_nullable\s*=\s*'NO'/i.test(bloque) && !/is_nullable\s*=\s*'YES'/i.test(bloque),
+     "E · una columna extra que admita NULL no se rechaza");
+  ok(/column_default is null/i.test(bloque) && !/column_default is not null/i.test(bloque),
+     "F · ni una con default");
+}
+
+console.log("\n── H, I · el default no se adivina: se deja puesto ──");
+{
+  ok(/alter column creado set default now\(\)/i.test(SQL),
+     "la migración FIJA el default a now()");
+  ok(!/column_default[^;]*like/i.test(SQL) && !/'%now\(\)%'/.test(SQL),
+     "H, I · y no lo acepta por contener 'now()', que dejaría pasar now() + interval");
+  // El `set default` va fuera del bloque condicional: vale igual para la tabla
+  // recién creada y para la que ya estaba.
+  ok(SQL.search(/alter column creado set default/i) > SQL.search(/\$migracion\$;/),
+     "y se aplica en los dos casos, fuera del bloque DO");
+}
+
+console.log("\n── A · el estado final de service_role no depende del inicial ──");
+{
+  const iRevoke = SQL.search(/revoke all privileges on table public\.reservas_alta from service_role/i);
+  const iGrant  = SQL.search(/grant\s+select\s*,\s*insert on table public\.reservas_alta to service_role/i);
+  ok(iRevoke > -1, "se le revoca TODO primero");
+  ok(iGrant > -1 && iRevoke < iGrant, "y después se le conceden los dos que usa");
+  ok(!/grant[^;]*\b(update|delete|truncate|references|trigger)\b/i.test(SQL),
+     "A · así, venga de donde venga, acaba sin UPDATE ni DELETE");
+}
+
+console.log("\n── J · repetir la migración ──");
+{
+  // Lo que se ejecuta SIEMPRE tiene que ser idempotente por naturaleza.
+  // Después del cierre del bloque DO, no desde él: si no, el propio
+  // terminador `$migracion$` entra en el recuento como si fuera una sentencia.
+  const cierre = /\$migracion\$\s*;/.exec(SQL);
+  const trasDo = SQL.slice(cierre.index + cierre[0].length);
+  const sentencias = trasDo.split(";").map(x => x.trim()).filter(Boolean)
+    .filter(x => !/^commit$/i.test(x) && !/^notify/i.test(x));
+  const idempotente = (x) =>
+    /^alter table public\.reservas_alta enable row level security$/i.test(x) ||
+    /^revoke all privileges/i.test(x) ||
+    /^grant select, insert/i.test(x) ||
+    /^alter table public\.reservas_alta alter column creado set default now\(\)$/i.test(x) ||
+    /^comment on table/i.test(x);
+  const raras = sentencias.filter(x => !idempotente(x));
+  ok(raras.length === 0,
+     `J · fuera del bloque DO solo hay sentencias que se pueden repetir (${raras.length} raras)`);
+  // Y dentro, lo destructivo solo ocurre en la rama del check que no cuadra.
+  const iDrop = SQL.search(/drop constraint/i);
+  const iRama = SQL.search(/no es el del contrato/i);
+  ok(iRama > -1 && iDrop > iRama, "y el DROP del check solo pasa cuando no es el del contrato");
+}
+
 console.log("\n── idempotencia ESTRUCTURAL, no `if not exists` ──");
 {
   ok(!/create table if not exists/i.test(SQL),
@@ -96,7 +213,10 @@ console.log("\n── idempotencia ESTRUCTURAL, no `if not exists` ──");
      "valida los TIPOS de las tres columnas");
   ok((SQL.match(/is_nullable/g) || []).length >= 3 && /<>\s*'no'/i.test(SQL),
      "valida que ninguna admita NULL");
-  ok(/column_default/.test(SQL) && /now\(\)/.test(SQL), "y el default de creado");
+  // El default ya no se VALIDA dentro del DO: se canonicaliza fuera. Lo que
+  // aquí importa es que no quede un resto del viejo "contiene now()".
+  ok(!/v_col_def[^;]*now\(\)/.test(SQL),
+     "el default de creado ya no se valida por texto dentro del bloque");
   ok(/indisprimary/.test(SQL), "comprueba que hay PRIMARY KEY");
   ok(/array\['email'\]/i.test(SQL), "y que es EXCLUSIVAMENTE sobre email");
   ok(/pg_get_constraintdef/.test(SQL),

@@ -63,10 +63,20 @@ declare
   v_pk         text[];
   v_def        text;
   v_malas      bigint;
+  v_valido     boolean;
   -- Lo que tiene que haber, columna a columna.
   v_col_tipo   text;
   v_col_null   text;
   v_col_def    text;
+  v_extra      text;
+  v_norm       text;
+  -- Las ÚNICAS formas admitidas del check. Lista explícita y comparación
+  -- COMPLETA: nada de buscar fragmentos. `CHECK (email = lower(btrim(email))
+  -- OR true)` contiene los mismos trozos y no protege de nada.
+  v_admitidas  text[] := array[
+    'check((email=lower(btrim(email))))',
+    'check(email=lower(btrim(email)))'
+  ];
 begin
   select c.oid into v_oid
     from pg_catalog.pg_class c
@@ -140,9 +150,36 @@ begin
     if v_col_null <> 'NO' then
       raise exception 'public.reservas_alta.creado: admite NULL y no debe';
     end if;
-    if v_col_def is null or v_col_def not like '%now()%' then
-      raise exception 'public.reservas_alta.creado: default % y se esperaba now()',
-        coalesce(v_col_def, '(ninguno)');
+    -- ⚠️ EL DEFAULT NO SE ADIVINA: SE DEJA PUESTO. Comprobar que "contiene
+    -- now()" aceptaba `now() + interval '5 years'`, que no es el contrato; y
+    -- enumerar todas las expresiones equivalentes a now() es una lista que
+    -- nunca se acaba. Se canonicaliza más abajo, fuera de este bloque, con un
+    -- `alter column ... set default now()` que vale igual para la tabla recién
+    -- creada y para la que ya estaba: el estado final queda determinado y
+    -- repetir la migración no cambia nada.
+
+    -- ── COLUMNAS DE MÁS QUE IMPEDIRÍAN EL INSERT ────────────────────────
+    -- Nuestras tres columnas pueden estar perfectas y el INSERT de Kylia fallar
+    -- igual: basta una cuarta columna NOT NULL sin default. El código inserta
+    -- `(email, propietario_id)` y nada más, así que esa fila no se escribiría
+    -- nunca y la reserva —o sea la exclusión entera— dejaría de funcionar.
+    --
+    -- No se exige que la tabla tenga exactamente tres columnas: una columna de
+    -- más que admita NULL, o que traiga default, o generada, o de identidad, no
+    -- estorba al INSERT. Se rechaza solo la combinación que lo rompe.
+    select string_agg(col.column_name, ', ' order by col.column_name)
+      into v_extra
+      from information_schema.columns col
+     where col.table_schema = 'public' and col.table_name = 'reservas_alta'
+       and col.column_name not in ('email', 'propietario_id', 'creado')
+       and col.is_nullable = 'NO'
+       and col.column_default is null
+       and coalesce(col.is_generated, 'NEVER') = 'NEVER'
+       and coalesce(col.is_identity, 'NO') = 'NO';
+    if v_extra is not null then
+      raise exception
+        'public.reservas_alta: la(s) columna(s) % son NOT NULL sin default, y el INSERT de Kylia solo escribe (email, propietario_id): no cabría ninguna reserva.',
+        v_extra;
     end if;
 
     -- La PRIMARY KEY, y que sea EXCLUSIVAMENTE sobre email.
@@ -161,34 +198,56 @@ begin
     end if;
 
     -- ── C · el check de normalización ────────────────────────────────────
-    select pg_catalog.pg_get_constraintdef(c.oid)
-      into v_def
+    -- ── LAS FILAS, ANTES QUE NADA ───────────────────────────────────────
+    -- Añadir el check o validarlo exige que el contenido ya cumpla. Se cuenta
+    -- primero y se aborta con el número: no se reescribe el correo de nadie.
+    select count(*) into v_malas
+      from public.reservas_alta
+     where email is distinct from lower(btrim(email));
+    if v_malas > 0 then
+      raise exception
+        'public.reservas_alta: % fila(s) con el correo sin normalizar. Revisarlas a mano antes de migrar: no se reescriben automáticamente.',
+        v_malas;
+    end if;
+
+    -- ── EL CHECK: SE DEJA EL CONTRATO, NO SE ADIVINA ────────────────────
+    -- Nada de buscar fragmentos. `CHECK (email = lower(btrim(email)) OR true)`
+    -- contiene "email =" y "lower(btrim(email))" y no protege de nada.
+    --
+    -- Se compara la definición COMPLETA contra una lista explícita, y si no es
+    -- una de ellas se sustituye. Solo se toca el constraint con NUESTRO nombre:
+    -- cualquier otro que haya en la tabla se queda donde está.
+    select pg_catalog.pg_get_constraintdef(c.oid), c.convalidated
+      into v_def, v_valido
       from pg_catalog.pg_constraint c
      where c.conrelid = v_oid
        and c.conname = 'reservas_alta_email_normalizado_ck';
 
-    if v_def is null then
-      -- No está. Antes de añadirlo se mira si TODAS las filas ya cumplen: si
-      -- alguna no, se aborta. No se reescribe el correo de nadie.
-      select count(*) into v_malas
-        from public.reservas_alta
-       where email is distinct from lower(btrim(email));
-      if v_malas > 0 then
-        raise exception
-          'public.reservas_alta: % fila(s) con el correo sin normalizar. Revisarlas a mano antes de migrar: no se reescriben automáticamente.',
-          v_malas;
+    if v_def is not null then
+      -- `NOT VALID` viene pegado al final de la definición; la validez se mira
+      -- aparte, con convalidated, que es el dato y no su representación.
+      v_norm := regexp_replace(lower(v_def), '\s+', '', 'g');
+      v_norm := regexp_replace(v_norm, 'notvalid$', '');
+      if not (v_norm = any (v_admitidas)) then
+        raise notice 'reservas_alta: el check existente no es el del contrato (%), se sustituye', v_def;
+        alter table public.reservas_alta
+          drop constraint reservas_alta_email_normalizado_ck;
+        v_def := null;
       end if;
+    end if;
+
+    if v_def is null then
       alter table public.reservas_alta
         add constraint reservas_alta_email_normalizado_ck
         check (email = lower(btrim(email)));
-      raise notice 'reservas_alta: check de normalización añadido';
-    else
-      -- Está. Que se llame igual no basta: tiene que DECIR lo mismo.
-      if position('lower(btrim(email))' in regexp_replace(lower(v_def), '\s+', '', 'g')) = 0
-         or position('email=' in regexp_replace(lower(v_def), '\s+', '', 'g')) = 0 then
-        raise exception
-          'public.reservas_alta: el constraint reservas_alta_email_normalizado_ck existe pero dice otra cosa: %', v_def;
-      end if;
+      raise notice 'reservas_alta: check de normalización puesto';
+    elsif not v_valido then
+      -- ⚠️ UN CHECK `NOT VALID` NO CUMPLE EL CONTRATO: existe, se lee igual, y
+      -- no garantiza nada sobre lo que ya había. Las filas ya se han comprobado
+      -- arriba, así que validarlo es seguro.
+      alter table public.reservas_alta
+        validate constraint reservas_alta_email_normalizado_ck;
+      raise notice 'reservas_alta: check existente VALIDADO';
     end if;
   end if;
 end
@@ -208,12 +267,23 @@ revoke all privileges on table public.reservas_alta from PUBLIC;
 revoke all privileges on table public.reservas_alta from anon;
 revoke all privileges on table public.reservas_alta from authenticated;
 
+-- ⚠️ TAMBIÉN A service_role, Y ANTES DE CONCEDERLE. Un `grant select, insert`
+-- suma: no quita lo que ya tuviera. Si por un default privilege histórico de
+-- Supabase arrastraba UPDATE o DELETE, se quedaban puestos y la migración
+-- dejaba un estado distinto según cómo estuviera la base antes. Revocando
+-- primero, el estado FINAL es el mismo salga de donde salga.
+revoke all privileges on table public.reservas_alta from service_role;
+
 -- ⚠️ RLS Y GRANTS SON DOS CAPAS DISTINTAS. Que service_role eluda RLS no le da
 -- privilegios de tabla: esos se conceden aquí, explícitamente, y solo los dos
 -- que usa api/_acceso.js —INSERT con return=representation, y el SELECT de la
 -- reserva ganadora cuando pierde la carrera—. Nada de depender de los default
 -- privileges históricos de Supabase, que pueden no estar.
 grant select, insert on table public.reservas_alta to service_role;
+
+-- El default, canonicalizado. Idempotente: si ya era `now()`, esto no cambia
+-- nada; si era otra cosa, la deja en el contrato. No toca ninguna fila.
+alter table public.reservas_alta alter column creado set default now();
 
 comment on table public.reservas_alta is
   'Reserva del uuid de propietario para un correo que aún no tiene cuenta. La clave primaria sobre el correo es lo que impide que dos peticiones simultáneas reserven dos propietarios distintos. La cuenta se crea al canjear el enlace, no aquí.';
