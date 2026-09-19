@@ -27,6 +27,16 @@
 -- Esta tabla no toca nada existente y solo la usa el alta por enlace.
 --
 -- IDEMPOTENTE: se puede ejecutar las veces que haga falta.
+--
+-- ⚠️ EJECUTADA EN PRODUCCIÓN EL 19-sep-2026, en dos tiempos: primero el
+-- `create table` (sin los permisos, que faltaban en la primera versión de este
+-- fichero) y después el bloque de permisos, con la tabla todavía VACÍA y el
+-- código sin desplegar. Verificado por consulta: `anon` y `authenticated` ya no
+-- aparecen en `information_schema.role_table_grants`.
+--
+-- ⚠️ Y `create table if not exists` NO VALIDA LA FORMA: si ya existiera una
+-- tabla con este nombre y otras columnas, no lanzaría y esto parecería correcto.
+-- Comprobarlo con la consulta de más abajo, no darlo por hecho.
 
 create table if not exists reservas_alta (
   -- El correo NORMALIZADO (minúsculas, sin espacios), tal y como lo normaliza
@@ -38,8 +48,45 @@ create table if not exists reservas_alta (
   creado         timestamptz not null default now()
 );
 
+-- ── PERMISOS: NADIE MÁS QUE EL SERVIDOR ──────────────────────────────────
+-- Lo único que hay en esta tabla son CORREOS de gente que ha pedido un enlace
+-- y todavía no tiene cuenta. No hay otro dato. Una tabla nueva en `public` la
+-- enruta PostgREST, así que sin esto la lista de correos queda alcanzable con
+-- la clave anon.
+--
+-- Mismo criterio que db/congelar-lamina-riego-2026-09-14.sql, donde ya se
+-- decidió que duplicar el agujero de RLS que arrastran las tablas viejas no
+-- tiene defensa. El backend habla con la service_role, que ignora RLS: no se
+-- le añade ninguna política porque no necesita ninguna, y así nadie más entra.
+revoke all on reservas_alta from public, anon, authenticated;
+alter table reservas_alta enable row level security;
+
+-- PostgREST cachea el esquema. Sin recargarlo, el primer INSERT contra una
+-- tabla recién creada puede fallar con 42P01 —"no existe"— aunque exista.
+notify pgrst, 'reload schema';
+
 comment on table reservas_alta is
   'Reserva del uuid de propietario para un correo que aún no tiene cuenta. La clave primaria sobre el correo es lo que impide que dos peticiones simultáneas reserven dos propietarios distintos. La cuenta se crea al canjear el enlace, no aquí.';
+
+-- ── Comprobaciones, solo lectura ──────────────────────────────────────────
+-- Después de ejecutar, estas cuatro dicen si quedó bien. La primera es la que
+-- descarta una tabla previa incompatible, y no es opcional.
+--
+--   select column_name, data_type, is_nullable
+--     from information_schema.columns where table_name = 'reservas_alta';
+--   -- email text NO · propietario_id uuid NO · creado timestamptz NO
+--
+--   select a.attname from pg_index i join pg_attribute a
+--       on a.attrelid = i.indrelid and a.attnum = any(i.indkey)
+--    where i.indrelid = 'reservas_alta'::regclass and i.indisprimary;
+--   -- tiene que ser `email`: ahí vive la exclusión
+--
+--   select grantee, privilege_type from information_schema.role_table_grants
+--    where table_name = 'reservas_alta';
+--   -- NI anon NI authenticated
+--
+--   select relrowsecurity from pg_class where relname = 'reservas_alta';
+--   -- true
 
 -- ── Higiene ───────────────────────────────────────────────────────────────
 -- Una reserva cuyo propietario YA existe en `usuarios` ha cumplido su función.

@@ -779,6 +779,18 @@ console.log("\n── la migración y el código dicen lo mismo ──");
   ok(/propietario_id\s+uuid\s+not null/i.test(mig), "con el propietario reservado, obligatorio");
   ok(!/unique\s*\(\s*email\s*\)/i.test(mig) || !/on\s+usuarios/i.test(mig),
      "y NO se impone unique(email) sobre usuarios: las zonas legacy comparten correo");
+  // ⚠️ LO ÚNICO QUE HAY EN ESA TABLA SON CORREOS. Una tabla nueva en `public` la
+  // enruta PostgREST, así que sin revocar permisos la lista queda alcanzable con
+  // la clave anon. La primera versión de esta migración se ejecutó sin estas dos
+  // líneas y hubo que cerrarlo después, con la tabla ya creada.
+  ok(/revoke all on reservas_alta from public, anon, authenticated/i.test(mig),
+     "se revocan los permisos de anon y authenticated");
+  ok(/alter table reservas_alta enable row level security/i.test(mig),
+     "y se activa RLS: el backend va con service_role, que la ignora");
+  ok(/notify pgrst, 'reload schema'/i.test(mig),
+     "y se recarga la caché de esquema, o el primer INSERT daría 42P01");
+  ok(/column_name.*information_schema\.columns/is.test(mig),
+     "la migración lleva su comprobación de forma: `if not exists` no valida columnas");
 
   const src = readFileSync(join(RAIZ, "api", "_acceso.js"), "utf8");
   ok(/supabaseInsert\("reservas_alta",\s*\{ email, propietario_id/.test(src),
